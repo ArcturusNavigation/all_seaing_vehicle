@@ -49,7 +49,7 @@ class FollowBuoyPID(ActionServerBase):
 
 
         pid_vals = (
-            self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
+            self.declare_parameter("pid_vals", [0.005, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
@@ -122,14 +122,18 @@ class FollowBuoyPID(ActionServerBase):
 
 
     def intrinsics_callback(self, msg):
+        #self.get_logger().info("camera info sub works")
         self.height = msg.height
         self.width = msg.width
 
     def bbox_callback(self, msg):
+        #self.get_logger().info("bbox sub works")
         self.bboxes = msg.boxes
 
     def control_loop(self):
+        #self.get_logger().info("follow buoy pid lopigngngngjskafdalj")
         if self.width is None or len(self.bboxes) == 0:
+            #self.get_logger().info("hi")
             return
         
 
@@ -158,14 +162,17 @@ class FollowBuoyPID(ActionServerBase):
         # if we see neither, log + kill
         # if red_center_x is None or green_center_x is None:
         #     if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
-        #         self.get_logger().info("no more buoys killing")
+        #         #self.get_logger().info("no more buoys killing")
         #         self.result = True
         #     return
 
-        
+        #self.get_logger().info(f"red center {red_center_x},")
+        angular_none = False
         if red_center_x is None and green_center_x is None:
+            angular_none = True
+
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
-                self.get_logger().info("no more buoys killing")
+                #self.get_logger().info("no more buoys killing")
                 self.result = True
             return
         else:
@@ -182,10 +189,15 @@ class FollowBuoyPID(ActionServerBase):
 
         # self.width / 2.0 is img ctr
         offset = gate_ctr - self.width / 2.0
+        #self.get_logger().info(f'offset: {offset}')
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
         yaw_rate = self.pid.get_effort()
+        if yaw_rate <= 0:
+            yaw_rate = max(yaw_rate * 1.8, -self.max_yaw_rate)
+        if angular_none:
+            yaw_rate = 0
         self.prev_update_time = self.get_clock().now()
 
         control_msg = ControlOption()
@@ -193,6 +205,7 @@ class FollowBuoyPID(ActionServerBase):
         control_msg.twist.linear.x = float(self.forward_speed)
         control_msg.twist.linear.y = 0.0
         control_msg.twist.angular.z = float(yaw_rate)
+
         self.control_pub.publish(control_msg)
 
     def execute_callback(self, goal_handle):

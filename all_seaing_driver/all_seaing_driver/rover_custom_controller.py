@@ -4,7 +4,11 @@ import rclpy
 from rclpy.node import Node
 import time
 
-from all_seaing_interfaces.msg import ControlOption, Heartbeat
+from all_seaing_interfaces.msg import (
+    ControlOption, 
+    Heartbeat, 
+    KeyboardButton
+)
 from all_seaing_interfaces.srv import GetEstopStatus
 
 TIMER_PERIOD = 1 / 30
@@ -29,6 +33,7 @@ class RoverCustomController(Node):
 
         self.timer = self.create_timer(TIMER_PERIOD, self.timer_callback)
 
+        self.keyboard_publisher = self.create_publisher(KeyboardButton, "keyboard_button", 10)
         self.estop_cli = self.create_client(GetEstopStatus, "get_estop_status")
         while not self.estop_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("GetEstopStatus service not available, waiting again...")
@@ -43,17 +48,22 @@ class RoverCustomController(Node):
     def process_response(self, future):
         result = future.result()
 
-        new_mode = result.mode
+        new_mode = bool(result.mode)
         if new_mode != self.heartbeat_message.in_teleop:
-            self.get_logger().info(f"Toggled teleop (now {self.heartbeat_message.in_teleop})")
+            self.get_logger().info(f"Toggled teleop (now {new_mode})")
 
-        self.heartbeat_message.in_teleop = bool(new_mode)
+        keyboard_msg = KeyboardButton()
+        if new_mode != self.heartbeat_message.in_teleop and new_mode == 0:
+            keyboard_msg.key = "p"
+        else:
+            keyboard_msg.key = "0"
+        self.keyboard_publisher.publish(keyboard_msg)
+
+        self.heartbeat_message.in_teleop = new_mode
         self.heartbeat_message.e_stopped = result.is_estopped
+        self.heartbeat_publisher.publish(self.heartbeat_message)
 
         if self.heartbeat_message.in_teleop and not self.heartbeat_message.e_stopped:
-            self.heartbeat_publisher.publish(self.heartbeat_message)
-
-        if not self.heartbeat_message.e_stopped:
             self.send_controls(result)
 
     def send_controls(self, result):
