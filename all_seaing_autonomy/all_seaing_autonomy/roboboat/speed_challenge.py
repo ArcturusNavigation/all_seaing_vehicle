@@ -374,6 +374,8 @@ class SpeedChallenge(TaskServerBase):
 
         self.get_logger().info('going back to the gate')
         self.move_to_point(self.gate_wpt, busy_wait=True,
+            goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, -self.forward_dist_back)))
+        self.move_to_point(self.gate_wpt, busy_wait=True,
             goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, self.forward_dist_back)))
         # self.move_to_point(self.home_pos, busy_wait=True)
         return Task.Result(success=True)
@@ -577,6 +579,7 @@ class SpeedChallenge(TaskServerBase):
                 self.gate_pair = InternalBuoyPair(red_to, green_to)
             else:
                 self.gate_pair = InternalBuoyPair(green_to, red_to)
+            self.get_logger().info(f'FOUND GATE')
             return True
 
     def ccw(self, a, b, c):
