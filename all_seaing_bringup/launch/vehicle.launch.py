@@ -105,7 +105,7 @@ def launch_setup(context, *args, **kwargs):
 
     rover_lora_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
-        executable="rover_lora_controller.py",
+        executable="rover_lora_combined.py",
         output="screen",
     )
 

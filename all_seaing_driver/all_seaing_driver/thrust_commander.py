@@ -26,10 +26,10 @@ class ThrustCommander(Node):
         self.prev_heartbeat = self.get_clock().now()
         self.e_stopped = False
 
-        self.front_right_sub = self.create_subscription(
-            Float64, "thrusters/front_right/thrust", self.front_right_cb, 10)
-        self.front_left_sub = self.create_subscription(
-            Float64, "thrusters/front_left/thrust", self.front_left_cb, 10)
+#        self.front_right_sub = self.create_subscription(
+#            Float64, "thrusters/front_right/thrust", self.front_right_cb, 10)
+#        self.front_left_sub = self.create_subscription(
+#            Float64, "thrusters/front_left/thrust", self.front_left_cb, 10)
         self.back_right_sub = self.create_subscription(
             Float64, "thrusters/back_right/thrust", self.back_right_cb, 10)
         self.back_left_sub = self.create_subscription(
