@@ -188,7 +188,6 @@ def generate_launch_description():
         ],
     )
 
-
     waypoint_finder = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="waypoint_finder.py",
