@@ -1,8 +1,8 @@
 clustering_color_weights: [1.0, 0.0, 0.0]
-clustering_color_thres: 5
+clustering_color_thres: 5000
 cluster_contour_distance_weight: 100.0
-cluster_contour_color_weights: [10.0, 0.0, 0.0]
-contour_detection_color_weights: [500.0, 0.0, 0.0]
+cluster_contour_color_weights: [0.0, 0.0, 0.0]
+contour_detection_color_weights: [0.0, 0.0, 0.0]
 cluster_contour_size_weight: 0.0
 cluster_distance_weight: 100000.0
 cluster_area_ratio_weight: 250000.0
