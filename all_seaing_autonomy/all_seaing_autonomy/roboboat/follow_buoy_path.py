@@ -159,10 +159,10 @@ class FollowBuoyPath(ActionServerBase):
             self.red_labels.add(label_mappings["red_buoy"])
             self.red_labels.add(label_mappings["red_circle"])
             self.red_labels.add(label_mappings["red_pole_buoy"])
-            self.red_labels.add(label_mappings["yellow_buoy"])
-            self.red_labels.add(label_mappings["yellow_racquet_ball"])
-            # self.green_beacon_labels.add(label_mappings["yellow_buoy"])
-            # self.green_beacon_labels.add(label_mappings["yellow_racquet_ball"])
+            # self.red_labels.add(label_mappings["yellow_buoy"])
+            # self.red_labels.add(label_mappings["yellow_racquet_ball"])
+            self.green_beacon_labels.add(label_mappings["yellow_buoy"])
+            self.green_beacon_labels.add(label_mappings["yellow_racquet_ball"])
         
         self.sent_waypoints = set()
 

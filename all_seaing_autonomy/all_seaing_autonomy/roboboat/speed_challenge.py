@@ -145,10 +145,12 @@ class SpeedChallenge(ActionServerBase):
                 self.blue_labels.add(label_mappings[buoy_label])
             for buoy_label in ["red_buoy", "red_circle", "red_racquet_ball"]:
                 self.red_labels.add(label_mappings[buoy_label])
-                self.blue_labels.add(label_mappings[buoy_label])
+                # self.blue_labels.add(label_mappings[buoy_label])
             for buoy_label in ["green_buoy", "green_circle"]:
                 self.green_labels.add(label_mappings[buoy_label])
                 # self.blue_labels.add(label_mappings[buoy_label])
+            for buoy_label in ["yellow_buoy", "yellow_racquet_ball"]:
+                self.blue_labels.add(label_mappings[buoy_label])
 
         self.obstacles = []
 

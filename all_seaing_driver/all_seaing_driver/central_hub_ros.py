@@ -97,11 +97,12 @@ class CentralHubROS(Node):
     def battery_check(self):
         current_voltage = self.bms.stack_voltage()
         # self.get_logger().warn(f"Voltage: {current_voltage}V")
-        if current_voltage < self.low_battery_threshold and not self.estop.manual():
-            if not self.battery_ack:
-                self.get_logger().warn(f"Warning: battery is low! {current_voltage}V < {self.low_battery_threshold}V")
-                self.get_logger().warn("Please run the command: ros2 service call /acknowledge_low_battery all_seaing_interfaces/srv/AcknowledgeLowBattery \"{ack: true}\" in order to continue")
-                return False
+        # if current_voltage < self.low_battery_threshold and not self.estop.manual():
+        #     if not self.battery_ack:
+        #         self.get_logger().warn(f"Warning: battery is low! {current_voltage}V < {self.low_battery_threshold}V")
+        #         self.get_logger().warn("Please run the command: ros2 service call /acknowledge_low_battery all_seaing_interfaces/srv/AcknowledgeLowBattery \"{ack: true}\" in order to continue")
+        #         return False
+        # return True
         return True
 
     def cmd_servo_cb(self, request, response):
@@ -137,6 +138,7 @@ class CentralHubROS(Node):
         # TODO: Implement side strafe using drive x2 and y2 (add those to the .srv as well)
         response.is_connected = bool(self.estop.connected())
         response.is_estopped = bool(self.main_pow.estop())
+        # self.get_logger().info(f'{response.mode, response.is_connected, response.is_estopped}')
 
         # Added a field in GetEstopStatus to check if the battery is okay
         response.battery_ok = self.battery_check()
