@@ -209,7 +209,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"joy_x_scale": -1.0},
             {"joy_ang_scale": 0.3},
-            {"serial_port": "/dev/ttyACM0"},
+            {"serial_port": "/dev/ttyACM1"},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -289,7 +289,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM0"}],
+        parameters=[{"port": "/dev/ttyACM1"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -310,7 +310,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -376,7 +376,7 @@ def launch_setup(context, *args, **kwargs):
         task_init_server, 
         follow_buoy_path,
         grid_map_generator,
-        central_hub,
+        #central_hub,
         amcl_ld,
         static_transforms_ld,
         #webcam_publisher,
