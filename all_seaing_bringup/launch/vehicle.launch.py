@@ -118,34 +118,10 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"forward_speed": 1.2},
             {"max_yaw": 0.2},
-            {"pid_vals": [0.0006, 0.0, 0.0001]},
+            {"pid_vals": [0.0009, 0.0, 0.0003]},
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
-        ],
-    )
-
-    speed_challenge_pid = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="speed_challenge_pid.py",
-        parameters=[
-            {"is_sim": False},
-            {"color_label_mappings_file": color_label_mappings},
-            {"forward_speed": 1.2},
-            {"max_yaw": 0.25},
-            {"pid_vals": [0.0003, 0.0, 0.00005]},
-            {"straight_pid_vals": [0.001, 0.0, 0.0001]},
-            {"blue_pid_vals": [0.0008, 0.0, 0.0001]},
-        ],
-        remappings=[
-            (
-                "camera_info",
-                "/zed/zed_node/rgb/camera_info"
-            ),
-            (
-                "imu",
-                "/mavros/imu/data",
-            )
         ],
     )
 
@@ -247,7 +223,7 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_custom_controller.py",
         parameters=[
             {"joy_x_scale": -1.8},
-            {"joy_ang_scale": 0.25},
+            {"joy_ang_scale": 0.2},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -260,7 +236,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 1},
+            {"video_index": 0},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -326,10 +302,15 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{"is_sim": False}],
     )
 
+    delivery_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="delivery_server.py",
+    )
+
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM0"}],
+        parameters=[{"port": "/dev/ttyACM2"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -350,7 +331,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -407,7 +388,7 @@ def launch_setup(context, *args, **kwargs):
         #obstacle_detector_node,
         #point_cloud_filter_node,
         rover_custom_controller,
-        rover_lora_controller,
+        #rover_lora_controller,
         #rviz_waypoint_sender,
         thrust_commander_node,
         buoy_yolo_node,
@@ -416,10 +397,10 @@ def launch_setup(context, *args, **kwargs):
         #task_init_server, 
         #follow_buoy_path,
         #follow_buoy_pid,
-        #speed_challenge_pid,
+        #delivery_server,
         #grid_map_generator,
         central_hub,
-        #amcl_ld,
+        amcl_ld,
         static_transforms_ld,
         #webcam_publisher,
         #lidar_ld,
