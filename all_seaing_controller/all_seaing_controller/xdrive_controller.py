@@ -67,7 +67,7 @@ class XDriveController(Node):
         self.thrust_forces = np.array([
             [thrust_force_x, thrust_force_x, thrust_force_x, thrust_force_x],
             [thrust_force_y, thrust_force_y, -thrust_force_y, -thrust_force_y],
-            [thrust_torque[0], -thrust_torque[1], -thrust_torque[2], thrust_torque[3]],
+            [-thrust_torque[0], -thrust_torque[1], thrust_torque[2], thrust_torque[3]],
         ])
 
         #--------------- SUBSCRIBERS, PUBLISHERS, AND TIMERS ---------------#

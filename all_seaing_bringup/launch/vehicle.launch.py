@@ -54,7 +54,7 @@ def launch_setup(context, *args, **kwargs):
                 "thruster_angle": 67.5,
                 "drag_constants": [50.0, 50.0, 200.0],
                 "output_range": [1100.0, 1900.0],
-                "smoothing_factor": 0.95,
+                "smoothing_factor": 0.8,
             }
         ],
     )

@@ -78,10 +78,10 @@ class ThrustCommander(Node):
         time_since_last_heartbeat = (self.get_clock().now() - self.prev_heartbeat).nanoseconds / 1e9
 
         if time_since_last_heartbeat > self.heartbeat_threshold and not self.e_stopped:
-            self.get_logger().warning("Lost heartbeat! Entering e-stop mode.")
             self.e_stopped = True
 
         if self.e_stopped:
+            self.get_logger().warning("Lost heartbeat! Entering e-stop mode.")
             self.turn_off_thrusters()
         
         self.send_pwm(self.front_right_port, self.front_right_command)
