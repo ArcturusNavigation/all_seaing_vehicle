@@ -135,7 +135,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            {"range_radius": [0.5, 100000.0]},
+            {"range_radius": [0.5, 60.0]},
         ],
         condition=UnlessCondition(use_bag),
     )
@@ -207,8 +207,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
         parameters=[
-            {"joy_x_scale": -1.0},
-            {"joy_ang_scale": 0.3},
+            {"joy_x_scale": -1.8},
+            {"joy_ang_scale": 0.2},
         ],
         condition=IfCondition(
             PythonExpression([

@@ -7,8 +7,7 @@ import time
 from all_seaing_interfaces.msg import ControlOption, Heartbeat
 from all_seaing_interfaces.srv import GetEstopStatus
 
-HEART_RATE = 1
-CONTROL_RATE = 1 / 30
+TIMER_PERIOD = 1 / 30
 
 class RoverCustomController(Node):
     def __init__(self):
@@ -28,44 +27,41 @@ class RoverCustomController(Node):
         self.heartbeat_message.in_teleop = True
         self.heartbeat_message.e_stopped = False
 
-        self.heartbeat_timer = self.create_timer(HEART_RATE, self.heart_timer_callback)
-        self.controls_timer = self.create_timer(CONTROL_RATE, self.controls_timer_callback)
+        self.timer = self.create_timer(TIMER_PERIOD, self.timer_callback)
 
         self.estop_cli = self.create_client(GetEstopStatus, "get_estop_status")
         while not self.estop_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("GetEstopStatus service not available, waiting again...")
-            time.sleep(CONTROL_RATE)
+            time.sleep(TIMER_PERIOD)
 
         self.result = None
 
-    def heart_timer_callback(self):
+    def timer_callback(self):
         self.future = self.estop_cli.call_async(GetEstopStatus.Request())
-        rclpy.spin_until_future_complete(self, self.future)
-        self.result = self.future.result()
+        self.future.add_done_callback(self.process_response)
 
-        new_mode = bool(self.result.mode)
+    def process_response(self, future):
+        result = future.result()
+
+        new_mode = result.mode
         if new_mode != self.heartbeat_message.in_teleop:
             self.get_logger().info(f"Toggled teleop (now {self.heartbeat_message.in_teleop})")
 
-        self.heartbeat_message.in_teleop = new_mode
-        self.heartbeat_message.e_stopped = bool(self.result.is_estopped)
+        self.heartbeat_message.in_teleop = bool(new_mode)
+        self.heartbeat_message.e_stopped = result.is_estopped
 
         if self.heartbeat_message.in_teleop and not self.heartbeat_message.e_stopped:
             self.heartbeat_publisher.publish(self.heartbeat_message)
 
-    def controls_timer_callback(self):
         if not self.heartbeat_message.e_stopped:
-            self.send_controls()
+            self.send_controls(result)
 
-    def send_controls(self):
-        if self.result is None:
-            return
-
+    def send_controls(self, result):
         control_option = ControlOption()
         control_option.priority = 0  # TeleOp has the highest priority value
-        control_option.twist.linear.x = self.result.drive_y * self.joy_x_scale
+        control_option.twist.linear.x = result.drive_y * self.joy_x_scale
         control_option.twist.linear.y = 0.0
-        control_option.twist.angular.z = self.result.drive_x * self.joy_ang_scale
+        control_option.twist.angular.z = result.drive_x * self.joy_ang_scale
         self.control_option_pub.publish(control_option)
 
 
