@@ -236,7 +236,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 1},
+            {"video_index": 0},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -300,6 +300,11 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_autonomy",
         executable="task_init.py",
         parameters=[{"is_sim": False}],
+    )
+
+    delivery_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="delivery_server.py",
     )
 
     central_hub = launch_ros.actions.Node(
@@ -375,13 +380,13 @@ def launch_setup(context, *args, **kwargs):
         control_mux,
         controller_node,
         controller_server,
-        ekf_node,
-        navsat_node,
+        #ekf_node,
+        #navsat_node,
         navigation_server,
-        obstacle_bbox_overlay_node,
-        obstacle_bbox_visualizer_node,
-        obstacle_detector_node,
-        point_cloud_filter_node,
+        #obstacle_bbox_overlay_node,
+        #obstacle_bbox_visualizer_node,
+        #obstacle_detector_node,
+        #point_cloud_filter_node,
         rover_custom_controller,
         rover_lora_controller,
         rviz_waypoint_sender,
@@ -390,13 +395,14 @@ def launch_setup(context, *args, **kwargs):
         shape_yolo_node,
         run_tasks,
         task_init_server, 
-        # follow_buoy_path,
+        #follow_buoy_path,
         follow_buoy_pid,
-        grid_map_generator,
+        delivery_server,
+        #grid_map_generator,
         central_hub,
         amcl_ld,
         static_transforms_ld,
-        #webcam_publisher,
+        webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,

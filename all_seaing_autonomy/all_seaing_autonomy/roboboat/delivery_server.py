@@ -11,7 +11,7 @@ from all_seaing_interfaces.srv import CommandAdj, CommandServo
 
 import time
 
-TIMER_PERIOD = 1 / 30
+TIMER_PERIOD = 1 / 2
 SERVO_HALF_RANGE = 90.0
 
 class DeliveryServer(ActionServerBase):
@@ -115,10 +115,17 @@ class DeliveryServer(ActionServerBase):
         else:
             self.prev_update_time = self.get_clock().now()
             self.aim_pid.reset()
-            req = CommandServo.Request()
-            req.enable = False
-            req.port = 2
-            self.command_servo_cli.call_async(req)
+            #req = CommandServo.Request()
+            #req.enable = False
+            #req.port = 2
+            #self.command_servo_cli.call_async(req)
+
+            req = CommandAdj.Request()
+            req.enable = True
+            req.port = 1
+            req.voltage = 12.0
+            self.command_adj_cli.call_async(req)
+
 
     def bbox_callback(self, msg):
         # TODO: this won't work since you're subscribing to 2d array

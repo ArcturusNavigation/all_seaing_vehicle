@@ -1,4 +1,5 @@
 import struct
+import time
 
 class LED:
     def __init__(self, ser):

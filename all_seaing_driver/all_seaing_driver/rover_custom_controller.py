@@ -11,7 +11,7 @@ from all_seaing_interfaces.msg import (
 )
 from all_seaing_interfaces.srv import GetEstopStatus
 
-TIMER_PERIOD = 1 / 30
+TIMER_PERIOD = 1 / 2
 
 class RoverCustomController(Node):
     def __init__(self):
