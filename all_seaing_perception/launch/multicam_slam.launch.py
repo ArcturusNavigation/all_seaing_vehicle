@@ -14,6 +14,7 @@ from launch_ros.actions import SetRemap
 import os
 import yaml
 import xacro
+import numpy as np
 
 def launch_setup(context, *args, **kwargs):
     driver_prefix = get_package_share_directory("all_seaing_driver")
@@ -93,7 +94,7 @@ def launch_setup(context, *args, **kwargs):
             ("odom_topic", "/mavros/local_position/odom")
         ],
         parameters=[
-
+            {"yaw_offset": np.pi/2.0},
         ]
     )
 
@@ -304,7 +305,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
     )
 

@@ -12,12 +12,14 @@ object_tracking_map:
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 0.01 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 10.0
-    update_gps_xy_uncertainty: 60.0
+    # update_gps_xy_uncertainty: 60.0 # for combination with unlabeled
+    update_gps_xy_uncertainty: 25.0 # when only labeled
     include_odom_theta: True
     include_odom_only_theta: False
     rotate_odom: False
     update_odom_theta_uncertainty: 0.01
-    new_object_slam_threshold: 0.03
+    # new_object_slam_threshold: 0.03 # for combination with unlabeled
+    new_object_slam_threshold: 1.0 # for only labeled i.e. slower & less accurate
     init_xy_noise: 0.7
     init_theta_noise: 0.25
     init_new_cov: 50.0
@@ -26,7 +28,7 @@ object_tracking_map:
     gps_update: True
     direct_tf: False
     is_sim: False
-    data_association: "greedy_exclusive_measurement_var" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
+    data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0
     include_unlabeled: True
     unlabeled_association_threshold: 0.01

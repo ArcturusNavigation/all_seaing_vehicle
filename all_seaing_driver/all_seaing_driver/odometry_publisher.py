@@ -91,8 +91,9 @@ class OdometryPublisher(Node):
             # convert gps lat/lon to reference frame coordinates
             delta = geopy.distance.geodesic((self.datum_lat, self.datum_lon), (lat, lon)).meters
             heading = np.arctan2(lon-self.datum_lon, lat-self.datum_lat)
-            dx = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
-            dy = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
+            # TODO: hotfix or real? should be swapped
+            dy = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
+            dx = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
         else:
             dx = self.pos_odom_msg.pose.pose.position.x
             dy = self.pos_odom_msg.pose.pose.position.y
