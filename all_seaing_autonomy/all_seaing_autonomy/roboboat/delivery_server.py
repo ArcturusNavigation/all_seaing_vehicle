@@ -11,7 +11,7 @@ from all_seaing_interfaces.srv import CommandAdj, CommandServo
 
 import time
 
-TIMER_PERIOD = 1 / 2
+TIMER_PERIOD = 1 / 10
 SERVO_HALF_RANGE = 90.0
 
 class DeliveryServer(ActionServerBase):
@@ -23,7 +23,7 @@ class DeliveryServer(ActionServerBase):
         # --------------- PARAMETERS ---------------#
 
         Kpid = (
-            self.declare_parameter("Kpid", [0.1, 0.0, 0.0])
+            self.declare_parameter("Kpid", [0.18, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
@@ -48,7 +48,7 @@ class DeliveryServer(ActionServerBase):
             .double_value
         )
         self.object_delivery_time = (
-            self.declare_parameter("object_delivery_time", 20.0)
+            self.declare_parameter("object_delivery_time", 10.0)
             .get_parameter_value()
             .double_value
         )
@@ -169,14 +169,14 @@ class DeliveryServer(ActionServerBase):
         req.enable = True
         req.port = 2
         req.voltage = 5.0
-        #self.command_adj_cli.call_async(req)
+        self.command_adj_cli.call_async(req)
 
         # Turn on ball shooter feeding servo
         req = CommandServo.Request()
         req.enable = True
         req.angle = 0
         req.port = 1
-        #self.command_servo_cli.call_async(req)
+        self.command_servo_cli.call_async(req)
         self.is_aiming = True
 
         # Aim until a ball is launched or timed out
@@ -190,13 +190,13 @@ class DeliveryServer(ActionServerBase):
         req = CommandAdj.Request()
         req.enable = False
         req.port = 2
-        #self.command_adj_cli.call_async(req)
+        self.command_adj_cli.call_async(req)
 
         # Turn off ball shooter feeding servo
         req = CommandServo.Request()
         req.enable = False
         req.port = 1
-        #self.command_servo_cli.call_async(req)
+        self.command_servo_cli.call_async(req)
         self.is_aiming = False
 
         self.end_process("Object delivery completed!")

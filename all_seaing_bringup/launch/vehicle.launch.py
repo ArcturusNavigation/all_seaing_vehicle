@@ -397,7 +397,7 @@ def launch_setup(context, *args, **kwargs):
         #task_init_server, 
         #follow_buoy_path,
         follow_buoy_pid,
-        #delivery_server,
+        delivery_server,
         #grid_map_generator,
         central_hub,
         amcl_ld,
