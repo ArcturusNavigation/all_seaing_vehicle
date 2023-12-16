@@ -14,7 +14,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 
 # ros messages
-find_package(rosidl_default_generators REQUIRED)
+find_package(all_seaing_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -23,12 +23,6 @@ find_package(geometry_msgs REQUIRED)
 install(DIRECTORY
     launch
     DESTINATION share/${PROJECT_NAME}
-)
-
-# generate messages
-rosidl_generate_interfaces(${PROJECT_NAME}
-    "msg/ASVState.msg"
-    DEPENDENCIES std_msgs
 )
 
 ament_python_install_package(${PROJECT_NAME})
