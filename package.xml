@@ -1,18 +1,32 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>all_seaing_vehicle</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="toyatakahashi522@gmail.com">toyat</maintainer>
-  <license>TODO: License declaration</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
+    <name>all_seaing_vehicle</name>
+    <version>0.0.0</version>
+    <description>General autonomy code base for MIT Arcturus Robotics</description>
+    <maintainer email="arcturus-logistics@mit.edu">arcturus</maintainer>
+    <license>MIT</license>
 
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
+    <!-- ament build system dependencies -->
+    <buildtool_depend>ament_cmake</buildtool_depend>
+    <test_depend>ament_lint_auto</test_depend>
+    <test_depend>ament_lint_common</test_depend>
+    <export><build_type>ament_cmake</build_type></export>
 
-  <export>
-    <build_type>ament_cmake</build_type>
-  </export>
+    <!-- ros2 interface build dependencies -->
+    <buildtool_depend>rosidl_default_generators</buildtool_depend>
+    <build_depend>builtin_interfaces</build_depend>
+    <exec_depend>rosidl_default_runtime</exec_depend>
+    <member_of_group>rosidl_interface_packages</member_of_group>
+
+    <!-- message dependencies -->
+    <depend>std_msgs</depend>
+    <depend>mavros_msgs</depend>
+    <depend>geometry_msgs</depend>
+
+    <!-- general package dependencies -->
+    <depend>rclcpp</depend>
+    <depend>rclpy</depend>
+
 </package>
