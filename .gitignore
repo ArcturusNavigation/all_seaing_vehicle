@@ -1,0 +1,20 @@
+# Project files
+.DS_Store
+.DS_Store?
+.cproject
+.project
+.pydevproject
+*.pyc
+__pycache__/
+
+# ROS
+install/
+log/
+build/
+*.db3
+*.bag
+*settings.yaml
+COLCON_IGNORE
+
+# VSCode
+.vscode
