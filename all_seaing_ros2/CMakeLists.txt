@@ -28,7 +28,7 @@ install(DIRECTORY
 ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS
-    src/controller/pwm_sender.py
+    src/navigation/pwm_sender.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
