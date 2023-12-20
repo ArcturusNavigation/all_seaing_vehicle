@@ -2,26 +2,30 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
 
+    <!-- METADATA -->
     <name>all_seaing_vehicle</name>
     <version>0.0.0</version>
     <description>General autonomy code base for MIT Arcturus Robotics</description>
     <maintainer email="arcturus-logistics@mit.edu">arcturus</maintainer>
     <license>MIT</license>
 
-    <!-- ament build system dependencies -->
+    <!-- BUILD SYSTEM DEPENDENCIES -->
     <buildtool_depend>ament_cmake</buildtool_depend>
     <test_depend>ament_lint_auto</test_depend>
     <test_depend>ament_lint_common</test_depend>
     <export><build_type>ament_cmake</build_type></export>
 
-    <!-- message dependencies -->
+    <!-- MESSAGE DEPENDENCIES -->
     <depend>all_seaing_interfaces</depend>
     <depend>std_msgs</depend>
-    <depend>mavros_msgs</depend>
+    <depend>sensor_msgs</depend>
     <depend>geometry_msgs</depend>
+    <depend>nav_msgs</depend>
+    <depend>mavros_msgs</depend>
 
-    <!-- general package dependencies -->
+    <!-- GENERAL PACKAGE DEPENDENCIES -->
     <depend>rclcpp</depend>
     <depend>rclpy</depend>
+    <depend>tf2</depend>
 
 </package>
