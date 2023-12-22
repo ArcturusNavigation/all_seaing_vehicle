@@ -14,10 +14,11 @@ find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/ASVState.msg"
-    "msg/MOOSCommand.msg"
+    "msg/ControlMessage.msg"
+    "msg/GoalState.msg"
     "msg/LabeledBoundingBox2D.msg"
     "msg/LabeledBoundingBox2DArray.msg"
-    "msg/ControlMessage.msg"
+    "msg/MOOSCommand.msg"
     DEPENDENCIES std_msgs
 )
 

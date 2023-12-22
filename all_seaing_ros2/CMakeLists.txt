@@ -19,6 +19,7 @@ find_package(rclpy REQUIRED)
 find_package(tf2 REQUIRED)
 
 # ROS messages
+find_package(protobuf_client_interfaces REQUIRED)
 find_package(all_seaing_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -56,6 +57,36 @@ ament_target_dependencies(state_reporter
     all_seaing_interfaces
 )
 
+# Node: message_parser
+add_executable(message_parser src/utils/message_parser.cpp)
+ament_target_dependencies(message_parser
+    rclcpp
+    std_msgs
+    geometry_msgs
+    protobuf_client_interfaces
+    all_seaing_interfaces
+)
+
+# Node: message_sender
+add_executable(message_sender src/utils/message_sender.cpp)
+ament_target_dependencies(message_sender
+    rclcpp
+    std_msgs
+    geometry_msgs
+    protobuf_client_interfaces
+    all_seaing_interfaces
+)
+
+# Node: message_sender_goal
+add_executable(message_sender_goal src/utils/message_sender_goal.cpp)
+ament_target_dependencies(message_sender_goal
+    rclcpp
+    std_msgs
+    geometry_msgs
+    protobuf_client_interfaces
+    all_seaing_interfaces
+)
+
 
 
 #---------- INSTALL C++ PROGRAMS ----------#
@@ -73,9 +104,14 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
 
     # Competition-specific programs
+    src/competitions/vrx_2023/acoustic_tracking_sub.py
 
     # Controller programs
+    src/controller/goal_publisher.py
+    src/controller/sample_publisher.py
     src/controller/simple_controller.py
+    src/controller/state_publisher.py
+    src/controller/xdrive_controller.py
 
     # Localization progams
 
@@ -85,6 +121,7 @@ install(PROGRAMS
     src/navigation/pwm_sender.py
 
     # Perception programs
+    src/perception/topic_to_image.py
     src/perception/yolov5_detector.py
     src/perception/yolov5_image.py
 
