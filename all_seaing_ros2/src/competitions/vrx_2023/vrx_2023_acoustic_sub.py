@@ -5,7 +5,7 @@ import math
 from ros_gz_interfaces.msg import ParamVec
 from geometry_msgs.msg import Point
 from all_seaing_interfaces.msg import ASVState
-from all_seaing_ros2.vrx_task_node import TaskNode
+from all_seaing_vehicle.vrx_task_node import TaskNode
 
 class AcousticTrackingSub(TaskNode):
     def __init__(self):

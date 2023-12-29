@@ -2,7 +2,7 @@
 import rclpy
 
 from geometry_msgs.msg import Point
-from all_seaing_ros2.vrx_task_node import TaskNode
+from all_seaing_vehicle.vrx_task_node import TaskNode
 from protobuf_client_interfaces.msg import Gateway
 
 class AcousticWPTSender(TaskNode):

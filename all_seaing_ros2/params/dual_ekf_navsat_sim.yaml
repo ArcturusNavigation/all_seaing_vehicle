@@ -6,12 +6,12 @@ ekf_filter_node:
         transform_time_offset: 0.1
 
         odom_frame: odom
-        base_link_frame: base_link
+        base_link_frame: wamv/wamv/base_link
         world_frame: odom
         publish_tf: true
         reset_on_time_jump: true
 
-        imu0: /mavros/imu/data
+        imu0: /wamv/sensors/imu/imu/data
         imu0_config: [false, false, false,
                       true,  true,  true,
                       false, false, false,
@@ -41,9 +41,8 @@ navsat_transform_node:
         delay: 3.0
         zero_altitude: true
         magnetic_declination_radians: 0.0
-        broadcast_cartesian_transform: true
         wait_for_datum: true
         use_odometry_yaw: false
-        datum: [42.3599380014875, -71.10459068336837, 0.0]
+        datum: [-33.7228, 150.6740, 0.0]
         yaw_offset: 0.0
         publish_filtered_gps: true

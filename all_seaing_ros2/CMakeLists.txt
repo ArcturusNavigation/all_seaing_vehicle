@@ -93,6 +93,9 @@ ament_target_dependencies(message_sender_goal
 
 install(TARGETS
     state_reporter
+    message_parser
+    message_sender
+    message_sender_goal
     DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -104,7 +107,12 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
 
     # Competition-specific programs
-    src/competitions/vrx_2023/acoustic_tracking_sub.py
+    src/competitions/vrx_2023/vrx_2023_acoustic_sender.py
+    src/competitions/vrx_2023/vrx_2023_acoustic_sub.py
+    src/competitions/vrx_2023/vrx_2023_pwm_sub.py
+    src/competitions/vrx_2023/vrx_2023_stationkeeping.py
+    src/competitions/vrx_2023/vrx_2023_task_sender.py
+    src/competitions/vrx_2023/vrx_2023_waypoints.py
 
     # Controller programs
     src/controller/goal_publisher.py
@@ -132,12 +140,13 @@ install(PROGRAMS
 
 
 
-#---------- INSTALL LAUNCH DIRECTORY ----------#
+#---------- INSTALL DIRECTORIES ----------#
 
 install(DIRECTORY
     launch
-    params
     models
+    params
+    urdf
     DESTINATION share/${PROJECT_NAME}
 )
 
