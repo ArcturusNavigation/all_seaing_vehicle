@@ -11,10 +11,9 @@ import os
 
 def generate_launch_description():
     vrx_gz_prefix = get_package_share_directory("vrx_gz") 
-    controller_suite_prefix = get_package_share_directory("controller_suite") 
-    robot_localization_params = os.path.join(get_package_share_directory("controller_suite"), "params", "dual_ekf_navsat.yaml")
+    all_seaing_prefix = get_package_share_directory("all_seaing_vehicle") 
     return LaunchDescription([
-        DeclareLaunchArgument("in_sim", default_value=TextSubstitution(text="False")),
+        DeclareLaunchArgument("in_sim", default_value=TextSubstitution(text="True")),
         DeclareLaunchArgument("with_control", default_value=TextSubstitution(text="True")),
         launch_ros.actions.Node(
 	        package="all_seaing_vehicle", 
@@ -25,18 +24,7 @@ def generate_launch_description():
             ]
         ),
         launch_ros.actions.Node(
-            package="robot_localization",
-            executable="ekf_node",
-            name="ekf_filter_node",
-            parameters=[robot_localization_params]),
-        launch_ros.actions.Node(
-            package="robot_localization",
-            executable="navsat_transform_node",
-            name="navsat_transform_node",
-            remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
-            parameters=[robot_localization_params]),
-        launch_ros.actions.Node(
-            package="controller_suite",
+            package="all_seaing_vehicle",
             executable="xdrive_controller.py",
             name="controller",
             parameters=[{"in_sim": LaunchConfiguration("in_sim")}],
@@ -44,5 +32,5 @@ def generate_launch_description():
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
-            launch_arguments = {"world": "sydney_regatta", "urdf": f"{controller_suite_prefix}/resource/wamv_target.urdf"}.items()),
+            launch_arguments = {"world": "sydney_regatta", "urdf": f"{all_seaing_prefix}/urdf/xdrive_wamv/wamv_target.urdf"}.items()),
     ])

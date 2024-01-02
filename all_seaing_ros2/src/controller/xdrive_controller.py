@@ -74,15 +74,15 @@ class Controller(Node):
         self.required_imu_data_recentness = 1 # if we didn't get IMU data in the last X seconds, ignore data
 
         if in_sim: # set output ROS2 topic names
-            self.front_left_name = "/wamv/thrusters/front_left/thrust"
+            self.front_left_name  = "/wamv/thrusters/front_left/thrust"
             self.front_right_name = "/wamv/thrusters/front_right/thrust"
-            self.back_left_name = "/wamv/thrusters/back_left/thrust"
-            self.back_right_name = "/wamv/thrusters/back_right/thrust"
+            self.back_left_name   = "/wamv/thrusters/back_left/thrust"
+            self.back_right_name  = "/wamv/thrusters/back_right/thrust"
         else:
-            self.front_left_name = "frontleft_pwm"
+            self.front_left_name  = "frontleft_pwm"
             self.front_right_name = "frontright_pwm"
-            self.back_left_name = "backleft_pwm"
-            self.back_right_name = "backright_pwm"
+            self.back_left_name   = "backleft_pwm"
+            self.back_right_name  = "backright_pwm"
 
         self.all_thruster_names = (
             self.front_left_name,
@@ -106,7 +106,7 @@ class Controller(Node):
                 self.msg_type, thruster_prefix, 10
             )
 
-        timer_period = 1/100 # update rate for the output loop
+        timer_period = 1/60 # update rate for the output loop
         self.timer = self.create_timer(timer_period, self.update_thrust) # start the output loop
 
     def get_thrust_values(self, tx, ty, tn):
