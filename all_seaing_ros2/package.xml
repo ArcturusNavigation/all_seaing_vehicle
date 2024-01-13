@@ -4,7 +4,7 @@
 
     <!-- METADATA -->
     <name>all_seaing_vehicle</name>
-    <version>0.0.0</version>
+    <version>1.0.0</version>
     <description>General autonomy code base for MIT Arcturus Robotics</description>
     <maintainer email="arcturus-logistics@mit.edu">arcturus</maintainer>
     <license>MIT</license>
@@ -18,7 +18,14 @@
     <!-- GENERAL PACKAGE DEPENDENCIES -->
     <depend>rclcpp</depend>
     <depend>rclpy</depend>
+    <depend>image_geometry</depend>
+    <depend>cv_bridge</depend>
+
+    <!-- TRANSFORM DEPENDENCIES -->
     <depend>tf2</depend>
+    <depend>tf2_ros</depend>
+    <depend>tf2_geometry_msgs</depend>
+    <depend>tf2_sensor_msgs</depend>
 
     <!-- MESSAGE DEPENDENCIES -->
     <depend>protobuf_client_interfaces</depend>
@@ -28,5 +35,9 @@
     <depend>geometry_msgs</depend>
     <depend>nav_msgs</depend>
     <depend>mavros_msgs</depend>
+
+    <!-- PCL DEPENDENCIES -->
+    <depend>pcl_ros</depend>
+    <depend>pcl_conversions</depend>
 
 </package>

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 project(all_seaing_vehicle)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
@@ -16,7 +17,14 @@ find_package(ament_cmake_python REQUIRED)
 # General package dependencies
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(image_geometry REQUIRED)
+find_package(cv_bridge REQUIRED)
+
+# Transform dependencies
 find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_sensor_msgs REQUIRED)
 
 # ROS messages
 find_package(protobuf_client_interfaces REQUIRED)
@@ -26,6 +34,19 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
+
+# PCL dependencies
+find_package(pcl_ros)
+find_package(pcl_conversions REQUIRED)
+
+# Build
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+include_directories(
+    ${PCL_INCLUDE_DIRS} 
+    /opt/ros/humble/include
+    include
+)
 
 
 
@@ -42,6 +63,23 @@ find_package(mavros_msgs REQUIRED)
 #---------- Navigation programs ----------#
 
 #---------- Perception programs ----------#
+
+# Node: pointcloud_image_overlay
+add_executable(pointcloud_image_overlay src/perception/pointcloud_image_fusion/pointcloud_image_overlay.cpp)
+target_link_libraries(pointcloud_image_overlay
+    ${PCL_LIBRARIES}
+)
+ament_target_dependencies(pointcloud_image_overlay
+    rclcpp
+    std_msgs
+    sensor_msgs
+    tf2
+    tf2_ros
+    tf2_geometry_msgs
+    image_geometry
+    cv_bridge
+    pcl_conversions
+)
 
 #---------- Utils programs ----------#
 
@@ -91,7 +129,10 @@ ament_target_dependencies(message_sender_goal
 
 #---------- INSTALL C++ PROGRAMS ----------#
 
+include_directories(include)
+
 install(TARGETS
+    pointcloud_image_overlay
     state_reporter
     message_parser
     message_sender
@@ -140,7 +181,7 @@ install(PROGRAMS
 
 
 
-#---------- INSTALL DIRECTORIES ----------#
+#---------- INSTALL MISC DIRECTORIES ----------#
 
 install(DIRECTORY
     launch
@@ -149,5 +190,7 @@ install(DIRECTORY
     urdf
     DESTINATION share/${PROJECT_NAME}
 )
+
+
 
 ament_package()
