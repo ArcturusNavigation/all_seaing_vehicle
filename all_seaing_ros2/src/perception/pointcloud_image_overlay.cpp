@@ -84,9 +84,6 @@ PclImageOverlay::PclImageOverlay() : Node("pointcloud_image_overlay") {
     );
     image_sub_.subscribe(this, "/img_src", rmw_qos_profile_system_default);
     cloud_sub_.subscribe(this, "/cloud_src", rmw_qos_profile_system_default);
-    const char* img_sub_topic = image_sub_.getSubscriber()->get_topic_name();
-    const char* img_info_sub_topic = image_intrinsics_sub_->get_topic_name();
-    const char* cloud_sub_topic = cloud_sub_.getSubscriber()->get_topic_name();
 
     // Send pc msg and img msg to PCImageFusionCb
     pc_cam_sync_ = std::make_shared<PC_Cam_Sync>(PC_Cam_Policy(10), image_sub_, cloud_sub_);
@@ -95,6 +92,9 @@ PclImageOverlay::PclImageOverlay() : Node("pointcloud_image_overlay") {
     // Publishers
     image_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/pc_image_fusion", 1);
 
+    const char* img_sub_topic = image_sub_.getSubscriber()->get_topic_name();
+    const char* img_info_sub_topic = image_intrinsics_sub_->get_topic_name();
+    const char* cloud_sub_topic = cloud_sub_.getSubscriber()->get_topic_name();
     RCLCPP_INFO(this->get_logger(), "img_src: %s", img_sub_topic);
     RCLCPP_INFO(this->get_logger(), "img_info_src %s", img_info_sub_topic);
     RCLCPP_INFO(this->get_logger(), "cloud_src %s", cloud_sub_topic);
