@@ -65,7 +65,7 @@ include_directories(
 #---------- Perception programs ----------#
 
 # Node: pointcloud_image_overlay
-add_executable(pointcloud_image_overlay src/perception/pointcloud_image_fusion/pointcloud_image_overlay.cpp)
+add_executable(pointcloud_image_overlay src/perception/pointcloud_image_overlay.cpp)
 target_link_libraries(pointcloud_image_overlay
     ${PCL_LIBRARIES}
 )
@@ -76,6 +76,7 @@ ament_target_dependencies(pointcloud_image_overlay
     tf2
     tf2_ros
     tf2_geometry_msgs
+    tf2_sensor_msgs
     image_geometry
     cv_bridge
     pcl_conversions

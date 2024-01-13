@@ -28,30 +28,25 @@ void PclImageOverlay::PcImageFusionCb(const sensor_msgs::msg::Image::ConstShared
         return;
     }
 
-    // Transform in_cloud_msg and convert PointCloud2 to PCL
+    // Transform in_cloud_msg and convert PointCloud2 to PCL PointCloud
     sensor_msgs::msg::PointCloud2 in_cloud_tf;
     tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, pc_cam_tf_);
     pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
 
     for (pcl::PointXYZ & point_tf : in_cloud_tf_ptr->points) {
-
-        /* Project 3D point onto the image plane using the intrinsic matrix.
-         * Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-         */
+        // Project 3D point onto the image plane using the intrinsic matrix.
+        // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
         cv::Point2d xy_rect = cam_model_.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));
         
         // Plot projected point onto image if within bounds and in front of the boat
-        if ((xy_rect.x >= 0) && (xy_rect.x < image_size_.width) && (xy_rect.y >= 0) && (xy_rect.y < image_size_.height) &&
-                (point_tf.x >= 0)) {
-            cv::circle(
-                cv_ptr->image,
-                cv::Point(xy_rect.x, xy_rect.y),
-                2, // radius
-                cv::Scalar(255, 0, 0), // color
-                4 // thickness
-            );
+        if ((xy_rect.x >= 0) && (xy_rect.x < cam_model_.cameraInfo().width) && 
+                (xy_rect.y >= 0) && (xy_rect.y < cam_model_.cameraInfo().height) && (point_tf.x >= 0)) {
+            cv::circle(cv_ptr->image, cv::Point(xy_rect.x, xy_rect.y), 2, cv::Scalar(255, 0, 0), 4);
         } 
+
+        RCLCPP_INFO(this->get_logger(), "Transformed 3D point:   x: %f, y: %f, z: %f", point_tf.x, point_tf.y, point_tf.z);
+        RCLCPP_INFO(this->get_logger(), "Projected 2D point:     x: %f, y: %f", xy_rect.x, xy_rect.y);
     }
     image_pub_->publish(*cv_ptr->toImageMsg());
 }
@@ -72,10 +67,8 @@ geometry_msgs::msg::TransformStamped PclImageOverlay::GetTransform(const std::st
 }
 
 void PclImageOverlay::IntrinsicsCb(const sensor_msgs::msg::CameraInfo & info_msg) {
-    image_size_.height = info_msg.height;
-    image_size_.width = info_msg.width;
     cam_model_.fromCameraInfo(info_msg);
-    RCLCPP_INFO(this->get_logger(), "Image Intrinsics set: %i, %i", image_size_.height, image_size_.width);
+    RCLCPP_INFO(this->get_logger(), "Image Intrinsics set: %i, %i", cam_model_.cameraInfo().width, cam_model_.cameraInfo().height);
 }
 
 PclImageOverlay::PclImageOverlay() : Node("pointcloud_image_overlay") {
@@ -95,17 +88,17 @@ PclImageOverlay::PclImageOverlay() : Node("pointcloud_image_overlay") {
     const char* img_info_sub_topic = image_intrinsics_sub_->get_topic_name();
     const char* cloud_sub_topic = cloud_sub_.getSubscriber()->get_topic_name();
 
-    RCLCPP_INFO(this->get_logger(), "img_src: %s", img_sub_topic);
-    RCLCPP_INFO(this->get_logger(), "img_info_src %s", img_info_sub_topic);
-    RCLCPP_INFO(this->get_logger(), "cloud_src %s", cloud_sub_topic);
-
-    // Send pc msg and img msg to cb
-    RCLCPP_INFO(this->get_logger(), "Approximate time sync for %s and %s", img_sub_topic, cloud_sub_topic);
+    // Send pc msg and img msg to PCImageFusionCb
     pc_cam_sync_ = std::make_shared<PC_Cam_Sync>(PC_Cam_Policy(10), image_sub_, cloud_sub_);
     pc_cam_sync_->registerCallback(std::bind(&PclImageOverlay::PcImageFusionCb, this, std::placeholders::_1, std::placeholders::_2));
 
     // Publishers
-    image_pub_ = this->create_publisher<sensor_msgs::msg::Image>("pc_image_fusion", 1);
+    image_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/pc_image_fusion", 1);
+
+    RCLCPP_INFO(this->get_logger(), "img_src: %s", img_sub_topic);
+    RCLCPP_INFO(this->get_logger(), "img_info_src %s", img_info_sub_topic);
+    RCLCPP_INFO(this->get_logger(), "cloud_src %s", cloud_sub_topic);
+    RCLCPP_INFO(this->get_logger(), "Approximate time sync for %s and %s", img_sub_topic, cloud_sub_topic);
 }
 
 PclImageOverlay::~PclImageOverlay(){}
