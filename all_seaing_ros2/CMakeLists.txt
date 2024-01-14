@@ -65,7 +65,7 @@ include_directories(
 #---------- Perception programs ----------#
 
 # Node: pointcloud_image_overlay
-add_executable(pointcloud_image_overlay src/perception/pointcloud_image_overlay.cpp)
+add_executable(pointcloud_image_overlay ${PROJECT_NAME}/perception/pointcloud_image_overlay.cpp)
 target_link_libraries(pointcloud_image_overlay
     ${PCL_LIBRARIES}
 )
@@ -85,7 +85,7 @@ ament_target_dependencies(pointcloud_image_overlay
 #---------- Utils programs ----------#
 
 # Node: state_reporter
-add_executable(state_reporter src/utils/state_reporter.cpp)
+add_executable(state_reporter ${PROJECT_NAME}/utils/state_reporter.cpp)
 ament_target_dependencies(state_reporter
     rclcpp
     std_msgs
@@ -97,7 +97,7 @@ ament_target_dependencies(state_reporter
 )
 
 # Node: message_parser
-add_executable(message_parser src/utils/message_parser.cpp)
+add_executable(message_parser ${PROJECT_NAME}/utils/message_parser.cpp)
 ament_target_dependencies(message_parser
     rclcpp
     std_msgs
@@ -107,7 +107,7 @@ ament_target_dependencies(message_parser
 )
 
 # Node: message_sender
-add_executable(message_sender src/utils/message_sender.cpp)
+add_executable(message_sender ${PROJECT_NAME}/utils/message_sender.cpp)
 ament_target_dependencies(message_sender
     rclcpp
     std_msgs
@@ -117,7 +117,7 @@ ament_target_dependencies(message_sender
 )
 
 # Node: message_sender_goal
-add_executable(message_sender_goal src/utils/message_sender_goal.cpp)
+add_executable(message_sender_goal ${PROJECT_NAME}/utils/message_sender_goal.cpp)
 ament_target_dependencies(message_sender_goal
     rclcpp
     std_msgs
@@ -149,31 +149,31 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
 
     # Competition-specific programs
-    src/competitions/vrx_2023/vrx_2023_acoustic_sender.py
-    src/competitions/vrx_2023/vrx_2023_acoustic_sub.py
-    src/competitions/vrx_2023/vrx_2023_pwm_sub.py
-    src/competitions/vrx_2023/vrx_2023_stationkeeping.py
-    src/competitions/vrx_2023/vrx_2023_task_sender.py
-    src/competitions/vrx_2023/vrx_2023_waypoints.py
+    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sender.py
+    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sub.py
+    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_pwm_sub.py
+    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_stationkeeping.py
+    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_task_sender.py
+    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_waypoints.py
 
     # Controller programs
-    src/controller/goal_publisher.py
-    src/controller/sample_publisher.py
-    src/controller/simple_controller.py
-    src/controller/state_publisher.py
-    src/controller/xdrive_controller.py
+    ${PROJECT_NAME}/controller/goal_publisher.py
+    ${PROJECT_NAME}/controller/sample_publisher.py
+    ${PROJECT_NAME}/controller/simple_controller.py
+    ${PROJECT_NAME}/controller/state_publisher.py
+    ${PROJECT_NAME}/controller/xdrive_controller.py
 
     # Localization progams
 
     # Mapping programs
 
     # Navigation programs
-    src/navigation/pwm_sender.py
+    ${PROJECT_NAME}/navigation/pwm_sender.py
 
     # Perception programs
-    src/perception/topic_to_image.py
-    src/perception/yolov5_detector.py
-    src/perception/yolov5_image.py
+    ${PROJECT_NAME}/perception/topic_to_image.py
+    ${PROJECT_NAME}/perception/yolov5_detector.py
+    ${PROJECT_NAME}/perception/yolov5_image.py
 
     # Utils programs
 
