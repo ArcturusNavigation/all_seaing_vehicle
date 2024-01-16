@@ -84,41 +84,22 @@ ament_target_dependencies(pointcloud_image_overlay
 
 #---------- Utils programs ----------#
 
-# Node: state_reporter
-add_executable(state_reporter ${PROJECT_NAME}/utils/state_reporter.cpp)
-ament_target_dependencies(state_reporter
+# Node: nav_state_reporter
+add_executable(nav_state_reporter ${PROJECT_NAME}/navigation/nav_state_reporter.cpp)
+ament_target_dependencies(nav_state_reporter
     rclcpp
     std_msgs
     sensor_msgs
     geometry_msgs
     nav_msgs
     tf2
-    all_seaing_interfaces
-)
-
-# Node: message_parser
-add_executable(message_parser ${PROJECT_NAME}/utils/message_parser.cpp)
-ament_target_dependencies(message_parser
-    rclcpp
-    std_msgs
-    geometry_msgs
     protobuf_client_interfaces
     all_seaing_interfaces
 )
 
-# Node: message_sender
-add_executable(message_sender ${PROJECT_NAME}/utils/message_sender.cpp)
-ament_target_dependencies(message_sender
-    rclcpp
-    std_msgs
-    geometry_msgs
-    protobuf_client_interfaces
-    all_seaing_interfaces
-)
-
-# Node: message_sender_goal
-add_executable(message_sender_goal ${PROJECT_NAME}/utils/message_sender_goal.cpp)
-ament_target_dependencies(message_sender_goal
+# Node: stationkeeping_goal_sender
+add_executable(stationkeeping_goal_sender ${PROJECT_NAME}/navigation/stationkeeping_goal_sender.cpp)
+ament_target_dependencies(stationkeeping_goal_sender
     rclcpp
     std_msgs
     geometry_msgs
@@ -134,10 +115,8 @@ include_directories(include)
 
 install(TARGETS
     pointcloud_image_overlay
-    state_reporter
-    message_parser
-    message_sender
-    message_sender_goal
+    nav_state_reporter
+    stationkeeping_goal_sender
     DESTINATION lib/${PROJECT_NAME}
 )
 

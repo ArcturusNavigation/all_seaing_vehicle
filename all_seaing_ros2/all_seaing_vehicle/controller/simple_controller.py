@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
-from all_seaing_interfaces.msg import MOOSCommand
+from all_seaing_interfaces.msg import ASVState
 
 class SimpleController(Node):
     def __init__(self):
@@ -24,8 +24,8 @@ class SimpleController(Node):
 
         # subscribers
         self.command_sub = self.create_subscription(
-            MOOSCommand,
-            "/moos/command", 
+            ASVState,
+            "/asv_state", 
             self.command_callback, 
             10
         )

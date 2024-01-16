@@ -9,10 +9,11 @@ class pwm_sender(Node):
 
     def __init__(self):
         super().__init__("pwm_subscriber")
-        self.pose_subscriber_left = self.create_subscription(Int64, "frontleft_pwm" , self.pwm_callback_FL, 10)
-        self.pose_subscriber_right = self.create_subscription(Int64, "frontright_pwm" ,self.pwm_callback_FR, 10)
-        self.pose_subscriber_right = self.create_subscription(Int64, "backleft_pwm" ,self.pwm_callback_BL, 10)
-        self.pose_subscriber_right = self.create_subscription(Int64, "backright_pwm" ,self.pwm_callback_BR, 10)
+        # TODO: Add parameters for port numbers
+        self.create_subscription(Int64, "frontleft_pwm" , self.pwm_callback_FL, 10)
+        self.create_subscription(Int64, "frontright_pwm", self.pwm_callback_FR, 10)
+        self.create_subscription(Int64, "backleft_pwm",   self.pwm_callback_BL, 10)
+        self.create_subscription(Int64, "backright_pwm",  self.pwm_callback_BR, 10)
         self.proxy = self.create_client(CommandLong, "/mavros/cmd/command")
 
     def pwm_callback_FR(self, msg: Int64):

@@ -16,7 +16,7 @@ class AcousticTrackingSub(TaskNode):
         self.nav_x = 0
         self.nav_y = 0
         self.heading = 0
-        timer_period = 1/60
+        timer_period = 1/10
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         self.pinger_subscription = self.create_subscription(
@@ -27,7 +27,7 @@ class AcousticTrackingSub(TaskNode):
 
         self.odometry_subscription = self.create_subscription(
             ASVState,
-            "/allseaing_main/state",
+            "/asv_state",
             self.odom_callback,
             10)
         self.pinger_coord_pub = self.create_publisher(Point, "/pinger_coord", 10)

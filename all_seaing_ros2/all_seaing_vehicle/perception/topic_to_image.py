@@ -8,11 +8,11 @@ bridge = CvBridge()
 class TopicToImage(Node):
 
     def __init__(self):
-        super().__init__('image_listener')
+        super().__init__('topic_to_image')
 
         self.img_sub = self.create_subscription(
             Image, 
-            '/zed2i/zed_node/rgb/image_rect_color', 
+            '/image',
             self.img_callback
         )
 
@@ -24,7 +24,7 @@ class TopicToImage(Node):
 def main(args=None):
     rclpy.init(args=args) 
     node = TopicToImage()
-    rclpy.spin(node )
+    rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
 

@@ -21,8 +21,8 @@ def generate_launch_description():
             parameters=[
                 {"linear_scaling": 25.0},
                 {"angular_scaling": 15.0},
-                {"lower_thrust_limit": -1000.0},
-                {"upper_thrust_limit": 1000.0}]),
+                {"lower_thrust_limit": -1400.0},
+                {"upper_thrust_limit": 1400.0}]),
 
         # overlay node
         launch_ros.actions.Node(
@@ -37,7 +37,7 @@ def generate_launch_description():
         # state reporter
         launch_ros.actions.Node(
 	        package="all_seaing_vehicle", 
-            executable="state_reporter", 
+            executable="nav_state_reporter", 
             output="screen",
             remappings=[
                 ("/imu/data", "/wamv/sensors/imu/imu/data"),
@@ -50,9 +50,5 @@ def generate_launch_description():
         # MOOS-ROS bridge
         launch_ros.actions.Node(
 	        package="protobuf_client", executable="protobuf_client_node", output="screen"),
-        launch_ros.actions.Node(
-	        package="all_seaing_vehicle", executable="message_parser", output="screen"),
-        launch_ros.actions.Node(
-	        package="all_seaing_vehicle", executable="message_sender", output="screen"),
     ])
 

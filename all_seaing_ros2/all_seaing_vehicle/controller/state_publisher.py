@@ -24,12 +24,12 @@ class Pub(Node):
         self.declare_parameter('nav_speed', 0.0)
 
         self.msg = ASVState()
-        self.message.nav_lat = float(self.get_parameter('nav_lat').value)
-        self.message.nav_long = float(self.get_parameter('nav_long').value)
-        self.message.nav_x = float(self.get_parameter('nav_x').value)
-        self.message.nav_y = float(self.get_parameter('nav_y').value)
-        self.message.nav_heading = float(self.get_parameter('nav_heading').value)
-        self.message.nav_speed = float(self.get_parameter('nav_speed').value)
+        self.msg.nav_lat = float(self.get_parameter('nav_lat').value)
+        self.msg.nav_long = float(self.get_parameter('nav_long').value)
+        self.msg.nav_x = float(self.get_parameter('nav_x').value)
+        self.msg.nav_y = float(self.get_parameter('nav_y').value)
+        self.msg.nav_heading = float(self.get_parameter('nav_heading').value)
+        self.msg.nav_speed = float(self.get_parameter('nav_speed').value)
 
         timer_period = 1/60  # seconds
         self.timer = self.create_timer(timer_period, self.cb)

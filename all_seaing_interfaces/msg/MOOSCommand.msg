@@ -1,2 +1,0 @@
-float64 desired_thrust
-float64 desired_rudder
