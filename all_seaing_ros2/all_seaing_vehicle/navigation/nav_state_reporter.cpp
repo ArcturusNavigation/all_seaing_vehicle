@@ -107,7 +107,7 @@ class NavStateReporter : public rclcpp::Node {
 
             // Send latitude, longitude, and heading to MOOS
             auto gateway_msg = protobuf_client_interfaces::msg::Gateway();
-            gateway_msg.gateway_key = "ROS_REPORT";
+            gateway_msg.gateway_key = "NAV_REPORT";
             gateway_msg.gateway_string = "NAV_LAT=" + std::to_string(m_state.nav_lat) + ", NAV_LON=" + std::to_string(m_state.nav_long) + 
                     ", NAV_HEADING=" + std::to_string(m_state.nav_heading) + ", NAV_SPEED=" + std::to_string(m_state.nav_speed);
             m_gateway_pub->publish(gateway_msg);
