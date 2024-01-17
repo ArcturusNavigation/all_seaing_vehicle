@@ -2,7 +2,6 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-import os
 import launch_ros
 
 def generate_launch_description():
@@ -33,14 +32,21 @@ def generate_launch_description():
                 ("/imu/data", "/wamv/sensors/imu/imu/data"),
                 ("/gps/fix", "/wamv/sensors/gps/gps/fix")]),
 
+        # waypoint sender
+        launch_ros.actions.Node(
+	        package="all_seaing_vehicle", 
+            executable="waypoint_sender.py", 
+            output="screen",
+            remappings=[
+                ("/waypoints", "/vrx/stationkeeping/goal")],
+            parameters=[
+                {"use_pose_array": False},
+                {"use_gps": True}]),
+
         # stationkeeping
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
             launch_arguments = {"world": "stationkeeping_task"}.items()),
-        launch_ros.actions.Node(
-	        package="all_seaing_vehicle", 
-            executable="vrx_2023_stationkeeping.py", 
-            output="screen"),
 
         # MOOS-ROS bridge
         launch_ros.actions.Node(

@@ -128,12 +128,8 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
 
     # Competition-specific programs
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sender.py
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sub.py
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_pwm_sub.py
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_stationkeeping.py
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_task_sender.py
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_waypoints.py
 
     # Controller programs
     ${PROJECT_NAME}/controller/goal_publisher.py
@@ -144,10 +140,9 @@ install(PROGRAMS
 
     # Localization progams
 
-    # Mapping programs
-
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
+    ${PROJECT_NAME}/navigation/waypoint_sender.py
 
     # Perception programs
     ${PROJECT_NAME}/perception/topic_to_image.py
