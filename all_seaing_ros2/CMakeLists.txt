@@ -62,28 +62,6 @@ include_directories(
 
 #---------- Navigation programs ----------#
 
-#---------- Perception programs ----------#
-
-# Node: pointcloud_image_overlay
-add_executable(pointcloud_image_overlay ${PROJECT_NAME}/perception/pointcloud_image_overlay.cpp)
-target_link_libraries(pointcloud_image_overlay
-    ${PCL_LIBRARIES}
-)
-ament_target_dependencies(pointcloud_image_overlay
-    rclcpp
-    std_msgs
-    sensor_msgs
-    tf2
-    tf2_ros
-    tf2_geometry_msgs
-    tf2_sensor_msgs
-    image_geometry
-    cv_bridge
-    pcl_conversions
-)
-
-#---------- Utils programs ----------#
-
 # Node: nav_state_reporter
 add_executable(nav_state_reporter ${PROJECT_NAME}/navigation/nav_state_reporter.cpp)
 ament_target_dependencies(nav_state_reporter
@@ -106,6 +84,28 @@ ament_target_dependencies(stationkeeping_goal_sender
     protobuf_client_interfaces
     all_seaing_interfaces
 )
+
+#---------- Perception programs ----------#
+
+# Node: pointcloud_image_overlay
+add_executable(pointcloud_image_overlay ${PROJECT_NAME}/perception/pointcloud_image_overlay.cpp)
+target_link_libraries(pointcloud_image_overlay
+    ${PCL_LIBRARIES}
+)
+ament_target_dependencies(pointcloud_image_overlay
+    rclcpp
+    std_msgs
+    sensor_msgs
+    tf2
+    tf2_ros
+    tf2_geometry_msgs
+    tf2_sensor_msgs
+    image_geometry
+    cv_bridge
+    pcl_conversions
+)
+
+#---------- Utils programs ----------#
 
 
 
