@@ -13,7 +13,7 @@ def generate_launch_description():
     vrx_gz_prefix = get_package_share_directory("vrx_gz") 
     all_seaing_prefix = get_package_share_directory("all_seaing_vehicle") 
 
-    robot_localization_params = os.path.join(all_seaing_prefix, "params", "dual_ekf_navsat.yaml")
+    robot_localization_params = os.path.join(all_seaing_prefix, "params", "dual_ekf_navsat_sim.yaml")
     return LaunchDescription([
         DeclareLaunchArgument("with_control", default_value=TextSubstitution(text="True")),
         launch_ros.actions.Node(
@@ -39,7 +39,7 @@ def generate_launch_description():
             package="all_seaing_vehicle",
             executable="xdrive_controller.py",
             name="controller",
-            parameters=[{"in_sim": "False"}],
+            parameters=[{"in_sim": "True"}],
             condition=IfCondition(LaunchConfiguration("with_control"))
         ),
         IncludeLaunchDescription(

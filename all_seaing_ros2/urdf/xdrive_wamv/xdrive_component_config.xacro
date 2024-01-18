@@ -1,5 +1,11 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="wam-v-components">
   <xacro:macro name="yaml_components">
+    <!-- === wamv_imu === -->
+      <xacro:wamv_imu name="imu_wamv" x="-0.65" y="0.0" z="1.3" R="0.0" P="0.0" Y="0.0" />
+
+    <!-- === wamv_gps === -->
+      <xacro:wamv_gps name="gps_wamv" x="-0.65" y="0.0" z="1.3" R="0.0" P="0.0" Y="0.0" />
+
   </xacro:macro>
 </robot>
