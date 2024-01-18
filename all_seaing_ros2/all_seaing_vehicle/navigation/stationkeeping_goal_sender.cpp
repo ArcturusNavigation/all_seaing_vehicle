@@ -3,16 +3,15 @@
 #include "protobuf_client_interfaces/msg/gateway.hpp"
 #include "all_seaing_interfaces/msg/goal_state.hpp"
 
-
 using namespace std::chrono_literals;
 
-class MessageSender : public rclcpp::Node {
+class StationkeepingGoalSender : public rclcpp::Node {
     public:
-        MessageSender() : Node("message_parser") {
+        StationkeepingGoalSender() : Node("stationkeeping_goal_sender") {
             m_state_sub = this->create_subscription<all_seaing_interfaces::msg::GoalState>(
-                "/allseaing_main/state",
+                "/goal_state",
                 10,
-                std::bind(&MessageSender::state_callback, this, std::placeholders::_1)
+                std::bind(&StationkeepingGoalSender::state_callback, this, std::placeholders::_1)
             );
 
             m_gateway_pub = this->create_publisher<protobuf_client_interfaces::msg::Gateway>("/send_to_gateway", 10);
@@ -33,7 +32,7 @@ class MessageSender : public rclcpp::Node {
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<MessageSender>());
+    rclcpp::spin(std::make_shared<StationkeepingGoalSender>());
     rclcpp::shutdown();
     return 0;
 }

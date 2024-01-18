@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(all_seaing_interfaces)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # Find dependencies
@@ -18,7 +18,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/GoalState.msg"
     "msg/LabeledBoundingBox2D.msg"
     "msg/LabeledBoundingBox2DArray.msg"
-    "msg/MOOSCommand.msg"
     DEPENDENCIES std_msgs
 )
 

@@ -2,7 +2,6 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-import os
 import launch_ros
 
 def generate_launch_description():
@@ -21,8 +20,17 @@ def generate_launch_description():
             parameters=[
                 {"linear_scaling": 25.0},
                 {"angular_scaling": 15.0},
-                {"lower_thrust_limit": -1000.0},
-                {"upper_thrust_limit": 1000.0}]),
+                {"lower_thrust_limit": -1400.0},
+                {"upper_thrust_limit": 1400.0}]),
+
+        # state reporter
+        launch_ros.actions.Node(
+	        package="all_seaing_vehicle", 
+            executable="nav_state_reporter", 
+            output="screen",
+            remappings=[
+                ("/imu/data", "/wamv/sensors/imu/imu/data"),
+                ("/gps/fix", "/wamv/sensors/gps/gps/fix")]),
 
         # overlay node
         launch_ros.actions.Node(
@@ -34,25 +42,12 @@ def generate_launch_description():
                 ("/img_info_src", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
                 ("/cloud_src", "/wamv/sensors/lidars/lidar_wamv_sensor/points")]),
 
-        # state reporter
-        launch_ros.actions.Node(
-	        package="all_seaing_vehicle", 
-            executable="state_reporter", 
-            output="screen",
-            remappings=[
-                ("/imu/data", "/wamv/sensors/imu/imu/data"),
-                ("/gps/fix", "/wamv/sensors/gps/gps/fix")]),
-
-        # default simulation
+        # follow the path
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"])),
-       
+            PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
+            launch_arguments = {"world": "follow_path_task"}.items()),
+
         # MOOS-ROS bridge
         launch_ros.actions.Node(
 	        package="protobuf_client", executable="protobuf_client_node", output="screen"),
-        launch_ros.actions.Node(
-	        package="all_seaing_vehicle", executable="message_parser", output="screen"),
-        launch_ros.actions.Node(
-	        package="all_seaing_vehicle", executable="message_sender", output="screen"),
     ])
-

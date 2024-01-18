@@ -62,6 +62,29 @@ include_directories(
 
 #---------- Navigation programs ----------#
 
+# Node: nav_state_reporter
+add_executable(nav_state_reporter ${PROJECT_NAME}/navigation/nav_state_reporter.cpp)
+ament_target_dependencies(nav_state_reporter
+    rclcpp
+    std_msgs
+    sensor_msgs
+    geometry_msgs
+    nav_msgs
+    tf2
+    protobuf_client_interfaces
+    all_seaing_interfaces
+)
+
+# Node: stationkeeping_goal_sender
+add_executable(stationkeeping_goal_sender ${PROJECT_NAME}/navigation/stationkeeping_goal_sender.cpp)
+ament_target_dependencies(stationkeeping_goal_sender
+    rclcpp
+    std_msgs
+    geometry_msgs
+    protobuf_client_interfaces
+    all_seaing_interfaces
+)
+
 #---------- Perception programs ----------#
 
 # Node: pointcloud_image_overlay
@@ -84,48 +107,6 @@ ament_target_dependencies(pointcloud_image_overlay
 
 #---------- Utils programs ----------#
 
-# Node: state_reporter
-add_executable(state_reporter ${PROJECT_NAME}/utils/state_reporter.cpp)
-ament_target_dependencies(state_reporter
-    rclcpp
-    std_msgs
-    sensor_msgs
-    geometry_msgs
-    nav_msgs
-    tf2
-    all_seaing_interfaces
-)
-
-# Node: message_parser
-add_executable(message_parser ${PROJECT_NAME}/utils/message_parser.cpp)
-ament_target_dependencies(message_parser
-    rclcpp
-    std_msgs
-    geometry_msgs
-    protobuf_client_interfaces
-    all_seaing_interfaces
-)
-
-# Node: message_sender
-add_executable(message_sender ${PROJECT_NAME}/utils/message_sender.cpp)
-ament_target_dependencies(message_sender
-    rclcpp
-    std_msgs
-    geometry_msgs
-    protobuf_client_interfaces
-    all_seaing_interfaces
-)
-
-# Node: message_sender_goal
-add_executable(message_sender_goal ${PROJECT_NAME}/utils/message_sender_goal.cpp)
-ament_target_dependencies(message_sender_goal
-    rclcpp
-    std_msgs
-    geometry_msgs
-    protobuf_client_interfaces
-    all_seaing_interfaces
-)
-
 
 
 #---------- INSTALL C++ PROGRAMS ----------#
@@ -134,10 +115,8 @@ include_directories(include)
 
 install(TARGETS
     pointcloud_image_overlay
-    state_reporter
-    message_parser
-    message_sender
-    message_sender_goal
+    nav_state_reporter
+    stationkeeping_goal_sender
     DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -149,12 +128,8 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
 
     # Competition-specific programs
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sender.py
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sub.py
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_pwm_sub.py
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_stationkeeping.py
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_task_sender.py
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_waypoints.py
 
     # Controller programs
     ${PROJECT_NAME}/controller/goal_publisher.py
@@ -165,10 +140,9 @@ install(PROGRAMS
 
     # Localization progams
 
-    # Mapping programs
-
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
+    ${PROJECT_NAME}/navigation/waypoint_sender.py
 
     # Perception programs
     ${PROJECT_NAME}/perception/topic_to_image.py

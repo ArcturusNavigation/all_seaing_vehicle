@@ -2,12 +2,12 @@
 import rclpy
 import math
 
+from rclpy.node import Node
 from ros_gz_interfaces.msg import ParamVec
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import PoseStamped
 from all_seaing_interfaces.msg import ASVState
-from all_seaing_vehicle.competitions.vrx_task_node import TaskNode
 
-class AcousticTrackingSub(TaskNode):
+class AcousticTrackingSub(Node):
     def __init__(self):
         super().__init__("acoustic_tracking_sub")
         self.pinger_bearing = 0
@@ -16,7 +16,7 @@ class AcousticTrackingSub(TaskNode):
         self.nav_x = 0
         self.nav_y = 0
         self.heading = 0
-        timer_period = 1/60
+        timer_period = 1/10
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         self.pinger_subscription = self.create_subscription(
@@ -27,10 +27,10 @@ class AcousticTrackingSub(TaskNode):
 
         self.odometry_subscription = self.create_subscription(
             ASVState,
-            "/allseaing_main/state",
+            "/asv_state",
             self.odom_callback,
             10)
-        self.pinger_coord_pub = self.create_publisher(Point, "/pinger_coord", 10)
+        self.pinger_coord_pub = self.create_publisher(PoseStamped, "/pinger_coord", 10)
 
     def timer_callback(self):
         orientation_angle = math.radians(self.heading)
@@ -40,11 +40,10 @@ class AcousticTrackingSub(TaskNode):
         pinger_radius = self.pinger_range * math.cos(self.pinger_elevation)
         new_x_coord = x_coord + pinger_radius * math.sin(bearing + orientation_angle)
         new_y_coord = y_coord + pinger_radius * math.cos(bearing + orientation_angle)
-        point = Point()
-        point.x = new_x_coord
-        point.y = new_y_coord
-        if self.task_name in ("acoustic_tracking", "acoustic_perception"):
-            self.pinger_coord_pub.publish(point)
+        point = PoseStamped()
+        point.pose.position.x = new_x_coord
+        point.pose.position.y = new_y_coord
+        self.pinger_coord_pub.publish(point)
 
     def pinger_callback(self, msg):
         for element in msg.params:
