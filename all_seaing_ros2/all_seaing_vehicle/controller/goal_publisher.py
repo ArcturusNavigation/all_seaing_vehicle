@@ -11,18 +11,18 @@ from all_seaing_interfaces.msg import GoalState
 # use angular:=123 to set angular parameter
 # use use_heading:=True to tell the controller whether to use heading or velocity control on angle
 
-class Pub(Node):
+class goal_publisher(Node):
 
     def __init__(self):
         super().__init__('goal_publisher')
-        self.publisher_ = self.create_publisher(GoalState, '/stationkeeping_input', 10)
-        self.declare_parameter('goal_x', 0.0)
-        self.declare_parameter('goal_y', 0.0)
+        self.publisher_ = self.create_publisher(GoalState, '/goal_state', 10)
+        self.declare_parameter('goal_lat', 0.0)
+        self.declare_parameter('goal_lon', 0.0)
         self.declare_parameter('goal_heading', 0.0)
 
         self.msg = GoalState()
-        self.message.goal_x = float(self.get_parameter('goal_x').value)
-        self.message.goal_y = float(self.get_parameter('goal_y').value)
+        self.message.goal_lat = float(self.get_parameter('goal_lat').value)
+        self.message.goal_lon = float(self.get_parameter('goal_lon').value)
         self.message.goal_heading = float(self.get_parameter('goal_heading').value)
 
         timer_period = 1/60  # seconds
@@ -34,9 +34,9 @@ class Pub(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    pub = Pub()
+    node = goal_publisher()
 
-    rclpy.spin(pub)
+    rclpy.spin(node)
     rclpy.shutdown()
 
 if __name__ == '__main__':
