@@ -18,15 +18,31 @@ class StationkeepingGoalSender : public rclcpp::Node {
         }
 
     private:
-        rclcpp::Subscription<all_seaing_interfaces::msg::GoalState>::SharedPtr m_state_sub;
-        rclcpp::Publisher<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_pub;
 
+        //Defining Pubs/Subs
+        rclcpp::Subscription<all_seaing_interfaces::msg::GoalState>::SharedPtr m_state_sub;
+        rclcpp::Publisher<all_seaing_interfaces::msg::ControlMessage>::SharedPtr m_control_pub;
+        rclcpp::Publisher<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_pub;
+        
+        //Setting message type to ControlMessage
+        all_seaing_interfaces::msg::ControlMessage m_control = all_seaing_interfaces::msg::ControlMessage();
+
+
+        //Publisher to MOOS 
         void state_callback(const all_seaing_interfaces::msg::GoalState & msg) {
             auto nav_msg = protobuf_client_interfaces::msg::Gateway();
             nav_msg.gateway_key = "ROS_REPORT_GOAL";
             nav_msg.gateway_string = "GOAL_LAT=" + std::to_string(msg.goal_lat) + ", GOAL_LON=" + std::to_string(msg.goal_long) + 
                                      ", GOAL_HEADING=" + std::to_string(msg.goal_heading);
             m_gateway_pub->publish(nav_msg);
+        }
+
+        //Parser from MOOS
+        void vel_callback(const protobuf_client_interfaces::msg::Gateway & msg) {
+            if (msg.gateway_key == "VEL_x") m_control.vx = msg.gateway_double;
+            if (msg.gateway_key == "VEL_Y") m_control.vy = msg.gateway_double;
+            if (msg.gateway_key == "GOAL_HEADING") {m_control.angular = msg.gateway_double; m_control.use_heading = true; }
+            m_control_pub->publish(m_control);
         }
 };
 
