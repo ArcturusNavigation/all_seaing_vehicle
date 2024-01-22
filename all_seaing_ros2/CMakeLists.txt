@@ -139,6 +139,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/xdrive_controller.py
 
     # Localization progams
+    ${PROJECT_NAME}/localization/obstacle_sender.py
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
