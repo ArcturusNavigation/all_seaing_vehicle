@@ -97,7 +97,7 @@ class Controller(Node):
         )
         #subscriber for data from the IMU
         self.create_subscription(
-            Imu, "/wamv/sensors/imu/imu/data", self.update_heading, 10
+            Imu, "/imu/data", self.update_heading, 10
         )
         # generate a publisher for each thruster
         self.thrust_publishers = {}

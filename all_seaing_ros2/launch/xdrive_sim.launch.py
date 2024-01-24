@@ -16,14 +16,14 @@ def generate_launch_description():
     robot_localization_params = os.path.join(all_seaing_prefix, "params", "dual_ekf_navsat_sim.yaml")
     return LaunchDescription([
         DeclareLaunchArgument("with_control", default_value=TextSubstitution(text="True")),
-        launch_ros.actions.Node(
-	        package="all_seaing_vehicle", 
-            executable="state_reporter",
-            remappings=[
-                ("/imu/data", "/wamv/sensors/imu/imu/data"),
-                ("/gps/fix", "/wamv/sensors/gps/gps/fix")
-            ]
-        ),
+        # launch_ros.actions.Node(
+	    #     package="all_seaing_vehicle", 
+        #     executable="state_reporter",
+        #     remappings=[
+        #         ("/imu/data", "/wamv/sensors/imu/imu/data"),
+        #         ("/gps/fix", "/wamv/sensors/gps/gps/fix")
+        #     ]
+        # ),
         launch_ros.actions.Node(
             package="robot_localization",
             executable="ekf_node",
@@ -33,14 +33,18 @@ def generate_launch_description():
             package="robot_localization",
             executable="navsat_transform_node",
             name="navsat_transform_node",
-            remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
             parameters=[robot_localization_params]),
         launch_ros.actions.Node(
             package="all_seaing_vehicle",
             executable="xdrive_controller.py",
             name="controller",
-            parameters=[{"in_sim": "True"}],
+            parameters=[{"in_sim": True}],
             condition=IfCondition(LaunchConfiguration("with_control"))
+        ),
+        launch_ros.actions.Node(
+            package="all_seaing_vehicle",
+            executable="sim_time_fixer.py",
+            name="sim_time_fixer"
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
