@@ -23,16 +23,6 @@ def generate_launch_description():
                 {"lower_thrust_limit": -1400.0},
                 {"upper_thrust_limit": 1400.0}]),
 
-        # overlay node
-        launch_ros.actions.Node(
-            package="all_seaing_vehicle",
-            executable="pointcloud_image_overlay",
-            output="screen",
-            remappings=[
-                ("/img_src", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
-                ("/img_info_src", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
-                ("/cloud_src", "/wamv/sensors/lidars/lidar_wamv_sensor/points")]),
-
         # state reporter
         launch_ros.actions.Node(
 	        package="all_seaing_vehicle", 
@@ -42,6 +32,25 @@ def generate_launch_description():
                 ("/imu/data", "/wamv/sensors/imu/imu/data"),
                 ("/gps/fix", "/wamv/sensors/gps/gps/fix")]),
 
+        # waypoint sender
+        launch_ros.actions.Node(
+	        package="all_seaing_vehicle", 
+            executable="waypoint_sender.py", 
+            output="screen",
+            remappings=[
+                ("/waypoints", "/pinger_coord")],
+            parameters=[
+                {"use_pose_array": False},
+                {"use_gps": False}]),
+
+        # obstacle sender
+        launch_ros.actions.Node(
+	        package="all_seaing_vehicle", 
+            executable="obstacle_sender.py", 
+            output="screen",
+            parameters=[
+                {"use_gps": False}]),
+
         # default simulation
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"])),
@@ -50,3 +59,4 @@ def generate_launch_description():
         launch_ros.actions.Node(
 	        package="protobuf_client", executable="protobuf_client_node", output="screen"),
     ])
+

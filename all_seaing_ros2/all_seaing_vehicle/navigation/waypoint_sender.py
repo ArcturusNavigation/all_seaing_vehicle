@@ -12,11 +12,11 @@ class WaypointSender(Node):
         super().__init__("waypoint_sender")
 
         # True is using PoseArray, False if using PoseStamped
-        self.declare_parameter("use_pose_array", rclpy.Parameter.Type.BOOL)
+        self.declare_parameter("use_pose_array", True)
         self.use_pose_array = bool(self.get_parameter("use_pose_array").value)
 
         # True if using GPS, False if using local UTM
-        self.declare_parameter("use_gps", rclpy.Parameter.Type.BOOL)
+        self.declare_parameter("use_gps", True)
         self.use_gps = bool(self.get_parameter("use_gps").value)
 
         # Subscribers and publishers
@@ -46,7 +46,6 @@ class WaypointSender(Node):
                 inner_string += ":"
         wpt_msg.gateway_key = "WPT_UPDATE_GPS" if self.use_gps else "WPT_UPDATE"
         wpt_msg.gateway_string = inner_string
-        self.get_logger().info("Publishing: '%s'" % wpt_msg.gateway_string)
         self.publisher.publish(wpt_msg)
 
 def main(args=None):
