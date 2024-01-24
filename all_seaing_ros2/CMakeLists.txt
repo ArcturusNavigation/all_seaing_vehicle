@@ -150,6 +150,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/perception/yolov5_image.py
 
     # Utils programs
+    ${PROJECT_NAME}/utils/e_stopped_node.py
+    ${PROJECT_NAME}/utils/e_stopped_publisher_test.py
 
     DESTINATION lib/${PROJECT_NAME}
 )

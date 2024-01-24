@@ -5,7 +5,9 @@ from std_msgs.msg import Int64
 import rclpy
 from rclpy.node import Node
 
-class pwm_sender(Node):
+from all_seaing_vehicle.utils.e_stopped_node import EStoppedNode
+
+class pwm_sender(EStoppedNode):
 
     def __init__(self):
         super().__init__("pwm_subscriber")
@@ -33,12 +35,17 @@ class pwm_sender(Node):
         self.send_pwm(5, msg.data)
 
     def send_pwm(self, channel, value):
-        print(f"Sending pwm value {value} to channel {channel}")
-        return self.proxy.call_async(CommandLong.Request(
-            command=183,
-            param1=float(channel),
-            param2=float(value)
-        ))
+        if not self.is_e_stopped:
+            print(f"Sending pwm value {value} to channel {channel}")
+            self.last_received_time = self.get_clock().now().to_msg().sec
+            # self.is_e_stopped = False
+            return self.proxy.call_async(CommandLong.Request(
+                command=183,
+                param1=float(channel),
+                param2=float(value)
+            ))
+        else:
+            print("is e_stopped")
 
 def main(args=None):
     rclpy.init(args=args)
