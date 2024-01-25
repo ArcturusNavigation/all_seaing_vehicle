@@ -75,9 +75,9 @@ ament_target_dependencies(nav_state_reporter
     all_seaing_interfaces
 )
 
-# Node: stationkeeping_goal_sender
-add_executable(stationkeeping_goal_sender ${PROJECT_NAME}/navigation/stationkeeping_goal_sender.cpp)
-ament_target_dependencies(stationkeeping_goal_sender
+# Node: stationkeeping_state_reporter
+add_executable(stationkeeping_state_reporter ${PROJECT_NAME}/navigation/stationkeeping_state_reporter.cpp)
+ament_target_dependencies(stationkeeping_state_reporter
     rclcpp
     std_msgs
     geometry_msgs
@@ -116,7 +116,7 @@ include_directories(include)
 install(TARGETS
     pointcloud_image_overlay
     nav_state_reporter
-    stationkeeping_goal_sender
+    stationkeeping_state_reporter
     DESTINATION lib/${PROJECT_NAME}
 )
 

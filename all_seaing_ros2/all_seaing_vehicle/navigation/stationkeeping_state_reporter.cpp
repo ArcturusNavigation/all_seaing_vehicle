@@ -2,6 +2,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "protobuf_client_interfaces/msg/gateway.hpp"
 #include "all_seaing_interfaces/msg/goal_state.hpp"
+#include "all_seaing_interfaces/msg/control_message.hpp"
 
 using namespace std::chrono_literals;
 
@@ -34,14 +35,14 @@ class StationkeepingStateReporter : public rclcpp::Node {
         void state_callback(const all_seaing_interfaces::msg::GoalState & msg) {
             auto nav_msg = protobuf_client_interfaces::msg::Gateway();
             nav_msg.gateway_key = "ROS_REPORT_GOAL";
-            nav_msg.gateway_string = "GOAL_LAT=" + std::to_string(msg.goal_lat) + ", GOAL_LON=" + std::to_string(msg.goal_long) + 
+            nav_msg.gateway_string = "GOAL_LAT=" + std::to_string(msg.goal_lat) + ", GOAL_LON=" + std::to_string(msg.goal_lon) + 
                                      ", GOAL_HEADING=" + std::to_string(msg.goal_heading);
             m_gateway_pub->publish(nav_msg);
         }
 
         //Parser from MOOS
         void vel_callback(const protobuf_client_interfaces::msg::Gateway & msg) {
-            if (msg.gateway_key == "VEL_x") m_control.vx = msg.gateway_double;
+            if (msg.gateway_key == "VEL_X") m_control.vx = msg.gateway_double;
             if (msg.gateway_key == "VEL_Y") m_control.vy = msg.gateway_double;
             if (msg.gateway_key == "GOAL_HEADING") {m_control.angular = msg.gateway_double; m_control.use_heading = true; }
             m_control_pub->publish(m_control);
