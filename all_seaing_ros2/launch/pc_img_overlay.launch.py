@@ -1,3 +1,4 @@
+import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
@@ -6,7 +7,13 @@ import launch_ros
 
 def generate_launch_description():
 
+    slam_toolbox_prefix = get_package_share_directory("slam_toolbox") 
+    nav2_prefix = get_package_share_directory("nav2_bringup") 
     vrx_gz_prefix = get_package_share_directory("vrx_gz") 
+
+    nav2_params = os.path.join(get_package_share_directory("all_seaing_vehicle"), "params", "nav2_params.yaml")
+    slam_params = os.path.join(get_package_share_directory("all_seaing_vehicle"), "params", "slam_params_sim.yaml")
+    robot_localization_params = os.path.join(get_package_share_directory("all_seaing_vehicle"), "params", "dual_ekf_navsat_sim.yaml")
 
     return LaunchDescription([
         # controller
@@ -22,6 +29,21 @@ def generate_launch_description():
                 {"angular_scaling": 15.0},
                 {"lower_thrust_limit": -1400.0},
                 {"upper_thrust_limit": 1400.0}]),
+
+        # robot localization
+        launch_ros.actions.Node(
+            package="robot_localization",
+            executable="ekf_node",
+            name="ekf_filter_node",
+            output="screen",
+            parameters=[robot_localization_params]),
+        launch_ros.actions.Node(
+            package="robot_localization",
+            executable="navsat_transform_node",
+            name="navsat_transform_node",
+            output="screen",
+            remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
+            parameters=[robot_localization_params]),
 
         # overlay node
         launch_ros.actions.Node(
@@ -42,11 +64,26 @@ def generate_launch_description():
                 ("/imu/data", "/wamv/sensors/imu/imu/data"),
                 ("/gps/fix", "/wamv/sensors/gps/gps/fix")]),
 
+        # online SLAM
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([slam_toolbox_prefix, "/launch/online_sync_launch.py"]),
+            launch_arguments = {"slam_params_file" : slam_params}.items()),
+        launch_ros.actions.Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            output='screen',
+            arguments=['0', '0', '0', '0', '0', '0', 'odom', 'wamv/wamv/base_link/lidar_wamv_sensor']),
+
         # default simulation
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"])),
-       
+                PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"])),
+
+        # nav2
+        IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([nav2_prefix, "/launch/navigation_launch.py"]),
+                launch_arguments = {"params_file" : nav2_params}.items()),
+
         # MOOS-ROS bridge
         launch_ros.actions.Node(
-	        package="protobuf_client", executable="protobuf_client_node", output="screen"),
-    ])
+                package="protobuf_client", executable="protobuf_client_node", output="screen"),
+   ])
