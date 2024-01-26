@@ -7,12 +7,7 @@ import launch_ros
 
 def generate_launch_description():
 
-    slam_toolbox_prefix = get_package_share_directory("slam_toolbox") 
-    nav2_prefix = get_package_share_directory("nav2_bringup") 
     vrx_gz_prefix = get_package_share_directory("vrx_gz") 
-
-    nav2_params = os.path.join(get_package_share_directory("all_seaing_vehicle"), "params", "nav2_params.yaml")
-    slam_params = os.path.join(get_package_share_directory("all_seaing_vehicle"), "params", "slam_params_sim.yaml")
     robot_localization_params = os.path.join(get_package_share_directory("all_seaing_vehicle"), "params", "dual_ekf_navsat_sim.yaml")
 
     return LaunchDescription([
@@ -64,24 +59,9 @@ def generate_launch_description():
                 ("/imu/data", "/wamv/sensors/imu/imu/data"),
                 ("/gps/fix", "/wamv/sensors/gps/gps/fix")]),
 
-        # online SLAM
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([slam_toolbox_prefix, "/launch/online_sync_launch.py"]),
-            launch_arguments = {"slam_params_file" : slam_params}.items()),
-        launch_ros.actions.Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            output='screen',
-            arguments=['0', '0', '0', '0', '0', '0', 'odom', 'wamv/wamv/base_link/lidar_wamv_sensor']),
-
         # default simulation
         IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"])),
-
-        # nav2
-        IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([nav2_prefix, "/launch/navigation_launch.py"]),
-                launch_arguments = {"params_file" : nav2_params}.items()),
 
         # MOOS-ROS bridge
         launch_ros.actions.Node(
