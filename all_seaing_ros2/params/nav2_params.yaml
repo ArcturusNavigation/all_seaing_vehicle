@@ -192,12 +192,11 @@ local_costmap:
       height: 3
       resolution: 0.05
       robot_radius: 0.22
-      #plugins: ["voxel_layer", "inflation_layer"]
-      plugins: ["voxel_layer", "gradient_layer"]
-#      inflation_layer:
-#        plugin: "nav2_costmap_2d::InflationLayer"
-#        cost_scaling_factor: 3.0
-#        inflation_radius: 0.55
+      plugins: ["voxel_layer", "buoy_layer", "inflation_layer"]
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -221,8 +220,8 @@ local_costmap:
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
-      gradient_layer:
-        plugin: "nav2_gradient_costmap_plugin/GradientLayer"
+      buoy_layer:
+        plugin: "nav2_buoy_costmap_plugin/BuoyLayer"
       always_send_full_costmap: True
 
 global_costmap:
@@ -236,8 +235,7 @@ global_costmap:
       robot_radius: 0.22
       resolution: 0.05
       track_unknown_space: true
-      #plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      plugins: ["static_layer", "obstacle_layer", "gradient_layer"]
+      plugins: ["static_layer", "obstacle_layer", "buoy_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -255,19 +253,17 @@ global_costmap:
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
-      gradient_layer:
-        plugin: "nav2_gradient_costmap_plugin/GradientLayer"
-#      inflation_layer:
-#        plugin: "nav2_costmap_2d::InflationLayer"
-#        cost_scaling_factor: 3.0
-#        inflation_radius: 0.55
+      buoy_layer:
+        plugin: "nav2_buoy_costmap_plugin/BuoyLayer"
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
       always_send_full_costmap: True
 
 map_server:
   ros__parameters:
     use_sim_time: True
-    # Overridden in launch by the "map" launch configuration or provided default value.
-    # To use in yaml, remove the default "map" value in the tb3_simulation_launch.py file & provide full path to map below.
     yaml_filename: ""
 
 map_saver:
@@ -340,16 +336,16 @@ waypoint_follower:
       waypoint_pause_duration: 200
 
 velocity_smoother:
-  ros__parameters:
-    use_sim_time: True
-    smoothing_frequency: 20.0
-    scale_velocities: False
-    feedback: "OPEN_LOOP"
-    max_velocity: [0.26, 0.0, 1.0]
-    min_velocity: [-0.26, 0.0, -1.0]
-    max_accel: [2.5, 0.0, 3.2]
-    max_decel: [-2.5, 0.0, -3.2]
-    odom_topic: "odom"
-    odom_duration: 0.1
-    deadband_velocity: [0.0, 0.0, 0.0]
-    velocity_timeout: 1.0
+ ros__parameters:
+   use_sim_time: True
+   smoothing_frequency: 20.0
+   scale_velocities: False
+   feedback: "OPEN_LOOP"
+   max_velocity: [0.26, 0.0, 1.0]
+   min_velocity: [-0.26, 0.0, -1.0]
+   max_accel: [2.5, 0.0, 3.2]
+   max_decel: [-2.5, 0.0, -3.2]
+   odom_topic: "odom"
+   odom_duration: 0.1
+   deadband_velocity: [0.0, 0.0, 0.0]
+   velocity_timeout: 1.0
