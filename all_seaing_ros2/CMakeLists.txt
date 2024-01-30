@@ -56,8 +56,6 @@ include_directories(
 
 #---------- Controller programs ----------#
 
-#---------- Localization programs ----------#
-
 #---------- Mapping programs ----------#
 
 #---------- Navigation programs ----------#
@@ -138,8 +136,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
 
-    # Localization progams
-    ${PROJECT_NAME}/localization/obstacle_sender.py
+    # Mapping progams
+    ${PROJECT_NAME}/mapping/obstacle_sender.py
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
