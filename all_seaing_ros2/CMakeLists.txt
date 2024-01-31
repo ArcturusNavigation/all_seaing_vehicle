@@ -139,6 +139,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/xdrive_controller.py
 
     # Localization progams
+    ${PROJECT_NAME}/localization/obstacle_sender.py
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
@@ -150,6 +151,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/perception/yolov5_image.py
 
     # Utils programs
+    ${PROJECT_NAME}/utils/e_stopped_node.py
+    ${PROJECT_NAME}/utils/e_stopped_publisher_test.py
 
     DESTINATION lib/${PROJECT_NAME}
 )
