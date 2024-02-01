@@ -58,7 +58,8 @@ class PIDSwitcher:
         pid = self.true_pid if self.mode else self.false_pid
         return pid.determine_output(self.pid_input, dt)
 
-
+# x = forward
+# y = left
 class Controller(Node):
     """
     A simple controller for x-drive. Receives velocities and/or heading as input
@@ -93,11 +94,11 @@ class Controller(Node):
         self.angular_factor = 0.32 if in_sim else 1 # units (kgm^2/s) arbitrary conversion between angular velocity and thrust, determined experimentally
        
         self.pid_omega = PID(0, 0, 0) # a pid constant for omega control
-        self.pid_theta = PID(1, 0, 0) # a pid constant for theta control
+        self.pid_theta = PID(0, 0, 0) # a pid constant for theta control
         self.pid_x = PID(0, 0, 0)
         self.pid_y = PID(0, 0, 0)
-        self.pid_vx = PID(0.5, 0, 0)
-        self.pid_vy = PID(0.5, 0, 0)
+        self.pid_vx = PID(0, 0, 0)
+        self.pid_vy = PID(1, 0, 0)
 
         self.angular_pid_switcher = PIDSwitcher(self.pid_omega, self.pid_theta)
         self.linear_x_pid_switcher = PIDSwitcher(self.pid_vx, self.pid_x)
@@ -184,8 +185,15 @@ class Controller(Node):
 
         self.pid_x.update_feedback_value(msg.pose.pose.position.x)
         self.pid_y.update_feedback_value(msg.pose.pose.position.y)
-        self.pid_vx.update_feedback_value(msg.twist.twist.linear.x)
-        self.pid_vy.update_feedback_value(msg.twist.twist.linear.y)
+
+        vx_boat_space = msg.twist.twist.linear.x
+        vy_boat_space = msg.twist.twist.linear.y
+
+        vx_world_space = vx_boat_space * math.cos(self.theta) - vy_boat_space * math.sin(self.theta)
+        vy_world_space = vy_boat_space * math.cos(self.theta) + vx_boat_space * math.sin(self.theta)
+
+        self.pid_vx.update_feedback_value(vx_world_space)
+        self.pid_vy.update_feedback_value(vy_world_space)
 
         self.last_data_timestamp = time.time() # keep a timestamp for the IMU update
 
@@ -196,20 +204,20 @@ class Controller(Node):
         current_time = time.time()
         if self.last_update_timestamp is not None:
             dt = current_time - self.last_update_timestamp
-            x_input = 0
-            y_input = 0
+            x_input_world_space = 0
+            y_input_world_space = 0
             angular_input = 0
             
             if self.last_data_timestamp is not None and current_time - self.last_data_timestamp <= self.required_data_recentness:
                 print("theta: ", self.theta)
-                x_input = self.linear_x_pid_switcher.determine_output(dt)
-                y_input = self.linear_y_pid_switcher.determine_output(dt)
+                x_input_world_space = self.linear_x_pid_switcher.determine_output(dt)
+                y_input_world_space = self.linear_y_pid_switcher.determine_output(dt)
                 angular_input = self.angular_pid_switcher.determine_output(dt)
-            transformed_x = x_input * math.cos(self.theta) + y_input * math.sin(self.theta)
-            transformed_y = y_input * math.cos(self.theta) - x_input * math.sin(self.theta)
+            
+            x_boat_space = x_input_world_space * math.cos(self.theta) - y_input_world_space * math.sin(self.theta)
+            y_boat_space = y_input_world_space * math.cos(self.theta) + x_input_world_space * math.sin(self.theta)
             # print(('%.3f' %transformed_x), ('%.3f' %transformed_y), ('%.3f' %angular_input))
-            results = self.get_thrust_values(x_input, y_input, angular_input)
-
+            results = self.get_thrust_values(x_boat_space, y_boat_space, angular_input)
             for name in self.all_thruster_names:
                 # for each thruster:
                 float_msg = self.msg_type()
