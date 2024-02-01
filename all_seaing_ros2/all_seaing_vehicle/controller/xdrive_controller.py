@@ -37,8 +37,8 @@ class Controller(Node):
         self.declare_parameter("debug", False)
         self.debug_mode = bool(self.get_parameter("debug").value)
 
-        l = 3.5 # BOAT LENGTH
-        w = 2 # BOAT WIDTH
+        l = 3.5 if in_sim else 0.6858 # BOAT LENGTH
+        w = 2 if in_sim else 0.2794 # BOAT WIDTH
         self.msg_type = Float64 if in_sim else Int64
         self.py_type = float if in_sim else int
         min_output = -1000 if in_sim else 1100 # the minimum PWM output value for thrusters
@@ -57,8 +57,10 @@ class Controller(Node):
         self.linear_factor = 1 # units (kg/s) arbitrary conversion between linear velocity and thrust, determined experimentally
         self.angular_factor = 0.32 if in_sim else 1 # units (kgm^2/s) arbitrary conversion between angular velocity and thrust, determined experimentally
        
-        self.pid_omega = PID(10, 0, 0) # a pid constant for omega control
-        self.pid_theta = PID(1.0, 0.0005, 0.5) # a pid constant for theta control
+        self.pid_omega = PID(0, 0, 0)
+        self.pid_theta = PID(0, 0, 0)
+        # self.pid_omega = PID(10, 0, 0) # a pid constant for omega control
+        # self.pid_theta = PID(1.0, 0.0005, 0.5) # a pid constant for theta control
 
         self.max_angular_velocity = 1 # custom constraint on theoretical angular velocity so we don't go out of control
 
@@ -95,9 +97,12 @@ class Controller(Node):
         self.create_subscription(
             ControlMessage, "/control_input", self.update_control_input, 10
         )
+
+        imu_topic = "/wamv/sensors/imu/imu/data" if in_sim else "/mavros/imu/data"
+
         #subscriber for data from the IMU
         self.create_subscription(
-            Imu, "/wamv/sensors/imu/imu/data", self.update_heading, 10
+            Imu, imu_topic, self.update_heading, 10
         )
         # generate a publisher for each thruster
         self.thrust_publishers = {}
@@ -137,11 +142,11 @@ class Controller(Node):
         """
         Callback function for when we receive data from the IMU
         """
-        self.actual_omega = msg.angular_velocity.z
-        self.actual_theta = R.from_quat([ # convert between quaternion and yaw value for theta
-            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
-        ]).as_euler('xyz')[2]
-        self.last_imu_data_timestamp = time.time() # keep a timestamp for the IMU update
+        # self.actual_omega = msg.angular_velocity.z
+        # self.actual_theta = R.from_quat([ # convert between quaternion and yaw value for theta
+        #     msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+        # ]).as_euler('xyz')[2]
+        # self.last_imu_data_timestamp = time.time() # keep a timestamp for the IMU update
 
     def update_thrust(self):
         """
@@ -151,33 +156,33 @@ class Controller(Node):
             print(self.actual_theta if self.i.use_heading else self.actual_omega)
         current_time = time.time()
         angular_input = 0 if self.i.use_heading else self.i.angular # this represents what we will pass in as angular velocity
-        if self.last_imu_data_timestamp is not None and (current_time - self.last_imu_data_timestamp) <= self.required_imu_data_recentness:
-            # if there's valid data from the IMU, run feedback stuff
-            if self.i.use_heading:
-                # if in theta mode, set PID accordingly and get error value
-                pid = self.pid_theta
-                diff = (self.i.angular - self.actual_theta) % (2 * math.pi)
-                if diff > math.pi:
-                    diff -= 2 * math.pi
-            else:
-                # otherwise, get error value using omega
-                pid = self.pid_omega
-                diff = self.i.angular - self.actual_omega
-            angular_input += pid.p * diff # add P contribution to angular input
+        # if self.last_imu_data_timestamp is not None and (current_time - self.last_imu_data_timestamp) <= self.required_imu_data_recentness:
+        #     # if there's valid data from the IMU, run feedback stuff
+        #     if self.i.use_heading:
+        #         # if in theta mode, set PID accordingly and get error value
+        #         pid = self.pid_theta
+        #         diff = (self.i.angular - self.actual_theta) % (2 * math.pi)
+        #         if diff > math.pi:
+        #             diff -= 2 * math.pi
+        #     else:
+        #         # otherwise, get error value using omega
+        #         pid = self.pid_omega
+        #         diff = self.i.angular - self.actual_omega
+        #     angular_input += pid.p * diff # add P contribution to angular input
 
-            if self.last_update_timestamp is not None:
-                # if this isn't the first time updating, run the rest of the feedback
-                dt = current_time - self.last_update_timestamp
+        #     if self.last_update_timestamp is not None:
+        #         # if this isn't the first time updating, run the rest of the feedback
+        #         dt = current_time - self.last_update_timestamp
 
-                if self.about_zero(diff) or (self.accumulated_error > 0) != (diff > 0):
-                    self.accumulated_error = 0 # optimization? for I control so it doesn't go crazy in the wrong direction
-                self.accumulated_error += diff * dt # update accumulated error
+        #         if self.about_zero(diff) or (self.accumulated_error > 0) != (diff > 0):
+        #             self.accumulated_error = 0 # optimization? for I control so it doesn't go crazy in the wrong direction
+        #         self.accumulated_error += diff * dt # update accumulated error
 
-                d_comp = 0 if self.last_error is None else (diff - self.last_error) / dt # calculate D contribution
+        #         d_comp = 0 if self.last_error is None else (diff - self.last_error) / dt # calculate D contribution
 
-                angular_input += pid.i * self.accumulated_error + pid.d * d_comp # add I and D contribution to angular input
+        #         angular_input += pid.i * self.accumulated_error + pid.d * d_comp # add I and D contribution to angular input
             
-            self.last_error = diff # update last error for future calculations
+        #     self.last_error = diff # update last error for future calculations
 
         # get thrust values using linear and angular velocity inputs
         results = self.get_thrust_values(self.i.vx, self.i.vy, self.restrict_input(angular_input, self.max_angular_velocity))
