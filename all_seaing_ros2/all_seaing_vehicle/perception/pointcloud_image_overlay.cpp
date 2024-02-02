@@ -45,8 +45,8 @@ void PclImageOverlay::PcImageFusionCb(const sensor_msgs::msg::Image::ConstShared
             cv::circle(cv_ptr->image, cv::Point(xy_rect.x, xy_rect.y), 2, cv::Scalar(255, 0, 0), 4);
         } 
 
-        RCLCPP_INFO(this->get_logger(), "Transformed 3D point:   x: %f, y: %f, z: %f", point_tf.x, point_tf.y, point_tf.z);
-        RCLCPP_INFO(this->get_logger(), "Projected 2D point:     x: %f, y: %f", xy_rect.x, xy_rect.y);
+//        RCLCPP_INFO(this->get_logger(), "Transformed 3D point:   x: %f, y: %f, z: %f", point_tf.x, point_tf.y, point_tf.z);
+//        RCLCPP_INFO(this->get_logger(), "Projected 2D point:     x: %f, y: %f", xy_rect.x, xy_rect.y);
     }
     image_pub_->publish(*cv_ptr->toImageMsg());
 }
@@ -68,7 +68,7 @@ geometry_msgs::msg::TransformStamped PclImageOverlay::GetTransform(const std::st
 
 void PclImageOverlay::IntrinsicsCb(const sensor_msgs::msg::CameraInfo & info_msg) {
     cam_model_.fromCameraInfo(info_msg);
-    RCLCPP_INFO(this->get_logger(), "Image Intrinsics set: %i, %i", cam_model_.cameraInfo().width, cam_model_.cameraInfo().height);
+//    RCLCPP_INFO(this->get_logger(), "Image Intrinsics set: %i, %i", cam_model_.cameraInfo().width, cam_model_.cameraInfo().height);
 }
 
 PclImageOverlay::PclImageOverlay() : Node("pointcloud_image_overlay") {

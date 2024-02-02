@@ -11,8 +11,8 @@ implied to use, copy, modify, and distribute this software
 except by the author(s), or those designated by the author.
  ************************************************************************/
 
-#ifndef PROJECT_POINTCLOUD_IMAGE_OVERLAY_H
-#define PROJECT_POINTCLOUD_IMAGE_OVERLAY_H
+#ifndef PROJECT_POINTCLOUD_IMAGE_OVERLAY_HPP_
+#define PROJECT_POINTCLOUD_IMAGE_OVERLAY_HPP_
 
 #include <string>
 #include <vector>
@@ -98,4 +98,4 @@ class PclImageOverlay : public rclcpp::Node {
         virtual ~PclImageOverlay();
 };
 
-#endif //PROJECT_POINTCLOUD_IMAGE_OVERLAY_H
+#endif //PROJECT_POINTCLOUD_IMAGE_OVERLAY_HPP_

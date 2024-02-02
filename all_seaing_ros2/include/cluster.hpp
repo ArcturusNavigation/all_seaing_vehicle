@@ -2,8 +2,8 @@
 // Author: Michael DeFilippo (mikedef@mit.edu), AUV Lab
 // License: MIT
 
-#ifndef CLUSTER_H_
-#define CLUSTER_H_
+#ifndef CLUSTER_HPP_
+#define CLUSTER_HPP_
 
 #include <ros/ros.h>
 #include <ros/console.h>
@@ -145,4 +145,4 @@ class Cluster {
         int SetID(int id);
 };
 
-#endif /* CLUSTER_H_ */
+#endif /* CLUSTER_HPP_ */
