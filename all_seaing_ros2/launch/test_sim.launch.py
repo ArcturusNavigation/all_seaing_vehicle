@@ -7,16 +7,9 @@ import os
 
 
 def generate_launch_description():
-    slam_toolbox_prefix = get_package_share_directory("slam_toolbox")
     nav2_prefix = get_package_share_directory("all_seaing_vehicle")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
-    slam_params = os.path.join(
-        slam_toolbox_prefix, "params", "slam_params_sim.yaml"
-    )
-    nav2_params = os.path.join(
-        nav2_prefix, "params", "nav2_params_sim.yaml"
-    )
     robot_localization_params = os.path.join(
         get_package_share_directory("all_seaing_vehicle"),
         "params",
@@ -57,11 +50,19 @@ def generate_launch_description():
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
             ),
+
+            # rviz
+            launch_ros.actions.Node(
+                package="rviz2",
+                executable="rviz2",
+                output="screen",
+                arguments=["-f", "odom"]
+            ),
             
             # buoy mapping
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
-                executable="buoy_mapper.py",
+                executable="static_map_generator.py",
                 output="screen"
             ),
             #            # overlay node

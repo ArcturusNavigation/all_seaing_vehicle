@@ -7,7 +7,7 @@ from launch_ros.descriptions import ComposableNode
 
 def generate_launch_description():
     params_file = os.path.join(
-        get_package_share_directory("all_seaing_vehicle"), "params", "nav2_params.yaml"
+        get_package_share_directory("all_seaing_vehicle"), "params", "nav2_params_sim.yaml"
     )
 
     lifecycle_nodes = ["smoother_server", "planner_server"]
