@@ -44,7 +44,6 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 include_directories(
     ${PCL_INCLUDE_DIRS} 
-    /opt/ros/humble/include
     include
 )
 
@@ -166,7 +165,5 @@ install(DIRECTORY
     urdf
     DESTINATION share/${PROJECT_NAME}
 )
-
-
 
 ament_package()
