@@ -138,6 +138,7 @@ install(PROGRAMS
 
     # Mapping progams
     ${PROJECT_NAME}/mapping/obstacle_sender.py
+    ${PROJECT_NAME}/mapping/buoy_mapper.py
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
