@@ -50,20 +50,18 @@ def generate_launch_description():
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
             ),
-
             # rviz
             launch_ros.actions.Node(
                 package="rviz2",
                 executable="rviz2",
                 output="screen",
-                arguments=["-f", "odom"]
+                arguments=["-f", "odom"],
             ),
-            
             # static map generation
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
                 executable="static_map_generator.py",
-                output="screen"
+                output="screen",
             ),
             # overlay node
             launch_ros.actions.Node(
@@ -106,16 +104,15 @@ def generate_launch_description():
                 output="screen",
                 parameters=[{"use_gps": False}],
             ),
-            # buoy pair finder
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="buoy_pair_finder.py",
-                output="screen",
-            ),
-           IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    [nav2_prefix, "/launch/nav2.launch.py"]
-                )
+            #            # buoy pair finder
+            #            launch_ros.actions.Node(
+            #                package="all_seaing_vehicle",
+            #                executable="buoy_pair_finder.py",
+            #                output="screen",
+            #            ),
+            # nav2 launch
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([nav2_prefix, "/launch/nav2.launch.py"])
             ),
             # default simulation
             IncludeLaunchDescription(

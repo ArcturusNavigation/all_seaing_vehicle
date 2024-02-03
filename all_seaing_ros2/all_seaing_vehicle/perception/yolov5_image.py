@@ -12,31 +12,44 @@ from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2D
 
 import time
 
+
 class Yolov5Image(Node):
 
     def __init__(self):
-        super().__init__('yolov5_image')
-        
+        super().__init__("yolov5_image")
+
         self.bridge = cv_bridge.CvBridge()
 
         # Get pretrained yolov5 models for colored buoys and cardinal markers
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
-        path_model = self.get_package_share_directory("perception_suite") + "/models/NJORD_WEIGHTS_ALL.pt"
-        self.model = torch.hub.load(path_hubconfig, 'custom', path=path_model, source='local')
+        path_model = (
+            self.get_package_share_directory("perception_suite")
+            + "/models/NJORD_WEIGHTS_ALL.pt"
+        )
+        self.model = torch.hub.load(
+            path_hubconfig, "custom", path=path_model, source="local"
+        )
 
         # Subscribers and publishers
         qos_profile = QoSProfile(depth=1)
-        self.bbox_pub = self.create_publisher(LabeledBoundingBox2DArray, '/perception_suite/bounding_boxes', qos_profile)
-        self.img_pub = self.create_publisher(Image, '/perception_suite/segmented_image', qos_profile)
+        self.bbox_pub = self.create_publisher(
+            LabeledBoundingBox2DArray, "/perception_suite/bounding_boxes", qos_profile
+        )
+        self.img_pub = self.create_publisher(
+            Image, "/perception_suite/segmented_image", qos_profile
+        )
 
         while not rclpy.shutdown():
             # Get image
-            img = PIL.Image.open(self.get_package_share_directory("perception_suite") + "/images/test_njord_red.jpg")
+            img = PIL.Image.open(
+                self.get_package_share_directory("perception_suite")
+                + "/images/test_njord_red.jpg"
+            )
             img = np.array(img.convert("RGB"))
 
             self.predict_image(img)
 
-            time.sleep(10) # Sleep for 10 ms
+            time.sleep(10)  # Sleep for 10 ms
 
     def predict_image(self, img):
         try:
@@ -57,20 +70,23 @@ class Yolov5Image(Node):
         # Set bounding boxes around colored buoys
         for _, row in preds.iterrows():
             bbox = LabeledBoundingBox2D()
-            
-            bbox.min_x = int(row['xmin'])
-            bbox.min_y = int(row['ymin'])
-            
-            bbox.max_x = int(row['xmax'])
-            bbox.max_y = int(row['ymax'])
-            
-            bbox.label = row['class']
-            bbox.probability = row['confidence']
+
+            bbox.min_x = int(row["xmin"])
+            bbox.min_y = int(row["ymin"])
+
+            bbox.max_x = int(row["xmax"])
+            bbox.max_y = int(row["ymax"])
+
+            bbox.label = row["class"]
+            bbox.probability = row["confidence"]
             bboxes.boxes.append(bbox)
-            cv2.rectangle(img, (bbox.min_x, bbox.min_y), (bbox.max_x, bbox.max_y), (255, 0, 0), 4)
+            cv2.rectangle(
+                img, (bbox.min_x, bbox.min_y), (bbox.max_x, bbox.max_y), (255, 0, 0), 4
+            )
 
         self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
         self.bbox_pub.publish(bboxes)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -78,6 +94,7 @@ def main(args=None):
     rclpy.spin(image_detector)
     image_detector.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

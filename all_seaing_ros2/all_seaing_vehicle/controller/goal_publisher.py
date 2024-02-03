@@ -11,25 +11,27 @@ from all_seaing_interfaces.msg import GoalState
 # use angular:=123 to set angular parameter
 # use use_heading:=True to tell the controller whether to use heading or velocity control on angle
 
+
 class Pub(Node):
 
     def __init__(self):
-        super().__init__('goal_publisher')
-        self.publisher_ = self.create_publisher(GoalState, '/stationkeeping_input', 10)
-        self.declare_parameter('goal_x', 0.0)
-        self.declare_parameter('goal_y', 0.0)
-        self.declare_parameter('goal_heading', 0.0)
+        super().__init__("goal_publisher")
+        self.publisher_ = self.create_publisher(GoalState, "/stationkeeping_input", 10)
+        self.declare_parameter("goal_x", 0.0)
+        self.declare_parameter("goal_y", 0.0)
+        self.declare_parameter("goal_heading", 0.0)
 
         self.msg = GoalState()
-        self.message.goal_x = float(self.get_parameter('goal_x').value)
-        self.message.goal_y = float(self.get_parameter('goal_y').value)
-        self.message.goal_heading = float(self.get_parameter('goal_heading').value)
+        self.message.goal_x = float(self.get_parameter("goal_x").value)
+        self.message.goal_y = float(self.get_parameter("goal_y").value)
+        self.message.goal_heading = float(self.get_parameter("goal_heading").value)
 
-        timer_period = 1/60  # seconds
+        timer_period = 1 / 60  # seconds
         self.timer = self.create_timer(timer_period, self.cb)
-    
+
     def cb(self):
         self.publisher_.publish(self.msg)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -39,5 +41,6 @@ def main(args=None):
     rclpy.spin(pub)
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

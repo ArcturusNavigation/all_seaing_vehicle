@@ -17,6 +17,7 @@ MAP_METERS_HEIGHT = MAP_GRID_HEIGHT * MAP_RESOLUTION
 MAP_ORIGIN_X = -MAP_METERS_WIDTH / 4
 MAP_ORIGIN_Y = -MAP_METERS_HEIGHT / 6
 
+
 class StaticMapGenerator(Node):
 
     def __init__(self):
@@ -24,12 +25,11 @@ class StaticMapGenerator(Node):
         self.publisher = self.create_publisher(
             OccupancyGrid,
             "/map",
-            QoSProfile(
-                durability=DurabilityPolicy.TRANSIENT_LOCAL,
-                depth=10
-            )
+            QoSProfile(durability=DurabilityPolicy.TRANSIENT_LOCAL, depth=10),
         )
-        self.timer = self.create_timer(timer_period_sec=1.0, callback=self.timer_callback)
+        self.timer = self.create_timer(
+            timer_period_sec=1.0, callback=self.timer_callback
+        )
         self.map_data = [0 for _ in range(MAP_GRID_WIDTH * MAP_GRID_HEIGHT)]
 
     def timer_callback(self):
@@ -41,7 +41,8 @@ class StaticMapGenerator(Node):
         grid.info.origin.position.x = MAP_ORIGIN_X
         grid.info.origin.position.y = MAP_ORIGIN_Y
         grid.data = self.map_data
-        self.publisher.publish(grid)  
+        self.publisher.publish(grid)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -49,6 +50,7 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

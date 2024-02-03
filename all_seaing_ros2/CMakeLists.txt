@@ -138,11 +138,11 @@ install(PROGRAMS
     # Mapping progams
     ${PROJECT_NAME}/mapping/obstacle_sender.py
     ${PROJECT_NAME}/mapping/static_map_generator.py
+    ${PROJECT_NAME}/mapping/buoy_pair_finder.py
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
     ${PROJECT_NAME}/navigation/waypoint_sender.py
-    ${PROJECT_NAME}/navigation/buoy_pair_finder.py
 
     # Perception programs
     ${PROJECT_NAME}/perception/topic_to_image.py
