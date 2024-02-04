@@ -35,6 +35,7 @@ class goal_publisher(Node):
     def goal_callback(self):
         self.publisher_.publish(self.msg)
 
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -43,5 +44,6 @@ def main(args=None):
     rclpy.spin(node)
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

@@ -6,6 +6,7 @@ from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import PoseArray
 from protobuf_client_interfaces.msg import Gateway
 
+
 class WaypointSender(Node):
 
     def __init__(self):
@@ -24,7 +25,8 @@ class WaypointSender(Node):
             PoseArray if self.use_pose_array else PoseStamped,
             "/waypoints",
             self.wpt_cb,
-            10)
+            10,
+        )
         self.publisher = self.create_publisher(Gateway, "/send_to_gateway", 10)
 
     def wpt_cb(self, msg):
@@ -48,12 +50,14 @@ class WaypointSender(Node):
         wpt_msg.gateway_string = inner_string
         self.publisher.publish(wpt_msg)
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = WaypointSender()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

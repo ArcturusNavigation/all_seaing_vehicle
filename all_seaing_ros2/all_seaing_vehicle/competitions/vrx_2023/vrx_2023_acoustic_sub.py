@@ -7,6 +7,7 @@ from ros_gz_interfaces.msg import ParamVec
 from geometry_msgs.msg import PoseStamped
 from all_seaing_interfaces.msg import ASVState
 
+
 class AcousticTrackingSub(Node):
     def __init__(self):
         super().__init__("acoustic_tracking_sub")
@@ -16,20 +17,19 @@ class AcousticTrackingSub(Node):
         self.nav_x = 0
         self.nav_y = 0
         self.heading = 0
-        timer_period = 1/10
+        timer_period = 1 / 10
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         self.pinger_subscription = self.create_subscription(
             ParamVec,
             "/wamv/sensors/acoustics/receiver/range_bearing",
             self.pinger_callback,
-            10)
+            10,
+        )
 
         self.odometry_subscription = self.create_subscription(
-            ASVState,
-            "/asv_state",
-            self.odom_callback,
-            10)
+            ASVState, "/asv_state", self.odom_callback, 10
+        )
         self.pinger_coord_pub = self.create_publisher(PoseStamped, "/pinger_coord", 10)
 
     def timer_callback(self):
@@ -52,12 +52,13 @@ class AcousticTrackingSub(Node):
             if element.name == "range":
                 self.pinger_range = element.value.double_value
             if element.name == "elevation":
-                self.pinger_elevation = element.value.double_value                
+                self.pinger_elevation = element.value.double_value
 
     def odom_callback(self, msg):
         self.nav_x = msg.nav_x
         self.nav_y = msg.nav_y
         self.heading = msg.nav_heading
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -65,6 +66,7 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

@@ -44,7 +44,6 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 include_directories(
     ${PCL_INCLUDE_DIRS} 
-    /opt/ros/humble/include
     include
 )
 
@@ -55,8 +54,6 @@ include_directories(
 #---------- Competition-specific programs ----------#
 
 #---------- Controller programs ----------#
-
-#---------- Localization programs ----------#
 
 #---------- Mapping programs ----------#
 
@@ -138,8 +135,10 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
 
-    # Localization progams
-    ${PROJECT_NAME}/localization/obstacle_sender.py
+    # Mapping progams
+    ${PROJECT_NAME}/mapping/obstacle_sender.py
+    ${PROJECT_NAME}/mapping/static_map_generator.py
+    ${PROJECT_NAME}/mapping/buoy_pair_finder.py
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
@@ -168,7 +167,5 @@ install(DIRECTORY
     urdf
     DESTINATION share/${PROJECT_NAME}
 )
-
-
 
 ament_package()
