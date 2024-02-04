@@ -15,6 +15,12 @@ class StationkeepingStateReporter : public rclcpp::Node {
                 std::bind(&StationkeepingStateReporter::state_callback, this, std::placeholders::_1)
             );
 
+            m_gateway_sub = this->create_subscription<protobuf_client_interfaces::msg::Gateway>(
+                "/gateway_msg", 
+                10, 
+                std::bind(&StationkeepingStateReporter::vel_callback, this, std::placeholders::_1)
+            );
+
             m_gateway_pub = this->create_publisher<protobuf_client_interfaces::msg::Gateway>("/send_to_gateway", 10);
             m_control_pub = this->create_publisher<all_seaing_interfaces::msg::ControlMessage>("/control_input", 10);
         }
@@ -25,7 +31,7 @@ class StationkeepingStateReporter : public rclcpp::Node {
         rclcpp::Subscription<all_seaing_interfaces::msg::GoalState>::SharedPtr m_state_sub;
         rclcpp::Publisher<all_seaing_interfaces::msg::ControlMessage>::SharedPtr m_control_pub;
         rclcpp::Publisher<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_pub;
-        
+        rclcpp::Subscription<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_sub;
         
         //Setting message type to ControlMessage
         all_seaing_interfaces::msg::ControlMessage m_control = all_seaing_interfaces::msg::ControlMessage();
