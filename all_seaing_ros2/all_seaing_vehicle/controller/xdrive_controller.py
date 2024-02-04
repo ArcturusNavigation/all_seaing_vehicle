@@ -15,7 +15,7 @@ class PID:
     """
     A data class representing a PID object.
     """
-    def __init__(self, p, i, d, default_value = 0):
+    def __init__(self, p, i, d, debug_name = None, default_value = 0):
         self.p = p
         self.i = i
         self.d = d
@@ -23,13 +23,17 @@ class PID:
         self.default_value = default_value
         self.accumulated_error = 0
         self.previousError = None
+        self.debug_name = debug_name
     def update_feedback_value(self, value):
         self.feedback = value
+    def get_error(self, input):
+        return input - self.feedback
     def determine_output(self, input, dt):
         if self.feedback is None:
             return self.default_value
-        error = input - self.feedback
-        print("error: ", error)
+        error = self.get_error(input)
+        if self.debug_name is not None:
+            print(self.debug_name + " error: " + str(error))
         self.accumulated_error += error * dt
         derror_dt = 0 if self.previousError is None else (error - self.previousError)/dt
         self.previousError = error
@@ -37,6 +41,13 @@ class PID:
     def reset(self):
         self.accumulated_error = 0
         self.previousError = None
+
+class CircularPID(PID):
+    def get_error(self, input):
+        diff = (input - self.feedback) % (2 * math.pi)
+        if diff > math.pi:
+            diff -= 2 * math.pi
+        return diff
 
 class PIDSwitcher:
     def __init__(self, true_pid, false_pid, default_value = 0):
@@ -73,10 +84,6 @@ class Controller(Node):
 
         self.declare_parameter("in_sim", False)
         in_sim = bool(self.get_parameter("in_sim").value)
-        print("in sim: ", in_sim)
-        
-        self.declare_parameter("debug", False)
-        self.debug_mode = bool(self.get_parameter("debug").value)
 
         l = 3.5 # BOAT LENGTH
         w = 2 # BOAT WIDTH
@@ -93,12 +100,12 @@ class Controller(Node):
         self.linear_factor = 1 # units (kg/s) arbitrary conversion between linear velocity and thrust, determined experimentally
         self.angular_factor = 0.32 if in_sim else 1 # units (kgm^2/s) arbitrary conversion between angular velocity and thrust, determined experimentally
        
-        self.pid_omega = PID(0, 0, 0) # a pid constant for omega control
-        self.pid_theta = PID(0, 0, 0) # a pid constant for theta control
-        self.pid_x = PID(0, 0, 0)
-        self.pid_y = PID(0, 0, 0)
-        self.pid_vx = PID(0, 0, 0)
-        self.pid_vy = PID(1, 0, 0)
+        self.pid_omega = PID(10, 0, 0) # a pid constant for omega control
+        self.pid_theta = CircularPID(1, 0, 0)
+        self.pid_x = PID(0.1, 0, 0)
+        self.pid_y = PID(0.1, 0, 0)
+        self.pid_vx = PID(0.7, 0.1, 0)
+        self.pid_vy = PID(1, 0.1, 0)
 
         self.angular_pid_switcher = PIDSwitcher(self.pid_omega, self.pid_theta)
         self.linear_x_pid_switcher = PIDSwitcher(self.pid_vx, self.pid_x)
@@ -189,8 +196,12 @@ class Controller(Node):
         vx_boat_space = msg.twist.twist.linear.x
         vy_boat_space = msg.twist.twist.linear.y
 
+        # print("boat velocity: " + str(vx_boat_space))
+
         vx_world_space = vx_boat_space * math.cos(self.theta) - vy_boat_space * math.sin(self.theta)
         vy_world_space = vy_boat_space * math.cos(self.theta) + vx_boat_space * math.sin(self.theta)
+
+        # print("world velocity: " + str(vx_world_space))
 
         self.pid_vx.update_feedback_value(vx_world_space)
         self.pid_vy.update_feedback_value(vy_world_space)
@@ -209,15 +220,16 @@ class Controller(Node):
             angular_input = 0
             
             if self.last_data_timestamp is not None and current_time - self.last_data_timestamp <= self.required_data_recentness:
-                print("theta: ", self.theta)
                 x_input_world_space = self.linear_x_pid_switcher.determine_output(dt)
                 y_input_world_space = self.linear_y_pid_switcher.determine_output(dt)
                 angular_input = self.angular_pid_switcher.determine_output(dt)
             
-            x_boat_space = x_input_world_space * math.cos(self.theta) - y_input_world_space * math.sin(self.theta)
-            y_boat_space = y_input_world_space * math.cos(self.theta) + x_input_world_space * math.sin(self.theta)
-            # print(('%.3f' %transformed_x), ('%.3f' %transformed_y), ('%.3f' %angular_input))
+            x_boat_space = x_input_world_space * math.cos(self.theta) + y_input_world_space * math.sin(self.theta)
+            y_boat_space = y_input_world_space * math.cos(self.theta) - x_input_world_space * math.sin(self.theta)
             results = self.get_thrust_values(x_boat_space, y_boat_space, angular_input)
+
+            # print(x_boat_space, y_boat_space)
+            # print(results)
             for name in self.all_thruster_names:
                 # for each thruster:
                 float_msg = self.msg_type()

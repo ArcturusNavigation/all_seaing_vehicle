@@ -33,6 +33,7 @@ def generate_launch_description():
             package="robot_localization",
             executable="navsat_transform_node",
             name="navsat_transform_node",
+            remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
             parameters=[robot_localization_params]),
         launch_ros.actions.Node(
             package="all_seaing_vehicle",
@@ -40,11 +41,6 @@ def generate_launch_description():
             name="controller",
             parameters=[{"in_sim": True}],
             condition=IfCondition(LaunchConfiguration("with_control"))
-        ),
-        launch_ros.actions.Node(
-            package="all_seaing_vehicle",
-            executable="sim_time_fixer.py",
-            name="sim_time_fixer"
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
