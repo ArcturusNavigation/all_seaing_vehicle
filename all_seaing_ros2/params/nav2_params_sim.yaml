@@ -15,6 +15,9 @@ global_costmap:
         map_subscribe_transient_local: True
       buoy_layer:
         plugin: "nav2_buoy_costmap_plugin/BuoyLayer"
+        origin_x: 40.0
+        origin_y: 10.0
+        map_resolution: 0.25
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0

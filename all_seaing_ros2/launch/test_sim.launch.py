@@ -62,6 +62,13 @@ def generate_launch_description():
                 package="all_seaing_vehicle",
                 executable="static_map_generator.py",
                 output="screen",
+                parameters=[
+                    {"map_resolution": 0.25},
+                    {"grid_width": 600},
+                    {"grid_height": 400},
+                    {"origin_x": 40.0},
+                    {"origin_y": 10.0},
+                ]
             ),
             # overlay node
             launch_ros.actions.Node(
