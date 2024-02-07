@@ -26,8 +26,8 @@ class goal_publisher(Node):
         #self.message.goal_heading = float(self.get_parameter('goal_heading').value)
 
         # starting is -33.7227 and 150.6740
-        self.msg.goal_lat = float(-33.7229)
-        self.msg.goal_lon = float(150.6741)
+        self.msg.goal_lat = float(-33.7225)
+        self.msg.goal_lon = float(150.6738)
         # self.msg.goal_lat = float( 0.0001)
         # self.msg.goal_lon = float( 0.0001)
         self.msg.goal_heading = float(0.0)

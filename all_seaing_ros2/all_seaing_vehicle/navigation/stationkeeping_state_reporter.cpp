@@ -48,9 +48,18 @@ class StationkeepingStateReporter : public rclcpp::Node {
 
         //Parser from MOOS
         void vel_callback(const protobuf_client_interfaces::msg::Gateway & msg) {
-            if (msg.gateway_key == "VEL_X") m_control.vx = msg.gateway_double;
-            if (msg.gateway_key == "VEL_Y") m_control.vy = msg.gateway_double;
-            if (msg.gateway_key == "GOAL_HEADING") {m_control.angular = msg.gateway_double; m_control.use_heading = true; }
+            if (msg.gateway_key == "VEL_X") {
+                m_control.x = msg.gateway_double;
+                m_control.use_x_velocity = true;
+            }
+            if (msg.gateway_key == "VEL_Y") {
+                m_control.y = msg.gateway_double;
+                m_control.use_y_velocity = true;
+            }
+            if (msg.gateway_key == "GOAL_HEADING") {
+                m_control.angular = msg.gateway_double; 
+                m_control.use_angular_velocity = false; 
+            }
             m_control_pub->publish(m_control);
         }
 };
