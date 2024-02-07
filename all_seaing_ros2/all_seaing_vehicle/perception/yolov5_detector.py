@@ -30,8 +30,8 @@ class Yolov5Detector(Node):
         # Get pretrained yolov5 models for colored buoys and cardinal markers
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
         path_model = (
-            get_package_share_directory("perception_suite")
-            + "/models/buoy_detection_best_weights_v7.pt"
+            get_package_share_directory("all_seaing_vehicle")
+            + "/models/yolov5s.pt"
         )
         self.model = torch.hub.load(
             path_hubconfig, "custom", path=path_model, source="local"
@@ -47,7 +47,8 @@ class Yolov5Detector(Node):
         )
         self.img_sub = self.create_subscription(
             Image,
-            "/perception_suite/image",  # Remap this to correct topic
+            #"/perception_suite/image",  # Remap this to correct topic
+            "/zed/zed_node/rgb/image_rect_color",  # Remap this to correct topic
             self.img_callback,
             qos_profile,
         )
