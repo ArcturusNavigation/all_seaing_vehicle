@@ -21,8 +21,16 @@ namespace nav2_buoy_costmap_plugin
 	void BuoyLayer::onInitialize()
 	{
 		auto node = node_.lock();
+		// Get parameters
 		declareParameter("enabled", rclcpp::ParameterValue(true));
+		declareParameter("origin_x", rclcpp::ParameterValue(0.0));
+		declareParameter("origin_y", rclcpp::ParameterValue(0.0));
+		declareParameter("map_resolution", rclcpp::ParameterValue(0.0));
 		node->get_parameter(name_ + "." + "enabled", enabled_);
+		node->get_parameter(name_ + "." + "origin_x", origin_x_);
+		node->get_parameter(name_ + "." + "origin_y", origin_y_);
+		node->get_parameter(name_ + "." + "map_resolution", map_resolution_);
+
 		// TODO: Change this to use actual data
 		obstacle_sub_ = node->create_subscription<geometry_msgs::msg::PoseArray>(
 			"/obstacles",
@@ -101,8 +109,8 @@ namespace nav2_buoy_costmap_plugin
 
 		for (std::pair<int, int> obstacle : obstacles_)
 		{
-			int x = obstacle.first + (size_x / 2);
-			int y = obstacle.second + (size_y / 2);
+			int x = obstacle.first + (int)(origin_x_ / map_resolution_);
+			int y = obstacle.second + (int)(origin_y_ / map_resolution_);
 			if (x > min_i && x < max_i && y > min_j && y < max_j)
 			{
 				int index = master_grid.getIndex(x, y);
