@@ -1,10 +1,10 @@
 ekf_filter_node:
-    ros__parameters:
-        use_sim_time: true
-        frequency: 30.0
-        sensor_timeout: 0.1
-        two_d_mode: true
-        transform_time_offset: 0.1
+  ros__parameters:
+    use_sim_time: true
+    frequency: 30.0
+    sensor_timeout: 0.1
+    two_d_mode: true
+    transform_time_offset: 0.1
 
     odom_frame: odom
     base_link_frame: wamv/wamv/base_link

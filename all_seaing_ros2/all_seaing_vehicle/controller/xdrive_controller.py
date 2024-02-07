@@ -86,6 +86,7 @@ class Controller(Node):
 
         self.declare_parameter("in_sim", False)
         in_sim = bool(self.get_parameter("in_sim").value)
+        print("in sim: ", in_sim)
 
         l = 3.5 if in_sim else 0.6858  # BOAT LENGTH
         w = 2 if in_sim else 0.2794  # BOAT WIDTH
@@ -108,14 +109,14 @@ class Controller(Node):
         ) ** 0.5 / 2  # constant we found in matrix math stuff
 
         self.linear_factor = 1 # units (kg/s) arbitrary conversion between linear velocity and thrust, determined experimentally
-        self.angular_factor = 0.32 if in_sim else 1 # units (kgm^2/s) arbitrary conversion between angular velocity and thrust, determined experimentally
+        self.angular_factor = 1 if in_sim else 1 # units (kgm^2/s) arbitrary conversion between angular velocity and thrust, determined experimentally
        
-        self.pid_omega = PID(10, 0, 0) # a pid constant for omega control
+        self.pid_omega = PID(1, 0.5, 0) # a pid constant for omega control
         self.pid_theta = CircularPID(1, 0, 0)
         self.pid_x = PID(0.1, 0, 0)
         self.pid_y = PID(0.1, 0, 0)
-        self.pid_vx = PID(0.7, 0.1, 0)
-        self.pid_vy = PID(1, 0.1, 0)
+        self.pid_vx = PID(0.4, 0.1, 0)
+        self.pid_vy = PID(0.4, 0.1, 0)
 
         self.angular_pid_switcher = PIDSwitcher(self.pid_omega, self.pid_theta)
         self.linear_x_pid_switcher = PIDSwitcher(self.pid_vx, self.pid_x)
@@ -249,8 +250,6 @@ class Controller(Node):
             y_boat_space = y_input_world_space * math.cos(self.theta) - x_input_world_space * math.sin(self.theta)
             results = self.get_thrust_values(x_boat_space, y_boat_space, angular_input)
 
-            # print(x_boat_space, y_boat_space)
-            # print(results)
             for name in self.all_thruster_names:
                 # for each thruster:
                 float_msg = self.msg_type()
