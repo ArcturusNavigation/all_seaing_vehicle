@@ -25,9 +25,12 @@ class goal_publisher(Node):
         #self.message.goal_lon = float(self.get_parameter('goal_lon').value)
         #self.message.goal_heading = float(self.get_parameter('goal_heading').value)
 
-        self.msg.goal_lat = float( 0.00003)
-        self.msg.goal_lon = float( 0.00003)
-        self.msg.goal_heading = float(1.7)
+        # starting is -33.7227 and 150.6740
+        self.msg.goal_lat = float(-33.7229)
+        self.msg.goal_lon = float(150.6741)
+        # self.msg.goal_lat = float( 0.0001)
+        # self.msg.goal_lon = float( 0.0001)
+        self.msg.goal_heading = float(0.0)
 
         timer_period = 1/60  # seconds
         self.timer = self.create_timer(timer_period, self.goal_callback)
