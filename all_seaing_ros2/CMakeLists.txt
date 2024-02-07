@@ -49,73 +49,73 @@ include_directories(
 
 
 
-#---------- ADD C++ EXECUTABLES ----------#
-
-#---------- Competition-specific programs ----------#
-
-#---------- Controller programs ----------#
-
-#---------- Mapping programs ----------#
-
-#---------- Navigation programs ----------#
-
-# Node: nav_state_reporter
-add_executable(nav_state_reporter ${PROJECT_NAME}/navigation/nav_state_reporter.cpp)
-ament_target_dependencies(nav_state_reporter
-    rclcpp
-    std_msgs
-    sensor_msgs
-    geometry_msgs
-    nav_msgs
-    tf2
-    protobuf_client_interfaces
-    all_seaing_interfaces
-)
-
-# Node: stationkeeping_goal_sender
-add_executable(stationkeeping_goal_sender ${PROJECT_NAME}/navigation/stationkeeping_goal_sender.cpp)
-ament_target_dependencies(stationkeeping_goal_sender
-    rclcpp
-    std_msgs
-    geometry_msgs
-    protobuf_client_interfaces
-    all_seaing_interfaces
-)
-
-#---------- Perception programs ----------#
-
-# Node: pointcloud_image_overlay
-add_executable(pointcloud_image_overlay ${PROJECT_NAME}/perception/pointcloud_image_overlay.cpp)
-target_link_libraries(pointcloud_image_overlay
-    ${PCL_LIBRARIES}
-)
-ament_target_dependencies(pointcloud_image_overlay
-    rclcpp
-    std_msgs
-    sensor_msgs
-    tf2
-    tf2_ros
-    tf2_geometry_msgs
-    tf2_sensor_msgs
-    image_geometry
-    cv_bridge
-    pcl_conversions
-)
-
-#---------- Utils programs ----------#
-
-
-
-#---------- INSTALL C++ PROGRAMS ----------#
-
-include_directories(include)
-
-install(TARGETS
-    pointcloud_image_overlay
-    nav_state_reporter
-    stationkeeping_goal_sender
-    DESTINATION lib/${PROJECT_NAME}
-)
+##---------- ADD C++ EXECUTABLES ----------#
+#
+##---------- Competition-specific programs ----------#
+#
+##---------- Controller programs ----------#
+#
+##---------- Mapping programs ----------#
+#
+##---------- Navigation programs ----------#
+#
+## Node: nav_state_reporter
+#add_executable(nav_state_reporter ${PROJECT_NAME}/navigation/nav_state_reporter.cpp)
+#ament_target_dependencies(nav_state_reporter
+#    rclcpp
+#    std_msgs
+#    sensor_msgs
+#    geometry_msgs
+#    nav_msgs
+#    tf2
+#    protobuf_client_interfaces
+#    all_seaing_interfaces
+#)
+#
+## Node: stationkeeping_goal_sender
+#add_executable(stationkeeping_goal_sender ${PROJECT_NAME}/navigation/stationkeeping_goal_sender.cpp)
+#ament_target_dependencies(stationkeeping_goal_sender
+#    rclcpp
+#    std_msgs
+#    geometry_msgs
+#    protobuf_client_interfaces
+#    all_seaing_interfaces
+#)
+#
+##---------- Perception programs ----------#
+#
+## Node: pointcloud_image_overlay
+#add_executable(pointcloud_image_overlay ${PROJECT_NAME}/perception/pointcloud_image_overlay.cpp)
+#target_link_libraries(pointcloud_image_overlay
+#    ${PCL_LIBRARIES}
+#)
+#ament_target_dependencies(pointcloud_image_overlay
+#    rclcpp
+#    std_msgs
+#    sensor_msgs
+#    tf2
+#    tf2_ros
+#    tf2_geometry_msgs
+#    tf2_sensor_msgs
+#    image_geometry
+#    cv_bridge
+#    pcl_conversions
+#)
+#
+##---------- Utils programs ----------#
+#
+#
+#
+##---------- INSTALL C++ PROGRAMS ----------#
+#
+#include_directories(include)
+#
+#install(TARGETS
+#    pointcloud_image_overlay
+#    nav_state_reporter
+#    stationkeeping_goal_sender
+#    DESTINATION lib/${PROJECT_NAME}
+#)
 
 
 
@@ -146,6 +146,7 @@ install(PROGRAMS
 
     # Perception programs
     ${PROJECT_NAME}/perception/topic_to_image.py
+    ${PROJECT_NAME}/perception/redgreen_detector.py
     ${PROJECT_NAME}/perception/yolov5_detector.py
     ${PROJECT_NAME}/perception/yolov5_image.py
 
