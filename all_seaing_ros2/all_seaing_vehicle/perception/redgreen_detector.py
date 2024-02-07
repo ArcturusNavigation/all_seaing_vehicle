@@ -53,85 +53,86 @@ class Yolov5Detector(Node):
         seg_red_1=cv2.inRange(img, [0,0,0], [15,255,255])
         seg_red_2=cv2.inRange(img, [165,0,0], [180,255,255])
         seg_red=add(seg_red_1,seg_red_2)
-	seg_green=cv2.inRange(img, [45,0,0], [75,255,255])
-	[row,col]=seg_red.shape()
-	for i in range(row):
-		for j in range(col):
-			if seg_red[i,j] !=0:
-				min_x=10000
-				max_x=0
-				min_y=10000
-				max_y=0
-				queue=[[i,j]]
-				seg_red[i,j]=0
-				st_queue=0
-				end_queue=1
-				while st_queue<end_queue:
-					cur=queue[st_queue]
-					if cur[0]>max_x:
-						max_x=cur[0]
-					if cur[0]<min_x:
-						min_x=cur[0]
-					if cur[1]>max_y:
-						max_x=cur[0]
-					if cur[1]<min_y:
-						min_x=cur[0]	
-					if cur[0]>0 and seg_red[cur[0]-1,cur[1]]!=0:
-						queue[end_queue]=[cur[0]-1,cur[1]]
-						seg_red[cur[0]-1,cur[1]]=0
-						end_queue+=1
-					if cur[1]>0 and seg_red[cur[0],cur[1]-1]!=0:
-						queue[end_queue]=[cur[0],cur[1]-1]
-						seg_red[cur[0],cur[1]-1]=0
-						end_queue+=1
-					if cur[0]+1<row and seg_red[cur[0]+1,cur[1]]!=0:
-						queue[end_queue]=[cur[0]+1,cur[1]]
-						seg_red[cur[0]+1,cur[1]]=0
-						end_queue+=1
-					if cur[1]+1<col and seg_red[cur[0],cur[1]+1]!=0:
-						queue[end_queue]=[cur[0],cur[1]+1]
-						seg_red[cur[0],cur[1]+1]=0
-						end_queue+=1
-					st_queue+=1
-				detected_objects.append([min_x,min_y,max_x,max_y,"red")
-			if seg_green[i,j] !=0:
-				min_x=10000
-				max_x=0
-				min_y=10000
-				max_y=0
-				queue=[[i,j]]
-				seg_green[i,j]=0
-				st_queue=0
-				end_queue=1
-				while st_queue<end_queue:
-					cur=queue[st_queue]
-					if cur[0]>max_x:
-						max_x=cur[0]
-					if cur[0]<min_x:
-						min_x=cur[0]
-					if cur[1]>max_y:
-						max_x=cur[0]
-					if cur[1]<min_y:
-						min_x=cur[0]	
-					if cur[0]>0 and seg_green[cur[0]-1,cur[1]]!=0:
-						queue[end_queue]=[cur[0]-1,cur[1]]
-						seg_green[cur[0]-1,cur[1]]=0
-						end_queue+=1
-					if cur[1]>0 and seg_green[cur[0],cur[1]-1]!=0:
-						queue[end_queue]=[cur[0],cur[1]-1]
-						seg_green[cur[0],cur[1]-1]=0
-						end_queue+=1
-					if cur[0]+1<row and seg_green[cur[0]+1,cur[1]]!=0:
-						queue[end_queue]=[cur[0]+1,cur[1]]
-						seg_green[cur[0]+1,cur[1]]=0
-						end_queue+=1
-					if cur[1]+1<col and seg_green[cur[0],cur[1]+1]!=0:
-						queue[end_queue]=[cur[0],cur[1]+1]
-						seg_green[cur[0],cur[1]+1]=0
-						end_queue+=1
-					st_queue+=1
-				detected_objects.append([min_x,min_y,max_x,max_y,"green")
-						
+        seg_green=cv2.inRange(img, [45,0,0], [75,255,255])
+        [row,col]=seg_red.shape()
+        detected_objects = []
+        for i in range(row):
+            for j in range(col):
+                if seg_red[i,j] !=0:
+                    min_x=10000
+                    max_x=0
+                    min_y=10000
+                    max_y=0
+                    queue=[[i,j]]
+                    seg_red[i,j]=0
+                    st_queue=0
+                    end_queue=1
+                    while st_queue<end_queue:
+                        cur=queue[st_queue]
+                        if cur[0]>max_x:
+                            max_x=cur[0]
+                        if cur[0]<min_x:
+                            min_x=cur[0]
+                        if cur[1]>max_y:
+                            max_x=cur[0]
+                        if cur[1]<min_y:
+                            min_x=cur[0]	
+                        if cur[0]>0 and seg_red[cur[0]-1,cur[1]]!=0:
+                            queue[end_queue]=[cur[0]-1,cur[1]]
+                            seg_red[cur[0]-1,cur[1]]=0
+                            end_queue+=1
+                        if cur[1]>0 and seg_red[cur[0],cur[1]-1]!=0:
+                            queue[end_queue]=[cur[0],cur[1]-1]
+                            seg_red[cur[0],cur[1]-1]=0
+                            end_queue+=1
+                        if cur[0]+1<row and seg_red[cur[0]+1,cur[1]]!=0:
+                            queue[end_queue]=[cur[0]+1,cur[1]]
+                            seg_red[cur[0]+1,cur[1]]=0
+                            end_queue+=1
+                        if cur[1]+1<col and seg_red[cur[0],cur[1]+1]!=0:
+                            queue[end_queue]=[cur[0],cur[1]+1]
+                            seg_red[cur[0],cur[1]+1]=0
+                            end_queue+=1
+                        st_queue+=1
+                    detected_objects.append([min_x,min_y,max_x,max_y,"red"])
+                if seg_green[i,j] !=0:
+                    min_x=10000
+                    max_x=0
+                    min_y=10000
+                    max_y=0
+                    queue=[[i,j]]
+                    seg_green[i,j]=0
+                    st_queue=0
+                    end_queue=1
+                    while st_queue<end_queue:
+                        cur=queue[st_queue]
+                        if cur[0]>max_x:
+                            max_x=cur[0]
+                        if cur[0]<min_x:
+                            min_x=cur[0]
+                        if cur[1]>max_y:
+                            max_x=cur[0]
+                        if cur[1]<min_y:
+                            min_x=cur[0]	
+                        if cur[0]>0 and seg_green[cur[0]-1,cur[1]]!=0:
+                            queue[end_queue]=[cur[0]-1,cur[1]]
+                            seg_green[cur[0]-1,cur[1]]=0
+                            end_queue+=1
+                        if cur[1]>0 and seg_green[cur[0],cur[1]-1]!=0:
+                            queue[end_queue]=[cur[0],cur[1]-1]
+                            seg_green[cur[0],cur[1]-1]=0
+                            end_queue+=1
+                        if cur[0]+1<row and seg_green[cur[0]+1,cur[1]]!=0:
+                            queue[end_queue]=[cur[0]+1,cur[1]]
+                            seg_green[cur[0]+1,cur[1]]=0
+                            end_queue+=1
+                        if cur[1]+1<col and seg_green[cur[0],cur[1]+1]!=0:
+                            queue[end_queue]=[cur[0],cur[1]+1]
+                            seg_green[cur[0],cur[1]+1]=0
+                            end_queue+=1
+                        st_queue+=1
+                    detected_objects.append([min_x,min_y,max_x,max_y,"green"])
+                            
 
         # Set header of bboxes
         bboxes = LabeledBoundingBox2DArray()
