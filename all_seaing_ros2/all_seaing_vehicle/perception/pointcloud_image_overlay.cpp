@@ -35,11 +35,14 @@ void PclImageOverlay::PcImageFusionCb(const sensor_msgs::msg::Image::ConstShared
 	// Transform in_cloud_msg and convert PointCloud2 to PCL PointCloud
 	sensor_msgs::msg::PointCloud2 in_cloud_tf;
 	tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, pc_cam_tf_);
-	pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZI>);
 	pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
 
-	for (pcl::PointXYZ &point_tf : in_cloud_tf_ptr->points)
+	for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points)
 	{
+        // TODO: Remove this for real world!!! Only to remove water in Gazebo Simulation
+        if (point_tf.intensity > 100) continue;
+
 		// Project 3D point onto the image plane using the intrinsic matrix.
 		// Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
 		cv::Point2d xy_rect = cam_model_.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));

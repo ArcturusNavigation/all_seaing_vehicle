@@ -133,6 +133,8 @@ install(PROGRAMS
     # Controller programs
     ${PROJECT_NAME}/controller/goal_publisher.py
     ${PROJECT_NAME}/controller/sample_publisher.py
+    ${PROJECT_NAME}/controller/sim_time_fixer.py
+    ${PROJECT_NAME}/controller/test_printer.py
     ${PROJECT_NAME}/controller/simple_controller.py
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
