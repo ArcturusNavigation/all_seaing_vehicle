@@ -44,6 +44,8 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 include_directories(
     ${PCL_INCLUDE_DIRS} 
+    ${PCL_CONVERSIONS_INCLUDE_DIRS}
+    /opt/ros/humble/include
     include
 )
 
@@ -168,4 +170,6 @@ install(DIRECTORY
     DESTINATION share/${PROJECT_NAME}
 )
 
+
+ament_export_include_directories(include)
 ament_package()
