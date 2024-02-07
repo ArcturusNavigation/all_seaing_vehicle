@@ -11,6 +11,7 @@ from all_seaing_interfaces.msg import ControlMessage
 # use angular:=123 to set angular parameter
 # use use_heading:=True to tell the controller whether to use heading or velocity control on angle
 
+
 class Pub(Node):
 
     def __init__(self):
@@ -33,12 +34,11 @@ class Pub(Node):
         self.msg.use_y_velocity = bool(self.get_parameter('use_y_velocity').value)
         self.msg.use_angular_velocity = bool(self.get_parameter('use_angular_velocity').value)
 
-        timer_period = 1/60  # seconds
+        timer_period = 1 / 60  # seconds
         self.timer = self.create_timer(timer_period, self.cb)
-    
+
     def cb(self):
         self.publisher_.publish(self.msg)
-            
 
 
 def main(args=None):
@@ -47,5 +47,6 @@ def main(args=None):
     rclpy.spin(pub)
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

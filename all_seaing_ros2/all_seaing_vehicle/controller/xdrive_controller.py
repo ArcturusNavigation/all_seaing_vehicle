@@ -11,6 +11,7 @@ from nav_msgs.msg import Odometry
 
 from all_seaing_interfaces.msg import ControlMessage
 
+
 class PID:
     """
     A data class representing a PID object.
@@ -76,26 +77,35 @@ class Controller(Node):
     A simple controller for x-drive. Receives velocities and/or heading as input
     and gives PWM output to thrusters.
     """
+
     def __init__(self):
         """
         Initialize the controller.
         """
-        super().__init__("xdrive_controller") # initialize ROS2
+        super().__init__("xdrive_controller")  # initialize ROS2
 
         self.declare_parameter("in_sim", False)
         in_sim = bool(self.get_parameter("in_sim").value)
 
-        l = 3.5 # BOAT LENGTH
-        w = 2 # BOAT WIDTH
+        l = 3.5 if in_sim else 0.6858  # BOAT LENGTH
+        w = 2 if in_sim else 0.2794  # BOAT WIDTH
         self.msg_type = Float64 if in_sim else Int64
         self.py_type = float if in_sim else int
-        min_output = -1000 if in_sim else 1100 # the minimum PWM output value for thrusters
-        max_output = 1000 if in_sim else 1900 # the maximum PWM output value for thrusters
-        self.max_input = 1.1 # the maximum magnitude of controller input, used to find a conversion between input and output
-        self.thrust_factor = (max_output - min_output) / (2 * self.max_input) # conversion factor between input and output
+        min_output = (
+            -1000 if in_sim else 1100
+        )  # the minimum PWM output value for thrusters
+        max_output = (
+            1000 if in_sim else 1900
+        )  # the maximum PWM output value for thrusters
+        self.max_input = 1.1  # the maximum magnitude of controller input, used to find a conversion between input and output
+        self.thrust_factor = (max_output - min_output) / (
+            2 * self.max_input
+        )  # conversion factor between input and output
         self.midpoint = (max_output + min_output) / 2
 
-        self.r = ((l ** 2 + w ** 2) / 2 - l * w) ** 0.5 / 2 # constant we found in matrix math stuff
+        self.r = (
+            (l**2 + w**2) / 2 - l * w
+        ) ** 0.5 / 2  # constant we found in matrix math stuff
 
         self.linear_factor = 1 # units (kg/s) arbitrary conversion between linear velocity and thrust, determined experimentally
         self.angular_factor = 0.32 if in_sim else 1 # units (kgm^2/s) arbitrary conversion between angular velocity and thrust, determined experimentally
@@ -120,22 +130,31 @@ class Controller(Node):
         self.last_data_timestamp = None # the last time we received data from odometry
         self.required_data_recentness = 1 # if we didn't get odometry data in the last X seconds, ignore data
 
-        if in_sim: # set output ROS2 topic names
-            self.front_left_name  = "/wamv/thrusters/front_left/thrust"
+        self.used_heading_last = (
+            False  # whether or not the last input value was in theta mode
+        )
+        self.last_update_timestamp = None  # the last time the output loop ran
+        self.last_imu_data_timestamp = None  # the last time we received data from IMU
+        self.required_imu_data_recentness = (
+            1  # if we didn't get IMU data in the last X seconds, ignore data
+        )
+
+        if in_sim:  # set output ROS2 topic names
+            self.front_left_name = "/wamv/thrusters/front_left/thrust"
             self.front_right_name = "/wamv/thrusters/front_right/thrust"
-            self.back_left_name   = "/wamv/thrusters/back_left/thrust"
-            self.back_right_name  = "/wamv/thrusters/back_right/thrust"
+            self.back_left_name = "/wamv/thrusters/back_left/thrust"
+            self.back_right_name = "/wamv/thrusters/back_right/thrust"
         else:
-            self.front_left_name  = "frontleft_pwm"
+            self.front_left_name = "frontleft_pwm"
             self.front_right_name = "frontright_pwm"
-            self.back_left_name   = "backleft_pwm"
-            self.back_right_name  = "backright_pwm"
+            self.back_left_name = "backleft_pwm"
+            self.back_right_name = "backright_pwm"
 
         self.all_thruster_names = (
             self.front_left_name,
             self.front_right_name,
             self.back_left_name,
-            self.back_right_name
+            self.back_right_name,
         )
 
         # subscriber for input to the controller
@@ -153,8 +172,10 @@ class Controller(Node):
                 self.msg_type, thruster_prefix, 10
             )
 
-        timer_period = 1/60 # update rate for the output loop
-        self.timer = self.create_timer(timer_period, self.update_thrust) # start the output loop
+        timer_period = 1 / 60  # update rate for the output loop
+        self.timer = self.create_timer(
+            timer_period, self.update_thrust
+        )  # start the output loop
 
     def get_thrust_values(self, tx, ty, tn):
         """
@@ -257,7 +278,7 @@ class Controller(Node):
         if input > max_val:
             return max_val
         return input
-    
+
     def about_zero(self, val):
         """
         Helper function to check whether a value is close to 0 (deadband).
@@ -283,7 +304,6 @@ class Controller(Node):
 
         self.angular_pid_switcher.update_mode(msg.use_angular_velocity)
         self.angular_pid_switcher.update_input(msg.angular)
-
 
 
 def main(args=None):
