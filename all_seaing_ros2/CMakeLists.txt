@@ -144,6 +144,7 @@ install(PROGRAMS
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
+    ${PROJECT_NAME}/navigation/path_generator.py
     ${PROJECT_NAME}/navigation/waypoint_sender.py
 
     # Perception programs

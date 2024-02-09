@@ -51,8 +51,7 @@ class PclImageOverlay : public rclcpp::Node
 private:
     // Publishers and subscribers
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_pub_;
-    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
-        image_intrinsics_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr image_intrinsics_sub_;
     message_filters::Subscriber<sensor_msgs::msg::Image> image_sub_;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> cloud_sub_;
 
