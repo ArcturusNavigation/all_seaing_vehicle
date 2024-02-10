@@ -8,9 +8,12 @@ from rclpy.node import Node
 from std_msgs.msg import Float64
 from std_msgs.msg import Int64
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Imu
 
 from all_seaing_interfaces.msg import ControlMessage
 
+# WHETHER TO USE ODOMETRY i.e. ARE WE INSIDE?? 
+BLIND_LINEAR = True
 
 class PID:
     """
@@ -64,9 +67,11 @@ class PIDSwitcher:
         self.mode = mode
     def update_input(self, pid_input):
         self.pid_input = pid_input
-    def determine_output(self, dt):
+    def determine_output(self, dt, blind = False):
         if self.pid_input is None:
             return self.default_value
+        if blind:
+            return self.pid_input
         pid = self.true_pid if self.mode else self.false_pid
         return pid.determine_output(self.pid_input, dt)
 
@@ -98,7 +103,7 @@ class Controller(Node):
         max_output = (
             1000 if in_sim else 1900
         )  # the maximum PWM output value for thrusters
-        self.max_input = 2 # the maximum magnitude of controller input, used to find a conversion between input and output
+        self.max_input = 1.1 # the maximum magnitude of controller input, used to find a conversion between input and output
         self.thrust_factor = (max_output - min_output) / (
             2 * self.max_input
         )  # conversion factor between input and output
@@ -107,13 +112,11 @@ class Controller(Node):
         self.r = (
             (l**2 + w**2) / 2 - l * w
         ) ** 0.5 / 2  # constant we found in matrix math stuff
-
-        print(self.max_input * 4 * self.r)
        
-        self.pid_omega = PID(0, 0, 0, "omega") # a pid constant for omega control
-        self.pid_theta = CircularPID(0, 0, 0)
-        self.pid_x = PID(0.1, 0, 0)
-        self.pid_y = PID(0.1, 0, 0)
+        self.pid_omega = PID(0, 0, 0, "omega")#PID(1, 0, 0, "omega") # a pid constant for omega control
+        self.pid_theta = CircularPID(0, 0, 0, "theta")#CircularPID(0.25, 0, 0, "theta")
+        self.pid_x = PID(0, 0, 0)
+        self.pid_y = PID(0, 0, 0)
         self.pid_vx = PID(0, 0, 0)
         self.pid_vy = PID(0, 0, 0)
 
@@ -150,9 +153,12 @@ class Controller(Node):
             ControlMessage, "/control_input", self.update_control_input, 10
         )
         #subscriber for data from the IMU
-        self.create_subscription(
-            Odometry, "/odometry/filtered", self.update_odometry, 10
-        )
+        if(BLIND_LINEAR):
+            imu_topic_name = "/wamv/sensors/imu/imu/data" if in_sim else "/mavros/imu/data"
+            self.create_subscription(Imu, imu_topic_name, self.update_imu, 10)
+        else:
+            self.create_subscription(Odometry, "/odometry/filtered", self.update_odometry, 10)
+        
         # generate a publisher for each thruster
         self.thrust_publishers = {}
         for thruster_prefix in self.all_thruster_names:
@@ -188,6 +194,15 @@ class Controller(Node):
             self.front_left_name: (tx - ty) / d - ang,
             self.front_right_name: (ty + tx) / d + ang,
         }
+    
+    def update_imu(self, msg):
+        self.theta = R.from_quat([ # convert between quaternion and yaw value for theta
+            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+        ]).as_euler('xyz')[2] 
+        self.pid_theta.update_feedback_value(self.theta)
+        self.pid_omega.update_feedback_value(msg.angular_velocity.z)
+        self.last_data_timestamp = time.time()
+
     
     def update_odometry(self, msg):
         """
@@ -229,8 +244,8 @@ class Controller(Node):
             angular_input = 0
             
             if self.last_data_timestamp is not None and current_time - self.last_data_timestamp <= self.required_data_recentness:
-                x_input_world_space = self.linear_x_pid_switcher.determine_output(dt)
-                y_input_world_space = self.linear_y_pid_switcher.determine_output(dt)
+                x_input_world_space = self.linear_x_pid_switcher.determine_output(dt, BLIND_LINEAR)
+                y_input_world_space = self.linear_y_pid_switcher.determine_output(dt, BLIND_LINEAR)
                 angular_input = self.angular_pid_switcher.determine_output(dt)
             
             x_boat_space = x_input_world_space * math.cos(self.theta) + y_input_world_space * math.sin(self.theta)
