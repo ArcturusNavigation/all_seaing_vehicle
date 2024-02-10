@@ -88,8 +88,8 @@ class Controller(Node):
         in_sim = bool(self.get_parameter("in_sim").value)
         print("in sim: ", in_sim)
 
-        l = 3.5 if in_sim else 0.6858  # BOAT LENGTH
-        w = 2 if in_sim else 0.2794  # BOAT WIDTH
+        l = 3.5 if in_sim else 0.7112  # BOAT LENGTH
+        w = 2 if in_sim else 0.2540  # BOAT WIDTH
         self.msg_type = Float64 if in_sim else Int64
         self.py_type = float if in_sim else int
         min_output = (
@@ -98,7 +98,7 @@ class Controller(Node):
         max_output = (
             1000 if in_sim else 1900
         )  # the maximum PWM output value for thrusters
-        self.max_input = 1.1  # the maximum magnitude of controller input, used to find a conversion between input and output
+        self.max_input = 2 # the maximum magnitude of controller input, used to find a conversion between input and output
         self.thrust_factor = (max_output - min_output) / (
             2 * self.max_input
         )  # conversion factor between input and output
@@ -108,15 +108,14 @@ class Controller(Node):
             (l**2 + w**2) / 2 - l * w
         ) ** 0.5 / 2  # constant we found in matrix math stuff
 
-        self.linear_factor = 1 # units (kg/s) arbitrary conversion between linear velocity and thrust, determined experimentally
-        self.angular_factor = 1 if in_sim else 1 # units (kgm^2/s) arbitrary conversion between angular velocity and thrust, determined experimentally
+        print(self.max_input * 4 * self.r)
        
-        self.pid_omega = PID(1, 0.5, 0) # a pid constant for omega control
-        self.pid_theta = CircularPID(1, 0, 0)
+        self.pid_omega = PID(0, 0, 0, "omega") # a pid constant for omega control
+        self.pid_theta = CircularPID(0, 0, 0)
         self.pid_x = PID(0.1, 0, 0)
         self.pid_y = PID(0.1, 0, 0)
-        self.pid_vx = PID(0.4, 0.1, 0)
-        self.pid_vy = PID(0.4, 0.1, 0)
+        self.pid_vx = PID(0, 0, 0)
+        self.pid_vy = PID(0, 0, 0)
 
         self.angular_pid_switcher = PIDSwitcher(self.pid_omega, self.pid_theta)
         self.linear_x_pid_switcher = PIDSwitcher(self.pid_vx, self.pid_x)
@@ -124,21 +123,9 @@ class Controller(Node):
 
         self.theta = 0
 
-        self.max_angular_velocity = 1 # custom constraint on theoretical angular velocity so we don't go out of control
-
-        self.used_heading_last = False # whether or not the last input value was in theta mode
         self.last_update_timestamp = None # the last time the output loop ran
         self.last_data_timestamp = None # the last time we received data from odometry
         self.required_data_recentness = 1 # if we didn't get odometry data in the last X seconds, ignore data
-
-        self.used_heading_last = (
-            False  # whether or not the last input value was in theta mode
-        )
-        self.last_update_timestamp = None  # the last time the output loop ran
-        self.last_imu_data_timestamp = None  # the last time we received data from IMU
-        self.required_imu_data_recentness = (
-            1  # if we didn't get IMU data in the last X seconds, ignore data
-        )
 
         if in_sim:  # set output ROS2 topic names
             self.front_left_name = "/wamv/thrusters/front_left/thrust"
@@ -194,12 +181,12 @@ class Controller(Node):
             A dictionary mapping thruster topic name to output value, as a velocity
         """
         d = 2 ** (3 / 2)
-        ang = tn * self.angular_factor / (4 * self.r)
+        ang = tn / (4 * self.r)
         return {
-            self.back_right_name: (tx - ty) * self.linear_factor / d + ang,
-            self.back_left_name: (ty + tx) * self.linear_factor / d - ang,
-            self.front_left_name: (tx - ty) * self.linear_factor / d - ang,
-            self.front_right_name: (ty + tx) * self.linear_factor / d + ang,
+            self.back_right_name: (tx - ty) / d + ang,
+            self.back_left_name: (ty + tx) / d - ang,
+            self.front_left_name: (tx - ty) / d - ang,
+            self.front_right_name: (ty + tx) / d + ang,
         }
     
     def update_odometry(self, msg):
@@ -256,6 +243,7 @@ class Controller(Node):
                 float_msg.data = self.py_type(self.restrict_input(
                     results[name], self.max_input # make sure the input isn't way out of bounds
                 ) * self.thrust_factor + self.midpoint) # convert thrust to PWM
+                # print(float_msg)
                 self.thrust_publishers[name].publish(float_msg) # publish to thrusters
         self.last_update_timestamp = current_time # update timestamp for next time
 
