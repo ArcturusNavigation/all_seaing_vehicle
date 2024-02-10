@@ -31,6 +31,7 @@ namespace nav2_buoy_costmap_plugin
 
 	private:
 		void obstacleCallback(const geometry_msgs::msg::PoseArray &msg);
+		double origin_x_, origin_y_, map_resolution_;
 		double last_min_x_, last_min_y_, last_max_x_, last_max_y_;
 		bool need_recalculation_;
 		rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr obstacle_sub_;
