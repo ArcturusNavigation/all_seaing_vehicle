@@ -1,0 +1,5 @@
+<library path="nav2_buoy_costmap_plugin_core">
+	<class name="nav2_buoy_costmap_plugin/BuoyLayer" type="nav2_buoy_costmap_plugin::BuoyLayer"
+		base_class_type="nav2_costmap_2d::Layer">
+	</class>
+</library>

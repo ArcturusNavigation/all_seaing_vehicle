@@ -4,6 +4,7 @@ from rclpy.node import Node
 from std_msgs.msg import Float64
 from all_seaing_interfaces.msg import ASVState
 
+
 class SimpleController(Node):
     def __init__(self):
         super().__init__("simple_controller")
@@ -24,10 +25,7 @@ class SimpleController(Node):
 
         # subscribers
         self.command_sub = self.create_subscription(
-            ASVState,
-            "/asv_state", 
-            self.command_callback, 
-            10
+            ASVState, "/asv_state", self.command_callback, 10
         )
 
     def command_callback(self, msg):
@@ -41,14 +39,19 @@ class SimpleController(Node):
         right_thrust -= msg.desired_rudder * self.angular_scaling
 
         # limit outputs
-        left_thrust_msg.data = max(self.lower_thrust_limit, min(left_thrust, self.upper_thrust_limit))
-        right_thrust_msg.data = max(self.lower_thrust_limit, min(right_thrust, self.upper_thrust_limit))
+        left_thrust_msg.data = max(
+            self.lower_thrust_limit, min(left_thrust, self.upper_thrust_limit)
+        )
+        right_thrust_msg.data = max(
+            self.lower_thrust_limit, min(right_thrust, self.upper_thrust_limit)
+        )
 
         # publish left and right thrust values
         self.left_thrust_pub.publish(left_thrust_msg)
         self.right_thrust_pub.publish(right_thrust_msg)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     rclpy.init()
     simple_controller = SimpleController()
     rclpy.spin(simple_controller)
