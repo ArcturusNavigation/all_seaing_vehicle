@@ -138,6 +138,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/simple_controller.py
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
+    ${PROJECT_NAME}/controller/joy_to_control.py
+
 
     # Mapping progams
     ${PROJECT_NAME}/mapping/obstacle_sender.py
