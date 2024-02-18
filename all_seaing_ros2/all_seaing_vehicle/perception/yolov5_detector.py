@@ -18,8 +18,6 @@ from rclpy.qos import QoSProfile
 from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 from ament_index_python.packages import get_package_share_directory
-from pathlib import Path
-
 
 class Yolov5Detector(Node):
 
@@ -32,10 +30,10 @@ class Yolov5Detector(Node):
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
         path_model = (
             get_package_share_directory("all_seaing_vehicle")
-            + "/models/3dRenderingModel.pt"
+            + "/models/yolov5s.pt"
         )
         self.model = torch.hub.load(
-            Path(path_hubconfig), "custom", path=path_model, source="local"
+            path_hubconfig, "custom", path=path_model, source="local"
         )
 
         # Subscribers and publishers
