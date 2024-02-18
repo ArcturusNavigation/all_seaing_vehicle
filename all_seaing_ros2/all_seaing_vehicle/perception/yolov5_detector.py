@@ -18,6 +18,7 @@ from rclpy.qos import QoSProfile
 from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 from ament_index_python.packages import get_package_share_directory
+from pathlib import Path
 
 
 class Yolov5Detector(Node):
@@ -30,11 +31,11 @@ class Yolov5Detector(Node):
         # Get pretrained yolov5 models for colored buoys and cardinal markers
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
         path_model = (
-            get_package_share_directory("perception_suite")
-            + "/models/buoy_detection_best_weights_v7.pt"
+            get_package_share_directory("all_seaing_vehicle")
+            + "/models/3dRenderingModel.pt"
         )
         self.model = torch.hub.load(
-            path_hubconfig, "custom", path=path_model, source="local"
+            Path(path_hubconfig), "custom", path=path_model, source="local"
         )
 
         # Subscribers and publishers
