@@ -139,6 +139,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
     ${PROJECT_NAME}/controller/joy_to_control.py
+    ${PROJECT_NAME}/controller/turn_off_motors.py
 
 
     # Mapping progams

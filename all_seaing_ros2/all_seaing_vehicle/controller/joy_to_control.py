@@ -88,9 +88,10 @@ class JoyToControlNode(Node):
 
     def vel_callback(self, msg):
         self.m_joy = msg
-        self.m_control.y = self.m_joy.axes[0] * .2
-        self.m_control.x = self.m_joy.axes[1] * .2
-        self.m_control.angular = self.m_joy.axes[2] * .3
+        print(self.m_control.x)
+        self.m_control.y = self.m_joy.axes[0] * -.6
+        self.m_control.x = self.m_joy.axes[1] * .6
+        self.m_control.angular = self.m_joy.axes[2] * -.3
         self.joy_control_pub.publish(self.m_control)
 
 
