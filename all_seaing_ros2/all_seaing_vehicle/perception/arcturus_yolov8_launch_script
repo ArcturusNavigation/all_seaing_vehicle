@@ -2,9 +2,17 @@
 : '
 Reference: https://github.com/mgonzs13/yolov8_ros
 
-make sure to colcon build --symlink-install
-source dev_ws/install/setup.bash
-source vrx_ws/install/setup.bash
+Instructions: 
+$ cd ~/arcturus/dev_ws/src/
+$ git clone https://github.com/mgonzs13/yolov8_ros.git
+$ pip install -r yolov8_ros/requirements.txt
+$ cd ~/arcturus/dev_ws/
+$ rosdep install --from-paths src --ignore-src -r -y
+$ colcon build --symlink-install
+$ source ~/arcturus/dev_ws/install/setup.bash
+$ source ~/arcturus/vrx_ws/install/setup.bash
+
+follow those instructions before running script
 '
 
 : '
@@ -16,6 +24,11 @@ Parameters to Yolov8 Launch
     threshold: detection threshold (default: 0.5)
     input_image_topic: camera topic of RGB images (default: /camera/rgb/image_raw)
     image_reliability: reliability for the image topic: 0=system default, 1=Reliable, 2=Best Effort (default: 2)
+'
+
+: '
+Ensure that the model parameter has the correct path to a yolov8 model
+and that input_image_topic subscribes to the correct topic (such as zed)
 '
 
 ros2 launch yolov8_bringup yolov8.launch.py \
