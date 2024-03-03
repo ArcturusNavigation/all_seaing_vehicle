@@ -13,8 +13,8 @@ from sensor_msgs.msg import Imu
 from std_msgs.msg import Header
 from all_seaing_interfaces.msg import ControlMessage
 
-# WHETHER TO USE ODOMETRY i.e. ARE WE INSIDE?? 
-BLIND_LINEAR = True
+# WHETHER TO NOT USE ODOMETRY i.e. ARE WE INSIDE?? 
+BLIND_LINEAR = False
 
 class PID:
     """
@@ -111,15 +111,15 @@ class Controller(Node):
         self.r = (
             (l**2 + w**2) / 2 - l * w
         ) ** 0.5 / 2  # constant we found in matrix math stuff
-       
-        self.pid_omega = PID(0.8, 0.04, 0, "omega")#PID(1, 0, 0, "omega") # a pid constant for omega control
-        self.pid_theta = CircularPID(0.2, 0, 0, "theta")#CircularPID(0.25, 0, 0, "theta")
-        self.pid_x = PID(0, 0, 0)
-        self.pid_y = PID(0, 0, 0)
-        self.pid_vx = PID(0, 0, 0)
-        self.pid_vy = PID(0, 0, 0)
-        self.local_pid_vx = PID(0, 0, 0)
-        self.local_pid_vy = PID(0, 0, 0)
+        
+        self.pid_omega = PID(1, 0.5, 0) if self.in_sim else PID(0.8, 0.04, 0, "omega")
+        self.pid_theta = CircularPID(1, 0, 0) if self.in_sim else CircularPID(0.2, 0, 0, "theta")
+        self.pid_x = PID(0.1, 0, 0)         if self.in_sim else PID(0, 0, 0)
+        self.pid_y = PID(0.1, 0, 0)         if self.in_sim else PID(0, 0, 0)
+        self.pid_vx = PID(0.4, 0.1, 0, 'vx')      if self.in_sim else PID(0, 0, 0)
+        self.pid_vy = PID(0.4, 0.1, 0)      if self.in_sim else PID(0, 0, 0)
+        self.local_pid_vx = PID(0.4, 0.1, 0)if self.in_sim else PID(0, 0, 0)
+        self.local_pid_vy = PID(0.4, 0.1, 0)if self.in_sim else PID(0, 0, 0)
 
         self.chosen_angular_pid = self.pid_omega
         self.chosen_x_pid = self.pid_vx
@@ -184,6 +184,8 @@ class Controller(Node):
             timer_period, self.update_thrust
         )  # start the output loop
 
+        self.heart_stopper = self.create_publisher(Header, "/heart_stopped", 10)
+
     def get_time(self):
         """
         Get the current time. Written into a function because it's annoying to write every time.
@@ -227,7 +229,7 @@ class Controller(Node):
         self.theta = R.from_quat([ # convert between quaternion and yaw value for theta
             msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
         ]).as_euler('xyz')[2] 
-        print("theta updated: ", self.theta)
+        # print("theta updated: ", self.theta)
         self.pid_theta.update_feedback_value(self.theta)
         self.pid_omega.update_feedback_value(msg.angular_velocity.z)
         self.last_data_timestamp = self.get_time()
@@ -237,7 +239,6 @@ class Controller(Node):
         """
         Callback function for when we receive data from the odometry.
         """
-        print("received")
         self.theta = R.from_quat([ # convert between quaternion and yaw value for theta
             msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w
         ]).as_euler('xyz')[2]
@@ -278,7 +279,7 @@ class Controller(Node):
             float_msg.data = self.py_type(self.restrict_input(
                 thrust_values[name], self.max_input # make sure the input isn't way out of bounds
             ) * self.thrust_factor + self.midpoint) # convert thrust to PWM
-            print(float_msg)
+            #print(float_msg)
             self.thrust_publishers[name].publish(float_msg) # publish to thrusters
 
     def update_thrust(self):
@@ -288,22 +289,31 @@ class Controller(Node):
         current_time = self.get_time()
         if self.time_diff(current_time, self.last_heartbeat_timestamp) > self.required_heartbeat_recentness:
             self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
+            self.heart_stopper.publish(Header())
             raise Exception("lost hearbeat! killing node")
         if self.last_update_timestamp is not None:
             dt = self.time_diff(current_time, self.last_update_timestamp)
-            x_output_world_space = 0
-            y_output_world_space = 0
+            x_output = 0
+            y_output = 0
             angular_output = 0
             
             if self.last_data_timestamp is not None and self.time_diff(current_time, self.last_data_timestamp) <= self.required_data_recentness:
-                x_output_world_space = self.x_input if BLIND_LINEAR else self.chosen_x_pid.determine_output(self.x_input, dt)
-                y_output_world_space = self.x_input if BLIND_LINEAR else self.chosen_y_pid.determine_output(self.y_input, dt)
+                x_output = self.x_input if BLIND_LINEAR else self.chosen_x_pid.determine_output(self.x_input, dt)
+                y_output = self.x_input if BLIND_LINEAR else self.chosen_y_pid.determine_output(self.y_input, dt)
                 angular_output = self.chosen_angular_pid.determine_output(self.angular_input, dt)
-            
+
+            print("world: ", (x_output, y_output))
+                
             if self.chosen_x_pid != self.local_pid_vx:
-                x_boat_space = x_output_world_space * math.cos(self.theta) + x_output_world_space * math.sin(self.theta)
+                x_boat_space = x_output * math.cos(self.theta) + y_output * math.sin(self.theta)
+            else:
+                x_boat_space = x_output
             if self.chosen_y_pid != self.local_pid_vy:
-                y_boat_space = y_output_world_space * math.cos(self.theta) - y_output_world_space * math.sin(self.theta)
+                y_boat_space = y_output * math.cos(self.theta) - x_output * math.sin(self.theta)
+            else:
+                y_boat_space = y_output
+
+            print("boat: ", (x_boat_space, y_boat_space))
             results = self.get_thrust_values(x_boat_space, y_boat_space, angular_output)
             # print(results)
 
@@ -328,19 +338,6 @@ class Controller(Node):
         if input > max_val:
             return max_val
         return input
-
-    def about_zero(self, val):
-        """
-        Helper function to check whether a value is close to 0 (deadband).
-
-        Args:
-            val:
-                The input value
-
-        Returns:
-            True if the value is about zero, False otherwise
-        """
-        return abs(val) < 0.001
 
     def update_control_input(self, msg):
         """
