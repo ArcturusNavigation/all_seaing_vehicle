@@ -84,6 +84,14 @@ ament_target_dependencies(stationkeeping_state_reporter
     all_seaing_interfaces
 )
 
+# Node: moos_to_controller
+add_executable(moos_to_controller ${PROJECT_NAME}/controller/moos_to_controller.cpp)
+ament_target_dependencies(moos_to_controller
+    rclcpp
+    std_msgs
+    protobuf_client_interfaces
+    all_seaing_interfaces
+)
 #---------- Perception programs ----------#
 
 # Node: pointcloud_image_overlay
@@ -116,6 +124,7 @@ install(TARGETS
     pointcloud_image_overlay
     nav_state_reporter
     stationkeeping_state_reporter
+    moos_to_controller
     DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -139,6 +148,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
     ${PROJECT_NAME}/controller/joy_to_control.py
+
 
 
     # Mapping progams
