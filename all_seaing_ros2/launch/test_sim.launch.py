@@ -30,8 +30,8 @@ def generate_launch_description():
                 parameters=[
                     {"linear_scaling": 25.0},
                     {"angular_scaling": 15.0},
-                    {"lower_thrust_limit": -1400.0},
-                    {"upper_thrust_limit": 1400.0},
+                    {"lower_thrust_limit": -1000.0},
+                    {"upper_thrust_limit": 1000.0},
                 ],
             ),
             # robot localization
@@ -84,8 +84,18 @@ def generate_launch_description():
                         "/img_info_src",
                         "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
                     ),
-                    ("/cloud_src", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
+                    ("/cloud_src", "/wamv/sensors/lidars/filtered/points"),
                 ],
+            ),
+            # pointcloud filter
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="pointcloud_filter",
+                output="screen",
+                remappings=[
+                    ("/in_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
+                    ("/out_cloud", "/wamv/sensors/lidars/filtered/points"),
+                ]
             ),
             # state reporter
             launch_ros.actions.Node(
