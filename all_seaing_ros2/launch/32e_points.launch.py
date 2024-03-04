@@ -16,6 +16,7 @@ def generate_launch_description():
     tf_params["min_range"] = 0.9
     tf_params["max_range"] = 130.0
     tf_params["view_direction"] = 0.0
+    tf_params["model"] = "32E"
     tf_params["organize_cloud"] = True
     transform_container = ComposableNodeContainer(
         name="velodyne_pointcloud_transform_container",
@@ -25,7 +26,7 @@ def generate_launch_description():
         composable_node_descriptions=[
             ComposableNode(
                 package="velodyne_pointcloud",
-                plugin="velodyne_pointcloud::Convert",
+                plugin="velodyne_pointcloud::Transform",
                 name="velodyne_convert_node",
                 parameters=[tf_params],
             ),

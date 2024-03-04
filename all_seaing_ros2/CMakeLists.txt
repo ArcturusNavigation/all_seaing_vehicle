@@ -43,7 +43,9 @@ find_package(pcl_conversions REQUIRED)
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 include_directories(
-    ${PCL_INCLUDE_DIRS} 
+    ${PCL_INCLUDE_DIRS}
+    ${PCL_CONVERSIONS_INCLUDE_DIRS}
+    /opt/ros/humble/include
     include
 )
 
@@ -72,9 +74,9 @@ ament_target_dependencies(nav_state_reporter
     all_seaing_interfaces
 )
 
-# Node: stationkeeping_goal_sender
-add_executable(stationkeeping_goal_sender ${PROJECT_NAME}/navigation/stationkeeping_goal_sender.cpp)
-ament_target_dependencies(stationkeeping_goal_sender
+# Node: stationkeeping_state_reporter
+add_executable(stationkeeping_state_reporter ${PROJECT_NAME}/navigation/stationkeeping_state_reporter.cpp)
+ament_target_dependencies(stationkeeping_state_reporter
     rclcpp
     std_msgs
     geometry_msgs
@@ -125,7 +127,7 @@ install(TARGETS
     pointcloud_image_overlay
     pointcloud_filter
     nav_state_reporter
-    stationkeeping_goal_sender
+    stationkeeping_state_reporter
     DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -148,6 +150,9 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/simple_controller.py
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
+    ${PROJECT_NAME}/controller/joy_to_control.py
+    ${PROJECT_NAME}/controller/rviz_testing_helper.py
+
 
     # Mapping progams
     ${PROJECT_NAME}/mapping/obstacle_sender.py
@@ -183,4 +188,6 @@ install(DIRECTORY
     DESTINATION share/${PROJECT_NAME}
 )
 
+
+ament_export_include_directories(include)
 ament_package()

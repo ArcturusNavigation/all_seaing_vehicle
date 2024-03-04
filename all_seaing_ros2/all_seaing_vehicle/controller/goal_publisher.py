@@ -36,9 +36,9 @@ class Pub(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    pub = Pub()
+    node = goal_publisher()
 
-    rclpy.spin(pub)
+    rclpy.spin(node)
     rclpy.shutdown()
 
 
