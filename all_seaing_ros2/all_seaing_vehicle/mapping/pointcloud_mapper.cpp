@@ -11,7 +11,7 @@ implied to use, copy, modify, and distribute this software
 except by the author(s), or those designated by the author.
  **********************************************************************/
 
-#include "pointcloud_image_overlay.hpp"
+#include "pointcloud_mapper.hpp"
 
 void PclImageOverlay::PcImageFusionCb(const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
 									  const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg)
@@ -40,6 +40,9 @@ void PclImageOverlay::PcImageFusionCb(const sensor_msgs::msg::Image::ConstShared
 
 	for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points)
 	{
+        // TODO: Remove this for real world!!! Only to remove water in Gazebo Simulation
+        if (point_tf.intensity > 100) continue;
+
 		// Project 3D point onto the image plane using the intrinsic matrix.
 		// Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
 		cv::Point2d xy_rect = cam_model_.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));

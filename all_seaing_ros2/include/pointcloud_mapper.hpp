@@ -1,5 +1,18 @@
-#ifndef PROJECT_POINTCLOUD_IMAGE_OVERLAY_HPP_
-#define PROJECT_POINTCLOUD_IMAGE_OVERLAY_HPP_
+/*****************************************************
+Author: Michael DeFilippo (mikedef@mit.edu), AUV Lab
+NAME: Michael DeFilippo
+ORGN: Dept of Mechanical Engineering, MIT, Cambridge MA
+FILE: pointcloud_image_overlay.hpp
+DATE: 2022
+NOTE: Node to project pointcloud data into the given image space
+
+This is unreleased BETA code. no permission is granted or
+implied to use, copy, modify, and distribute this software
+except by the author(s), or those designated by the author.
+ ************************************************************************/
+
+#ifndef PROJECT_POINTCLOUD_IMAGE_MAPPER_HPP_
+#define PROJECT_POINTCLOUD_IMAGE_MAPPER_HPP_
 
 #include <string>
 #include <vector>
@@ -89,4 +102,4 @@ public:
     virtual ~PclImageOverlay();
 };
 
-#endif // PROJECT_POINTCLOUD_IMAGE_OVERLAY_HPP_
+#endif // PROJECT_POINTCLOUD_IMAGE_MAPPER_HPP_

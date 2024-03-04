@@ -104,6 +104,17 @@ ament_target_dependencies(pointcloud_image_overlay
     pcl_conversions
 )
 
+# Node: pointcloud_filter
+add_executable(pointcloud_filter ${PROJECT_NAME}/perception/pointcloud_filter.cpp)
+target_link_libraries(pointcloud_filter
+    ${PCL_LIBRARIES}
+)
+ament_target_dependencies(pointcloud_filter
+    rclcpp
+    sensor_msgs
+    pcl_conversions
+)
+
 #---------- Utils programs ----------#
 
 
@@ -114,6 +125,7 @@ include_directories(include)
 
 install(TARGETS
     pointcloud_image_overlay
+    pointcloud_filter
     nav_state_reporter
     stationkeeping_state_reporter
     DESTINATION lib/${PROJECT_NAME}
@@ -149,6 +161,7 @@ install(PROGRAMS
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
+    ${PROJECT_NAME}/navigation/path_generator.py
     ${PROJECT_NAME}/navigation/waypoint_sender.py
 
     # Perception programs

@@ -30,7 +30,11 @@ class Yolov5Detector(Node):
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
         path_model = (
             get_package_share_directory("all_seaing_vehicle")
+<<<<<<< HEAD
+            + "/models/3dRenderingModel.pt"
+=======
             + "/models/yolov5s.pt"
+>>>>>>> 6b217659fa234218b6575949799474ca33b6ac9a
         )
         self.model = torch.hub.load(
             path_hubconfig, "custom", path=path_model, source="local"
