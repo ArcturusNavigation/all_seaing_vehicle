@@ -11,15 +11,26 @@ find_package(ament_cmake REQUIRED)
 # ROS messages
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/ASVState.msg"
+    "msg/BoundingBox.msg"
+    "msg/Centroids.msg"
+    "msg/CloudClusterArray.msg"
+    "msg/CloudCluster.msg"
     "msg/ControlMessage.msg"
-    "msg/ObstacleFeature.msg"
     "msg/GoalState.msg"
-    "msg/LabeledBoundingBox2D.msg"
     "msg/LabeledBoundingBox2DArray.msg"
-    DEPENDENCIES std_msgs
+    "msg/LabeledBoundingBox2D.msg"
+    "msg/ObstacleFeature.msg"
+    DEPENDENCIES
+    std_msgs
+    sensor_msgs
+    geometry_msgs
+    builtin_interfaces
 )
 
 ament_package()
