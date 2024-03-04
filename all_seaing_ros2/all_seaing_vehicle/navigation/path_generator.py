@@ -15,7 +15,7 @@ class PathGenerator(Node):
         # Declare parameters
         self.declare_parameter("update_frequency", 2.0)
         self.declare_parameter("publish_path", True)
-        self.declare_parameter("sample_rate", 0.1)
+        self.declare_parameter("sample_rate", 0.05)
         update_frequency = self.get_parameter("update_frequency").value
         self.publish_path = self.get_parameter("publish_path").value
         self.sample_rate = self.get_parameter("sample_rate").value
@@ -30,10 +30,8 @@ class PathGenerator(Node):
     def send_goal(self):
         goal_msg = ComputePathToPose.Goal()
         goal_msg.goal.header.frame_id = "odom"
-        goal_msg.goal.pose.position.x = 10.0
-        goal_msg.goal.pose.position.y = 30.0
-        #goal_msg.goal.pose.position.x = 0.0
-        #goal_msg.goal.pose.position.y = 0.0
+        goal_msg.goal.pose.position.x = 8.0
+        goal_msg.goal.pose.position.y = 40.0
         self.action_client.wait_for_server()
         self.send_goal_future = self.action_client.send_goal_async(goal_msg)
         self.send_goal_future.add_done_callback(self.goal_response_callback)
