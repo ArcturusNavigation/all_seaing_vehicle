@@ -1,31 +1,32 @@
 #include "all_seaing_vehicle/cluster.hpp"
+#include <iostream>
 
 Cluster::Cluster()
 {
     valid_cluster_ = true;
 }
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr Cluster::GetCloud()
+pcl::PointCloud<pcl::PointXYZI>::Ptr Cluster::GetCloud()
 {
     return pointcloud_;
 }
 
-pcl::PointXYZ Cluster::GetMinPoint()
+pcl::PointXYZI Cluster::GetMinPoint()
 {
     return min_point_;
 }
 
-pcl::PointXYZ Cluster::GetMaxPoint()
+pcl::PointXYZI Cluster::GetMaxPoint()
 {
     return max_point_;
 }
 
-pcl::PointXYZ Cluster::GetCentroidPoint()
+pcl::PointXYZI Cluster::GetCentroidPoint()
 {
     return centroid_;
 }
 
-pcl::PointXYZ Cluster::GetAveragePoint()
+pcl::PointXYZI Cluster::GetAveragePoint()
 {
     return average_point_;
 }
@@ -94,7 +95,7 @@ int Cluster::SetID(int id)
     return id_;
 }
 
-void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_origin_cloud_ptr,
+void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
                        const std::vector<int> &in_cluster_indices, std_msgs::msg::Header in_ros_header,
                        int in_id, std::string in_label, builtin_interfaces::msg::Time in_last_seen)
 {
@@ -105,7 +106,7 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_origin_cloud
 
     // extract point cloud using the indices
     // calculate min and max points
-    pcl::PointCloud<pcl::PointXYZ>::Ptr current_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr current_cluster(new pcl::PointCloud<pcl::PointXYZI>);
     float min_x = std::numeric_limits<float>::max();
     float max_x = -std::numeric_limits<float>::max();
     float min_y = std::numeric_limits<float>::max();
@@ -117,7 +118,7 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_origin_cloud
     for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); ++pit)
     {
         // fill cluster point by point
-        pcl::PointXYZ p;
+        pcl::PointXYZI p;
         p.x = in_origin_cloud_ptr->points[*pit].x;
         p.y = in_origin_cloud_ptr->points[*pit].y;
         p.z = in_origin_cloud_ptr->points[*pit].z;
@@ -185,8 +186,8 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_origin_cloud
 
     // calculate convex hull polygon
     polygon_.header = in_ros_header;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::ConvexHull<pcl::PointXYZ> chull;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::ConvexHull<pcl::PointXYZI> chull;
     chull.setInputCloud(current_cluster);
     chull.reconstruct(*hull_cloud);
 
@@ -217,6 +218,8 @@ void Cluster::ToROSMessage(std_msgs::msg::Header in_ros_header,
 
     pcl::toROSMsg(*(this->GetCloud()), cloud_msg);
     cloud_msg.header = in_ros_header;
+
+    out_cluster_message.header = in_ros_header;
 
     out_cluster_message.cloud = cloud_msg;
     out_cluster_message.min_point.header = in_ros_header;

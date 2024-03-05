@@ -34,11 +34,11 @@
 class Cluster
 {
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud_;
-    pcl::PointXYZ min_point_; ///< min_point_
-    pcl::PointXYZ max_point_;
-    pcl::PointXYZ average_point_;
-    pcl::PointXYZ centroid_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_;
+    pcl::PointXYZI min_point_;
+    pcl::PointXYZI max_point_;
+    pcl::PointXYZI average_point_;
+    pcl::PointXYZI centroid_;
     float length_, width_, height_, area_;
     double orientation_angle_;
 
@@ -65,7 +65,7 @@ public:
      * @param[in] in_label            label to identify the cluster (optional)
      */
 
-    void SetCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_origin_cloud_ptr,
+    void SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
                   const std::vector<int> &in_cluster_indices,
                   std_msgs::msg::Header in_ros_header,
                   int in_id,
@@ -89,15 +89,15 @@ public:
     virtual ~Cluster();
 
     /** @brief Returns the pointer to the pointcloud containing the points in this Cluster */
-    pcl::PointCloud<pcl::PointXYZ>::Ptr GetCloud();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr GetCloud();
     /** @brief Returns the minimum point in the cluster */
-    pcl::PointXYZ GetMinPoint();
+    pcl::PointXYZI GetMinPoint();
     /** @brief Returns the maximum point in the cluster */
-    pcl::PointXYZ GetMaxPoint();
+    pcl::PointXYZI GetMaxPoint();
     /** @brief Returns the average point in the cluster */
-    pcl::PointXYZ GetAveragePoint();
+    pcl::PointXYZI GetAveragePoint();
     /** @brief Returns the centroid point in the cluster */
-    pcl::PointXYZ GetCentroidPoint();
+    pcl::PointXYZI GetCentroidPoint();
     /** @brief Returns the convex hull (polygon) of the cluster */
     geometry_msgs::msg::PolygonStamped GetPolygon();
     /** @brief Returns the area of the polygon (convex hull) */

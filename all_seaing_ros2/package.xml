@@ -35,6 +35,7 @@
     <depend>geometry_msgs</depend>
     <depend>nav_msgs</depend>
     <depend>mavros_msgs</depend>
+    <depend>visualization_msgs</depend>
 
     <!-- PCL DEPENDENCIES -->
     <depend>pcl_ros</depend>

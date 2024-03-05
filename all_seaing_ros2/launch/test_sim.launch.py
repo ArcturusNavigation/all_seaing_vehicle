@@ -58,18 +58,18 @@ def generate_launch_description():
                 arguments=["-f", "odom"],
             ),
             # static map generation
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="static_map_generator.py",
-                output="screen",
-                parameters=[
-                    {"map_resolution": 0.25},
-                    {"grid_width": 600},
-                    {"grid_height": 400},
-                    {"origin_x": 40.0},
-                    {"origin_y": 10.0},
-                ]
-            ),
+            #launch_ros.actions.Node(
+            #    package="all_seaing_vehicle",
+            #    executable="static_map_generator.py",
+            #    output="screen",
+            #    parameters=[
+            #        {"map_resolution": 0.25},
+            #        {"grid_width": 600},
+            #        {"grid_height": 400},
+            #        {"origin_x": 40.0},
+            #        {"origin_y": 10.0},
+            #    ]
+            #),
             # overlay node
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
@@ -115,12 +115,12 @@ def generate_launch_description():
                 parameters=[{"use_pose_array": True}, {"use_gps": False}],
             ),
             # obstacle sender
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="obstacle_sender.py",
-                output="screen",
-                parameters=[{"use_gps": False}],
-            ),
+            #launch_ros.actions.Node(
+            #    package="all_seaing_vehicle",
+            #    executable="obstacle_sender.py",
+            #    output="screen",
+            #    parameters=[{"use_gps": False}],
+            #),
             #            # buoy pair finder
             #            launch_ros.actions.Node(
             #                package="all_seaing_vehicle",
@@ -128,9 +128,9 @@ def generate_launch_description():
             #                output="screen",
             #            ),
             # nav2 launch
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([nav2_prefix, "/launch/nav2.launch.py"])
-            ),
+            #IncludeLaunchDescription(
+            #    PythonLaunchDescriptionSource([nav2_prefix, "/launch/nav2.launch.py"])
+            #),
             # default simulation
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(

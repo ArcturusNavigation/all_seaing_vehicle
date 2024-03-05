@@ -2,117 +2,46 @@
 
 ClusterNode::ClusterNode() : Node("pointcloud_euclidean_cluster")
 {
-    // Initialize member variables to default values
-    initMemberVariables();
+    // Initialize parameters
+    this->declare_parameter<int>("cluster_size_min", 20);
+    this->declare_parameter<int>("cluster_size_max", 100000);
+    this->declare_parameter<double>("clustering_distance", 0.75);
+    this->declare_parameter<double>("cluster_seg_thresh", 1.0);
+    this->declare_parameter<int>("drop_cluster_count", 5);
+    this->declare_parameter<double>("drop_cluster_thresh", 1.0);
+    this->declare_parameter<double>("polygon_area_thresh", 100000.0);
+    this->declare_parameter<bool>("viz", true);
 
+    // Initialize member variables from parameters
+    _cluster_size_min = this->get_parameter("cluster_size_min").as_int();
+    _cluster_size_max = this->get_parameter("cluster_size_max").as_int();
+    _clustering_distance = this->get_parameter("clustering_distance").as_double();
+    _cluster_seg_thresh = this->get_parameter("cluster_seg_thresh").as_double();
+    _drop_cluster_count = this->get_parameter("drop_cluster_count").as_int();
+    _drop_cluster_thresh = this->get_parameter("drop_cluster_thresh").as_double();
+    _polygon_area_thresh = this->get_parameter("polygon_area_thresh").as_double();
+    _viz = this->get_parameter("viz").as_bool();
+    
     // Initialize publishers and subscribers
-    initPublishersAndSubscribers();
-}
-
-// Implement other member functions of ClusterNode
-void ClusterNode::initMemberVariables()
-{
-    _using_cloud = false;
-    _filter_camera_view = false;
-    _camera_hfov = 80;
-    _camera_theta = 0.0;
-    _filter_cloud = false;
-    _cull_min = 0.0;
-    _cull_max = 0.0;
-    _downsampled_cloud = false;
-    _leaf_size = 0.0;
-    _cluster_size_min = 20;
-    _cluster_size_max = 100000;
-    _clustering_distance = 0.75;
-    _use_multiple_thres = false;
-    _cluster_seg_thresh = 1.0;
-    _drop_cluster_count = 5;
-    _drop_cluster_thresh = 1.0;
-    _polygon_area_thresh = 100000.0;
-    _viz = true;
-}
-
-void ClusterNode::initPublishersAndSubscribers()
-{
     _pub_cluster_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud", 10);
     _centroid_pub = this->create_publisher<all_seaing_interfaces::msg::Centroids>("/cluster_centroids", 10);
     _pub_clusters_message = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/detection/raw_cloud_clusters", 10);
     _pub_matched_clusters_msg = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/detection/matched_cloud_clusters", 10);
     _marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/chull_markers", 10);
     _text_marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/text_markers", 10);
-
     _cloud_sub = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/wamv/sensors/lidars/filtered/points", 100, std::bind(&ClusterNode::pc_callback, this, std::placeholders::_1));
 }
 
-// Define other member functions like pc_callback, filterCloud, downsampleCloud, etc.
-// ...
-/**
- * @brief Filter points around the vessel to remove self reflections
- * @param in_cloud_ptr  Input point cloud to filter
- * @param out_cloud_ptr Output point cloud to store filtered cloud
- * @param min_distance  Minimum distance allowed to keep a point
- * @param max_distance  Maximum distance allowed to keep a point
- */
-void ClusterNode::filterCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &in_cloud_ptr,
-                              pcl::PointCloud<pcl::PointXYZ>::Ptr &out_cloud_ptr,
-                              double min_distance,
-                              double max_distance)
+void ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr,
+                               pcl::PointCloud<pcl::PointXYZI>::Ptr out_cloud_ptr,
+                               all_seaing_interfaces::msg::Centroids &in_out_centroids,
+                               all_seaing_interfaces::msg::CloudClusterArray &in_out_clusters)
 {
-    out_cloud_ptr->points.clear();
-    for (const auto &point : in_cloud_ptr->points)
-    {
-        float origin_distance = std::sqrt(std::pow(point.x, 2) + std::pow(point.y, 2));
-        if (origin_distance > min_distance && origin_distance < max_distance)
-        {
-            out_cloud_ptr->points.push_back(point);
-        }
-    }
-}
-
-void ClusterNode::downsampledCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &in_cloud_ptr,
-                                  pcl::PointCloud<pcl::PointXYZ>::Ptr &out_cloud_ptr,
-                                  float leaf_size)
-{
-    pcl::VoxelGrid<pcl::PointXYZ> vg;
-    vg.setInputCloud(in_cloud_ptr);
-    vg.setLeafSize(leaf_size, leaf_size, leaf_size);
-    vg.filter(*out_cloud_ptr);
-}
-
-void ClusterNode::filterCameraView(const pcl::PointCloud<pcl::PointXYZ>::Ptr &in_cloud_ptr,
-                                   pcl::PointCloud<pcl::PointXYZ>::Ptr &out_cloud_ptr,
-                                   const int fov, const double theta)
-{
-    float half_fov = static_cast<float>(fov * M_PI / 180) / 2.0f;
-    float camera_theta = static_cast<float>(theta * M_PI / 180);
-
-    out_cloud_ptr->points.clear();
-    for (const auto &point : in_cloud_ptr->points)
-    {
-        float current_theta = std::atan2(point.y, point.x);
-        if (current_theta > camera_theta - half_fov && current_theta < camera_theta + half_fov)
-        {
-            out_cloud_ptr->points.push_back(point);
-        }
-    }
-}
-
-void ClusterNode::ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
-                                            pcl::PointCloud<pcl::PointXYZ>::Ptr out_cloud_ptr,
-                                            all_seaing_interfaces::msg::Centroids &in_out_centroids,
-                                            all_seaing_interfaces::msg::CloudClusterArray &in_out_clusters)
-{
-    // Cluster the pointcloud by the distance of the points using different thresholds
-    // This helps with clustering at larger distances. See adaptive clustering for more info.
-    // Thresholds are based off empirical evidence, further study required for larger distances
-
+    // Cluster the pointcloud by the distance of the points
     std::vector<std::shared_ptr<Cluster>> all_clusters;
-    if (!_use_multiple_thres)
-    {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>(*in_cloud_ptr));
-        all_clusters = clusterCloud(cloud_ptr, out_cloud_ptr, in_out_centroids, _clustering_distance);
-    }
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>(*in_cloud_ptr));
+    all_clusters = clusterCloud(cloud_ptr, _clustering_distance);
 
     // Push raw clusters (all_clusters) to CloudClusterArray and publish
     all_seaing_interfaces::msg::CloudClusterArray raw_cloud_clusters;
@@ -137,7 +66,7 @@ void ClusterNode::ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZ>
     {
         *out_cloud_ptr += *all_clusters[i]->GetCloud();
 
-        pcl::PointXYZ center_point = all_clusters[i]->GetCentroidPoint();
+        pcl::PointXYZI center_point = all_clusters[i]->GetCentroidPoint();
         geometry_msgs::msg::Point centroid;
         centroid.x = center_point.x;
         centroid.y = center_point.y;
@@ -156,15 +85,13 @@ void ClusterNode::ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZ>
 }
 
 std::vector<std::shared_ptr<Cluster>> ClusterNode::clusterCloud(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &in_cloud_ptr,
-    pcl::PointCloud<pcl::PointXYZ>::Ptr &out_cloud_ptr,
-    all_seaing_interfaces::msg::Centroids &in_out_centroids,
+    const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr,
     double in_max_cluster_distance)
 {
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
+    pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>());
 
     // Create 2d pointcloud
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::copyPointCloud(*in_cloud_ptr, *cloud_2d);
 
     // Flatten cloud
@@ -176,7 +103,7 @@ std::vector<std::shared_ptr<Cluster>> ClusterNode::clusterCloud(
 
     // Extract clusters from point cloud and save indices in cluster_indices
     std::vector<pcl::PointIndices> cluster_indices;
-    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+    pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
     ec.setClusterTolerance(in_max_cluster_distance);
     ec.setMinClusterSize(_cluster_size_min);
     ec.setMaxClusterSize(_cluster_size_max);
@@ -250,28 +177,6 @@ void ClusterNode::matchClusters(std::vector<std::shared_ptr<Cluster>> &in_cluste
     }
 }
 
-// Publishing functions
-// Function to publish point cloud
-void ClusterNode::publishCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &in_cloud_to_publish_ptr)
-{
-    sensor_msgs::msg::PointCloud2 cloud_msg;
-    pcl::toROSMsg(*in_cloud_to_publish_ptr, cloud_msg);
-    cloud_msg.header = _sensor_header; // Assuming _sensor_header is properly set elsewhere in your class
-
-    _pub_cluster_cloud->publish(cloud_msg);
-}
-// Function to publish centroids
-void ClusterNode::publishCentroids(const all_seaing_interfaces::msg::Centroids &in_centroids)
-{
-    // Use the publisher member to publish the centroids message
-    _centroid_pub->publish(in_centroids);
-}
-// Function to publish cloud clusters
-void ClusterNode::publishCloudClusters(const all_seaing_interfaces::msg::CloudClusterArray &in_clusters)
-{
-    // Directly use the publisher to publish the message
-    _pub_clusters_message->publish(in_clusters);
-}
 void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &in_cluster_array)
 {
     visualization_msgs::msg::MarkerArray markers_array;
@@ -296,7 +201,7 @@ void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &i
         text_marker.header = cluster.header;
         text_marker.ns = "text_clustering";
         text_marker.id = cluster.id;
-        text_marker.scale.z = 10.0; // Text scale in RVIZ
+        text_marker.scale.z = 1.0; // Text scale in RVIZ
         text_marker.color.a = 1.0;
         text_marker.color.g = 1.0;
         text_marker.lifetime = rclcpp::Duration::from_seconds(1.3);
@@ -339,56 +244,36 @@ void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &i
 
 void ClusterNode::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud)
 {
-    if (!_using_cloud)
-    {
-        _using_cloud = true;
-        _current_time = in_cloud->header.stamp;
+    _current_time = in_cloud->header.stamp;
+    _sensor_header = in_cloud->header;
 
-        pcl::PointCloud<pcl::PointXYZ>::Ptr current_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr clustered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr camera_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr current_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr clustered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+    all_seaing_interfaces::msg::Centroids centroids;
+    all_seaing_interfaces::msg::CloudClusterArray cloud_clusters;
 
-        all_seaing_interfaces::msg::Centroids centroids;              // Current segment centroids
-        all_seaing_interfaces::msg::CloudClusterArray cloud_clusters; // Current segments clusters
+    // Convert ROS2 PointCloud2 to pcl::PointCloud<pcl::PointXYZI>
+    fromROSMsg(*in_cloud, *current_cloud_ptr);
 
-        fromROSMsg(*in_cloud, *current_cloud_ptr);
-        _sensor_header = in_cloud->header;
+    // Segment cloud 
+    segmentCloud(current_cloud_ptr, clustered_cloud_ptr, centroids, cloud_clusters);
 
-        if (_filter_cloud)
-            filterCloud(current_cloud_ptr, filtered_cloud_ptr, _cull_min, _cull_max);
-        else
-            filtered_cloud_ptr = current_cloud_ptr;
+    // Publish clustered clouds (raw cloud publisher)
+    sensor_msgs::msg::PointCloud2 cloud_msg;
+    pcl::toROSMsg(*clustered_cloud_ptr, cloud_msg);
+    cloud_msg.header = _sensor_header;
+    _pub_cluster_cloud->publish(cloud_msg);
 
-        if (_downsampled_cloud)
-            downsampledCloud(filtered_cloud_ptr, downsampled_cloud_ptr, _leaf_size);
-        else
-            downsampled_cloud_ptr = filtered_cloud_ptr;
+    // Publish centroids
+    centroids.header = _sensor_header;
+    _centroid_pub->publish(centroids);
 
-        if (_filter_camera_view)
-            filterCameraView(downsampled_cloud_ptr, camera_cloud_ptr, _camera_hfov, _camera_theta);
-        else
-            camera_cloud_ptr = downsampled_cloud_ptr;
+    // Publish matched cloud clusters
+    cloud_clusters.header = _sensor_header;
+    _pub_clusters_message->publish(cloud_clusters);
 
-        segmentCloud(camera_cloud_ptr, clustered_cloud_ptr, centroids, cloud_clusters);
-
-        // Cluster_cloud publisher (raw cloud publisher)
-        publishCloud(clustered_cloud_ptr);
-
-        centroids.header = _sensor_header;
-        publishCentroids(centroids);
-
-        // Cloud clusters message publisher (matched clusters)
-        cloud_clusters.header = _sensor_header;
-        publishCloudClusters(cloud_clusters);
-
-        // Visualization
-        if (_viz)
-            markers(cloud_clusters);
-
-        _using_cloud = false;
-    }
+    // Publish visualization markers
+    if (_viz) markers(cloud_clusters);
 }
 
 int main(int argc, char **argv)
