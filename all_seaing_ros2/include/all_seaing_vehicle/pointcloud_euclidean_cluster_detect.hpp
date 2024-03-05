@@ -26,9 +26,7 @@ private:
                       pcl::PointCloud<pcl::PointXYZI>::Ptr out_cloud_ptr,
                       all_seaing_interfaces::msg::Centroids &in_out_centroids,
                       all_seaing_interfaces::msg::CloudClusterArray &in_out_clusters);
-    std::vector<std::shared_ptr<Cluster>> clusterCloud(
-        const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr,
-        double in_max_cluster_distance = 0.5);
+    std::vector<std::shared_ptr<Cluster>> clusterCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr);
     void matchClusters(std::vector<std::shared_ptr<Cluster>> &in_clusters,
                        std::vector<std::shared_ptr<Cluster>> &in_out_clusters);
     void markers(const all_seaing_interfaces::msg::CloudClusterArray &in_cluster_array);
@@ -39,11 +37,10 @@ private:
     builtin_interfaces::msg::Time _current_time;
     int _cluster_size_min;
     int _cluster_size_max;
-    int cluster_id;
+    int _cluster_id;
     double _clustering_distance;
     std::string _output_frame;
     double _cluster_seg_thresh;
-    int _drop_cluster_count;
     double _drop_cluster_thresh;
     double _polygon_area_thresh;
     bool _viz;

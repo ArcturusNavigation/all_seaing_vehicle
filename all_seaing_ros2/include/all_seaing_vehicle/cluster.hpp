@@ -49,9 +49,7 @@ class Cluster
     geometry_msgs::msg::PolygonStamped polygon_;
     std_msgs::msg::Header ros_header_;
 
-    std::string label_;
     int id_;
-    // int last_seen_;
     builtin_interfaces::msg::Time last_seen_;
 
     bool valid_cluster_;
@@ -68,9 +66,7 @@ public:
     void SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
                   const std::vector<int> &in_cluster_indices,
                   std_msgs::msg::Header in_ros_header,
-                  int in_id,
-                  std::string in_label,
-                  builtin_interfaces::msg::Time last_seen);
+                  int in_id, builtin_interfaces::msg::Time last_seen);
 
     /**
      * @brief Constructs the all_seaing_interfaces::CloudCluster message associated to this Cluster

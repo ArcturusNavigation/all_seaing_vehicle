@@ -97,9 +97,8 @@ int Cluster::SetID(int id)
 
 void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
                        const std::vector<int> &in_cluster_indices, std_msgs::msg::Header in_ros_header,
-                       int in_id, std::string in_label, builtin_interfaces::msg::Time in_last_seen)
+                       int in_id, builtin_interfaces::msg::Time in_last_seen)
 {
-    label_ = in_label;
     id_ = in_id;
     ros_header_ = in_ros_header;
     last_seen_ = in_last_seen;
@@ -175,11 +174,9 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
 
     // calculate bounding box
     bounding_box_.header = in_ros_header;
-
     bounding_box_.pose.position.x = min_point_.x + length_ / 2;
     bounding_box_.pose.position.y = min_point_.y + width_ / 2;
     bounding_box_.pose.position.z = min_point_.z + height_ / 2;
-
     bounding_box_.dimensions.x = ((length_ < 0) ? -1 * length_ : length_);
     bounding_box_.dimensions.y = ((width_ < 0) ? -1 * width_ : width_);
     bounding_box_.dimensions.z = ((height_ < 0) ? -1 * height_ : height_);
