@@ -34,6 +34,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 # PCL dependencies
 find_package(pcl_ros)
@@ -115,6 +116,23 @@ ament_target_dependencies(pointcloud_filter
     pcl_conversions
 )
 
+# Node: pointcloud_euclidian_cluster_detect
+add_executable(pointcloud_euclidean_cluster_detect 
+    ${PROJECT_NAME}/perception/pointcloud_euclidean_cluster_detect.cpp
+    ${PROJECT_NAME}/perception/cluster.cpp)
+ament_target_dependencies(pointcloud_euclidean_cluster_detect
+    visualization_msgs 
+    rclcpp 
+    std_msgs
+    all_seaing_interfaces
+    geometry_msgs
+    pcl_conversions
+    pcl_ros
+    sensor_msgs
+    tf2
+)
+
+
 #---------- Utils programs ----------#
 
 
@@ -124,8 +142,9 @@ ament_target_dependencies(pointcloud_filter
 include_directories(include)
 
 install(TARGETS
-    pointcloud_image_overlay
+    pointcloud_euclidean_cluster_detect
     pointcloud_filter
+    pointcloud_image_overlay
     nav_state_reporter
     stationkeeping_state_reporter
     DESTINATION lib/${PROJECT_NAME}
