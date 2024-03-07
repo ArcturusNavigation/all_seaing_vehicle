@@ -31,16 +31,18 @@ class MoosToController : public rclcpp::Node {
             double moos_speed;
             double moos_heading;
 
-            if (msg.gateway_key == "DESIRED_SPEED") {moos_speed = msg.gateway_double;}
-            if (msg.gateway_key == "DESIRED_HEADING") {moos_heading = msg.gateway_double;}
-
-            m_control.x = moos_speed*cos(moos_heading);
-            m_control.y = moos_speed*sin(moos_heading);
-            m_control.angular = moos_heading;
-
             m_control.use_x_velocity = true;
             m_control.use_y_velocity = true;
             m_control.use_angular_velocity = false;
+            m_control.world_space = false;
+
+            if (msg.gateway_key == "DESIRED_THRUST") {moos_speed = msg.gateway_double;}
+            if (msg.gateway_key == "DESIRED_HEADING") {moos_heading = msg.gateway_double;}
+
+            m_control.x = 20; // moos_speed*cos(moos_heading);
+            m_control.y = 20; // moos_speed*sin(moos_heading);
+            m_control.angular = moos_heading;
+
 
             m_control_pub->publish(m_control);
         }

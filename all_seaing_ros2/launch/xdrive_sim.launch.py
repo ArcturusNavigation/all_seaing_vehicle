@@ -42,6 +42,13 @@ def generate_launch_description():
             executable="ekf_node",
             name="ekf_filter_node",
             parameters=[robot_localization_params]),
+        # MOOS-ROS bridge
+        launch_ros.actions.Node(
+            package="protobuf_client",
+            executable="protobuf_client_node",
+            output="screen",
+        ),
+
         launch_ros.actions.Node(
             package="robot_localization",
             executable="navsat_transform_node",
