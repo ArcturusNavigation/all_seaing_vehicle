@@ -5,7 +5,7 @@ from rclpy.serialization import serialize_message
 
 from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped
-from std_msgs.msg import Header
+from all_seaing_interfaces.msg import Heartbeat
 import rosbag2_py
 
 import datetime
@@ -20,13 +20,15 @@ class RvizTestingHelper(Node):
 
         self.pub = self.create_publisher(Path, self.path_topic, 10)
         self.create_subscription(Odometry, "/odometry/filtered", self.record_odometry, 10)
-        self.create_subscription(Header, "/heart_stopped", self.finish_recording, 10)
+        self.create_subscription(Heartbeat, "/heartbeat", self.handle_heartbeat, 10)
 
         self.recorded_poses = []
 
         self.timestring = datetime.datetime.now().strftime("%I_%M%p_%m_%d_%Y")
         self.counter = 0
 
+        self.last_heartbeat = Heartbeat()
+        self.last_heartbeat.e_stopped = True
 
     def make_new_bag(self, path):
         self.counter += 1
@@ -52,13 +54,16 @@ class RvizTestingHelper(Node):
                 self.get_clock().now().nanoseconds)
 
     def record_odometry(self, msg):
+        if self.last_heartbeat.e_stopped:
+            return
+
         pose_stamped = PoseStamped()
         pose_stamped.pose = msg.pose.pose
         pose_stamped.header = msg.header
         self.recorded_poses.append(pose_stamped)
 
-    def finish_recording(self, _):
-        print("heartbeat stopped, publishing recording")
+    def save(self):
+        print("publishing recording")
         if self.recorded_poses:
             path = Path()
             path.poses = self.recorded_poses
@@ -69,7 +74,13 @@ class RvizTestingHelper(Node):
         else:
             print("no poses detected, skipping publish")
 
-        self.recorded_poses = []
+    def handle_heartbeat(self, msg):
+        if msg.e_stopped != self.last_heartbeat.e_stopped or msg.in_teleop != self.last_heartbeat.in_teleop:
+            if not self.last_heartbeat.e_stopped:
+                self.save()
+            self.recorded_poses = []
+        self.last_heartbeat = msg
+        
 
 def main(args=None):
     rclpy.init(args=args)
