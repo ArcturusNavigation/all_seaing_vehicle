@@ -109,8 +109,8 @@ namespace nav2_buoy_costmap_plugin
 
 		for (std::pair<int, int> obstacle : obstacles_)
 		{
-			int x = obstacle.first + (int)(origin_x_ / map_resolution_);
-			int y = obstacle.second + (int)(origin_y_ / map_resolution_);
+			int x = (int)((obstacle.first + origin_x_) / map_resolution_);
+			int y = (int)((obstacle.second + origin_y_) / map_resolution_);
 			if (x > min_i && x < max_i && y > min_j && y < max_j)
 			{
 				int index = master_grid.getIndex(x, y);

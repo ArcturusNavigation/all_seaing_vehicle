@@ -34,6 +34,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 # PCL dependencies
 find_package(pcl_ros)
@@ -112,6 +113,34 @@ ament_target_dependencies(pointcloud_image_overlay
     pcl_conversions
 )
 
+# Node: pointcloud_filter
+add_executable(pointcloud_filter ${PROJECT_NAME}/perception/pointcloud_filter.cpp)
+target_link_libraries(pointcloud_filter
+    ${PCL_LIBRARIES}
+)
+ament_target_dependencies(pointcloud_filter
+    rclcpp
+    sensor_msgs
+    pcl_conversions
+)
+
+# Node: pointcloud_euclidian_cluster_detect
+add_executable(pointcloud_euclidean_cluster_detect 
+    ${PROJECT_NAME}/perception/pointcloud_euclidean_cluster_detect.cpp
+    ${PROJECT_NAME}/perception/cluster.cpp)
+ament_target_dependencies(pointcloud_euclidean_cluster_detect
+    visualization_msgs 
+    rclcpp 
+    std_msgs
+    all_seaing_interfaces
+    geometry_msgs
+    pcl_conversions
+    pcl_ros
+    sensor_msgs
+    tf2
+)
+
+
 #---------- Utils programs ----------#
 
 
@@ -121,6 +150,8 @@ ament_target_dependencies(pointcloud_image_overlay
 include_directories(include)
 
 install(TARGETS
+    pointcloud_euclidean_cluster_detect
+    pointcloud_filter
     pointcloud_image_overlay
     nav_state_reporter
     stationkeeping_state_reporter
@@ -148,7 +179,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
     ${PROJECT_NAME}/controller/joy_to_control.py
-    ${PROJECT_NAME}/controller/turn_off_motors.py
+    ${PROJECT_NAME}/controller/rviz_testing_helper.py
 
 
 
@@ -159,6 +190,7 @@ install(PROGRAMS
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
+    ${PROJECT_NAME}/navigation/path_generator.py
     ${PROJECT_NAME}/navigation/waypoint_sender.py
 
     # Perception programs

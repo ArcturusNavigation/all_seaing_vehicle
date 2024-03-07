@@ -91,6 +91,18 @@ def generate_launch_description():
         ])
     )
 
+    # pwm sender
+    pwm_sender_node = Node(
+        package="all_seaing_vehicle"
+    )
+
+    laserscan_node = Node(
+        package="velodyne_laserscan",
+        executable="velodyne_laserscan_node",
+        output="screen",
+    )
+
+
     return LaunchDescription([
         driver_container, 
         transform_container,
