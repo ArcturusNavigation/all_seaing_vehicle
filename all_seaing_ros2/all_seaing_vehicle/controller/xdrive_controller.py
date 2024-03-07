@@ -10,7 +10,7 @@ from std_msgs.msg import Float64
 from std_msgs.msg import Int64
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
-from std_msgs.msg import Header
+from all_seaing_interfaces.msg import Heartbeat
 from all_seaing_interfaces.msg import ControlMessage
 
 # WHETHER TO NOT USE ODOMETRY i.e. ARE WE INSIDE?? 
@@ -160,7 +160,7 @@ class Controller(Node):
             ControlMessage, "/control_input", self.update_control_input, 10
         )
         self.create_subscription(
-            Header, "/heartbeat", self.receive_heartbeat, 10
+            Heartbeat, "/heartbeat", self.receive_heartbeat, 10
         )
         #subscriber for data from the IMU
         if(BLIND_LINEAR):
@@ -190,10 +190,13 @@ class Controller(Node):
         """
         return self.get_clock().now()
 
-    def receive_heartbeat(self, _):
+    def receive_heartbeat(self, msg):
         """
         Callback function for receiving hearbeat messages, which are necessary for the controller to run.
         """
+        if msg.e_stopped:
+            self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
+            raise Exception("received e-stop message! killing node")
         self.last_heartbeat_timestamp = self.get_time()
 
     def get_thrust_values(self, tx, ty, tn):
@@ -287,7 +290,7 @@ class Controller(Node):
         current_time = self.get_time()
         if self.time_diff(current_time, self.last_heartbeat_timestamp) > self.required_heartbeat_recentness:
             self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
-            raise Exception("lost hearbeat! killing node")
+            raise Exception("lost heartbeat! killing node")
         if self.last_update_timestamp is not None:
             dt = self.time_diff(current_time, self.last_update_timestamp)
             x_output = 0
