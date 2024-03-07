@@ -184,8 +184,6 @@ class Controller(Node):
             timer_period, self.update_thrust
         )  # start the output loop
 
-        self.heart_stopper = self.create_publisher(Header, "/heart_stopped", 10)
-
     def get_time(self):
         """
         Get the current time. Written into a function because it's annoying to write every time.
@@ -289,7 +287,6 @@ class Controller(Node):
         current_time = self.get_time()
         if self.time_diff(current_time, self.last_heartbeat_timestamp) > self.required_heartbeat_recentness:
             self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
-            self.heart_stopper.publish(Header())
             raise Exception("lost hearbeat! killing node")
         if self.last_update_timestamp is not None:
             dt = self.time_diff(current_time, self.last_update_timestamp)
