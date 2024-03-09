@@ -11,6 +11,6 @@ roboflow:
   url: https://universe.roboflow.com/arcturus-gx59n/buoy-labeling-full/dataset/1
   version: 1
   workspace: arcturus-gx59n
-test: ../test/images
-train: Buoy-Labeling-Full-1/train/images
-val: Buoy-Labeling-Full-1/valid/images
+test: ../../../Buoy-Labeling-Full-1/test/images
+train: ../../../Buoy-Labeling-Full-1/train/images
+val: ../../../Buoy-Labeling-Full-1/valid/images
