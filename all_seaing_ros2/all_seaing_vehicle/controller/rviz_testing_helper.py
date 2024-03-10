@@ -7,6 +7,7 @@ from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped
 from all_seaing_interfaces.msg import Heartbeat
 import rosbag2_py
+import os
 
 import datetime
 
@@ -17,6 +18,10 @@ class RvizTestingHelper(Node):
         super().__init__('rviz_testing_helper')
 
         self.path_topic = 'boat_path'
+
+        self.declare_parameter('bag_path', None)
+        bag_path_value = self.get_parameter('bag_path').value
+        self.bag_path = str(bag_path_value) if bag_path_value else None
 
         self.pub = self.create_publisher(Path, self.path_topic, 10)
         self.create_subscription(Odometry, "/odometry/filtered", self.record_odometry, 10)
@@ -36,7 +41,7 @@ class RvizTestingHelper(Node):
         writer = rosbag2_py.SequentialWriter()
 
         storage_options = rosbag2_py._storage.StorageOptions(
-            uri=f'{self.timestring}_{self.counter}',
+            uri=os.path.join(self.bag_path, f'{self.timestring}_{self.counter}'),
             storage_id='sqlite3'
         )
         converter_options = rosbag2_py._storage.ConverterOptions('', '')
@@ -70,7 +75,8 @@ class RvizTestingHelper(Node):
             path.header = self.recorded_poses[-1].header
 
             self.pub.publish(path)
-            self.make_new_bag(path)
+            if self.bag_path is not None:
+                self.make_new_bag(path)
         else:
             print("no poses detected, skipping publish")
 
