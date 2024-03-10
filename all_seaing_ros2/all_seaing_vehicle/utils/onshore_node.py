@@ -20,10 +20,8 @@ class OnshoreNode(Node):
 
         self.control_message = ControlMessage()
         self.control_input_publisher = self.create_publisher(ControlMessage, '/control_input', 10)
-        self.control_message.use_x_velocity = True
-        self.control_message.use_y_velocity = True
-        self.control_message.use_angular_velocity = True
-        self.control_message.world_space = False
+        self.control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
+        self.control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
 
         self.heartbeat_message = Heartbeat()
         self.heartbeat_publisher = self.create_publisher(Heartbeat, "/heartbeat", 10)
