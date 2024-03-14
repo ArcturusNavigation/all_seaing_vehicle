@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 
-import abc
-
 import rclpy
-from rclpy import qos
 from rclpy.node import Node
 
 from sensor_msgs.msg import Joy
-from keyboard_msgs.msg import Key
 
 from all_seaing_interfaces.msg import ControlMessage
 from all_seaing_interfaces.msg import Heartbeat
@@ -37,22 +33,24 @@ class OnshoreNode(Node):
 
         self.enter_held = False
 
+        self.get_logger().info('starting onshore node, teleop enabled')
+
     def beat_heart(self):
         self.heartbeat_publisher.publish(self.heartbeat_message)
 
     def keyboard_callback(self, msg):
         if self.heartbeat_message.e_stopped:
-            print('we are e-stopped!')
+            self.get_logger().fatal("we are e-stopped!")
             return
         if msg.buttons[0]:
-            print('e-stop pressed!')
+            self.get_logger().info('e-stop pressed!')
             self.heartbeat_message.e_stopped = True
             return
         if msg.buttons[1]:
             if not self.enter_held:
                 self.enter_held = True
                 self.heartbeat_message.in_teleop = not self.heartbeat_message.in_teleop
-                print(f'toggled teleop (now {self.heartbeat_message.in_teleop})')
+                self.get_logger().info(f'toggled teleop (now {self.heartbeat_message.in_teleop})')
         elif self.enter_held:
             self.enter_held = False
         if self.heartbeat_message.in_teleop:

@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import Heartbeat
-from all_seaing_interfaces.msg import ASV2State
+from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlMessage
+from geometry_msgs.msg import Point
+from nav_msgs.msg import Odometry
+
+def point_diff_2d(a, b):
+    return ((a.x - b.x)**2 + (a.y - b.y)**2)**0.5
 
 class Task:
     def get_name(self):
@@ -16,15 +20,33 @@ class Task:
     def end(self):
         pass
     def get_next(self):
+        return False
+    def receive_odometry(self, _):
         pass
 
 class NavigationChannel(Task):
+    def __init__(self, control_message_pub, logger):
+        self.control_message_pub = control_message_pub
+
+        self.start_point = None
+        self.current_point = None
+        self.logger = logger
     def get_name(self):
         # the idea is that since this is a method, we can edit the name to display some sort of information for debugging
         return "NavigationChannel"
     def start(self):
         # start moos behavior of path following
-        pass
+        control_message = ControlMessage()
+        control_message.x = 0.5
+        control_message.y = 0.0
+        control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
+        control_message.angular = 0.0
+        control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
+
+        self.control_message_pub.publish(control_message)
+
+        self.start_point = None
+        self.current_point = None
     def update(self):
         # pass new waypoints into moos, reading from perception
         pass
@@ -33,33 +55,52 @@ class NavigationChannel(Task):
         pass
     def get_next(self):
         # check if moos is done, if so return the next task
-        return None
+        if self.start_point is None or self.current_point is None:
+            return False
+        self.logger.info(str(point_diff_2d(self.start_point, self.current_point)))
+        return point_diff_2d(self.start_point, self.current_point) >= 1
+    def receive_odometry(self, msg):
+        self.current_point = msg.pose.pose.position
+        if self.start_point is None:
+            self.start_point = self.current_point
     
 class Idling(Task):
-    def update():
+    def get_name(self):
+        return "Idling"
+    def update(self):
         # keep boat in place
         pass
-    
-STARTING_TASK = NavigationChannel()
+
 TIMEOUT_TIME = 3 # seconds
 UPDATE_RATE = 1/60 # seconds
 
 class TaskManager(Node):
     def __init__(self):
         super().__init__("task_manager")
-        self.task = STARTING_TASK
-        self.task.start()
-        self.clock = self.get_clock()
-        self.last_heartbeat_timestamp = self.clock.now()
 
         self.create_subscription(Heartbeat, "/heartbeat", self.receive_heartbeat, 10)
+        self.create_subscription(Odometry, "/odometry/filtered", self.receive_odometry, 10)
 
         self.state_publisher = self.create_publisher(ASV2State, "/boat_state", 10)
         self.state_message = ASV2State()
 
+        self.control_message_publisher = self.create_publisher(ControlMessage, "/control_input", 10)
+
+        self.TASK_LIST = [
+            NavigationChannel(self.control_message_publisher, self.get_logger()), 
+            Idling()
+        ]
+
+        self.task_index = 0
+        self.task = self.TASK_LIST[self.task_index]
+        
+        self.clock = self.get_clock()
+        self.last_heartbeat_timestamp = self.clock.now()
+
         self.timer = self.create_timer(UPDATE_RATE, self.update)
 
         self.paused = True
+        self.has_started_for_the_first_time = False
 
         print("starting task manager (paused for now)")
 
@@ -69,6 +110,9 @@ class TaskManager(Node):
         
         if self.paused:
             return
+        if not self.has_started_for_the_first_time:
+            self.has_started_for_the_first_time = True
+            self.task.start()
 
         self.check_transition()
         self.task.update()
@@ -76,11 +120,17 @@ class TaskManager(Node):
         self.state_message.current_state = self.task.get_name()
         self.state_publisher.publish(self.state_message)
 
+    def receive_odometry(self, msg):
+        self.task.receive_odometry(msg)
+
     def check_transition(self):
-        transition = self.task.get_next()
-        if transition is not None:
+        if self.task.get_next():
+            self.get_logger().info("transitioning to next state")
             self.task.end()
-            self.task = transition
+            self.task_index += 1
+            if self.task_index >= len(self.TASK_LIST):
+                raise Exception("transitioned out of last task!")
+            self.task = self.TASK_LIST[self.task_index]
             self.task.start()
             self.check_transition()
 

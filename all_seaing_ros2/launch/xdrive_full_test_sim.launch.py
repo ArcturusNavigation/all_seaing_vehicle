@@ -8,7 +8,7 @@ from launch.conditions import IfCondition
 import launch_ros
 import os
 
-# sample launch file to run the sydney regatta sim with an xdrive boat and controller
+# this will run everything except the heartbeat, so you can directly Ctrl+C the heartbeat
 
 
 def generate_launch_description():
