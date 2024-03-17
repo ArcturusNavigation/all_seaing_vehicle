@@ -34,15 +34,15 @@ class MoosToController : public rclcpp::Node {
             m_control.use_x_velocity = true;
             m_control.use_y_velocity = true;
             m_control.use_angular_velocity = false;
-            m_control.world_space = false;
+            m_control.world_space = true;
+
 
             if (msg.gateway_key == "DESIRED_THRUST") {moos_speed = msg.gateway_double;}
-            if (msg.gateway_key == "DESIRED_HEADING") {moos_heading = msg.gateway_double;}
+            if (msg.gateway_key == "DESIRED_HEADING") {moos_heading = ((msg.gateway_double)*(3.14159/180));}
 
-            m_control.x = 20; // moos_speed*cos(moos_heading);
-            m_control.y = 20; // moos_speed*sin(moos_heading);
+            m_control.x = moos_speed*sin(moos_heading);
+            m_control.y = moos_speed*cos(moos_heading);
             m_control.angular = moos_heading;
-
 
             m_control_pub->publish(m_control);
         }

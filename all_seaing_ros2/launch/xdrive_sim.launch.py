@@ -28,14 +28,14 @@ def generate_launch_description():
     )
     return LaunchDescription([
         DeclareLaunchArgument("with_control", default_value=TextSubstitution(text="True")),
-        # launch_ros.actions.Node(
-	    #     package="all_seaing_vehicle",
-        #     executable="state_reporter",
-        #     remappings=[
-        #         ("/imu/data", "/wamv/sensors/imu/imu/data"),
-        #         ("/gps/fix", "/wamv/sensors/gps/gps/fix")
-        #     ]
-        # ),
+        launch_ros.actions.Node(
+	        package="all_seaing_vehicle",
+            executable="nav_state_reporter",
+            remappings=[
+                ("/imu/data", "/wamv/sensors/imu/imu/data"),
+                ("/gps/fix", "/wamv/sensors/gps/gps/fix")
+            ]
+        ),
         launch_ros.actions.Node(
             package="robot_localization",
             executable="ekf_node",

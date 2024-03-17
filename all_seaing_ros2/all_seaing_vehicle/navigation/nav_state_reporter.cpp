@@ -99,6 +99,8 @@ private:
 			m_state.desired_rudder = msg.gateway_double;
 		if (msg.gateway_key == "DESIRED_THRUST")
 			m_state.desired_thrust = msg.gateway_double;
+		if (msg.gateway_key == "DESIRED_HEADING")
+			m_state.desired_heading = msg.gateway_double;
 		if (msg.gateway_key == "NAV_X")
 			m_state.nav_x = msg.gateway_double;
 		if (msg.gateway_key == "NAV_Y")

@@ -9,3 +9,4 @@ float64 nav_heading
 float64 nav_speed
 float64 desired_rudder
 float64 desired_thrust
+float64 desired_heading
