@@ -1,0 +1,2 @@
+bool in_teleop
+bool e_stopped

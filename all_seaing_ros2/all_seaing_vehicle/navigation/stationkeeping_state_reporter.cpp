@@ -50,7 +50,7 @@ class StationkeepingStateReporter : public rclcpp::Node {
         void vel_callback(const protobuf_client_interfaces::msg::Gateway & msg) {
             if (msg.gateway_key == "VEL_X") m_control.x = msg.gateway_double;
             if (msg.gateway_key == "VEL_Y") m_control.y = msg.gateway_double;
-            if (msg.gateway_key == "GOAL_HEADING") {m_control.angular = msg.gateway_double; m_control.use_angular_velocity = false; }
+            if (msg.gateway_key == "GOAL_HEADING") {m_control.angular = msg.gateway_double; m_control.angular_control_mode = all_seaing_interfaces::msg::ControlMessage::WORLD_POSITION; }
             m_control_pub->publish(m_control);
         }
 };

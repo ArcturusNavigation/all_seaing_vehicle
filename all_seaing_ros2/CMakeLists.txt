@@ -169,6 +169,7 @@ install(PROGRAMS
     # Competition-specific programs
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sub.py
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_pwm_sub.py
+    ${PROJECT_NAME}/competitions/roboboat/task_manager.py
 
     # Controller programs
     ${PROJECT_NAME}/controller/goal_publisher.py
@@ -201,6 +202,7 @@ install(PROGRAMS
     # Utils programs
     ${PROJECT_NAME}/utils/e_stopped_node.py
     ${PROJECT_NAME}/utils/e_stopped_publisher_test.py
+    ${PROJECT_NAME}/utils/onshore_node.py
 
     DESTINATION lib/${PROJECT_NAME}
 )
