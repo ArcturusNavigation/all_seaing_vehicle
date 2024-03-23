@@ -8,6 +8,7 @@ import os
 
 def generate_launch_description():
     nav2_prefix = get_package_share_directory("all_seaing_vehicle")
+    all_seaing_prefix = get_package_share_directory("all_seaing_vehicle")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
     robot_localization_params = os.path.join(
@@ -161,7 +162,11 @@ def generate_launch_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [vrx_gz_prefix, "/launch/competition.launch.py"]
-                )
+                ),
+                launch_arguments = {
+                    "world": "sydney_regatta",
+                    "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
+                }.items(),
             ),
             # MOOS-ROS bridge
             launch_ros.actions.Node(

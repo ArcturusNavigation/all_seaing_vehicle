@@ -44,7 +44,7 @@ wamv_imu:
       Y: 0.0
 lidar:
     - name: lidar_wamv
-      type: 16_beam
+      type: 32_beam
       x: 0.7
       y: 0.0
       z: 1.8
