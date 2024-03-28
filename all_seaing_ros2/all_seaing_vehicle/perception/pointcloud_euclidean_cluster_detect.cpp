@@ -22,7 +22,6 @@ ClusterNode::ClusterNode() : Node("pointcloud_euclidean_cluster")
     
     // Initialize publishers and subscribers
     _pub_cluster_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud", 10);
-    _centroid_pub = this->create_publisher<all_seaing_interfaces::msg::Centroids>("/cluster_centroids", 10);
     _pub_clusters_message = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/detection/raw_cloud_clusters", 10);
     _pub_matched_clusters_msg = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/detection/matched_cloud_clusters", 10);
     _marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/chull_markers", 10);
@@ -33,7 +32,6 @@ ClusterNode::ClusterNode() : Node("pointcloud_euclidean_cluster")
 
 void ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr,
                                pcl::PointCloud<pcl::PointXYZI>::Ptr out_cloud_ptr,
-                               all_seaing_interfaces::msg::Centroids &in_out_centroids,
                                all_seaing_interfaces::msg::CloudClusterArray &in_out_clusters)
 {
     // Cluster the pointcloud by the distance of the points
@@ -45,12 +43,9 @@ void ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_clo
     all_seaing_interfaces::msg::CloudClusterArray raw_cloud_clusters;
     for (unsigned int i = 0; i < all_clusters.size(); i++)
     {
-        if (all_clusters[i]->IsValid())
-        {
-            all_seaing_interfaces::msg::CloudCluster raw_cloud_cluster;
-            all_clusters[i]->ToROSMessage(_sensor_header, raw_cloud_cluster);
-            raw_cloud_clusters.clusters.push_back(raw_cloud_cluster);
-        }
+        all_seaing_interfaces::msg::CloudCluster raw_cloud_cluster;
+        all_clusters[i]->ToROSMessage(_sensor_header, raw_cloud_cluster);
+        raw_cloud_clusters.clusters.push_back(raw_cloud_cluster);
     }
 
     // Use the shared pointer publisher to publish the clusters
@@ -64,21 +59,10 @@ void ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_clo
     {
         *out_cloud_ptr += *all_clusters[i]->GetCloud();
 
-        pcl::PointXYZI center_point = all_clusters[i]->GetCentroidPoint();
-        geometry_msgs::msg::Point centroid;
-        centroid.x = center_point.x;
-        centroid.y = center_point.y;
-        centroid.z = center_point.z;
-
         // Push matched clusters to CloudClusterArray
-        if (all_clusters[i]->IsValid())
-        {
-            in_out_centroids.points.push_back(centroid);
-
-            all_seaing_interfaces::msg::CloudCluster cloud_cluster;
-            all_clusters[i]->ToROSMessage(_sensor_header, cloud_cluster);
-            in_out_clusters.clusters.push_back(cloud_cluster);
-        }
+        all_seaing_interfaces::msg::CloudCluster cloud_cluster;
+        all_clusters[i]->ToROSMessage(_sensor_header, cloud_cluster);
+        in_out_clusters.clusters.push_back(cloud_cluster);
     }
 }
 
@@ -136,12 +120,12 @@ void ClusterNode::matchClusters(std::vector<std::shared_ptr<Cluster>> &in_cluste
         // Remove cluster if larger than polygon area threshold
         if (cluster->GetPolygonArea() > _polygon_area_thresh) continue;
 
-        // Match clusters based on closest centroid
+        // Match clusters based on closest average point
         float dist = _cluster_seg_thresh;
         int best_match = -1;
-        for (int j = 0; j < in_out_clusters.size(); j++)
+        for (unsigned long j = 0; j < in_out_clusters.size(); j++)
         {
-            float this_dist = euclideanDistance(in_out_clusters[j]->GetCentroidPoint(), cluster->GetCentroidPoint());
+            float this_dist = euclideanDistance(in_out_clusters[j]->GetAveragePoint(), cluster->GetAveragePoint());
             if (this_dist < dist)
             {
                 best_match = j;
@@ -176,7 +160,7 @@ void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &i
         marker.color.a = 1.0;
         marker.color.r = 1.0;
         marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
-        marker.scale.x = 1.0;
+        marker.scale.x = 0.05;
         marker.lifetime = rclcpp::Duration::from_seconds(1.3);
 
         visualization_msgs::msg::Marker text_marker;
@@ -191,12 +175,12 @@ void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &i
         text_marker.lifetime = rclcpp::Duration::from_seconds(1.3);
         text_marker.text = std::to_string(cluster.id);
 
-        text_marker.pose.position.x = cluster.max_point.point.x;
-        text_marker.pose.position.y = cluster.centroid_point.point.y;
-        text_marker.pose.position.z = cluster.centroid_point.point.z + 1.0;
+        text_marker.pose.position.x = cluster.max_point.x;
+        text_marker.pose.position.y = cluster.avg_point.y;
+        text_marker.pose.position.z = cluster.avg_point.z + 1.0;
         text_markers_array.markers.push_back(text_marker);
 
-        for (const auto &p : cluster.convex_hull.polygon.points)
+        for (const auto &p : cluster.convex_hull.points)
         {
             geometry_msgs::msg::Point point;
             point.x = p.x;
@@ -206,12 +190,12 @@ void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &i
         }
 
         // Close the loop for LINE_STRIP
-        if (!cluster.convex_hull.polygon.points.empty())
+        if (!cluster.convex_hull.points.empty())
         {
             geometry_msgs::msg::Point first_point;
-            first_point.x = cluster.convex_hull.polygon.points.front().x;
-            first_point.y = cluster.convex_hull.polygon.points.front().y;
-            first_point.z = cluster.convex_hull.polygon.points.front().z;
+            first_point.x = cluster.convex_hull.points.front().x;
+            first_point.y = cluster.convex_hull.points.front().y;
+            first_point.z = cluster.convex_hull.points.front().z;
             marker.points.push_back(first_point);
         }
 
@@ -229,24 +213,19 @@ void ClusterNode::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPt
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr current_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::PointCloud<pcl::PointXYZI>::Ptr clustered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-    all_seaing_interfaces::msg::Centroids centroids;
     all_seaing_interfaces::msg::CloudClusterArray cloud_clusters;
 
     // Convert ROS2 PointCloud2 to pcl pointcloud
     fromROSMsg(*in_cloud, *current_cloud_ptr);
 
     // Segment cloud 
-    segmentCloud(current_cloud_ptr, clustered_cloud_ptr, centroids, cloud_clusters);
+    segmentCloud(current_cloud_ptr, clustered_cloud_ptr, cloud_clusters);
 
     // Publish clustered clouds (raw cloud publisher)
     sensor_msgs::msg::PointCloud2 cloud_msg;
     pcl::toROSMsg(*clustered_cloud_ptr, cloud_msg);
     cloud_msg.header = _sensor_header;
     _pub_cluster_cloud->publish(cloud_msg);
-
-    // Publish centroids
-    centroids.header = _sensor_header;
-    _centroid_pub->publish(centroids);
 
     // Publish matched cloud clusters
     cloud_clusters.header = _sensor_header;

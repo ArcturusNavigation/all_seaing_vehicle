@@ -1,10 +1,4 @@
 #include "all_seaing_vehicle/cluster.hpp"
-#include <iostream>
-
-Cluster::Cluster()
-{
-    valid_cluster_ = true;
-}
 
 pcl::PointCloud<pcl::PointXYZI>::Ptr Cluster::GetCloud()
 {
@@ -21,29 +15,9 @@ pcl::PointXYZI Cluster::GetMaxPoint()
     return max_point_;
 }
 
-pcl::PointXYZI Cluster::GetCentroidPoint()
-{
-    return centroid_;
-}
-
 pcl::PointXYZI Cluster::GetAveragePoint()
 {
     return average_point_;
-}
-
-double Cluster::GetOrientationAngle()
-{
-    return orientation_angle_;
-}
-
-Eigen::Matrix3f Cluster::GetEigenVectors()
-{
-    return eigen_vectors_;
-}
-
-Eigen::Vector3f Cluster::GetEigenValues()
-{
-    return eigen_values_;
 }
 
 all_seaing_interfaces::msg::BoundingBox Cluster::GetBoundingBox()
@@ -51,7 +25,7 @@ all_seaing_interfaces::msg::BoundingBox Cluster::GetBoundingBox()
     return bounding_box_;
 }
 
-geometry_msgs::msg::PolygonStamped Cluster::GetPolygon()
+geometry_msgs::msg::Polygon Cluster::GetPolygon()
 {
     return polygon_;
 }
@@ -59,11 +33,6 @@ geometry_msgs::msg::PolygonStamped Cluster::GetPolygon()
 float Cluster::GetPolygonArea()
 {
     return area_;
-}
-
-bool Cluster::IsValid()
-{
-    return valid_cluster_;
 }
 
 int Cluster::GetID()
@@ -76,23 +45,14 @@ std_msgs::msg::Header Cluster::GetROSHeader()
     return ros_header_;
 }
 
-builtin_interfaces::msg::Time Cluster::SetLastSeen(builtin_interfaces::msg::Time value)
-{
-    return last_seen_ = value;
-}
 builtin_interfaces::msg::Time Cluster::GetLastSeen()
 {
     return last_seen_;
 }
-void Cluster::SetValidity(bool in_valid)
-{
-    valid_cluster_ = in_valid;
-}
 
-int Cluster::SetID(int id)
+void Cluster::SetID(int id)
 {
     id_ = id;
-    return id_;
 }
 
 void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
@@ -125,9 +85,6 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
         average_x += p.x;
         average_y += p.y;
         average_z += p.z;
-        centroid_.x += p.x;
-        centroid_.y += p.y;
-        centroid_.z += p.z;
         current_cluster->points.push_back(p);
 
         if (p.x < min_x)
@@ -152,13 +109,9 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
     max_point_.y = max_y;
     max_point_.z = max_z;
 
-    // calculate centroid, average
+    // calculate average
     if (in_cluster_indices.size() > 0)
     {
-        centroid_.x /= in_cluster_indices.size();
-        centroid_.y /= in_cluster_indices.size();
-        centroid_.z /= in_cluster_indices.size();
-
         average_x /= in_cluster_indices.size();
         average_y /= in_cluster_indices.size();
         average_z /= in_cluster_indices.size();
@@ -177,12 +130,11 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
     bounding_box_.pose.position.x = min_point_.x + length_ / 2;
     bounding_box_.pose.position.y = min_point_.y + width_ / 2;
     bounding_box_.pose.position.z = min_point_.z + height_ / 2;
-    bounding_box_.dimensions.x = ((length_ < 0) ? -1 * length_ : length_);
-    bounding_box_.dimensions.y = ((width_ < 0) ? -1 * width_ : width_);
-    bounding_box_.dimensions.z = ((height_ < 0) ? -1 * height_ : height_);
+    bounding_box_.dimensions.x = length_;
+    bounding_box_.dimensions.y = width_;
+    bounding_box_.dimensions.z = height_;
 
     // calculate convex hull polygon
-    polygon_.header = in_ros_header;
     pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::ConvexHull<pcl::PointXYZI> chull;
     chull.setInputCloud(current_cluster);
@@ -194,7 +146,7 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
         p.x = hull_cloud->points[i].x;
         p.y = hull_cloud->points[i].y;
         p.z = min_point_.z;
-        polygon_.polygon.points.push_back(p);
+        polygon_.points.push_back(p);
     }
 
     // get area of polygon
@@ -204,7 +156,6 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
     current_cluster->height = 1;
     current_cluster->is_dense = true;
 
-    valid_cluster_ = true;
     pointcloud_ = current_cluster;
 }
 
@@ -218,28 +169,18 @@ void Cluster::ToROSMessage(std_msgs::msg::Header in_ros_header,
 
     out_cluster_message.header = in_ros_header;
 
-    out_cluster_message.cloud = cloud_msg;
-    out_cluster_message.min_point.header = in_ros_header;
-    out_cluster_message.min_point.point.x = this->GetMinPoint().x;
-    out_cluster_message.min_point.point.y = this->GetMinPoint().y;
-    out_cluster_message.min_point.point.z = this->GetMinPoint().z;
+    out_cluster_message.min_point.x = this->GetMinPoint().x;
+    out_cluster_message.min_point.y = this->GetMinPoint().y;
+    out_cluster_message.min_point.z = this->GetMinPoint().z;
 
-    out_cluster_message.max_point.header = in_ros_header;
-    out_cluster_message.max_point.point.x = this->GetMaxPoint().x;
-    out_cluster_message.max_point.point.y = this->GetMaxPoint().y;
-    out_cluster_message.max_point.point.z = this->GetMaxPoint().z;
+    out_cluster_message.max_point.x = this->GetMaxPoint().x;
+    out_cluster_message.max_point.y = this->GetMaxPoint().y;
+    out_cluster_message.max_point.z = this->GetMaxPoint().z;
 
-    out_cluster_message.avg_point.header = in_ros_header;
-    out_cluster_message.avg_point.point.x = this->GetAveragePoint().x;
-    out_cluster_message.avg_point.point.y = this->GetAveragePoint().y;
-    out_cluster_message.avg_point.point.z = this->GetAveragePoint().z;
+    out_cluster_message.avg_point.x = this->GetAveragePoint().x;
+    out_cluster_message.avg_point.y = this->GetAveragePoint().y;
+    out_cluster_message.avg_point.z = this->GetAveragePoint().z;
 
-    out_cluster_message.centroid_point.header = in_ros_header;
-    out_cluster_message.centroid_point.point.x = this->GetCentroidPoint().x;
-    out_cluster_message.centroid_point.point.y = this->GetCentroidPoint().y;
-    out_cluster_message.centroid_point.point.z = this->GetCentroidPoint().z;
-
-    out_cluster_message.convex_hull.header = in_ros_header;
     out_cluster_message.convex_hull = this->GetPolygon();
 
     out_cluster_message.polygon_area = this->GetPolygonArea();
@@ -251,7 +192,6 @@ void Cluster::ToROSMessage(std_msgs::msg::Header in_ros_header,
     out_cluster_message.bb_msg = this->GetBoundingBox();
 }
 
-Cluster::~Cluster()
-{
-    // Destructor
-}
+Cluster::Cluster(){}
+
+Cluster::~Cluster(){}
