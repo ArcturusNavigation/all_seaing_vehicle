@@ -4,9 +4,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <memory>
 #include <vector>
 #include <cmath>
+#include <unordered_set>
 
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"

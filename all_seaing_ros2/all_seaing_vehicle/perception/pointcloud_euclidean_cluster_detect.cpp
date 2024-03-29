@@ -35,33 +35,31 @@ void ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_clo
                                all_seaing_interfaces::msg::CloudClusterArray &in_out_clusters)
 {
     // Cluster the pointcloud by the distance of the points
-    std::vector<std::shared_ptr<Cluster>> all_clusters;
+    std::vector<std::shared_ptr<Cluster>> raw_clusters;
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>(*in_cloud_ptr));
-    all_clusters = clusterCloud(cloud_ptr);
+    raw_clusters = clusterCloud(cloud_ptr);
 
-    // Push raw clusters (all_clusters) to CloudClusterArray and publish
+    // Match raw clusters and tracked clusters
+    matchClusters(raw_clusters, _tracked_clusters);
+
+    // Push raw clusters to CloudClusterArray and publish
     all_seaing_interfaces::msg::CloudClusterArray raw_cloud_clusters;
-    for (unsigned int i = 0; i < all_clusters.size(); i++)
+    for (unsigned int i = 0; i < raw_clusters.size(); i++)
     {
         all_seaing_interfaces::msg::CloudCluster raw_cloud_cluster;
-        all_clusters[i]->ToROSMessage(_sensor_header, raw_cloud_cluster);
+        raw_clusters[i]->ToROSMessage(_sensor_header, raw_cloud_cluster);
         raw_cloud_clusters.clusters.push_back(raw_cloud_cluster);
     }
-
-    // Use the shared pointer publisher to publish the clusters
     _pub_clusters_message->publish(raw_cloud_clusters);
 
-    // Current sensor clusters (all_clusters), tracked_clusters
-    matchClusters(all_clusters, _tracked_clusters);
-
     // Final pointcloud to be published
-    for (unsigned int i = 0; i < all_clusters.size(); i++)
+    for (unsigned int i = 0; i < _tracked_clusters.size(); i++)
     {
-        *out_cloud_ptr += *all_clusters[i]->GetCloud();
+        *out_cloud_ptr += *_tracked_clusters[i]->GetCloud();
 
         // Push matched clusters to CloudClusterArray
         all_seaing_interfaces::msg::CloudCluster cloud_cluster;
-        all_clusters[i]->ToROSMessage(_sensor_header, cloud_cluster);
+        _tracked_clusters[i]->ToROSMessage(_sensor_header, cloud_cluster);
         in_out_clusters.clusters.push_back(cloud_cluster);
     }
 }
@@ -100,49 +98,74 @@ std::vector<std::shared_ptr<Cluster>> ClusterNode::clusterCloud(const pcl::Point
 
     return clusters;
 }
-void ClusterNode::matchClusters(std::vector<std::shared_ptr<Cluster>> &in_clusters,
-                                std::vector<std::shared_ptr<Cluster>> &in_out_clusters)
+
+void ClusterNode::matchClusters(std::vector<std::shared_ptr<Cluster>> &raw_clusters,
+                                std::vector<std::shared_ptr<Cluster>> &tracked_clusters)
 {
-    // Remove clusters if haven't seen for drop cluster threshold
-    for (int i = in_out_clusters.size() - 1; i >= 0; i--)
+    // Remove tracked clusters if haven't seen for drop cluster threshold
+    for (auto it = tracked_clusters.begin(); it != tracked_clusters.end(); it++)
     {
         rclcpp::Duration current_time(_current_time.sec, _current_time.nanosec);
-        rclcpp::Duration cluster_last_seen(in_out_clusters[i]->GetLastSeen().sec, in_out_clusters[i]->GetLastSeen().nanosec);
+        rclcpp::Duration cluster_last_seen((*it)->GetLastSeen().sec, (*it)->GetLastSeen().nanosec);
         rclcpp::Duration last_seen = current_time - cluster_last_seen;
 
         if (last_seen.seconds() >= _drop_cluster_thresh)
-            in_out_clusters.erase(in_out_clusters.begin() + i);
+        {
+            it = tracked_clusters.erase(it);
+            it--;
+        }
+            
     }
 
-    std::vector<std::shared_ptr<Cluster>> track_clusters;
-    for (auto &cluster : in_clusters)
+    std::vector<std::shared_ptr<Cluster>> new_clusters;
+    std::unordered_set<int> chosen_indices;
+    for (auto it = raw_clusters.begin(); it != raw_clusters.end(); it++)
     {
+        auto& raw_cluster = *it;
+
         // Remove cluster if larger than polygon area threshold
-        if (cluster->GetPolygonArea() > _polygon_area_thresh) continue;
+        if (raw_cluster->GetPolygonArea() > _polygon_area_thresh)
+        {
+            it = raw_clusters.erase(it);
+            it--;
+            continue;
+        }
 
         // Match clusters based on closest average point
-        float dist = _cluster_seg_thresh;
+        float best_dist = _cluster_seg_thresh;
         int best_match = -1;
-        for (unsigned long j = 0; j < in_out_clusters.size(); j++)
+        for (unsigned long j = 0; j < tracked_clusters.size(); j++)
         {
-            float this_dist = euclideanDistance(in_out_clusters[j]->GetAveragePoint(), cluster->GetAveragePoint());
-            if (this_dist < dist)
+            // Skip indices already chosen
+            if (chosen_indices.find(j) != chosen_indices.end())
+                continue;
+
+            float curr_dist = euclideanDistance(tracked_clusters[j]->GetAveragePoint(), raw_cluster->GetAveragePoint());
+            if (curr_dist < best_dist)
             {
                 best_match = j;
-                dist = this_dist;
+                best_dist = curr_dist;
             }
         }
 
-        // If there is best match, then set the ID
         if (best_match >= 0)
-            cluster->SetID(in_out_clusters[best_match]->GetID());
-        track_clusters.push_back(cluster);
+        {
+            // If there is best match, then set ID, move to tracked clusters, and remember chosen index
+            raw_cluster->SetID(tracked_clusters[best_match]->GetID());
+            tracked_clusters[best_match] = raw_cluster;
+            chosen_indices.insert(best_match);
+        }
+        else
+        {
+            // If there are no matches, then add to new clusters
+            new_clusters.push_back(raw_cluster);
+        }
     }
 
-    if (in_out_clusters.empty())
-        in_out_clusters = std::move(in_clusters);
+    if (tracked_clusters.empty())
+        tracked_clusters = std::move(raw_clusters);
     else
-        in_out_clusters.insert(in_out_clusters.end(), track_clusters.begin(), track_clusters.end());
+        tracked_clusters.insert(tracked_clusters.end(), new_clusters.begin(), new_clusters.end());
 }
 
 void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &in_cluster_array)
@@ -169,7 +192,7 @@ void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &i
         text_marker.header = cluster.header;
         text_marker.ns = "text_clustering";
         text_marker.id = cluster.id;
-        text_marker.scale.z = 1.0; // Text scale in RVIZ
+        text_marker.scale.z = 0.7; // Text scale in RVIZ
         text_marker.color.a = 1.0;
         text_marker.color.g = 1.0;
         text_marker.lifetime = rclcpp::Duration::from_seconds(1.3);
@@ -221,7 +244,7 @@ void ClusterNode::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPt
     // Segment cloud 
     segmentCloud(current_cloud_ptr, clustered_cloud_ptr, cloud_clusters);
 
-    // Publish clustered clouds (raw cloud publisher)
+    // Publish clustered clouds
     sensor_msgs::msg::PointCloud2 cloud_msg;
     pcl::toROSMsg(*clustered_cloud_ptr, cloud_msg);
     cloud_msg.header = _sensor_header;
