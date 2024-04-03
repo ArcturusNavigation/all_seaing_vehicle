@@ -31,10 +31,8 @@ class MoosToController : public rclcpp::Node {
             double moos_speed;
             double moos_heading;
 
-            m_control.use_x_velocity = true;
-            m_control.use_y_velocity = true;
-            m_control.use_angular_velocity = false;
-            m_control.world_space = true;
+            m_control.linear_control_mode = all_seaing_interfaces::msg::ControlMessage::WORLD_VELOCITY;
+            m_control.angular_control_mode = all_seaing_interfaces::msg::ControlMessage::WORLD_POSITION;
 
 
             if (msg.gateway_key == "DESIRED_THRUST") {moos_speed = msg.gateway_double;}
