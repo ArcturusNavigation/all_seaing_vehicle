@@ -17,13 +17,6 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # rviz
-            launch_ros.actions.Node(
-                package="rviz2",
-                executable="rviz2",
-                output="screen",
-                arguments=["-f", "odom"],
-            ),
             # controller
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
@@ -83,11 +76,11 @@ def generate_launch_description():
                     ("/in_cloud", "/filtered_cloud"),
                 ],
                 parameters=[
-                    {"cluster_size_min": 1},
-                    {"cluster_size_max": 20},
-                    {"clustering_distance": 0.2},
-                    {"cluster_seg_thresh": 1.5},
-                    {"drop_cluster_thresh": 1.5},
+                    {"cluster_size_min": 2},
+                    {"cluster_size_max": 60},
+                    {"clustering_distance": 1.0},
+                    {"cluster_seg_thresh": 10.0},
+                    {"drop_cluster_thresh": 1.0},
                     {"polygon_area_thresh": 100000.0},
                     {"viz": True},
                 ],

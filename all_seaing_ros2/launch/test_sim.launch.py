@@ -51,13 +51,6 @@ def generate_launch_description():
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
             ),
-            # rviz
-            launch_ros.actions.Node(
-                package="rviz2",
-                executable="rviz2",
-                output="screen",
-                arguments=["-f", "odom"],
-            ),
             # overlay node
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
@@ -103,9 +96,9 @@ def generate_launch_description():
                 ],
                 parameters=[
                     {"cluster_size_min": 2},
-                    {"cluster_size_max": 40},
-                    {"clustering_distance": 0.15},
-                    {"cluster_seg_thresh": 1.0},
+                    {"cluster_size_max": 60},
+                    {"clustering_distance": 1.0},
+                    {"cluster_seg_thresh": 10.0},
                     {"drop_cluster_thresh": 1.0},
                     {"polygon_area_thresh": 100000.0},
                     {"viz": True},
