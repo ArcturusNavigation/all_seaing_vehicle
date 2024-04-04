@@ -7,7 +7,6 @@ string label
 geometry_msgs/Point min_point
 geometry_msgs/Point max_point
 geometry_msgs/Point avg_point
-geometry_msgs/Point centroid_point
 
 geometry_msgs/Polygon convex_hull
 

@@ -19,6 +19,11 @@ ClusterNode::ClusterNode() : Node("pointcloud_euclidean_cluster")
     _drop_cluster_thresh = this->get_parameter("drop_cluster_thresh").as_double();
     _polygon_area_thresh = this->get_parameter("polygon_area_thresh").as_double();
     _viz = this->get_parameter("viz").as_bool();
+
+    // Initialize navigation variables to 0
+    nav_x_ = 0;
+    nav_y_ = 0;
+    nav_heading_ = 0;
     
     // Initialize publishers and subscribers
     _pub_cluster_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud", 10);
@@ -26,8 +31,11 @@ ClusterNode::ClusterNode() : Node("pointcloud_euclidean_cluster")
     _pub_matched_clusters_msg = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/detection/matched_cloud_clusters", 10);
     _marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/chull_markers", 10);
     _text_marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/text_markers", 10);
+    _gateway_pub = this->create_publisher<protobuf_client_interfaces::msg::Gateway>("/send_to_gateway", 10);
     _cloud_sub = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        "/in_cloud", 10, std::bind(&ClusterNode::pc_callback, this, std::placeholders::_1));
+        "/in_cloud", 10, std::bind(&ClusterNode::pcCallback, this, std::placeholders::_1));
+    _odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+        "/odometry/filtered", 10, std::bind(&ClusterNode::odomCallback, this, std::placeholders::_1));
 }
 
 void ClusterNode::segmentCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr,
@@ -229,7 +237,42 @@ void ClusterNode::markers(const all_seaing_interfaces::msg::CloudClusterArray &i
     _text_marker_array_pub->publish(text_markers_array);
 }
 
-void ClusterNode::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud)
+geometry_msgs::msg::Point ClusterNode::convertToGlobal(const geometry_msgs::msg::Point &point)
+{
+    geometry_msgs::msg::Point new_point;
+    double magnitude = std::hypot(point.x, point.y);
+    double point_angle = std::atan2(point.y, point.x);
+    new_point.x = nav_x_ + std::cos(nav_heading_ + point_angle) * magnitude;
+    new_point.y = nav_y_ + std::sin(nav_heading_ + point_angle) * magnitude;
+    new_point.z = point.z;
+    return new_point;
+}
+
+geometry_msgs::msg::Point ClusterNode::convertToGlobal(const geometry_msgs::msg::Point32 &point)
+{
+    geometry_msgs::msg::Point new_point;
+    new_point.x = point.x;
+    new_point.y = point.y;
+    new_point.z = point.z;
+    return convertToGlobal(new_point);
+}
+
+void ClusterNode::sendToGateway(const all_seaing_interfaces::msg::CloudClusterArray &in_cluster_array)
+{
+    for (const auto &cluster : in_cluster_array.clusters)
+    {
+        for (const auto &p : cluster.convex_hull.points) {
+            auto gateway_msg = protobuf_client_interfaces::msg::Gateway();
+            gateway_msg.gateway_key = "TRACKED_FEATURE";
+            geometry_msgs::msg::Point p_glob = convertToGlobal(p);
+            gateway_msg.gateway_string = 
+                "x=" + std::to_string(p_glob.x) + ",y=" + std::to_string(p_glob.y) + ",label=" + std::to_string(cluster.id);
+            _gateway_pub->publish(gateway_msg);
+        }
+    }
+}
+
+void ClusterNode::pcCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud)
 {
     _current_time = in_cloud->header.stamp;
     _sensor_header = in_cloud->header;
@@ -249,6 +292,9 @@ void ClusterNode::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPt
     pcl::toROSMsg(*clustered_cloud_ptr, cloud_msg);
     cloud_msg.header = _sensor_header;
     _pub_cluster_cloud->publish(cloud_msg);
+    
+    // Publish clusters to MOOS
+    sendToGateway(cloud_clusters);
 
     // Publish matched cloud clusters
     cloud_clusters.header = _sensor_header;
@@ -256,6 +302,21 @@ void ClusterNode::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPt
 
     // Publish visualization markers
     if (_viz) markers(cloud_clusters);
+}
+
+void ClusterNode::odomCallback(const nav_msgs::msg::Odometry &msg)
+{
+    nav_x_ = msg.pose.pose.position.x;
+    nav_y_ = msg.pose.pose.position.y;
+    tf2::Quaternion q;
+    q.setW(msg.pose.pose.orientation.w);
+    q.setX(msg.pose.pose.orientation.x);
+    q.setY(msg.pose.pose.orientation.y);
+    q.setZ(msg.pose.pose.orientation.z);
+    tf2::Matrix3x3 m(q);
+    double r, p, y;
+    m.getRPY(r, p, y);
+    nav_heading_ = y;
 }
 
 int main(int argc, char **argv)

@@ -125,7 +125,9 @@ ament_target_dependencies(pointcloud_euclidean_cluster_detect
     rclcpp 
     std_msgs
     all_seaing_interfaces
+    protobuf_client_interfaces
     geometry_msgs
+    nav_msgs
     pcl_conversions
     pcl_ros
     sensor_msgs
@@ -175,7 +177,6 @@ install(PROGRAMS
 
 
     # Mapping progams
-    ${PROJECT_NAME}/mapping/obstacle_sender.py
     ${PROJECT_NAME}/mapping/static_map_generator.py
     ${PROJECT_NAME}/mapping/buoy_pair_finder.py
 
