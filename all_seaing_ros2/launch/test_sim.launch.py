@@ -8,6 +8,7 @@ import os
 
 def generate_launch_description():
     nav2_prefix = get_package_share_directory("all_seaing_vehicle")
+    all_seaing_prefix = get_package_share_directory("all_seaing_vehicle")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
     robot_localization_params = os.path.join(
@@ -49,13 +50,6 @@ def generate_launch_description():
                 output="screen",
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
-            ),
-            # rviz
-            launch_ros.actions.Node(
-                package="rviz2",
-                executable="rviz2",
-                output="screen",
-                arguments=["-f", "odom"],
             ),
             # overlay node
             launch_ros.actions.Node(
@@ -102,9 +96,9 @@ def generate_launch_description():
                 ],
                 parameters=[
                     {"cluster_size_min": 2},
-                    {"cluster_size_max": 40},
-                    {"clustering_distance": 0.15},
-                    {"cluster_seg_thresh": 1.0},
+                    {"cluster_size_max": 60},
+                    {"clustering_distance": 1.0},
+                    {"cluster_seg_thresh": 10.0},
                     {"drop_cluster_thresh": 1.0},
                     {"polygon_area_thresh": 100000.0},
                     {"viz": True},
@@ -161,7 +155,11 @@ def generate_launch_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [vrx_gz_prefix, "/launch/competition.launch.py"]
-                )
+                ),
+                launch_arguments = {
+                    "world": "sydney_regatta",
+                    "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
+                }.items(),
             ),
             # MOOS-ROS bridge
             launch_ros.actions.Node(
