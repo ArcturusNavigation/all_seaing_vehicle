@@ -2,27 +2,14 @@
 import rclpy
 from rclpy.node import Node
 from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlMessage
-from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
+from all_seaing_vehicle.competitions.roboboat.Task import Task
+from all_seaing_vehicle.competitions.roboboat.FollowThePath import FollowThePath
+# from all_seaing_vehicle import Task
 
 def point_diff_2d(a, b):
     return ((a.x - b.x)**2 + (a.y - b.y)**2)**0.5
 
-class Task:
-    def get_name(self):
-        return "uhh... this class was supposed to be abstract lmao"
-    def start(self):
-        pass
-    def update(self):
-        pass
-    def check_finished(self):
-        return False
-    def end(self):
-        pass
-    def get_next(self):
-        return False
-    def receive_odometry(self, _):
-        pass
 
 class NavigationChannel(Task):
     def __init__(self, control_message_pub, logger):
@@ -87,7 +74,8 @@ class TaskManager(Node):
         self.control_message_publisher = self.create_publisher(ControlMessage, "/control_input", 10)
 
         self.TASK_LIST = [
-            NavigationChannel(self.control_message_publisher, self.get_logger()), 
+            FollowThePath(self.get_logger()),
+            # NavigationChannel(self.control_message_publisher, self.get_logger()), 
             Idling()
         ]
 

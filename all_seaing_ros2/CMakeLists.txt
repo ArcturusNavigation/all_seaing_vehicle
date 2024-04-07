@@ -161,6 +161,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sub.py
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_pwm_sub.py
     ${PROJECT_NAME}/competitions/roboboat/task_manager.py
+    ${PROJECT_NAME}/competitions/roboboat/Task.py
+    ${PROJECT_NAME}/competitions/roboboat/FollowThePath.py
 
     # Controller programs
     ${PROJECT_NAME}/controller/goal_publisher.py
@@ -172,6 +174,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/xdrive_controller.py
     ${PROJECT_NAME}/controller/joy_to_control.py
     ${PROJECT_NAME}/controller/rviz_testing_helper.py
+    ${PROJECT_NAME}/controller/replay_recordings.py
 
 
     # Mapping progams

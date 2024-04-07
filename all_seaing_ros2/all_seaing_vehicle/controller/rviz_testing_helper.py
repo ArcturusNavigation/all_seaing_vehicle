@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
+import pickle
 from rclpy.node import Node
 from rclpy.serialization import serialize_message
 
@@ -73,38 +74,15 @@ class RvizTestingHelper(Node):
 
     def make_new_bag(self, path, markers):
         self.counter += 1
+    
+        fullpath = os.path.join(self.bag_path, self.timestring, str(self.counter))
+        if not os.path.exists(fullpath):
+            os.makedirs(fullpath)
 
-        writer = rosbag2_py.SequentialWriter()
-
-        storage_options = rosbag2_py._storage.StorageOptions(
-            uri=os.path.join(self.bag_path, f'{self.timestring}_{self.counter}'),
-            storage_id='sqlite3'
-        )
-        converter_options = rosbag2_py._storage.ConverterOptions('', '')
-        writer.open(storage_options, converter_options)
-
-        topic_info = rosbag2_py._storage.TopicMetadata(
-            name=self.path_topic,
-            type='nav_msgs/msg/Path',
-            serialization_format='cdr')
-        
-        writer.create_topic(topic_info)
-        
-
-        writer.write(
-                self.path_topic,
-                serialize_message(path),
-                self.get_clock().now().nanoseconds)
-        
-        marker_topic_info = rosbag2_py._storage.TopicMetadata(
-            name=self.markers_topic,
-            type='visualization_msgs/msg/MarkerArray',
-            serialization_format='cdr')
-        writer.create_topic(marker_topic_info)
-        writer.write(
-                self.markers_topic,
-                serialize_message(markers),
-                self.get_clock().now().nanoseconds)
+        with open(os.path.join(fullpath, 'path.pkl'), 'wb') as file:
+            pickle.dump(path, file)
+        with open(os.path.join(fullpath, 'markers.pkl'), 'wb') as file:
+            pickle.dump(markers, file)
 
     def record_odometry(self, msg):
         if self.last_heartbeat.e_stopped:
