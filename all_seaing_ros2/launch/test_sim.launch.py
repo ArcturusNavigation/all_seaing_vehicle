@@ -8,6 +8,7 @@ import os
 
 def generate_launch_description():
     nav2_prefix = get_package_share_directory("all_seaing_vehicle")
+    all_seaing_prefix = get_package_share_directory("all_seaing_vehicle")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
     robot_localization_params = os.path.join(
@@ -50,19 +51,6 @@ def generate_launch_description():
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
             ),
-            # rviz
-            launch_ros.actions.Node(
-                package="rviz2",
-                executable="rviz2",
-                output="screen",
-                arguments=["-f", "odom"],
-            ),
-            # static map generation
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="static_map_generator.py",
-                output="screen",
-            ),
             # overlay node
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
@@ -77,7 +65,43 @@ def generate_launch_description():
                         "/img_info_src",
                         "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
                     ),
-                    ("/cloud_src", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
+                    ("/cloud_src", "/filtered_cloud"),
+                ],
+            ),
+            # pointcloud filter
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="pointcloud_filter",
+                output="screen",
+                remappings=[
+                    ("/in_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
+                    ("/out_cloud", "/filtered_cloud"),
+                ],
+                parameters=[
+                    {"range_min_threshold": 0.0},
+                    {"range_max_threshold": 60.0},
+                    {"intensity_low_threshold": 0.0},
+                    {"intensity_high_threshold": 50.0},
+                    {"leaf_size": 0.0},
+                    {"half_fov": 89}
+                ],
+            ),
+            # pointcloud euclidean cluster detect
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="pointcloud_euclidean_cluster_detect",
+                output="screen",
+                remappings=[
+                    ("/in_cloud", "/filtered_cloud"),
+                ],
+                parameters=[
+                    {"cluster_size_min": 2},
+                    {"cluster_size_max": 60},
+                    {"clustering_distance": 1.0},
+                    {"cluster_seg_thresh": 10.0},
+                    {"drop_cluster_thresh": 1.0},
+                    {"polygon_area_thresh": 100000.0},
+                    {"viz": True},
                 ],
             ),
             # state reporter
@@ -97,13 +121,26 @@ def generate_launch_description():
                 output="screen",
                 parameters=[{"use_pose_array": True}, {"use_gps": False}],
             ),
+            # static map generation
+            #launch_ros.actions.Node(
+            #    package="all_seaing_vehicle",
+            #    executable="static_map_generator.py",
+            #    output="screen",
+            #    parameters=[
+            #        {"map_resolution": 0.25},
+            #        {"grid_width": 600},
+            #        {"grid_height": 400},
+            #        {"origin_x": 40.0},
+            #        {"origin_y": 10.0},
+            #    ]
+            #),
             # obstacle sender
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="obstacle_sender.py",
-                output="screen",
-                parameters=[{"use_gps": False}],
-            ),
+            #launch_ros.actions.Node(
+            #    package="all_seaing_vehicle",
+            #    executable="obstacle_sender.py",
+            #    output="screen",
+            #    parameters=[{"use_gps": False}],
+            #),
             #            # buoy pair finder
             #            launch_ros.actions.Node(
             #                package="all_seaing_vehicle",
@@ -111,14 +148,18 @@ def generate_launch_description():
             #                output="screen",
             #            ),
             # nav2 launch
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([nav2_prefix, "/launch/nav2.launch.py"])
-            ),
+            #IncludeLaunchDescription(
+            #    PythonLaunchDescriptionSource([nav2_prefix, "/launch/nav2.launch.py"])
+            #),
             # default simulation
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [vrx_gz_prefix, "/launch/competition.launch.py"]
-                )
+                ),
+                launch_arguments = {
+                    "world": "sydney_regatta",
+                    "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
+                }.items(),
             ),
             # MOOS-ROS bridge
             launch_ros.actions.Node(

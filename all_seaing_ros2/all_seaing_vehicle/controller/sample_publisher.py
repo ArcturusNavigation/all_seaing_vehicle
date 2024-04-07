@@ -33,6 +33,7 @@ class Pub(Node):
         self.msg.use_x_velocity = bool(self.get_parameter('use_x_velocity').value)
         self.msg.use_y_velocity = bool(self.get_parameter('use_y_velocity').value)
         self.msg.use_angular_velocity = bool(self.get_parameter('use_angular_velocity').value)
+        self.msg.world_space = True
 
         timer_period = 1 / 60  # seconds
         self.timer = self.create_timer(timer_period, self.cb)

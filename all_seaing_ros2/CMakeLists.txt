@@ -34,6 +34,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 # PCL dependencies
 find_package(pcl_ros)
@@ -43,7 +44,7 @@ find_package(pcl_conversions REQUIRED)
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 include_directories(
-    ${PCL_INCLUDE_DIRS} 
+    ${PCL_INCLUDE_DIRS}
     ${PCL_CONVERSIONS_INCLUDE_DIRS}
     /opt/ros/humble/include
     include
@@ -104,6 +105,36 @@ ament_target_dependencies(pointcloud_image_overlay
     pcl_conversions
 )
 
+# Node: pointcloud_filter
+add_executable(pointcloud_filter ${PROJECT_NAME}/perception/pointcloud_filter.cpp)
+target_link_libraries(pointcloud_filter
+    ${PCL_LIBRARIES}
+)
+ament_target_dependencies(pointcloud_filter
+    rclcpp
+    sensor_msgs
+    pcl_conversions
+)
+
+# Node: pointcloud_euclidian_cluster_detect
+add_executable(pointcloud_euclidean_cluster_detect 
+    ${PROJECT_NAME}/perception/pointcloud_euclidean_cluster_detect.cpp
+    ${PROJECT_NAME}/perception/cluster.cpp)
+ament_target_dependencies(pointcloud_euclidean_cluster_detect
+    visualization_msgs 
+    rclcpp 
+    std_msgs
+    all_seaing_interfaces
+    protobuf_client_interfaces
+    geometry_msgs
+    nav_msgs
+    pcl_conversions
+    pcl_ros
+    sensor_msgs
+    tf2
+)
+
+
 #---------- Utils programs ----------#
 
 
@@ -113,6 +144,8 @@ ament_target_dependencies(pointcloud_image_overlay
 include_directories(include)
 
 install(TARGETS
+    pointcloud_euclidean_cluster_detect
+    pointcloud_filter
     pointcloud_image_overlay
     nav_state_reporter
     stationkeeping_state_reporter
@@ -129,6 +162,9 @@ install(PROGRAMS
     # Competition-specific programs
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sub.py
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_pwm_sub.py
+    ${PROJECT_NAME}/competitions/roboboat/task_manager.py
+    ${PROJECT_NAME}/competitions/roboboat/Task.py
+    ${PROJECT_NAME}/competitions/roboboat/FollowThePath.py
 
     # Controller programs
     ${PROJECT_NAME}/controller/goal_publisher.py
@@ -138,14 +174,18 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/simple_controller.py
     ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
+    ${PROJECT_NAME}/controller/joy_to_control.py
+    ${PROJECT_NAME}/controller/rviz_testing_helper.py
+    ${PROJECT_NAME}/controller/replay_recordings.py
+
 
     # Mapping progams
-    ${PROJECT_NAME}/mapping/obstacle_sender.py
     ${PROJECT_NAME}/mapping/static_map_generator.py
     ${PROJECT_NAME}/mapping/buoy_pair_finder.py
 
     # Navigation programs
     ${PROJECT_NAME}/navigation/pwm_sender.py
+    ${PROJECT_NAME}/navigation/path_generator.py
     ${PROJECT_NAME}/navigation/waypoint_sender.py
 
     # Perception programs
@@ -156,6 +196,7 @@ install(PROGRAMS
     # Utils programs
     ${PROJECT_NAME}/utils/e_stopped_node.py
     ${PROJECT_NAME}/utils/e_stopped_publisher_test.py
+    ${PROJECT_NAME}/utils/onshore_node.py
 
     DESTINATION lib/${PROJECT_NAME}
 )

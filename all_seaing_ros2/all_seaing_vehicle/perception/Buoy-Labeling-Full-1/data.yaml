@@ -1,0 +1,16 @@
+names:
+- BlackBuoy
+- GreenBuoy
+- OrangeBuoy
+- RedBuoy
+- WhiteBuoy
+nc: 5
+roboflow:
+  license: CC BY 4.0
+  project: buoy-labeling-full
+  url: https://universe.roboflow.com/arcturus-gx59n/buoy-labeling-full/dataset/1
+  version: 1
+  workspace: arcturus-gx59n
+test: ../test/images
+train: Buoy-Labeling-Full-1/train/images
+val: Buoy-Labeling-Full-1/valid/images

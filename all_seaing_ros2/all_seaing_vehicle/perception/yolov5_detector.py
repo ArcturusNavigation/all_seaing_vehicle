@@ -19,7 +19,6 @@ from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 from ament_index_python.packages import get_package_share_directory
 
-
 class Yolov5Detector(Node):
 
     def __init__(self):
@@ -30,8 +29,12 @@ class Yolov5Detector(Node):
         # Get pretrained yolov5 models for colored buoys and cardinal markers
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
         path_model = (
-            get_package_share_directory("perception_suite")
-            + "/models/buoy_detection_best_weights_v7.pt"
+            get_package_share_directory("all_seaing_vehicle")
+<<<<<<< HEAD
+            + "/models/3dRenderingModel.pt"
+=======
+            + "/models/yolov5s.pt"
+>>>>>>> 6b217659fa234218b6575949799474ca33b6ac9a
         )
         self.model = torch.hub.load(
             path_hubconfig, "custom", path=path_model, source="local"

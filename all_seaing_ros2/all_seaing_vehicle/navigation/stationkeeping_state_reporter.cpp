@@ -16,8 +16,8 @@ class StationkeepingStateReporter : public rclcpp::Node {
             );
 
             m_gateway_sub = this->create_subscription<protobuf_client_interfaces::msg::Gateway>(
-                "/gateway_msg", 
-                10, 
+                "/gateway_msg",
+                10,
                 std::bind(&StationkeepingStateReporter::vel_callback, this, std::placeholders::_1)
             );
 
@@ -32,34 +32,25 @@ class StationkeepingStateReporter : public rclcpp::Node {
         rclcpp::Publisher<all_seaing_interfaces::msg::ControlMessage>::SharedPtr m_control_pub;
         rclcpp::Publisher<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_pub;
         rclcpp::Subscription<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_sub;
-        
+
         //Setting message type to ControlMessage
         all_seaing_interfaces::msg::ControlMessage m_control = all_seaing_interfaces::msg::ControlMessage();
 
 
-        //Publisher to MOOS 
+        //Publisher to MOOS
         void state_callback(const all_seaing_interfaces::msg::GoalState & msg) {
             auto nav_msg = protobuf_client_interfaces::msg::Gateway();
             nav_msg.gateway_key = "ROS_REPORT_GOAL";
-            nav_msg.gateway_string = "GOAL_LAT=" + std::to_string(msg.goal_lat) + ", GOAL_LON=" + std::to_string(msg.goal_lon) + 
+            nav_msg.gateway_string = "GOAL_LAT=" + std::to_string(msg.goal_lat) + ", GOAL_LON=" + std::to_string(msg.goal_lon) +
                                      ", GOAL_HEADING=" + std::to_string(msg.goal_heading);
             m_gateway_pub->publish(nav_msg);
         }
 
         //Parser from MOOS
         void vel_callback(const protobuf_client_interfaces::msg::Gateway & msg) {
-            if (msg.gateway_key == "VEL_X") {
-                m_control.x = msg.gateway_double;
-                m_control.use_x_velocity = true;
-            }
-            if (msg.gateway_key == "VEL_Y") {
-                m_control.y = msg.gateway_double;
-                m_control.use_y_velocity = true;
-            }
-            if (msg.gateway_key == "GOAL_HEADING") {
-                m_control.angular = msg.gateway_double; 
-                m_control.use_angular_velocity = false; 
-            }
+            if (msg.gateway_key == "VEL_X") m_control.x = msg.gateway_double;
+            if (msg.gateway_key == "VEL_Y") m_control.y = msg.gateway_double;
+            if (msg.gateway_key == "GOAL_HEADING") {m_control.angular = msg.gateway_double; m_control.angular_control_mode = all_seaing_interfaces::msg::ControlMessage::WORLD_POSITION; }
             m_control_pub->publish(m_control);
         }
 };
