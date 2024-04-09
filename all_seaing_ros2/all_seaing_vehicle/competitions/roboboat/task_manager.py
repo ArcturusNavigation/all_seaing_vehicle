@@ -74,7 +74,7 @@ class TaskManager(Node):
         self.control_message_publisher = self.create_publisher(ControlMessage, "/control_input", 10)
 
         self.TASK_LIST = [
-            FollowThePath(self.get_logger()),
+            # FollowThePath(self.get_logger()),
             # NavigationChannel(self.control_message_publisher, self.get_logger()), 
             Idling()
         ]

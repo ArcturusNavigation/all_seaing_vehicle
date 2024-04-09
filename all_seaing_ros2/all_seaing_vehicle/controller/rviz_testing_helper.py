@@ -45,6 +45,7 @@ class RvizTestingHelper(Node):
 
         self.last_state = None
         self.marker_id_counter = 0
+        self.last_num_markers_used = 0
 
     def update_markers(self, msg):
         if not self.recorded_poses:
@@ -52,7 +53,6 @@ class RvizTestingHelper(Node):
         if msg.current_state != self.last_state:
             self.marker_id_counter += 1
             marker = Marker()
-            marker.header = Header()
             marker.header = self.recorded_poses[-1].header
             marker.ns = "state_markers"
             marker.id = self.marker_id_counter
@@ -69,6 +69,7 @@ class RvizTestingHelper(Node):
             marker.color.a = 1.0
             marker.lifetime = Duration(seconds=0).to_msg()
             marker.text = msg.current_state
+            
             self.recorded_markers.append(marker)
             self.last_state = msg.current_state
 
@@ -103,9 +104,14 @@ class RvizTestingHelper(Node):
             self.pub.publish(path)
 
             marker_array = MarkerArray()
-            marker_array.markers = self.recorded_markers
+            deleteAllMarker = Marker()
+            deleteAllMarker.header = self.recorded_poses[-1].header
+            deleteAllMarker.action = Marker.DELETEALL
+            marker_array.markers = [deleteAllMarker]
+            marker_array.markers.extend(self.recorded_markers)
 
             self.marker_pub.publish(marker_array)
+            self.last_num_markers_used = self.marker_id_counter
 
             if self.bag_path is not None:
                 self.make_new_bag(path, marker_array)
@@ -119,6 +125,7 @@ class RvizTestingHelper(Node):
             self.recorded_poses = []
             self.recorded_markers = []
             self.marker_id_counter = 0
+            self.last_state = None
         self.last_heartbeat = msg
         
 

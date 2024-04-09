@@ -14,7 +14,7 @@ from all_seaing_interfaces.msg import Heartbeat
 from all_seaing_interfaces.msg import ControlMessage
 
 # WHETHER TO NOT USE ODOMETRY i.e. ARE WE INSIDE?? 
-BLIND_LINEAR = False
+BLIND_LINEAR = True
 
 class DoNothingPID:
     def determine_output(self, _, __):
