@@ -53,7 +53,7 @@ geometry_msgs::msg::TransformStamped PclImageOverlay::GetTransform(const std::st
 	{
 		tf = tf_buffer_->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
 		pc_cam_tf_ok_ = true;
-		RCLCPP_INFO(this->get_logger(), "Pointcloud to Camera Transform good");
+		RCLCPP_INFO(this->get_logger(), "LiDAR to Camera Transform good");
 		RCLCPP_INFO(this->get_logger(), "in_target_frame: %s, in_src_frame: %s", in_target_frame.c_str(), in_src_frame.c_str());
 	}
 	catch (tf2::TransformException &ex)
@@ -89,14 +89,6 @@ PclImageOverlay::PclImageOverlay() : Node("pointcloud_image_overlay")
 
 	// Publishers
 	image_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/pc_image_fusion", 1);
-
-	const char *img_sub_topic = image_sub_.getSubscriber()->get_topic_name();
-	const char *img_info_sub_topic = image_intrinsics_sub_->get_topic_name();
-	const char *cloud_sub_topic = cloud_sub_.getSubscriber()->get_topic_name();
-	RCLCPP_INFO(this->get_logger(), "img_src: %s", img_sub_topic);
-	RCLCPP_INFO(this->get_logger(), "img_info_src %s", img_info_sub_topic);
-	RCLCPP_INFO(this->get_logger(), "cloud_src %s", cloud_sub_topic);
-	RCLCPP_INFO(this->get_logger(), "Approximate time sync for %s and %s", img_sub_topic, cloud_sub_topic);
 }
 
 PclImageOverlay::~PclImageOverlay() {}
