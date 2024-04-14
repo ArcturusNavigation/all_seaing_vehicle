@@ -69,6 +69,25 @@ class ColorSegmentation(Node):
                 result = cv2.bitwise_and(img, img, mask=mask)
                 result_dict[color] = result
 
+            bboxes = LabeledBoundingBox2DArray()
+            bboxes.header.stamp = self.get_clock().now().to_msg()
+            for color in result_dict:
+                new_image = result_dict[color]
+                bbox = LabeledBoundingBox2D()
+                # bbox.min_x = int(row["xmin"])
+                # bbox.min_y = int(row["ymin"])
+
+                # bbox.max_x = int(row["xmax"])
+                # bbox.max_y = int(row["ymax"])
+
+                # bbox.label = row["class"]
+                # bboxes.boxes.append(bbox)
+                # cv2.rectangle(
+                #     img, (bbox.min_x, bbox.min_y), (bbox.max_x, bbox.max_y), (255, 0, 0), 4
+                # )
+                
+                    
+
 
 def main(args=None):
     rclpy.init(args=args)
