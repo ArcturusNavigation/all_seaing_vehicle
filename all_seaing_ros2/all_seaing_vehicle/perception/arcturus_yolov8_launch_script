@@ -31,8 +31,15 @@ Ensure that the model parameter has the correct path to a yolov8 model
 and that input_image_topic subscribes to the correct topic (such as zed)
 '
 
+: '
 ros2 launch yolov8_bringup yolov8.launch.py \
     model:=../../models/****ADD YOLOV8 MODEL HERE**** \
     input_image_topic:=****ADD IMAGE TOPIC**** \ 
+'
+
+ros2 launch yolov8_bringup yolov8.launch.py \
+    model:=./runs/detect/train_roboboat/ \
+    input_image_topic:=****ADD IMAGE TOPIC**** \ 
+
 
 

@@ -41,3 +41,6 @@ CATKIN_IGNORE
 *~
 .\#*
 \#*\#
+
+# yolov8 images
+all_seaing_ros2/all_seaing_vehicle/perception/images
