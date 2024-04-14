@@ -155,6 +155,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/perception/topic_to_image.py
     ${PROJECT_NAME}/perception/yolov5_detector.py
     ${PROJECT_NAME}/perception/yolov5_image.py
+    ${PROJECT_NAME}/perception/webcam_publisher.py
 
     # Utils programs
     ${PROJECT_NAME}/utils/e_stopped_node.py
