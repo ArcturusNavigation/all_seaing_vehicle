@@ -31,8 +31,9 @@ class MoosToController : public rclcpp::Node {
         //Setting message type to ControlMessage
         all_seaing_interfaces::msg::ControlMessage m_control = all_seaing_interfaces::msg::ControlMessage();
 
-        double moos_speed;
+        double moos_thrust;
         double moos_heading;
+        double speed;
 
 
 
@@ -40,11 +41,12 @@ class MoosToController : public rclcpp::Node {
         void moos_callback(const protobuf_client_interfaces::msg::Gateway & msg) {
 
 
-            if (msg.gateway_key == "DESIRED_THRUST") {moos_speed = msg.gateway_double;}
-            if (msg.gateway_key == "DESIRED_HEADING") {moos_heading = ((msg.gateway_double + 90)*(3.14159/180));}
+            if (msg.gateway_key == "DESIRED_THRUST") {moos_thrust = msg.gateway_double;} //mapping = 100:5 = thrust:speed (m/s)
+            if (msg.gateway_key == "DESIRED_HEADING") {moos_heading = ((msg.gateway_double - 90)*(3.14159/180));}
 
-            m_control.x = moos_speed;
-            m_control.y = 0;
+            // speed = moos_thrust * .05;
+
+            m_control.x = moos_thrust;
             m_control.angular = moos_heading;
 
             m_control_pub->publish(m_control);
