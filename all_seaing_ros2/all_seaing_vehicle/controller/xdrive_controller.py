@@ -14,7 +14,7 @@ from all_seaing_interfaces.msg import Heartbeat
 from all_seaing_interfaces.msg import ControlMessage
 
 # WHETHER TO NOT USE ODOMETRY i.e. ARE WE INSIDE?? 
-BLIND_LINEAR = True
+BLIND_LINEAR = False
 
 class DoNothingPID:
     def determine_output(self, _, __):
@@ -121,14 +121,15 @@ class Controller(Node):
             (l**2 + w**2) / 2 - l * w
         ) ** 0.5 / 2  # constant we found in matrix math stuff
         
-        pid_omega = PID((1, 0.5, 0) if self.in_sim else (0.8, 0.04, 0), self.get_omega_feedback)
-        pid_theta = CircularPID((1, 0, 0) if self.in_sim else (0.2, 0, 0), self.get_theta_feedback)
-        pid_x = PID((0.1, 0, 0) if self.in_sim else (0, 0, 0), self.get_x_position_feedback)
-        pid_y = PID((0.1, 0, 0) if self.in_sim else (0, 0, 0), self.get_y_position_feedback)
+        pid_omega = PID((1, 0.5, 0) if self.in_sim else (0.0, 0.00, 0), self.get_omega_feedback)#0.8, 0.04, 0
+        pid_theta = CircularPID((1, 0, 0) if self.in_sim else (0.0, 0, 0), self.get_theta_feedback)
+
+        pid_x = PID((0.1, 0, 0) if self.in_sim else (0.0, 0, 0), self.get_x_position_feedback, None)
+        pid_y = PID((0.1, 0, 0) if self.in_sim else (0.0, 0, 0), self.get_y_position_feedback, None)
         pid_vx = PID((0.4, 0.1, 0) if self.in_sim else (0, 0, 0), self.get_x_velocity_world_feedback, None, BLIND_LINEAR)
         pid_vy = PID((0.4, 0.1, 0) if self.in_sim else (0, 0, 0), self.get_y_velocity_world_feedback, None, BLIND_LINEAR)
-        local_pid_vx = PID((0.4, 0.1, 0) if self.in_sim else (0, 0, 0), self.get_x_velocity_local_feedback, None, BLIND_LINEAR)
-        local_pid_vy = PID((0.4, 0.1, 0) if self.in_sim else (0, 0, 0), self.get_y_velocity_local_feedback, None, BLIND_LINEAR)
+        local_pid_vx = PID((0.4, 0.1, 0) if self.in_sim else (1, 0, 0), self.get_x_velocity_local_feedback, None, BLIND_LINEAR)
+        local_pid_vy = PID((0.4, 0.1, 0) if self.in_sim else (0.0, 0, 0), self.get_y_velocity_local_feedback, None, BLIND_LINEAR)
 
         do_nothing_pid = DoNothingPID()
 
@@ -218,12 +219,14 @@ class Controller(Node):
     def get_omega_feedback(self, msg):
         return msg.angular_velocity.z if BLIND_LINEAR else msg.twist.twist.angular.z
     def get_theta_feedback(self, _):
+        print(self.theta)
         return self.theta
     def get_x_position_feedback(self, msg):
         return msg.pose.pose.position.x
     def get_y_position_feedback(self, msg):
         return msg.pose.pose.position.y
     def get_x_velocity_local_feedback(self, msg):
+        #print(f"feedback: {msg.twist.twist.linear.x}")
         return msg.twist.twist.linear.x
     def get_y_velocity_local_feedback(self, msg):
         return msg.twist.twist.linear.y
@@ -284,7 +287,7 @@ class Controller(Node):
         Callback function for when we receive data from the odometry.
         """
         self.update_theta(msg, msg.pose.pose.orientation)
-        
+        #print("updating x feedback")
         self.x_control_handlers[self.chosen_linear_control_mode].update_feedback_value(msg)
         self.y_control_handlers[self.chosen_linear_control_mode].update_feedback_value(msg)
 
@@ -320,7 +323,11 @@ class Controller(Node):
         """
         The main update function that sends output to the thrusters
         """
+        #print("updating")
         current_time = self.get_time()
+        #print(current_time)
+        #print("heartbeat time: ")
+        #print(self.last_heartbeat_timestamp)
         if self.time_diff(current_time, self.last_heartbeat_timestamp) > self.required_heartbeat_recentness:
             self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
             raise Exception("lost heartbeat! killing node")

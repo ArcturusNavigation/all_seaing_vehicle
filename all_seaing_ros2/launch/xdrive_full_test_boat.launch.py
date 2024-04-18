@@ -12,7 +12,7 @@ import os
 def generate_launch_description():
     all_seaing_prefix = get_package_share_directory("all_seaing_vehicle")
 
-    robot_localization_params = os.path.join(all_seaing_prefix, "params", "dual_ekf_navsat_sim.yaml")
+    robot_localization_params = os.path.join(all_seaing_prefix, "params", "dual_ekf_navsat.yaml")
     task_manager_mode = launch_ros.actions.Node(
         package="all_seaing_vehicle",
         executable="task_manager.py",
@@ -33,13 +33,13 @@ def generate_launch_description():
             package="robot_localization",
             executable="navsat_transform_node",
             name="navsat_transform_node",
-            remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
+            remappings=[("/gps/fix", "/mavros/global_position/raw/fix")],
             parameters=[robot_localization_params]),
-        launch_ros.actions.Node(
-            package="all_seaing_vehicle",
-            executable="xdrive_controller.py",
-            name="controller",
-            parameters=[{"in_sim": False}]
-        ),
+        #launch_ros.actions.Node(
+        #    package="all_seaing_vehicle",
+        #    executable="xdrive_controller.py",
+        #    name="controller",
+        #    parameters=[{"in_sim": False}]
+        #),
         task_manager_mode
     ])
