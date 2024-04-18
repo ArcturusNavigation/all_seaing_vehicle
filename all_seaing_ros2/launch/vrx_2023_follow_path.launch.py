@@ -95,19 +95,21 @@ def generate_launch_description():
                     ("/gps/fix", "/wamv/sensors/gps/gps/fix"),
                 ],
             ),
+            # cluster bounding box overlay
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="cluster_bbox_overlay",
+                output="screen",
+                remappings=[
+                    ("/img_info_src", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+                ],
+            ),
             # follow the path
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [vrx_gz_prefix, "/launch/competition.launch.py"]
                 ),
                 launch_arguments={"world": "follow_path_task"}.items(),
-            ),
-            # waypoint sender
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="waypoint_sender.py",
-                output="screen",
-                parameters=[{"use_pose_array": True}, {"use_gps": False}],
             ),
             # MOOS-ROS bridge
             launch_ros.actions.Node(

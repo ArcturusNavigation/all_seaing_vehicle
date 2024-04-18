@@ -2,7 +2,7 @@ std_msgs/Header header
 
 uint32 id
 builtin_interfaces/Time last_seen 
-string label
+int8 label
 
 geometry_msgs/Point min_point
 geometry_msgs/Point max_point
