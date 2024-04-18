@@ -23,7 +23,7 @@ class ColorSegmentation(Node):
         )
         self.img_sub = self.create_subscription(
             Image,
-            "/perception_suite/image",  # Remap this to correct topic
+            "/wamv/sensors/cameras/front_right_camera_sensor/image_raw",  # Remap this to correct topic
             self.img_callback,
             qos_profile,
         )
