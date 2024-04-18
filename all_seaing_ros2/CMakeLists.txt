@@ -177,6 +177,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/joy_to_control.py
     ${PROJECT_NAME}/controller/rviz_testing_helper.py
     ${PROJECT_NAME}/controller/replay_recordings.py
+    ${PROJECT_NAME}/controller/angle_printer.py
 
 
     # Mapping progams
