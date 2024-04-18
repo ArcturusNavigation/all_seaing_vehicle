@@ -105,6 +105,25 @@ ament_target_dependencies(pointcloud_image_overlay
     pcl_conversions
 )
 
+# Node: pointcloud_image_overlay
+add_executable(cluster_bbox_overlay ${PROJECT_NAME}/perception/cluster_bbox_overlay.cpp)
+target_link_libraries(cluster_bbox_overlay
+    ${PCL_LIBRARIES}
+)
+ament_target_dependencies(cluster_bbox_overlay
+    rclcpp
+    std_msgs
+    tf2
+    tf2_ros
+    tf2_geometry_msgs
+    visualization_msgs
+    tf2_sensor_msgs
+    image_geometry
+    cv_bridge
+    pcl_conversions
+    all_seaing_interfaces
+)
+
 # Node: pointcloud_filter
 add_executable(pointcloud_filter ${PROJECT_NAME}/perception/pointcloud_filter.cpp)
 target_link_libraries(pointcloud_filter
@@ -147,6 +166,7 @@ install(TARGETS
     pointcloud_euclidean_cluster_detect
     pointcloud_filter
     pointcloud_image_overlay
+    cluster_bbox_overlay
     nav_state_reporter
     stationkeeping_state_reporter
     DESTINATION lib/${PROJECT_NAME}
@@ -193,6 +213,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/perception/topic_to_image.py
     ${PROJECT_NAME}/perception/yolov5_detector.py
     ${PROJECT_NAME}/perception/yolov5_image.py
+    ${PROJECT_NAME}/perception/webcam_publisher.py
 
     # Utils programs
     ${PROJECT_NAME}/utils/e_stopped_node.py

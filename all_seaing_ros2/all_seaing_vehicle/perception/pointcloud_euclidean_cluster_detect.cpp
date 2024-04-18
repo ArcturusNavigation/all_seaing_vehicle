@@ -27,8 +27,8 @@ ClusterNode::ClusterNode() : Node("pointcloud_euclidean_cluster")
     
     // Initialize publishers and subscribers
     _pub_cluster_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud", 10);
-    _pub_clusters_message = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/detection/raw_cloud_clusters", 10);
-    _pub_matched_clusters_msg = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/detection/matched_cloud_clusters", 10);
+    _pub_clusters_message = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/raw_cloud_clusters", 10);
+    _pub_matched_clusters_msg = this->create_publisher<all_seaing_interfaces::msg::CloudClusterArray>("/matched_cloud_clusters", 10);
     _marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/chull_markers", 10);
     _text_marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/text_markers", 10);
     _gateway_pub = this->create_publisher<protobuf_client_interfaces::msg::Gateway>("/send_to_gateway", 10);
