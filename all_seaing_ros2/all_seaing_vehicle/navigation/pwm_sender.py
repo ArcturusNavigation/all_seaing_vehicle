@@ -41,15 +41,13 @@ class pwm_sender(EStoppedNode):
         self.send_pwm(self.backleft_port, msg.data)
 
     def send_pwm(self, channel, value):
-        if not self.is_e_stopped:
-            self.get_logger().info(f"Sending PWM value {value} to channel {channel}")
-            self.last_received_time = self.get_clock().now().to_msg().sec
-            return self.proxy.call_async(
-                CommandLong.Request(
-                    command=183, param1=float(channel), param2=float(value)
-                )
+        self.get_logger().info(f"Sending PWM value {value} to channel {channel}")
+        self.last_received_time = self.get_clock().now().to_msg().sec
+        return self.proxy.call_async(
+            CommandLong.Request(
+                command=183, param1=float(channel), param2=float(value)
             )
-        self.get_logger().info("Cannot send PWM as node is E-stopped!")
+        )
 
 
 def main(args=None):

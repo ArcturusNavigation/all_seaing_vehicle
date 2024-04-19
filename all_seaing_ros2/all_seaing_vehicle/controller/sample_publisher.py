@@ -22,18 +22,15 @@ class Pub(Node):
         
         self.declare_parameter('angular', 0.0)
 
-        self.declare_parameter('use_x_velocity', True)
-        self.declare_parameter('use_y_velocity', True)
+        self.declare_parameter('use_linear_velocity', True)
         self.declare_parameter('use_angular_velocity', True)
 
         self.msg = ControlMessage()
         self.msg.x = float(self.get_parameter('x').value)
         self.msg.y = float(self.get_parameter('y').value)
         self.msg.angular = float(self.get_parameter('angular').value)
-        self.msg.use_x_velocity = bool(self.get_parameter('use_x_velocity').value)
-        self.msg.use_y_velocity = bool(self.get_parameter('use_y_velocity').value)
-        self.msg.use_angular_velocity = bool(self.get_parameter('use_angular_velocity').value)
-        self.msg.world_space = True
+        self.msg.linear_control_mode = ControlMessage.LOCAL_VELOCITY if bool(self.get_parameter('use_linear_velocity').value) else ControlMessage.WORLD_POSITION
+        self.msg.angular_control_mode = ControlMessage.WORLD_VELOCITY if bool(self.get_parameter('use_angular_velocity').value) else ControlMessage.WORLD_POSITION 
 
         timer_period = 1 / 60  # seconds
         self.timer = self.create_timer(timer_period, self.cb)

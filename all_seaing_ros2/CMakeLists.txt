@@ -197,6 +197,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/joy_to_control.py
     ${PROJECT_NAME}/controller/rviz_testing_helper.py
     ${PROJECT_NAME}/controller/replay_recordings.py
+    ${PROJECT_NAME}/controller/angle_printer.py
 
 
     # Mapping progams
@@ -212,6 +213,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/perception/topic_to_image.py
     ${PROJECT_NAME}/perception/yolov5_detector.py
     ${PROJECT_NAME}/perception/yolov5_image.py
+    ${PROJECT_NAME}/perception/webcam_publisher.py
 
     # Utils programs
     ${PROJECT_NAME}/utils/e_stopped_node.py
