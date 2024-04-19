@@ -15,11 +15,6 @@ class MoosToController : public rclcpp::Node {
             );
 
             m_control_pub = this->create_publisher<all_seaing_interfaces::msg::ControlMessage>("/control_input", 10);
-
-            m_control.linear_control_mode = all_seaing_interfaces::msg::ControlMessage::LOCAL_VELOCITY;
-            m_control.angular_control_mode = all_seaing_interfaces::msg::ControlMessage::WORLD_POSITION;
-
-
         }
 
     private:
@@ -28,28 +23,29 @@ class MoosToController : public rclcpp::Node {
         rclcpp::Publisher<all_seaing_interfaces::msg::ControlMessage>::SharedPtr m_control_pub;
         rclcpp::Subscription<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_sub;
 
-        //Setting message type to ControlMessage
-        all_seaing_interfaces::msg::ControlMessage m_control = all_seaing_interfaces::msg::ControlMessage();
 
         double moos_thrust;
         double moos_heading;
-        double speed;
-
-
 
         //MOOS to Controller Parser
         void moos_callback(const protobuf_client_interfaces::msg::Gateway & msg) {
 
+            // Setting message type to ControlMessage
+            all_seaing_interfaces::msg::ControlMessage control = all_seaing_interfaces::msg::ControlMessage();
+
+            control.linear_control_mode = all_seaing_interfaces::msg::ControlMessage::LOCAL_VELOCITY;
+            control.angular_control_mode = all_seaing_interfaces::msg::ControlMessage::WORLD_POSITION;
 
             if (msg.gateway_key == "DESIRED_THRUST") {moos_thrust = msg.gateway_double;} //mapping = 100:5 = thrust:speed (m/s)
             if (msg.gateway_key == "DESIRED_HEADING") {moos_heading = ((msg.gateway_double - 90)*(3.14159/180));}
 
-            // speed = moos_thrust * .05;
+            double speed = moos_thrust * .05;
 
-            m_control.x = moos_thrust;
-            m_control.angular = moos_heading;
+            //control.x = moos_thrust;
+            control.x = speed;
+            control.angular = -moos_heading;
 
-            m_control_pub->publish(m_control);
+            m_control_pub->publish(control);
         }
 };
 
