@@ -190,6 +190,7 @@ install(PROGRAMS
 
     # Perception programs
     ${PROJECT_NAME}/perception/topic_to_image.py
+    ${PROJECT_NAME}/perception/color_segmentation.py
     ${PROJECT_NAME}/perception/yolov5_detector.py
     ${PROJECT_NAME}/perception/yolov5_image.py
 

@@ -121,6 +121,15 @@ def generate_launch_description():
                 output="screen",
                 parameters=[{"use_pose_array": True}, {"use_gps": False}],
             ),
+            # color segmentation node
+            # launch_ros.actions.Node(
+            #     package="all_seaing_vehicle",
+            #     executable="color_segmentation.py",
+            #     output="screen",
+            #     remappings=[
+            #         ("/perception_suite/image", "/wamv/sensors/cameras/front_right_camera_sensor/image_raw"),
+            #     ],
+            # ),
             # static map generation
             #launch_ros.actions.Node(
             #    package="all_seaing_vehicle",

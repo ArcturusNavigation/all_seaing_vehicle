@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
@@ -5,6 +6,7 @@ import cv_bridge
 import cv2
 from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
+import numpy as np
 
 class ColorSegmentation(Node):
 
@@ -19,11 +21,12 @@ class ColorSegmentation(Node):
             LabeledBoundingBox2DArray, "/perception_suite/bounding_boxes", qos_profile
         )
         self.img_pub = self.create_publisher(
-            Image, "/perception_suite/segmented_image", qos_profile
+            Image, "/perception_suite/image_boxes", qos_profile
         )
         self.img_sub = self.create_subscription(
             Image,
-            "/wamv/sensors/cameras/front_right_camera_sensor/image_raw",  # Remap this to correct topic
+            # "/perception_suite/image",  # Remap this to correct topic
+            "/wamv/sensors/cameras/front_right_camera_sensor/image_raw",
             self.img_callback,
             qos_profile,
         )
@@ -36,24 +39,26 @@ class ColorSegmentation(Node):
         hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
         
         colors = {
-            "orange": [10, 31, 191, 219, 60, 249],
-            "red": [0, 10, 175, 255, 140, 255],
-            "red2": [170, 180, 175, 255, 140, 245],
-            "green": [59, 70, 142, 227, 30, 255], 
+            "orange": [10, 31, 125, 255, 60, 255],
+            "red": [0, 10, 175, 255, 100, 255],
+            "red2": [170, 180, 175, 255, 100, 245],
+            "green": [59, 82, 142, 255, 30, 255], 
             "black": [0, 0, 0, 0, 0, 50],
-            "white": [0, 0, 0, 0, 200, 255]
-        }
+            "white": [0, 0, 0, 10, 200, 255],
+            # "default": [0, 179, 0, 255, 0, 255]
+        } 
 
-        result_dict = {
-            "orange": [],
-            "red": [],
-            "green": [],
-            "black": [],
-            "white": []
+        # TEMPORARY NUMBERS!!!!
+        label_dict = {
+            "orange": 0,
+            "red": 1,
+            "green": 2,
+            "black": 3,
+            "white": 4
         }
 
         # change later !!!
-        threshold_pixels = 1000
+        # threshold_pixels = 1000
 
 
         bboxes = LabeledBoundingBox2DArray()
@@ -62,18 +67,26 @@ class ColorSegmentation(Node):
             if color == "red2":
                 continue
             h_min, h_max, s_min, s_max, v_min, v_max = colors[color]
-            lower_limit = [h_min, s_min, v_min]
-            upper_limit = [h_max, s_max, v_max]
+            lower_limit = np.array([h_min, s_min, v_min])
+            upper_limit = np.array([h_max, s_max, v_max])
             mask = cv2.inRange(hsv_img, lower_limit, upper_limit)
             if color == "red":
                 h_min, h_max, s_min, s_max, v_min, v_max = colors["red2"]
-                lower_limit = [h_min, s_min, v_min]
-                upper_limit = [h_max, s_max, v_max]
+                lower_limit = np.array([h_min, s_min, v_min])
+                upper_limit = np.array([h_max, s_max, v_max])
                 mask = mask + cv2.inRange(hsv_img, lower_limit, upper_limit)
 
             # findContours on mask
             # imgray = cv2.cvtColor(mask, cv.COLOR_BGR2GRAY)
             # ret, thresh = cv2.threshold(mask, 127, 255, 0)
+
+            # erode and dilate mask
+            # Define structuring element
+            kernel = np.ones((5,5), np.uint8)
+            mask = cv2.erode(mask, kernel, iterations = 1)
+            kernel2 = np.ones((7, 7), np.uint8)
+            mask = cv2.dilate(mask, kernel2, iterations = 1)
+
             contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             for contour in contours:
                 x, y, w, h = cv2.boundingRect(contour)
@@ -82,7 +95,7 @@ class ColorSegmentation(Node):
                 bbox.min_y = y
                 bbox.max_x = x + w
                 bbox.max_y = y + h
-                bbox.label = color
+                bbox.label = label_dict[color]
 
                 bboxes.boxes.append(bbox)
                 
