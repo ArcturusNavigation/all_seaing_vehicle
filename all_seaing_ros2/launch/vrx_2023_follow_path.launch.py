@@ -104,6 +104,15 @@ def generate_launch_description():
                     ("/img_info_src", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
                 ],
             ),
+            # color segmentation
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="color_segmentation.py",
+                output="screen",
+                remappings=[
+                    ("/in_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+                ],
+            ),
             # follow the path
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(

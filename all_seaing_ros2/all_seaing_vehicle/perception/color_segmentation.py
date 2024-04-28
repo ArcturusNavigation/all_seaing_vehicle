@@ -18,20 +18,23 @@ class ColorSegmentation(Node):
         # Subscribers and publishers
         qos_profile = QoSProfile(depth=1)
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "/perception_suite/bounding_boxes", qos_profile
+            LabeledBoundingBox2DArray, "/bounding_boxes", qos_profile
         )
         self.img_pub = self.create_publisher(
-            Image, "/perception_suite/image_boxes", qos_profile
+            Image, "/segmented_image", qos_profile
         )
         self.img_sub = self.create_subscription(
             Image,
-            # "/perception_suite/image",  # Remap this to correct topic
-            "/wamv/sensors/cameras/front_right_camera_sensor/image_raw",
+            "/in_image",  # Remap this to correct topic
             self.img_callback,
             qos_profile,
         )
 
     def img_callback(self, img):
+
+        bboxes = LabeledBoundingBox2DArray()
+        bboxes.header = img.header
+
         try:
             img = self.bridge.imgmsg_to_cv2(img, "rgb8")
         except cv_bridge.CvBridgeError as e:
@@ -61,8 +64,6 @@ class ColorSegmentation(Node):
         # threshold_pixels = 1000
 
 
-        bboxes = LabeledBoundingBox2DArray()
-        bboxes.header.stamp = self.get_clock().now().to_msg()
         for color in colors:
             if color == "red2":
                 continue
