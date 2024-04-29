@@ -58,8 +58,6 @@ include_directories(
 
 #---------- Controller programs ----------#
 
-#---------- Mapping programs ----------#
-
 #---------- Navigation programs ----------#
 
 # Node: nav_state_reporter
@@ -181,7 +179,6 @@ install(PROGRAMS
 
     # Competition-specific programs
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sub.py
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_pwm_sub.py
     ${PROJECT_NAME}/competitions/roboboat/task_manager.py
     ${PROJECT_NAME}/competitions/roboboat/Task.py
     ${PROJECT_NAME}/competitions/roboboat/FollowThePath.py
@@ -199,12 +196,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/controller/replay_recordings.py
     ${PROJECT_NAME}/controller/angle_printer.py
 
-
-    # Mapping progams
-    ${PROJECT_NAME}/mapping/static_map_generator.py
-    ${PROJECT_NAME}/mapping/buoy_pair_finder.py
-
     # Navigation programs
+    ${PROJECT_NAME}/navigation/buoy_pair_finder.py
     ${PROJECT_NAME}/navigation/pwm_sender.py
     ${PROJECT_NAME}/navigation/path_generator.py
     ${PROJECT_NAME}/navigation/waypoint_sender.py
