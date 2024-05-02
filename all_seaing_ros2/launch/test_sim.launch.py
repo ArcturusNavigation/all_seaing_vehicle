@@ -7,7 +7,6 @@ import os
 
 
 def generate_launch_description():
-    nav2_prefix = get_package_share_directory("all_seaing_vehicle")
     all_seaing_prefix = get_package_share_directory("all_seaing_vehicle")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
@@ -54,18 +53,22 @@ def generate_launch_description():
             # overlay node
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
-                executable="pointcloud_image_overlay",
+                executable="cluster_bbox_overlay",
                 output="screen",
                 remappings=[
                     (
-                        "/img_src",
-                        "/wamv/sensors/cameras/front_left_camera_sensor/image_raw",
-                    ),
-                    (
                         "/img_info_src",
                         "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
-                    ),
-                    ("/cloud_src", "/filtered_cloud"),
+                    )
+                ],
+            ),
+            # color segmentation
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="color_segmentation.py",
+                output="screen",
+                remappings=[
+                    ("/in_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
                 ],
             ),
             # pointcloud filter
@@ -114,52 +117,6 @@ def generate_launch_description():
                     ("/gps/fix", "/wamv/sensors/gps/gps/fix"),
                 ],
             ),
-            # waypoint sender
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="waypoint_sender.py",
-                output="screen",
-                parameters=[{"use_pose_array": True}, {"use_gps": False}],
-            ),
-            # color segmentation node
-            # launch_ros.actions.Node(
-            #     package="all_seaing_vehicle",
-            #     executable="color_segmentation.py",
-            #     output="screen",
-            #     remappings=[
-            #         ("/perception_suite/image", "/wamv/sensors/cameras/front_right_camera_sensor/image_raw"),
-            #     ],
-            # ),
-            # static map generation
-            #launch_ros.actions.Node(
-            #    package="all_seaing_vehicle",
-            #    executable="static_map_generator.py",
-            #    output="screen",
-            #    parameters=[
-            #        {"map_resolution": 0.25},
-            #        {"grid_width": 600},
-            #        {"grid_height": 400},
-            #        {"origin_x": 40.0},
-            #        {"origin_y": 10.0},
-            #    ]
-            #),
-            # obstacle sender
-            #launch_ros.actions.Node(
-            #    package="all_seaing_vehicle",
-            #    executable="obstacle_sender.py",
-            #    output="screen",
-            #    parameters=[{"use_gps": False}],
-            #),
-            #            # buoy pair finder
-            #            launch_ros.actions.Node(
-            #                package="all_seaing_vehicle",
-            #                executable="buoy_pair_finder.py",
-            #                output="screen",
-            #            ),
-            # nav2 launch
-            #IncludeLaunchDescription(
-            #    PythonLaunchDescriptionSource([nav2_prefix, "/launch/nav2.launch.py"])
-            #),
             # default simulation
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(

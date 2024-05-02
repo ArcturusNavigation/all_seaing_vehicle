@@ -7,8 +7,9 @@ import os
 
 
 def generate_launch_description():
-
+    all_seaing_prefix = get_package_share_directory("all_seaing_vehicle")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
+
     robot_localization_params = os.path.join(
         get_package_share_directory("all_seaing_vehicle"),
         "params",
@@ -48,6 +49,24 @@ def generate_launch_description():
                 output="screen",
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
+            ),
+            # overlay node
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="cluster_bbox_overlay",
+                output="screen",
+                remappings=[
+                    ("/img_info_src", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+                ],
+            ),
+            # color segmentation
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="color_segmentation.py",
+                output="screen",
+                remappings=[
+                    ("/in_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+                ],
             ),
             # pointcloud filter
             launch_ros.actions.Node(
@@ -94,31 +113,16 @@ def generate_launch_description():
                     ("/imu/data", "/wamv/sensors/imu/imu/data"),
                     ("/gps/fix", "/wamv/sensors/gps/gps/fix"),
                 ],
-            ),
-            # cluster bounding box overlay
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="cluster_bbox_overlay",
-                output="screen",
-                remappings=[
-                    ("/img_info_src", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
-                ],
-            ),
-            # color segmentation
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="color_segmentation.py",
-                output="screen",
-                remappings=[
-                    ("/in_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
-                ],
-            ),
+            ),            
             # follow the path
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [vrx_gz_prefix, "/launch/competition.launch.py"]
                 ),
-                launch_arguments={"world": "follow_path_task"}.items(),
+                launch_arguments={
+                    "world": "practice_2023_follow_path0_task",
+                    "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
+                }.items(),
             ),
             # MOOS-ROS bridge
             launch_ros.actions.Node(

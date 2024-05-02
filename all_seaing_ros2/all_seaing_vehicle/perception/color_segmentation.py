@@ -16,18 +16,18 @@ class ColorSegmentation(Node):
         self.bridge = cv_bridge.CvBridge()
 
         # Subscribers and publishers
-        qos_profile = QoSProfile(depth=1)
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "/bounding_boxes", qos_profile
+            LabeledBoundingBox2DArray, "/bounding_boxes", 1
         )
         self.img_pub = self.create_publisher(
-            Image, "/segmented_image", qos_profile
+            Image, "/segmented_image", 1
         )
         self.img_sub = self.create_subscription(
             Image,
-            "/in_image",  # Remap this to correct topic
+            #"/in_image",  # Remap this to correct topic
+            "/wamv/sensors/cameras/front_left_camera_sensor/image_raw",  # Remap this to correct topic
             self.img_callback,
-            qos_profile,
+            1,
         )
 
     def img_callback(self, img):
@@ -106,7 +106,7 @@ class ColorSegmentation(Node):
                 )
 
             self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
-            self.bbox_pub.publish(bboxes)
+        self.bbox_pub.publish(bboxes)
 
 
             # num_valid = cv2.countNonZero(mask)
@@ -115,16 +115,11 @@ class ColorSegmentation(Node):
             #     result = cv2.bitwise_and(img, img, mask=mask)
             #     result_dict[color] = result
 
-                    
-
 
 def main(args=None):
     rclpy.init(args=args)
-
     color_segmentation = ColorSegmentation()
-
     rclpy.spin(color_segmentation)
-
     color_segmentation.destroy_node()
     rclpy.shutdown()
 

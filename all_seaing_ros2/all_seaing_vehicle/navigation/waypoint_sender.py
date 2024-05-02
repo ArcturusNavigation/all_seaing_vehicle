@@ -22,7 +22,7 @@ class WaypointSender(Node):
     
     def gateway_cb(self, msg):
         wpt_msg = Gateway()
-        if msg.gateway_key in ("WAYPOINT_UPDATE", "DEPLOY", "MOOD_MANUAL_OVERRIDE"):
+        if msg.gateway_key in ("WAYPOINT_UPDATE", "DEPLOY", "MOOS_MANUAL_OVERRIDE"):
             wpt_msg.gateway_key = msg.gateway_key
             wpt_msg.gateway_string = msg.gateway_string
         self.publisher.publish(wpt_msg)

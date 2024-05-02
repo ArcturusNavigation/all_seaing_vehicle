@@ -11,6 +11,7 @@ void ClusterBboxOverlay::ClusterBboxFusionCb(
 
     // Match clusters and bounding boxes
     std::unordered_set<int> chosen_indices;
+	//tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, pc_cam_tf_); TODO: BRUH FORGOT THIS????
     all_seaing_interfaces::msg::CloudClusterArray new_cluster_array;
     new_cluster_array.header = in_cluster_msg->header;
 	for (const all_seaing_interfaces::msg::CloudCluster &cluster : in_cluster_msg->clusters)
@@ -19,39 +20,44 @@ void ClusterBboxOverlay::ClusterBboxFusionCb(
 		// Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
 	    cv::Point2d xy_rect = cam_model_.project3dToPixel(cv::Point3d(cluster.avg_point.y, cluster.avg_point.z, -cluster.avg_point.x));
 
-		// Only continue the loop if within bounds and in front of the boat
-		if (!((xy_rect.x >= 0) && (xy_rect.x < cam_model_.cameraInfo().width) &&
-			(xy_rect.y >= 0) && (xy_rect.y < cam_model_.cameraInfo().height) && (cluster.avg_point.x >= 0)))
-            continue;
+		// Match clusters if within bounds and in front of the boat
+		if ((xy_rect.x >= 0) && (xy_rect.x < cam_model_.cameraInfo().width) &&
+            (xy_rect.y >= 0) && (xy_rect.y < cam_model_.cameraInfo().height) && (cluster.avg_point.x >= 0)) {
 
-        // Iterate through bounding boxes
-        double best_dist = 1e9;
-        int best_match = -1;
-        for (unsigned long i = 0; i < in_bbox_msg->boxes.size(); i++)
-        {
-            // Skip indices already chosen
-            if (chosen_indices.find(i) != chosen_indices.end())
-                continue;
+		    RCLCPP_INFO(this->get_logger(), "Projected 2D point: x: %f, y: %f", xy_rect.x, xy_rect.y);
 
-            const all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = in_bbox_msg->boxes[i];
-
-            double center_x = bbox.max_x - bbox.min_x;
-            double center_y = bbox.max_y - bbox.min_y;
-
-            double curr_dist = std::hypot(center_x - xy_rect.x, center_y - xy_rect.y);
-            if (curr_dist < best_dist)
+            // Iterate through bounding boxes
+            double best_dist = 1e9;
+            int best_match = -1;
+            for (unsigned long i = 0; i < in_bbox_msg->boxes.size(); i++)
             {
-                best_match = i;
-                best_dist = curr_dist;
-            }
-        }
+                // Skip indices already chosen
+                if (chosen_indices.find(i) != chosen_indices.end())
+                    continue;
 
-        // Add best match index to chosen indices and add label to cluster
-        all_seaing_interfaces::msg::CloudCluster new_cluster = cluster;
-        new_cluster.label = in_bbox_msg->boxes[best_match].label;
-        new_cluster_array.clusters.push_back(new_cluster);
-        chosen_indices.insert(best_match);
-	}
+                const all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = in_bbox_msg->boxes[i];
+
+                double center_x = (bbox.max_x + bbox.min_x) / 2;
+                double center_y = (bbox.max_y + bbox.min_y) / 2;
+
+                double curr_dist = std::hypot(center_x - xy_rect.x, center_y - xy_rect.y);
+                if (curr_dist < best_dist)
+                {
+                    best_match = i;
+                    best_dist = curr_dist;
+                }
+            }
+
+            // If :est_match was never assigned, then skip
+            if (best_match == -1) continue;
+
+            // Add best match index to chosen indices and add label to cluster
+            all_seaing_interfaces::msg::CloudCluster new_cluster = cluster;
+            new_cluster.label = in_bbox_msg->boxes[best_match].label;
+            new_cluster_array.clusters.push_back(new_cluster);
+            chosen_indices.insert(best_match);
+        }
+    }
     cluster_pub_->publish(new_cluster_array);
     if (viz_) markers(new_cluster_array);
 }
