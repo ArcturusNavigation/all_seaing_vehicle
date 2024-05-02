@@ -10,15 +10,22 @@ void ClusterBboxOverlay::ClusterBboxFusionCb(
 		pc_cam_tf_ = GetTransform(in_bbox_msg->header.frame_id, in_cluster_msg->header.frame_id);
 
     // Match clusters and bounding boxes
-    std::unordered_set<int> chosen_indices;
-	//tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, pc_cam_tf_); TODO: BRUH FORGOT THIS????
     all_seaing_interfaces::msg::CloudClusterArray new_cluster_array;
     new_cluster_array.header = in_cluster_msg->header;
+    std::unordered_set<int> chosen_indices;
 	for (const all_seaing_interfaces::msg::CloudCluster &cluster : in_cluster_msg->clusters)
 	{
+        // Transform from LiDAR to camera coordinate systems
+        geometry_msgs::msg::Point lidar_point;
+        lidar_point.x = cluster.avg_point.x;
+        lidar_point.y = cluster.avg_point.y;
+        lidar_point.z = cluster.avg_point.z;
+        geometry_msgs::msg::Point tf_point;
+        tf2::doTransform<geometry_msgs::msg::Point>(lidar_point, tf_point, pc_cam_tf_);
+
 		// Project 3D point onto the image plane using the intrinsic matrix.
 		// Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-	    cv::Point2d xy_rect = cam_model_.project3dToPixel(cv::Point3d(cluster.avg_point.y, cluster.avg_point.z, -cluster.avg_point.x));
+	    cv::Point2d xy_rect = cam_model_.project3dToPixel(cv::Point3d(tf_point.y, tf_point.z, -tf_point.x));
 
 		// Match clusters if within bounds and in front of the boat
 		if ((xy_rect.x >= 0) && (xy_rect.x < cam_model_.cameraInfo().width) &&

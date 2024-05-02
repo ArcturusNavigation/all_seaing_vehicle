@@ -79,7 +79,7 @@ def generate_launch_description():
                 ],
                 parameters=[
                     {"range_min_threshold": 0.0},
-                    {"range_max_threshold": 60.0},
+                    {"range_max_threshold": 40.0},
                     {"intensity_low_threshold": 0.0},
                     {"intensity_high_threshold": 50.0},
                     {"leaf_size": 0.0},
@@ -120,7 +120,7 @@ def generate_launch_description():
                     [vrx_gz_prefix, "/launch/competition.launch.py"]
                 ),
                 launch_arguments={
-                    "world": "practice_2023_follow_path0_task",
+                    "world": "practice_2023_follow_path2_task",
                     "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
                 }.items(),
             ),
