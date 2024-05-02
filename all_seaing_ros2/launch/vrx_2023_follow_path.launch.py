@@ -104,6 +104,12 @@ def generate_launch_description():
                     {"viz": True},
                 ],
             ),
+            # Buoy pair finder
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="buoy_pair_finder.py",
+                output="screen",
+            ),
             # state reporter
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
@@ -124,7 +130,7 @@ def generate_launch_description():
                     "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
                 }.items(),
             ),
-            # MOOS-ROS bridge
+           # MOOS-ROS bridge
             launch_ros.actions.Node(
                 package="protobuf_client",
                 executable="protobuf_client_node",
