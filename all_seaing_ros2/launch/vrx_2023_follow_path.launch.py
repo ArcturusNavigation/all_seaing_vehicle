@@ -104,7 +104,7 @@ def generate_launch_description():
                     {"viz": True},
                 ],
             ),
-            # Buoy pair finder
+            # buoy pair finder
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
                 executable="buoy_pair_finder.py",
