@@ -186,10 +186,8 @@ install(PROGRAMS
     # Controller programs
     ${PROJECT_NAME}/controller/goal_publisher.py
     ${PROJECT_NAME}/controller/sample_publisher.py
-    ${PROJECT_NAME}/controller/sim_time_fixer.py
     ${PROJECT_NAME}/controller/test_printer.py
     ${PROJECT_NAME}/controller/simple_controller.py
-    ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
     ${PROJECT_NAME}/controller/joy_to_control.py
     ${PROJECT_NAME}/controller/rviz_testing_helper.py
@@ -203,7 +201,6 @@ install(PROGRAMS
     ${PROJECT_NAME}/navigation/waypoint_sender.py
 
     # Perception programs
-    ${PROJECT_NAME}/perception/topic_to_image.py
     ${PROJECT_NAME}/perception/color_segmentation.py
     ${PROJECT_NAME}/perception/yolov5_detector.py
     ${PROJECT_NAME}/perception/yolov5_image.py

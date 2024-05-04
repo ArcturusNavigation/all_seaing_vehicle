@@ -20,11 +20,6 @@ pcl::PointXYZI Cluster::GetAveragePoint()
     return average_point_;
 }
 
-all_seaing_interfaces::msg::BoundingBox Cluster::GetBoundingBox()
-{
-    return bounding_box_;
-}
-
 geometry_msgs::msg::Polygon Cluster::GetPolygon()
 {
     return polygon_;
@@ -125,15 +120,6 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
     width_ = max_point_.y - min_point_.y;
     height_ = max_point_.z - min_point_.z;
 
-    // calculate bounding box
-    bounding_box_.header = in_ros_header;
-    bounding_box_.pose.position.x = min_point_.x + length_ / 2;
-    bounding_box_.pose.position.y = min_point_.y + width_ / 2;
-    bounding_box_.pose.position.z = min_point_.z + height_ / 2;
-    bounding_box_.dimensions.x = length_;
-    bounding_box_.dimensions.y = width_;
-    bounding_box_.dimensions.z = height_;
-
     // calculate convex hull polygon
     pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::ConvexHull<pcl::PointXYZI> chull;
@@ -188,8 +174,6 @@ void Cluster::ToROSMessage(std_msgs::msg::Header in_ros_header,
     out_cluster_message.last_seen = this->GetLastSeen();
 
     out_cluster_message.id = this->GetID();
-
-    out_cluster_message.bb_msg = this->GetBoundingBox();
 }
 
 Cluster::Cluster(){}
