@@ -21,7 +21,6 @@
 
 #include "all_seaing_interfaces/msg/cloud_cluster.hpp"
 #include "all_seaing_interfaces/msg/cloud_cluster_array.hpp"
-#include "all_seaing_interfaces/msg/bounding_box.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/point32.hpp"
 #include "geometry_msgs/msg/polygon.hpp"
@@ -36,9 +35,7 @@ class Cluster
     pcl::PointXYZI min_point_;
     pcl::PointXYZI max_point_;
     pcl::PointXYZI average_point_;
-    float length_, width_, height_, area_;
-
-    all_seaing_interfaces::msg::BoundingBox bounding_box_;
+    float area_;
 
     geometry_msgs::msg::Polygon polygon_;
     std_msgs::msg::Header ros_header_;
@@ -90,10 +87,6 @@ public:
     float GetPolygonArea();
     /** @brief Returns the ID of the cluster */
     int GetID();
-    /** @breif Returns the Obs style message to be sent to MOOS-IvP for reporting Cluster convex hull */
-    std::string GetObs();
-    /** @brief Returns the Bounding Box of the cluster */
-    all_seaing_interfaces::msg::BoundingBox GetBoundingBox();
     /** @brief Returns the ROS header of the cluster */
     std_msgs::msg::Header GetROSHeader();
     /** @brief Returns message header */

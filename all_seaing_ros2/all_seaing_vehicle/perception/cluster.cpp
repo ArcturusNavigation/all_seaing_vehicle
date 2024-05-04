@@ -115,11 +115,6 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
     average_point_.y = average_y;
     average_point_.z = average_z;
 
-    // length, width, height
-    length_ = max_point_.x - min_point_.x;
-    width_ = max_point_.y - min_point_.y;
-    height_ = max_point_.z - min_point_.z;
-
     // calculate convex hull polygon
     pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::ConvexHull<pcl::PointXYZI> chull;
@@ -138,8 +133,6 @@ void Cluster::SetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_clou
     // get area of polygon
     area_ = pcl::calculatePolygonArea(*hull_cloud);
 
-    current_cluster->width = current_cluster->points.size();
-    current_cluster->height = 1;
     current_cluster->is_dense = true;
 
     pointcloud_ = current_cluster;
