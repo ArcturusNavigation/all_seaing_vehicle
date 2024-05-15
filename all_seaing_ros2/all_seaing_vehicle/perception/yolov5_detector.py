@@ -30,11 +30,7 @@ class Yolov5Detector(Node):
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
         path_model = (
             get_package_share_directory("all_seaing_vehicle")
-<<<<<<< HEAD
-            + "/models/3dRenderingModel.pt"
-=======
             + "/models/yolov5s.pt"
->>>>>>> 6b217659fa234218b6575949799474ca33b6ac9a
         )
         self.model = torch.hub.load(
             path_hubconfig, "custom", path=path_model, source="local"
@@ -43,19 +39,24 @@ class Yolov5Detector(Node):
         # Subscribers and publishers
         qos_profile = QoSProfile(depth=1)
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "/perception_suite/bounding_boxes", qos_profile
+            LabeledBoundingBox2DArray, "/bounding_boxes", qos_profile
         )
         self.img_pub = self.create_publisher(
-            Image, "/perception_suite/segmented_image", qos_profile
+            Image, "/segmented_image", qos_profile
         )
         self.img_sub = self.create_subscription(
             Image,
-            "/perception_suite/image",  # Remap this to correct topic
+            "/wamv/sensors/cameras/front_left_camera_sensor/image_raw",  # Remap this to correct topic
             self.img_callback,
             qos_profile,
         )
 
     def img_callback(self, img):
+
+        # Set header of bboxes
+        bboxes = LabeledBoundingBox2DArray()
+        bboxes.header = img.header
+
         try:
             img = self.bridge.imgmsg_to_cv2(img, "rgb8")
         except cv_bridge.CvBridgeError as e:
@@ -66,10 +67,6 @@ class Yolov5Detector(Node):
         preds = results.pandas().xyxy[0]
 
         self.get_logger().info(str(preds))
-
-        # Set header of bboxes
-        bboxes = LabeledBoundingBox2DArray()
-        bboxes.header.stamp = self.get_clock().now().to_msg()
 
         # Set bounding boxes around colored buoys
         for _, row in preds.iterrows():
@@ -90,7 +87,6 @@ class Yolov5Detector(Node):
 
         self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
         self.bbox_pub.publish(bboxes)
-
 
 def main(args=None):
     rclpy.init(args=args)

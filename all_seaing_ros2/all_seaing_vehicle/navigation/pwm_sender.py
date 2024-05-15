@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
+
+from rclpy.node import Node
 from mavros_msgs.srv import CommandLong
 from std_msgs.msg import Int64
 
 import rclpy
 
-from all_seaing_vehicle.utils.e_stopped_node import EStoppedNode
-
-
-class pwm_sender(EStoppedNode):
+class pwm_sender(Node):
 
     def __init__(self):
         super().__init__("pwm_subscriber")
@@ -41,15 +40,12 @@ class pwm_sender(EStoppedNode):
         self.send_pwm(self.backleft_port, msg.data)
 
     def send_pwm(self, channel, value):
-        if not self.is_e_stopped:
-            self.get_logger().info(f"Sending PWM value {value} to channel {channel}")
-            self.last_received_time = self.get_clock().now().to_msg().sec
-            return self.proxy.call_async(
-                CommandLong.Request(
-                    command=183, param1=float(channel), param2=float(value)
-                )
+        self.get_logger().info(f"Sending PWM value {value} to channel {channel}")
+        return self.proxy.call_async(
+            CommandLong.Request(
+                command=183, param1=float(channel), param2=float(value)
             )
-        self.get_logger().info("Cannot send PWM as node is E-stopped!")
+        )
 
 
 def main(args=None):

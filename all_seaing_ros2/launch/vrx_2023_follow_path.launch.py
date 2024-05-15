@@ -7,8 +7,9 @@ import os
 
 
 def generate_launch_description():
-
+    all_seaing_prefix = get_package_share_directory("all_seaing_vehicle")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
+
     robot_localization_params = os.path.join(
         get_package_share_directory("all_seaing_vehicle"),
         "params",
@@ -17,13 +18,6 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # rviz
-            launch_ros.actions.Node(
-                package="rviz2",
-                executable="rviz2",
-                output="screen",
-                arguments=["-f", "odom"],
-            ),
             # controller
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
@@ -56,6 +50,24 @@ def generate_launch_description():
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
             ),
+            # overlay node
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="cluster_bbox_overlay",
+                output="screen",
+                remappings=[
+                    ("/img_info_src", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+                ],
+            ),
+            # color segmentation
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="color_segmentation.py",
+                output="screen",
+                remappings=[
+                    ("/in_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+                ],
+            ),
             # pointcloud filter
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
@@ -67,7 +79,7 @@ def generate_launch_description():
                 ],
                 parameters=[
                     {"range_min_threshold": 0.0},
-                    {"range_max_threshold": 60.0},
+                    {"range_max_threshold": 40.0},
                     {"intensity_low_threshold": 0.0},
                     {"intensity_high_threshold": 50.0},
                     {"leaf_size": 0.0},
@@ -83,14 +95,20 @@ def generate_launch_description():
                     ("/in_cloud", "/filtered_cloud"),
                 ],
                 parameters=[
-                    {"cluster_size_min": 1},
-                    {"cluster_size_max": 20},
-                    {"clustering_distance": 0.2},
-                    {"cluster_seg_thresh": 1.5},
-                    {"drop_cluster_thresh": 1.5},
+                    {"cluster_size_min": 2},
+                    {"cluster_size_max": 60},
+                    {"clustering_distance": 1.0},
+                    {"cluster_seg_thresh": 10.0},
+                    {"drop_cluster_thresh": 1.0},
                     {"polygon_area_thresh": 100000.0},
                     {"viz": True},
                 ],
+            ),
+            # buoy pair finder
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="buoy_pair_finder.py",
+                output="screen",
             ),
             # state reporter
             launch_ros.actions.Node(
@@ -101,22 +119,18 @@ def generate_launch_description():
                     ("/imu/data", "/wamv/sensors/imu/imu/data"),
                     ("/gps/fix", "/wamv/sensors/gps/gps/fix"),
                 ],
-            ),
+            ),            
             # follow the path
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [vrx_gz_prefix, "/launch/competition.launch.py"]
                 ),
-                launch_arguments={"world": "follow_path_task"}.items(),
+                launch_arguments={
+                    "world": "practice_2023_follow_path2_task",
+                    "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
+                }.items(),
             ),
-            # waypoint sender
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="waypoint_sender.py",
-                output="screen",
-                parameters=[{"use_pose_array": True}, {"use_gps": False}],
-            ),
-            # MOOS-ROS bridge
+           # MOOS-ROS bridge
             launch_ros.actions.Node(
                 package="protobuf_client",
                 executable="protobuf_client_node",

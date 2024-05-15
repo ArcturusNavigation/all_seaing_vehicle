@@ -58,8 +58,6 @@ include_directories(
 
 #---------- Controller programs ----------#
 
-#---------- Mapping programs ----------#
-
 #---------- Navigation programs ----------#
 
 # Node: nav_state_reporter
@@ -113,6 +111,25 @@ ament_target_dependencies(pointcloud_image_overlay
     pcl_conversions
 )
 
+# Node: pointcloud_image_overlay
+add_executable(cluster_bbox_overlay ${PROJECT_NAME}/perception/cluster_bbox_overlay.cpp)
+target_link_libraries(cluster_bbox_overlay
+    ${PCL_LIBRARIES}
+)
+ament_target_dependencies(cluster_bbox_overlay
+    rclcpp
+    std_msgs
+    tf2
+    tf2_ros
+    tf2_geometry_msgs
+    visualization_msgs
+    tf2_sensor_msgs
+    image_geometry
+    cv_bridge
+    pcl_conversions
+    all_seaing_interfaces
+)
+
 # Node: pointcloud_filter
 add_executable(pointcloud_filter ${PROJECT_NAME}/perception/pointcloud_filter.cpp)
 target_link_libraries(pointcloud_filter
@@ -133,7 +150,9 @@ ament_target_dependencies(pointcloud_euclidean_cluster_detect
     rclcpp 
     std_msgs
     all_seaing_interfaces
+    protobuf_client_interfaces
     geometry_msgs
+    nav_msgs
     pcl_conversions
     pcl_ros
     sensor_msgs
@@ -153,6 +172,7 @@ install(TARGETS
     pointcloud_euclidean_cluster_detect
     pointcloud_filter
     pointcloud_image_overlay
+    cluster_bbox_overlay
     nav_state_reporter
     stationkeeping_state_reporter
     moos_to_controller
@@ -168,36 +188,34 @@ install(PROGRAMS
 
     # Competition-specific programs
     ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_acoustic_sub.py
-    ${PROJECT_NAME}/competitions/vrx_2023/vrx_2023_pwm_sub.py
     ${PROJECT_NAME}/competitions/roboboat/task_manager.py
+    ${PROJECT_NAME}/competitions/roboboat/Task.py
+    ${PROJECT_NAME}/competitions/roboboat/FollowThePath.py
 
     # Controller programs
     ${PROJECT_NAME}/controller/goal_publisher.py
     ${PROJECT_NAME}/controller/sample_publisher.py
-    ${PROJECT_NAME}/controller/sim_time_fixer.py
     ${PROJECT_NAME}/controller/test_printer.py
     ${PROJECT_NAME}/controller/simple_controller.py
-    ${PROJECT_NAME}/controller/state_publisher.py
     ${PROJECT_NAME}/controller/xdrive_controller.py
     ${PROJECT_NAME}/controller/joy_to_control.py
     ${PROJECT_NAME}/controller/rviz_testing_helper.py
-
-
-
-    # Mapping progams
-    ${PROJECT_NAME}/mapping/obstacle_sender.py
-    ${PROJECT_NAME}/mapping/static_map_generator.py
-    ${PROJECT_NAME}/mapping/buoy_pair_finder.py
+    ${PROJECT_NAME}/controller/replay_recordings.py
+    ${PROJECT_NAME}/controller/angle_printer.py
 
     # Navigation programs
+    ${PROJECT_NAME}/navigation/buoy_pair_finder.py
     ${PROJECT_NAME}/navigation/pwm_sender.py
     ${PROJECT_NAME}/navigation/path_generator.py
     ${PROJECT_NAME}/navigation/waypoint_sender.py
 
     # Perception programs
-    ${PROJECT_NAME}/perception/topic_to_image.py
+    ${PROJECT_NAME}/perception/color_segmentation.py
     ${PROJECT_NAME}/perception/yolov5_detector.py
     ${PROJECT_NAME}/perception/yolov5_image.py
+    ${PROJECT_NAME}/perception/webcam_publisher.py
+    ${PROJECT_NAME}/perception/webcam_splitter.py
+    ${PROJECT_NAME}/perception/zed2i_publisher.py
 
     # Utils programs
     ${PROJECT_NAME}/utils/e_stopped_node.py

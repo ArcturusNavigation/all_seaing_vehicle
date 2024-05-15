@@ -17,15 +17,12 @@ find_package(builtin_interfaces REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/ASVState.msg"
-    "msg/BoundingBox.msg"
-    "msg/Centroids.msg"
     "msg/CloudClusterArray.msg"
     "msg/CloudCluster.msg"
     "msg/ControlMessage.msg"
     "msg/GoalState.msg"
     "msg/LabeledBoundingBox2DArray.msg"
     "msg/LabeledBoundingBox2D.msg"
-    "msg/ObstacleFeature.msg"
     "msg/Heartbeat.msg"
     "msg/ASV2State.msg"
     DEPENDENCIES

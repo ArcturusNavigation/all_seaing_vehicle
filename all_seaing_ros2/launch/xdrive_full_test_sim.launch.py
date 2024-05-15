@@ -57,7 +57,7 @@ def generate_launch_description():
             name="controller",
             parameters=[{"in_sim": True}]
         ),
-        task_manager_mode,
+        # task_manager_mode,
         launch_ros.actions.Node(
             package="all_seaing_vehicle",
             executable="rviz_testing_helper.py",

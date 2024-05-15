@@ -17,19 +17,16 @@
 #include <pcl/common/transforms.h>
 #include <pcl/common/distances.h>
 #include <pcl/common/impl/common.hpp>
-#include "pcl_conversions/pcl_conversions.h"
+#include <pcl_conversions/pcl_conversions.h>
 
-#include "all_seaing_interfaces/msg/centroids.hpp"
 #include "all_seaing_interfaces/msg/cloud_cluster.hpp"
 #include "all_seaing_interfaces/msg/cloud_cluster_array.hpp"
-#include "all_seaing_interfaces/msg/bounding_box.hpp"
+#include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/point32.hpp"
-#include "geometry_msgs/msg/polygon_stamped.hpp"
+#include "geometry_msgs/msg/polygon.hpp"
 #include "builtin_interfaces/msg/time.hpp"
 
 #include <limits>
-#include <cmath>
-#include <sstream>
 
 class Cluster
 {
@@ -38,21 +35,13 @@ class Cluster
     pcl::PointXYZI min_point_;
     pcl::PointXYZI max_point_;
     pcl::PointXYZI average_point_;
-    pcl::PointXYZI centroid_;
-    float length_, width_, height_, area_;
-    double orientation_angle_;
+    float area_;
 
-    Eigen::Matrix3f eigen_vectors_;
-    Eigen::Vector3f eigen_values_;
-    all_seaing_interfaces::msg::BoundingBox bounding_box_;
-
-    geometry_msgs::msg::PolygonStamped polygon_;
+    geometry_msgs::msg::Polygon polygon_;
     std_msgs::msg::Header ros_header_;
 
     int id_;
     builtin_interfaces::msg::Time last_seen_;
-
-    bool valid_cluster_;
 
 public:
     /**
@@ -92,42 +81,20 @@ public:
     pcl::PointXYZI GetMaxPoint();
     /** @brief Returns the average point in the cluster */
     pcl::PointXYZI GetAveragePoint();
-    /** @brief Returns the centroid point in the cluster */
-    pcl::PointXYZI GetCentroidPoint();
     /** @brief Returns the convex hull (polygon) of the cluster */
-    geometry_msgs::msg::PolygonStamped GetPolygon();
+    geometry_msgs::msg::Polygon GetPolygon();
     /** @brief Returns the area of the polygon (convex hull) */
     float GetPolygonArea();
-    /** @brief Returns the length of the cluster */
-    float GetLength();
-    /** @brief Returns the width of the cluster */
-    float GetWidth();
-    /** @brief Returns the height of the cluster */
-    float GetHeight();
-    /** @brief Returns the orientation angle in radians of the Bounding Box */
-    double GetOrientationAngle();
     /** @brief Returns the ID of the cluster */
     int GetID();
-    /** @brief Returns the Bounding Box of the cluster */
-    all_seaing_interfaces::msg::BoundingBox GetBoundingBox();
-    /** @brief Returns the Eigen Vectors of the cluster */
-    Eigen::Matrix3f GetEigenVectors();
-    /** @brief Returns the Eigen Values of the cluster */
-    Eigen::Vector3f GetEigenValues();
     /** @brief Returns the ROS header of the cluster */
     std_msgs::msg::Header GetROSHeader();
-    /** @brief Returns if the cluster is valid or not */
-    bool IsValid();
-    /** @brief Sets whether cluster is valid or not */
-    void SetValidity(bool in_valid);
     /** @brief Returns message header */
     std_msgs::msg::Header GetHeader();
     /** @brief Returns last scene tick*/
     builtin_interfaces::msg::Time GetLastSeen();
-    /** @brief Sets last scene tick*/
-    builtin_interfaces::msg::Time SetLastSeen(builtin_interfaces::msg::Time value);
     /** @brief Sets cluster id */
-    int SetID(int id);
+    void SetID(int id);
 };
 
 #endif /* CLUSTER_HPP_ */

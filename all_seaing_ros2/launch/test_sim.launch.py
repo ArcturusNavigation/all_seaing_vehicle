@@ -7,7 +7,7 @@ import os
 
 
 def generate_launch_description():
-    nav2_prefix = get_package_share_directory("all_seaing_vehicle")
+    all_seaing_prefix = get_package_share_directory("all_seaing_vehicle")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
     robot_localization_params = os.path.join(
@@ -50,28 +50,25 @@ def generate_launch_description():
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
             ),
-            # rviz
-            launch_ros.actions.Node(
-                package="rviz2",
-                executable="rviz2",
-                output="screen",
-                arguments=["-f", "odom"],
-            ),
             # overlay node
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
-                executable="pointcloud_image_overlay",
+                executable="cluster_bbox_overlay",
                 output="screen",
                 remappings=[
                     (
-                        "/img_src",
-                        "/wamv/sensors/cameras/front_left_camera_sensor/image_raw",
-                    ),
-                    (
                         "/img_info_src",
                         "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
-                    ),
-                    ("/cloud_src", "/filtered_cloud"),
+                    )
+                ],
+            ),
+            # color segmentation
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="color_segmentation.py",
+                output="screen",
+                remappings=[
+                    ("/in_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
                 ],
             ),
             # pointcloud filter
@@ -102,9 +99,9 @@ def generate_launch_description():
                 ],
                 parameters=[
                     {"cluster_size_min": 2},
-                    {"cluster_size_max": 40},
-                    {"clustering_distance": 0.15},
-                    {"cluster_seg_thresh": 1.0},
+                    {"cluster_size_max": 60},
+                    {"clustering_distance": 1.0},
+                    {"cluster_seg_thresh": 10.0},
                     {"drop_cluster_thresh": 1.0},
                     {"polygon_area_thresh": 100000.0},
                     {"viz": True},
@@ -120,48 +117,15 @@ def generate_launch_description():
                     ("/gps/fix", "/wamv/sensors/gps/gps/fix"),
                 ],
             ),
-            # waypoint sender
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="waypoint_sender.py",
-                output="screen",
-                parameters=[{"use_pose_array": True}, {"use_gps": False}],
-            ),
-            # static map generation
-            #launch_ros.actions.Node(
-            #    package="all_seaing_vehicle",
-            #    executable="static_map_generator.py",
-            #    output="screen",
-            #    parameters=[
-            #        {"map_resolution": 0.25},
-            #        {"grid_width": 600},
-            #        {"grid_height": 400},
-            #        {"origin_x": 40.0},
-            #        {"origin_y": 10.0},
-            #    ]
-            #),
-            # obstacle sender
-            #launch_ros.actions.Node(
-            #    package="all_seaing_vehicle",
-            #    executable="obstacle_sender.py",
-            #    output="screen",
-            #    parameters=[{"use_gps": False}],
-            #),
-            #            # buoy pair finder
-            #            launch_ros.actions.Node(
-            #                package="all_seaing_vehicle",
-            #                executable="buoy_pair_finder.py",
-            #                output="screen",
-            #            ),
-            # nav2 launch
-            #IncludeLaunchDescription(
-            #    PythonLaunchDescriptionSource([nav2_prefix, "/launch/nav2.launch.py"])
-            #),
             # default simulation
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [vrx_gz_prefix, "/launch/competition.launch.py"]
-                )
+                ),
+                launch_arguments = {
+                    "world": "sydney_regatta",
+                    "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
+                }.items(),
             ),
             # MOOS-ROS bridge
             launch_ros.actions.Node(

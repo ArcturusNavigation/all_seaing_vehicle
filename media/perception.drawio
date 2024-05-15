@@ -1,0 +1,42 @@
+<mxfile host="app.diagrams.net" modified="2024-05-03T20:57:29.694Z" agent="Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0" etag="M1VrsHs7FJNi8OLIzbtR" version="24.3.1" type="github">
+  <diagram id="C5RBs43oDa-KdzZeNtuy" name="Page-1">
+    <mxGraphModel dx="1974" dy="726" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="WIyWlLk6GJQsqaUBKTNV-0" />
+        <mxCell id="WIyWlLk6GJQsqaUBKTNV-1" parent="WIyWlLk6GJQsqaUBKTNV-0" />
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="ou8zvbw-qNCCU-TRvPra-0" target="ou8zvbw-qNCCU-TRvPra-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-0" value="/pointcloud_euclidean_cluster_detect" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
+          <mxGeometry x="420" y="410" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="ou8zvbw-qNCCU-TRvPra-1" target="ou8zvbw-qNCCU-TRvPra-5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="460" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-1" value="/pointcloud_filter" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
+          <mxGeometry y="410" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="ou8zvbw-qNCCU-TRvPra-5" target="ou8zvbw-qNCCU-TRvPra-0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-5" value="&lt;div&gt;/filtered_cloud&lt;/div&gt;&lt;div&gt;(sensor_msgs/PointCloud2)&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
+          <mxGeometry x="200" y="410" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="ou8zvbw-qNCCU-TRvPra-6" target="ou8zvbw-qNCCU-TRvPra-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-6" value="&lt;div&gt;/in_cloud&lt;/div&gt;&lt;div&gt;(sensor_msgs/PointCloud2)&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
+          <mxGeometry x="-220" y="410" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-11" value="&lt;div&gt;/raw_cloud_clusters&lt;/div&gt;&lt;div&gt;(all_seaing_interfaces/CloudClusterArray)&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
+          <mxGeometry x="460" y="545" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ou8zvbw-qNCCU-TRvPra-13" value="" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
+          <mxGeometry x="260" y="545" width="160" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -18,7 +18,7 @@ public:
         this->declare_parameter<double>("intensity_low_threshold", 0.0);
         this->declare_parameter<double>("intensity_high_threshold", 100000.0);
         this->declare_parameter<double>("leaf_size", 0.0);
-        this->declare_parameter<int>("half_fov", 80);
+        this->declare_parameter<int>("half_fov", 0);
 
         // Subscribe to the input point cloud topic
         m_subscription = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -49,6 +49,7 @@ private:
     void filter_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr, pcl::PointCloud<pcl::PointXYZI>::Ptr &out_cloud_ptr)
     {
         float half_fov = static_cast<float>(m_half_fov * M_PI / 180) / 2.0f;
+
         for (const auto &point : in_cloud_ptr->points)
         {
             float current_theta = std::atan2(point.y, point.x);
@@ -56,7 +57,7 @@ private:
 
             if (m_range_min_threshold <= sqrt(range) && sqrt(range) <= m_range_max_threshold && 
                 m_intensity_low_threshold <= point.intensity && point.intensity <= m_intensity_high_threshold &&
-                current_theta > -half_fov && current_theta < half_fov && pcl::isFinite(point))
+                (half_fov == 0.0 || (current_theta > -half_fov && current_theta < half_fov)) && pcl::isFinite(point))
             {
                 out_cloud_ptr->points.push_back(point);
             }

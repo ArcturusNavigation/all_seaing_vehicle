@@ -1,4 +1,5 @@
 #include <string>
+#include <iostream>
 
 #include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Quaternion.h"
@@ -29,7 +30,7 @@ public:
 			10,
 			std::bind(&NavStateReporter::imu_callback, this, std::placeholders::_1));
 		m_gps_sub = this->create_subscription<sensor_msgs::msg::NavSatFix>(
-			"/gps/fix",
+			"/wamv/sensors/gps/gps/fix",
 			10,
 			std::bind(&NavStateReporter::gps_callback, this, std::placeholders::_1));
 		m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -91,6 +92,7 @@ private:
 	{
 		m_state.nav_lat = msg.latitude;
 		m_state.nav_long = msg.longitude;
+		// m_state.nav_long = 5;
 	}
 
 	void gateway_callback(const protobuf_client_interfaces::msg::Gateway &msg)
