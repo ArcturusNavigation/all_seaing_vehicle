@@ -42,10 +42,7 @@ class BuoyPairFinder(Node):
         left_buoy_points = []
         right_buoy_points = []
         for cluster in msg.clusters:
-            self.get_logger().info(f"nav x: {self.nav_x}, nav y: {self.nav_y}, nav heading {self.nav_heading}")
-            self.get_logger().info(f"local x: {cluster.avg_point.x}, local y: {cluster.avg_point.y}")
             x, y = self.convert_to_global(cluster.avg_point.x, cluster.avg_point.y)
-            self.get_logger().info(f"global x: {x}, global y: {y}")
             if cluster.label == 2:
                 left_buoy_points.append((x, y))
             elif cluster.label == 1:

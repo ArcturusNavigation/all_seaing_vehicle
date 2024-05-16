@@ -28,6 +28,7 @@ def generate_launch_description():
     )
     return LaunchDescription([
         DeclareLaunchArgument("run_tasks", default_value=TextSubstitution(text="True")),
+        # state reporter
         launch_ros.actions.Node(
 	        package="all_seaing_vehicle",
             executable="nav_state_reporter",
