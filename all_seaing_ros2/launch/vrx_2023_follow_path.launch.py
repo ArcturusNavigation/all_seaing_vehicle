@@ -18,22 +18,16 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            # controller
+            # state reporter
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
-                executable="simple_controller.py",
+                executable="nav_state_reporter",
                 output="screen",
                 remappings=[
-                    ("/left_thrust", "/wamv/thrusters/left/thrust"),
-                    ("/right_thrust", "/wamv/thrusters/right/thrust"),
+                    ("/imu/data", "/wamv/sensors/imu/imu/data"),
+                    ("/gps/fix", "/wamv/sensors/gps/gps/fix"),
                 ],
-                parameters=[
-                    {"linear_scaling": 25.0},
-                    {"angular_scaling": 15.0},
-                    {"lower_thrust_limit": -1400.0},
-                    {"upper_thrust_limit": 1400.0},
-                ],
-            ),
+            ),            
             # robot localization
             launch_ros.actions.Node(
                 package="robot_localization",
@@ -49,6 +43,29 @@ def generate_launch_description():
                 output="screen",
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
+            ),
+            # xdrive controller
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="xdrive_controller.py",
+                name="controller",
+                parameters=[{"in_sim": True}],
+            ),
+            # keyboard
+            launch_ros.actions.Node(
+                package="keyboard", executable="keyboard", name="keyboard"
+            ),
+            launch_ros.actions.Node(
+                package="keyboard",
+                executable="keyboard_to_joy.py",
+                name="keyboard_to_joy",
+                parameters=[
+                    {
+                        "config_file_name": os.path.join(
+                            all_seaing_prefix, "params", "keyboard_config.yaml"
+                        )
+                    }
+                ],
             ),
             # overlay node
             launch_ros.actions.Node(
@@ -110,16 +127,6 @@ def generate_launch_description():
                 executable="buoy_pair_finder.py",
                 output="screen",
             ),
-            # state reporter
-            launch_ros.actions.Node(
-                package="all_seaing_vehicle",
-                executable="nav_state_reporter",
-                output="screen",
-                remappings=[
-                    ("/imu/data", "/wamv/sensors/imu/imu/data"),
-                    ("/gps/fix", "/wamv/sensors/gps/gps/fix"),
-                ],
-            ),            
             # follow the path
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -127,7 +134,7 @@ def generate_launch_description():
                 ),
                 launch_arguments={
                     "world": "practice_2023_follow_path2_task",
-                    "urdf": f"{all_seaing_prefix}/urdf/simple_wamv/wamv_target.urdf",
+                    "urdf": f"{all_seaing_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
                 }.items(),
             ),
            # MOOS-ROS bridge
@@ -135,6 +142,11 @@ def generate_launch_description():
                 package="protobuf_client",
                 executable="protobuf_client_node",
                 output="screen",
+            ),
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
+                executable="moos_to_controller",
+                name="moos_to_controller",
             ),
         ]
     )

@@ -27,6 +27,7 @@ def generate_launch_description():
                     ("/gps/fix", "/wamv/sensors/gps/gps/fix"),
                 ],
             ),
+            # robot localization
             launch_ros.actions.Node(
                 package="robot_localization",
                 executable="ekf_node",
@@ -40,12 +41,14 @@ def generate_launch_description():
                 remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
                 parameters=[robot_localization_params],
             ),
+            # xdrive controller
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
                 executable="xdrive_controller.py",
                 name="controller",
                 parameters=[{"in_sim": True}],
             ),
+            # keyboard
             launch_ros.actions.Node(
                 package="keyboard", executable="keyboard", name="keyboard"
             ),
