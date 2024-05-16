@@ -218,7 +218,6 @@ install(PROGRAMS
     ${PROJECT_NAME}/perception/zed2i_publisher.py
 
     # Utils programs
-    ${PROJECT_NAME}/utils/e_stopped_node.py
     ${PROJECT_NAME}/utils/e_stopped_publisher_test.py
     ${PROJECT_NAME}/utils/onshore_node.py
 

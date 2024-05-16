@@ -35,8 +35,11 @@ def generate_launch_description():
             get_package_share_directory(
                 "zed_wrapper"
             ),
-            "/launch/obsolete/zed2i.launch.py"
-        ])
+            "/launch/zed_camera.launch.py"
+        ]),
+        launch_arguments={
+            "camera_model": "zed2i"
+        }.items()
     )
 
     return LaunchDescription([
