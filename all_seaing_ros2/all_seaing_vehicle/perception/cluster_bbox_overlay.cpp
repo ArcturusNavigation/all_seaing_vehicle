@@ -31,7 +31,7 @@ void ClusterBboxOverlay::ClusterBboxFusionCb(
 		if ((xy_rect.x >= 0) && (xy_rect.x < cam_model_.cameraInfo().width) &&
             (xy_rect.y >= 0) && (xy_rect.y < cam_model_.cameraInfo().height) && (cluster.avg_point.x >= 0)) {
 
-		    RCLCPP_INFO(this->get_logger(), "Projected 2D point: x: %f, y: %f", xy_rect.x, xy_rect.y);
+		    // RCLCPP_INFO(this->get_logger(), "Projected 2D point: x: %f, y: %f", xy_rect.x, xy_rect.y);
 
             // Iterate through bounding boxes
             double best_dist = 1e9;
@@ -55,7 +55,7 @@ void ClusterBboxOverlay::ClusterBboxFusionCb(
                 }
             }
 
-            // If :est_match was never assigned, then skip
+            // If best_match was never assigned, then skip
             if (best_match == -1) continue;
 
             // Add best match index to chosen indices and add label to cluster

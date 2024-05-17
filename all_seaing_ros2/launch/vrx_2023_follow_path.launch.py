@@ -100,7 +100,7 @@ def generate_launch_description():
                     {"intensity_low_threshold": 0.0},
                     {"intensity_high_threshold": 50.0},
                     {"leaf_size": 0.0},
-                    {"half_fov": 89}
+                    {"hfov": 150.0}
                 ],
             ),
             # pointcloud euclidean cluster detect
