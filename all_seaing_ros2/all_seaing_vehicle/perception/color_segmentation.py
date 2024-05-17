@@ -51,6 +51,14 @@ class ColorSegmentation(Node):
             # "default": [0, 179, 0, 255, 0, 255]
         } 
 
+        rgbs = {
+            "red": (255, 0, 0),
+            "orange": (255, 165, 0),
+            "green": (0, 255, 0),
+            "black": (0, 0, 0),
+            "white": (255, 255, 255)
+        }
+
         # TEMPORARY NUMBERS!!!!
         label_dict = {
             "orange": 0,
@@ -102,7 +110,7 @@ class ColorSegmentation(Node):
                 
                 # draw a rectangle on the image that is the bounding box
                 cv2.rectangle(
-                    img, (bbox.min_x, bbox.min_y), (bbox.max_x, bbox.max_y), (255, 0, 0), 4
+                    img, (bbox.min_x, bbox.min_y), (bbox.max_x, bbox.max_y), rgbs[color], 4
                 )
 
             self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
