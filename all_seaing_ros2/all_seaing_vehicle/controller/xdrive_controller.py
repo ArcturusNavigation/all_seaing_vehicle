@@ -111,7 +111,7 @@ class Controller(Node):
         max_output = (
             1000 if self.in_sim else 1900
         )  # the maximum PWM output value for thrusters
-        self.max_input = 1.1 # the maximum magnitude of controller input, used to find a conversion between input and output
+        self.max_input = 3.5 if self.in_sim else 1.1 # the maximum magnitude of controller input, used to find a conversion between input and output
         self.thrust_factor = (max_output - min_output) / (
             2 * self.max_input
         )  # conversion factor between input and output
@@ -121,15 +121,15 @@ class Controller(Node):
             (l**2 + w**2) / 2 - l * w
         ) ** 0.5 / 2  # constant we found in matrix math stuff
         
-        pid_omega = PID((1, 0.5, 0) if self.in_sim else (0.0, 0.00, 0), self.get_omega_feedback)#0.8, 0.04, 0
+        pid_omega = PID((2, 0.5, 0) if self.in_sim else (0.0, 0.00, 0), self.get_omega_feedback)#0.8, 0.04, 0
         pid_theta = CircularPID((1, 0, 0) if self.in_sim else (0.0, 0, 0), self.get_theta_feedback)
 
         pid_x = PID((0.1, 0, 0) if self.in_sim else (0.0, 0, 0), self.get_x_position_feedback, None)
         pid_y = PID((0.1, 0, 0) if self.in_sim else (0.0, 0, 0), self.get_y_position_feedback, None)
-        pid_vx = PID((0.4, 0.1, 0) if self.in_sim else (0, 0, 0), self.get_x_velocity_world_feedback, None, BLIND_LINEAR)
-        pid_vy = PID((0.4, 0.1, 0) if self.in_sim else (0, 0, 0), self.get_y_velocity_world_feedback, None, BLIND_LINEAR)
-        local_pid_vx = PID((0.4, 0.1, 0) if self.in_sim else (1, 0, 0), self.get_x_velocity_local_feedback, None, BLIND_LINEAR)
-        local_pid_vy = PID((0.4, 0.1, 0) if self.in_sim else (0.0, 0, 0), self.get_y_velocity_local_feedback, None, BLIND_LINEAR)
+        pid_vx = PID((1.0, 0.0, 0) if self.in_sim else (0, 0, 0), self.get_x_velocity_world_feedback, "x", BLIND_LINEAR)
+        pid_vy = PID((0.0, 0.0, 0) if self.in_sim else (0, 0, 0), self.get_y_velocity_world_feedback, None, BLIND_LINEAR)
+        local_pid_vx = PID((2.5, 0.1, 0) if self.in_sim else (1, 0, 0), self.get_x_velocity_local_feedback, None, BLIND_LINEAR)
+        local_pid_vy = PID((2.5, 0.1, 0) if self.in_sim else (0.0, 0, 0), self.get_y_velocity_local_feedback, None, BLIND_LINEAR)
 
         do_nothing_pid = DoNothingPID()
 
@@ -316,7 +316,7 @@ class Controller(Node):
             float_msg.data = self.py_type(self.restrict_input(
                 thrust_values[name], self.max_input # make sure the input isn't way out of bounds
             ) * self.thrust_factor + self.midpoint) # convert thrust to PWM
-            #print(float_msg)
+            # print(float_msg)
             self.thrust_publishers[name].publish(float_msg) # publish to thrusters
 
     def update_thrust(self):
