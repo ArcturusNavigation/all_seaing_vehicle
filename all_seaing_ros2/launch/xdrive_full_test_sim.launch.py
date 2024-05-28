@@ -60,6 +60,11 @@ def generate_launch_description():
             ),
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
+                executable="moos_to_controller",
+                name="moos_to_controller",
+            ),
+            launch_ros.actions.Node(
+                package="all_seaing_vehicle",
                 executable="xdrive_controller.py",
                 name="controller",
                 parameters=[{"in_sim": True}],
