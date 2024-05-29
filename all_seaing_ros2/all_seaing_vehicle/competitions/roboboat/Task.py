@@ -13,3 +13,5 @@ class Task:
         return False
     def receive_odometry(self, _):
         pass
+    def receive_buoys(self, _):
+        pass

@@ -5,6 +5,7 @@ from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlMessage
 from nav_msgs.msg import Odometry
 from all_seaing_vehicle.competitions.roboboat.Task import Task
 from all_seaing_vehicle.competitions.roboboat.FollowThePath import FollowThePath
+from all_seaing_interfaces.msg import CloudClusterArray
 # from all_seaing_vehicle import Task
 
 def point_diff_2d(a, b):
@@ -67,6 +68,7 @@ class TaskManager(Node):
 
         self.create_subscription(Heartbeat, "/heartbeat", self.receive_heartbeat, 10)
         self.create_subscription(Odometry, "/odometry/filtered", self.receive_odometry, 10)
+        self.create_subscription(CloudClusterArray, "/labeled_cloud_clusters", self.receive_buoys, 10)
 
         self.state_publisher = self.create_publisher(ASV2State, "/boat_state", 10)
         self.state_message = ASV2State()
@@ -74,7 +76,7 @@ class TaskManager(Node):
         self.control_message_publisher = self.create_publisher(ControlMessage, "/control_input", 10)
 
         self.TASK_LIST = [
-            # FollowThePath(self.get_logger()),
+            FollowThePath(self.get_logger()),
             # NavigationChannel(self.control_message_publisher, self.get_logger()), 
             Idling()
         ]
@@ -110,6 +112,9 @@ class TaskManager(Node):
 
     def receive_odometry(self, msg):
         self.task.receive_odometry(msg)
+
+    def receive_buoys(self, msg):
+        self.task.receive_buoys(msg)
 
     def check_transition(self):
         if self.task.get_next():
