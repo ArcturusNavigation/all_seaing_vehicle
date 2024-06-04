@@ -186,19 +186,25 @@ void ObstacleDetector::markers(const all_seaing_interfaces::msg::ObstacleMap &in
     {
         visualization_msgs::msg::Marker marker;
         marker.header.stamp = this->get_clock()->now();
-        marker.header.frame_id = obstacle.header.frame_id;
+        marker.header.frame_id = "odom";
         marker.ns = "unlabeled_obstacle";
         marker.id = obstacle.id;
         marker.color.a = 1.0;
         marker.color.r = 1.0;
-        marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
-        marker.scale.x = 0.05;
+        marker.type = visualization_msgs::msg::Marker::SPHERE;
+        marker.scale.x = 0.2;
+        marker.scale.y = 0.2;
+        marker.scale.z = 0.2;
         marker.lifetime = rclcpp::Duration::from_seconds(1.3);
+        marker.pose.position.x = obstacle.global_point.x;
+        marker.pose.position.y = obstacle.global_point.y;
+        marker_array.markers.push_back(marker);
 
         visualization_msgs::msg::Marker text_marker;
         text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
         text_marker.action = visualization_msgs::msg::Marker::ADD;
-        text_marker.header = obstacle.header;
+        text_marker.header.stamp = this->get_clock()->now();
+        text_marker.header.frame_id = "odom";
         text_marker.ns = "unlabeled_text";
         text_marker.id = obstacle.id;
         text_marker.scale.z = 0.7; // Text scale in RVIZ
@@ -206,32 +212,10 @@ void ObstacleDetector::markers(const all_seaing_interfaces::msg::ObstacleMap &in
         text_marker.color.g = 1.0;
         text_marker.lifetime = rclcpp::Duration::from_seconds(1.3);
         text_marker.text = std::to_string(obstacle.id);
-
-        text_marker.pose.position.x = obstacle.local_point.x;
-        text_marker.pose.position.y = obstacle.local_point.y;
-        text_marker.pose.position.z = obstacle.local_point.z + 1.0;
+        text_marker.pose.position.x = obstacle.global_point.x;
+        text_marker.pose.position.y = obstacle.global_point.y;
+        text_marker.pose.position.z = 1.0;
         text_marker_array.markers.push_back(text_marker);
-
-        for (const auto &p : obstacle.local_chull.points)
-        {
-            geometry_msgs::msg::Point point;
-            point.x = p.x;
-            point.y = p.y;
-            point.z = p.z;
-            marker.points.push_back(point);
-        }
-
-        // Close the loop for LINE_STRIP
-        if (!obstacle.local_chull.points.empty())
-        {
-            geometry_msgs::msg::Point first_point;
-            first_point.x = obstacle.local_chull.points.front().x;
-            first_point.y = obstacle.local_chull.points.front().y;
-            first_point.z = obstacle.local_chull.points.front().z;
-            marker.points.push_back(first_point);
-        }
-
-        marker_array.markers.push_back(marker);
     }
 
     m_marker_array_pub->publish(marker_array);

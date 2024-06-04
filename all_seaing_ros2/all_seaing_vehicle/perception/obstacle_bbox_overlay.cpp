@@ -101,60 +101,45 @@ void ObstacleBboxOverlay::markers(const all_seaing_interfaces::msg::ObstacleMap 
     visualization_msgs::msg::MarkerArray marker_array;
     visualization_msgs::msg::MarkerArray text_marker_array;
 
-    for (const auto &cluster : in_map_msg.obstacles)
+    for (const auto &obstacle : in_map_msg.obstacles)
     {
         visualization_msgs::msg::Marker marker;
         marker.header.stamp = this->get_clock()->now();
-        marker.header.frame_id = cluster.header.frame_id;
-        marker.ns = "clustering";
-        marker.id = cluster.id;
+        marker.header.frame_id = "odom";
+        marker.ns = "labeled_obstacle";
+        marker.id = obstacle.id;
         marker.color.a = 1.0;
         marker.color.r = 1.0;
-        marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
-        marker.scale.x = 0.05;
+        marker.type = visualization_msgs::msg::Marker::SPHERE;
+        marker.scale.x = 0.6;
+        marker.scale.y = 0.6;
+        marker.scale.z = 0.6;
         marker.lifetime = rclcpp::Duration::from_seconds(1.3);
+        marker.pose.position.x = obstacle.global_point.x;
+        marker.pose.position.y = obstacle.global_point.y;
+        marker_array.markers.push_back(marker);
 
         visualization_msgs::msg::Marker text_marker;
         text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
         text_marker.action = visualization_msgs::msg::Marker::ADD;
-        text_marker.header = cluster.header;
-        text_marker.ns = "text_clustering";
-        text_marker.id = cluster.id;
+        text_marker.header.stamp = this->get_clock()->now();
+        text_marker.header.frame_id = "odom";
+        text_marker.ns = "labeled_text";
+        text_marker.id = obstacle.id;
         text_marker.scale.z = 0.7; // Text scale in RVIZ
         text_marker.color.a = 1.0;
         text_marker.color.g = 1.0;
         text_marker.lifetime = rclcpp::Duration::from_seconds(1.3);
-        text_marker.text = std::to_string(cluster.label);
-
-        text_marker.pose.position.x = cluster.local_point.x;
-        text_marker.pose.position.y = cluster.local_point.y;
-        text_marker.pose.position.z = cluster.local_point.z + 1.0;
+        text_marker.text = std::to_string(obstacle.label);
+        text_marker.pose.position.x = obstacle.global_point.x;
+        text_marker.pose.position.y = obstacle.global_point.y;
+        text_marker.pose.position.z = 1.0;
         text_marker_array.markers.push_back(text_marker);
-
-        for (const auto &p : cluster.local_chull.points)
-        {
-            geometry_msgs::msg::Point point;
-            point.x = p.x;
-            point.y = p.y;
-            point.z = p.z;
-            marker.points.push_back(point);
-        }
-
-        // Close the loop for LINE_STRIP
-        if (!cluster.local_chull.points.empty())
-        {
-            geometry_msgs::msg::Point first_point;
-            first_point.x = cluster.local_chull.points.front().x;
-            first_point.y = cluster.local_chull.points.front().y;
-            first_point.z = cluster.local_chull.points.front().z;
-            marker.points.push_back(first_point);
-        }
-
-        marker_array.markers.push_back(marker);
     }
 
     m_marker_array_pub->publish(marker_array);
     m_text_marker_array_pub->publish(text_marker_array);
+
 }
 
 ObstacleBboxOverlay::ObstacleBboxOverlay() : Node("obstacle_bbox_overlay")
