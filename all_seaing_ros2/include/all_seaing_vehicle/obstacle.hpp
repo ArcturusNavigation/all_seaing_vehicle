@@ -41,15 +41,16 @@ class Obstacle
     float m_area;
 
 public:
-    void set_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
-                   const std::vector<int> &in_cluster_indices,
-                   std_msgs::msg::Header in_ros_header,
-                   int in_id, builtin_interfaces::msg::Time last_seen);
 
     void to_ros_msg(std_msgs::msg::Header in_ros_header,
                     all_seaing_interfaces::msg::Obstacle &out_obstacle_msg);
 
-    Obstacle();
+    Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
+             const std::vector<int> &in_cluster_indices,
+             std_msgs::msg::Header in_ros_header,
+             int in_id, builtin_interfaces::msg::Time last_seen,
+             double nav_x, double nav_y, double nav_heading);
+
     virtual ~Obstacle();
 
     std_msgs::msg::Header get_ros_header();
@@ -64,4 +65,6 @@ public:
     geometry_msgs::msg::Polygon get_local_chull();
     geometry_msgs::msg::Polygon get_global_chull();
     float get_polygon_area();
+
+    pcl::PointXYZI convert_to_global(double nav_x, double nav_y, double nav_heading, pcl::PointXYZI point);
 };

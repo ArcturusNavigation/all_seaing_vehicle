@@ -33,8 +33,6 @@ private:
                          std::vector<std::shared_ptr<Obstacle>> &tracked_obstacles);
     void markers(const all_seaing_interfaces::msg::ObstacleMap &in_map);
     void send_to_gateway(const all_seaing_interfaces::msg::ObstacleMap &in_map);
-    geometry_msgs::msg::Point convert_to_global(const geometry_msgs::msg::Point &point);
-    geometry_msgs::msg::Point convert_to_global(const geometry_msgs::msg::Point32 &point);
 
     // Member variables
     std::vector<std::shared_ptr<Obstacle>> m_tracked_obstacles;

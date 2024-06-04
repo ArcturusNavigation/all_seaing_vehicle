@@ -50,68 +50,17 @@ float Obstacle::get_polygon_area()
     return m_area;
 }
 
-void Obstacle::set_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
-                         const std::vector<int> &in_cluster_indices, std_msgs::msg::Header in_ros_header,
-                         int in_id, builtin_interfaces::msg::Time in_last_seen)
+
+
+pcl::PointXYZI Obstacle::convert_to_global(double nav_x, double nav_y, double nav_heading, pcl::PointXYZI point)
 {
-    // Set id and header
-    m_id = in_id;
-    m_ros_header = in_ros_header;
-    m_last_seen = in_last_seen;
-
-    // Fill cluster point by point
-    pcl::PointCloud<pcl::PointXYZI>::Ptr current_cluster(new pcl::PointCloud<pcl::PointXYZI>);
-    float min_z = std::numeric_limits<float>::max();
-    float average_x = 0, average_y = 0, average_z = 0;
-    for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); ++pit)
-    {
-        pcl::PointXYZI p;
-        p.x = in_origin_cloud_ptr->points[*pit].x;
-        p.y = in_origin_cloud_ptr->points[*pit].y;
-        p.z = in_origin_cloud_ptr->points[*pit].z;
-
-        average_x += p.x;
-        average_y += p.y;
-        average_z += p.z;
-        current_cluster->points.push_back(p);
-
-        if (p.z < min_z)
-            min_z = p.z;
-    }
-
-    // Calculate average point
-    if (in_cluster_indices.size() > 0)
-    {
-        average_x /= in_cluster_indices.size();
-        average_y /= in_cluster_indices.size();
-        average_z /= in_cluster_indices.size();
-    }
-    m_local_point.x = average_x;
-    m_local_point.y = average_y;
-    m_local_point.z = average_z;
-
-    // Calculate convex hull polygon
-    pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::ConvexHull<pcl::PointXYZI> chull;
-    chull.setInputCloud(current_cluster);
-    chull.reconstruct(*hull_cloud);
-    m_area = pcl::calculatePolygonArea(*hull_cloud);
-
-    // Add each point in convex hull
-    for (size_t i = 1; i < hull_cloud->points.size(); i++)
-    {
-        geometry_msgs::msg::Point32 p;
-        p.x = hull_cloud->points[i].x;
-        p.y = hull_cloud->points[i].y;
-        p.z = min_z;
-        m_local_chull.points.push_back(p);
-    }
-
-    // Speicfy that all points are finite
-    current_cluster->is_dense = true;
-
-    // Add pointcloud to member variable
-    m_cloud = current_cluster;
+    pcl::PointXYZI new_point;
+    double magnitude = std::hypot(point.x, point.y);
+    double point_angle = std::atan2(point.y, point.x);
+    new_point.x = nav_x + std::cos(nav_heading + point_angle) * magnitude;
+    new_point.y = nav_y + std::sin(nav_heading + point_angle) * magnitude;
+    new_point.z = 0;
+    return new_point;
 }
 
 void Obstacle::to_ros_msg(std_msgs::msg::Header in_ros_header,
@@ -136,6 +85,80 @@ void Obstacle::to_ros_msg(std_msgs::msg::Header in_ros_header,
     out_obstacle_msg.last_seen = this->get_last_seen();
 }
 
-Obstacle::Obstacle() {}
+Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
+                   const std::vector<int> &in_cluster_indices, std_msgs::msg::Header in_ros_header,
+                   int in_id, builtin_interfaces::msg::Time in_last_seen,
+                   double nav_x, double nav_y, double nav_heading)
+{
+    // Set id and header
+    m_id = in_id;
+    m_ros_header = in_ros_header;
+    m_last_seen = in_last_seen;
+
+    // Fill cluster point by point
+    pcl::PointCloud<pcl::PointXYZI>::Ptr current_cluster(new pcl::PointCloud<pcl::PointXYZI>);
+    float min_z = std::numeric_limits<float>::max();
+    float average_x = 0, average_y = 0, average_z = 0;
+    for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); pit++)
+    {
+        pcl::PointXYZI p;
+        p.x = in_origin_cloud_ptr->points[*pit].x;
+        p.y = in_origin_cloud_ptr->points[*pit].y;
+        p.z = in_origin_cloud_ptr->points[*pit].z;
+
+        average_x += p.x;
+        average_y += p.y;
+        average_z += p.z;
+        current_cluster->points.push_back(p);
+
+        if (p.z < min_z)
+            min_z = p.z;
+    }
+
+    // Calculate average local point
+    if (in_cluster_indices.size() > 0)
+    {
+        average_x /= in_cluster_indices.size();
+        average_y /= in_cluster_indices.size();
+        average_z /= in_cluster_indices.size();
+    }
+    m_local_point.x = average_x;
+    m_local_point.y = average_y;
+    m_local_point.z = average_z;
+
+    // Calculate global point
+    m_global_point = convert_to_global(nav_x, nav_y, nav_heading, m_local_point);
+
+    // Calculate convex hull polygon
+    pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::ConvexHull<pcl::PointXYZI> chull;
+    chull.setInputCloud(current_cluster);
+    chull.reconstruct(*hull_cloud);
+    m_area = pcl::calculatePolygonArea(*hull_cloud);
+
+    // Add each point in convex hull
+    for (size_t i = 0; i < hull_cloud->points.size(); i++)
+    {
+        // Push local point
+        geometry_msgs::msg::Point32 p;
+        p.x = hull_cloud->points[i].x;
+        p.y = hull_cloud->points[i].y;
+        p.z = min_z;
+        m_local_chull.points.push_back(p);
+
+        // Push global point
+        pcl::PointXYZI p_glob = convert_to_global(nav_x, nav_y, nav_heading, hull_cloud->points[i]);
+        geometry_msgs::msg::Point32 p_glob_msg;
+        p_glob_msg.x = p_glob.x;
+        p_glob_msg.y = p_glob.y;
+        m_global_chull.points.push_back(p_glob_msg);
+    }
+
+    // Speicfy that all points are finite
+    current_cluster->is_dense = true;
+
+    // Add pointcloud to member variable
+    m_cloud = current_cluster;
+}
 
 Obstacle::~Obstacle() {}

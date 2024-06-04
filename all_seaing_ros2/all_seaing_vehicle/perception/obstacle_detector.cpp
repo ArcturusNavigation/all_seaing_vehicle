@@ -98,8 +98,10 @@ std::vector<std::shared_ptr<Obstacle>> ObstacleDetector::cluster_cloud(const pcl
     std::vector<std::shared_ptr<Obstacle>> obstacles;
     for (auto it = obstacles_indices.begin(); it != obstacles_indices.end(); it++)
     {
-        std::shared_ptr<Obstacle> obstacle(new Obstacle());
-        obstacle->set_cloud(in_cloud_ptr, it->indices, m_lidar_header, m_obstacle_id++, m_current_time);
+        std::shared_ptr<Obstacle> obstacle(new Obstacle(
+            in_cloud_ptr, it->indices, m_lidar_header, m_obstacle_id++, 
+            m_current_time, m_nav_x, m_nav_y, m_nav_heading)
+        );
         obstacles.push_back(obstacle);
     }
 
@@ -168,6 +170,7 @@ void ObstacleDetector::match_obstacles(std::vector<std::shared_ptr<Obstacle>> &r
         }
     }
 
+    // Update tracked_obstacles
     if (tracked_obstacles.empty())
         tracked_obstacles = std::move(raw_obstacles);
     else
@@ -235,37 +238,16 @@ void ObstacleDetector::markers(const all_seaing_interfaces::msg::ObstacleMap &in
     m_text_marker_array_pub->publish(text_marker_array);
 }
 
-geometry_msgs::msg::Point ObstacleDetector::convert_to_global(const geometry_msgs::msg::Point &point)
-{
-    geometry_msgs::msg::Point new_point;
-    double magnitude = std::hypot(point.x, point.y);
-    double point_angle = std::atan2(point.y, point.x);
-    new_point.x = m_nav_x + std::cos(m_nav_heading + point_angle) * magnitude;
-    new_point.y = m_nav_y + std::sin(m_nav_heading + point_angle) * magnitude;
-    new_point.z = point.z;
-    return new_point;
-}
-
-geometry_msgs::msg::Point ObstacleDetector::convert_to_global(const geometry_msgs::msg::Point32 &point)
-{
-    geometry_msgs::msg::Point new_point;
-    new_point.x = point.x;
-    new_point.y = point.y;
-    new_point.z = point.z;
-    return convert_to_global(new_point);
-}
-
 void ObstacleDetector::send_to_gateway(const all_seaing_interfaces::msg::ObstacleMap &in_map)
 {
     for (const auto &obstacle : in_map.obstacles)
     {
-        for (const auto &p : obstacle.local_chull.points)
+        for (const auto &p : obstacle.global_chull.points)
         {
             auto gateway_msg = protobuf_client_interfaces::msg::Gateway();
             gateway_msg.gateway_key = "TRACKED_FEATURE";
-            geometry_msgs::msg::Point p_glob = convert_to_global(p);
             gateway_msg.gateway_string =
-                "x=" + std::to_string(p_glob.x) + ",y=" + std::to_string(p_glob.y) + ",label=" + std::to_string(obstacle.id);
+                "x=" + std::to_string(p.x) + ",y=" + std::to_string(p.y) + ",label=" + std::to_string(obstacle.id);
             m_gateway_pub->publish(gateway_msg);
         }
     }
@@ -274,17 +256,17 @@ void ObstacleDetector::send_to_gateway(const all_seaing_interfaces::msg::Obstacl
 // Main callback loop
 void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud)
 {
+    // Set header and timestamp
     m_current_time = in_cloud->header.stamp;
     m_lidar_header = in_cloud->header;
 
-    pcl::PointCloud<pcl::PointXYZI>::Ptr current_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::PointCloud<pcl::PointXYZI>::Ptr clustered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-    all_seaing_interfaces::msg::ObstacleMap obstacle_map;
-
     // Convert ROS2 PointCloud2 to pcl pointcloud
+    pcl::PointCloud<pcl::PointXYZI>::Ptr current_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
     fromROSMsg(*in_cloud, *current_cloud_ptr);
 
     // Segment cloud into clustered obstacles
+    pcl::PointCloud<pcl::PointXYZI>::Ptr clustered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+    all_seaing_interfaces::msg::ObstacleMap obstacle_map;
     segment_cloud(current_cloud_ptr, clustered_cloud_ptr, obstacle_map);
 
     // Publish clustered clouds
