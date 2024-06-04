@@ -5,47 +5,32 @@ import math
 
 from functools import cmp_to_key
 from rclpy.node import Node
-from all_seaing_interfaces.msg import CloudClusterArray
+from all_seaing_interfaces.msg import ObstacleMap
 from nav_msgs.msg import Odometry
 from protobuf_client_interfaces.msg import Gateway
 from tf_transformations import euler_from_quaternion
+
 
 class BuoyPairFinder(Node):
 
     def __init__(self):
         super().__init__("buoy_pair_finder")
 
-        self.cluster_sub = self.create_subscription(CloudClusterArray, "/labeled_cloud_clusters", self.buoy_cb, 10)
-        self.odom_sub = self.create_subscription(Odometry, "/odometry/filtered", self.odom_cb, 10)
+        self.map_sub = self.create_subscription(
+            ObstacleMap, "/labeled_map", self.buoy_cb, 10
+        )
         self.publisher = self.create_publisher(Gateway, "/send_to_gateway", 10)
-        self.nav_x = 0
-        self.nav_y = 0
-        self.nav_heading = 0
-
-    def convert_to_global(self, x, y):
-        magnitude = math.hypot(x, y)
-        angle = math.atan2(y, x)
-        new_x = self.nav_x + math.cos(self.nav_heading + angle) * magnitude
-        new_y = self.nav_y + math.sin(self.nav_heading + angle) * magnitude
-        return new_x, new_y;
-
-    def odom_cb(self, msg):
-        self.nav_x = msg.pose.pose.position.x
-        self.nav_y = msg.pose.pose.position.y
-        orientation = [msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
-        _, _, yaw = euler_from_quaternion(orientation)
-        self.nav_heading = yaw
-
+        
     def buoy_cb(self, msg):
 
         # Extract buoy points
         left_buoy_points = []
         right_buoy_points = []
-        for cluster in msg.clusters:
-            x, y = self.convert_to_global(cluster.avg_point.x, cluster.avg_point.y)
-            if cluster.label == 2:
+        for obstacle in msg.obstacles:
+            x, y = obstacle.global_point.x, obstacle.global_point.y
+            if obstacle.label == 2:
                 left_buoy_points.append((x, y))
-            elif cluster.label == 1:
+            elif obstacle.label == 1:
                 right_buoy_points.append((x, y))
 
         if len(left_buoy_points) == 0 or len(right_buoy_points) == 0:

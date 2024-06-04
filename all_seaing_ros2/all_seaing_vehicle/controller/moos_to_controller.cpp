@@ -23,8 +23,8 @@ private:
     rclcpp::Publisher<all_seaing_interfaces::msg::ControlMessage>::SharedPtr m_control_pub;
     rclcpp::Subscription<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_sub;
 
-    double moos_thrust;
-    double moos_heading;
+    double m_moos_thrust;
+    double m_moos_heading;
 
     // MOOS to Controller Parser
     void moos_callback(const protobuf_client_interfaces::msg::Gateway &msg)
@@ -38,19 +38,19 @@ private:
 
         if (msg.gateway_key == "DESIRED_THRUST")
         {
-            moos_thrust = msg.gateway_double;
+            m_moos_thrust = msg.gateway_double;
         } // mapping = 100:5 = thrust:speed (m/s)
 
         if (msg.gateway_key == "DESIRED_HEADING")
         {
-            moos_heading = ((msg.gateway_double - 90) * (3.14159 / 180));
+            m_moos_heading = ((msg.gateway_double - 90) * (3.14159 / 180));
         }
 
-        double speed = moos_thrust * .05;
+        double speed = m_moos_thrust * .05;
 
         // control.x = moos_thrust;
         control.x = speed;
-        control.angular = -moos_heading;
+        control.angular = -m_moos_heading;
 
         m_control_pub->publish(control);
     }

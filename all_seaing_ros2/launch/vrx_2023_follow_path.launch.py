@@ -70,7 +70,7 @@ def generate_launch_description():
             # overlay node
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
-                executable="cluster_bbox_overlay",
+                executable="obstacle_bbox_overlay",
                 output="screen",
                 remappings=[
                     ("/img_info_src", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
@@ -103,20 +103,20 @@ def generate_launch_description():
                     {"hfov": 150.0}
                 ],
             ),
-            # pointcloud euclidean cluster detect
+            # obstacle detector
             launch_ros.actions.Node(
                 package="all_seaing_vehicle",
-                executable="pointcloud_euclidean_cluster_detect",
+                executable="obstacle_detector",
                 output="screen",
                 remappings=[
                     ("/in_cloud", "/filtered_cloud"),
                 ],
                 parameters=[
-                    {"cluster_size_min": 2},
-                    {"cluster_size_max": 60},
+                    {"obstacle_size_min": 2},
+                    {"obstacle_size_max": 60},
                     {"clustering_distance": 1.0},
-                    {"cluster_seg_thresh": 10.0},
-                    {"drop_cluster_thresh": 1.0},
+                    {"obstacle_seg_thresh": 10.0},
+                    {"obstacle_drop_thresh": 1.0},
                     {"polygon_area_thresh": 100000.0},
                     {"viz": True},
                 ],

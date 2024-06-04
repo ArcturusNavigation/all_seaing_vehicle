@@ -17,8 +17,8 @@ find_package(builtin_interfaces REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/ASVState.msg"
-    "msg/CloudClusterArray.msg"
-    "msg/CloudCluster.msg"
+    "msg/ObstacleMap.msg"
+    "msg/Obstacle.msg"
     "msg/ControlMessage.msg"
     "msg/GoalState.msg"
     "msg/LabeledBoundingBox2DArray.msg"

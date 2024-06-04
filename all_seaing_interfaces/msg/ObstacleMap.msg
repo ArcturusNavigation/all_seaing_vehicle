@@ -1,2 +1,2 @@
 std_msgs/Header header
-CloudCluster[] clusters
+Obstacle[] obstacles

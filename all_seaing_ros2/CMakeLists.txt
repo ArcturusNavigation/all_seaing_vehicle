@@ -112,11 +112,11 @@ ament_target_dependencies(pointcloud_image_overlay
 )
 
 # Node: pointcloud_image_overlay
-add_executable(cluster_bbox_overlay ${PROJECT_NAME}/perception/cluster_bbox_overlay.cpp)
-target_link_libraries(cluster_bbox_overlay
+add_executable(obstacle_bbox_overlay ${PROJECT_NAME}/perception/obstacle_bbox_overlay.cpp)
+target_link_libraries(obstacle_bbox_overlay
     ${PCL_LIBRARIES}
 )
-ament_target_dependencies(cluster_bbox_overlay
+ament_target_dependencies(obstacle_bbox_overlay
     rclcpp
     std_msgs
     tf2
@@ -141,11 +141,11 @@ ament_target_dependencies(pointcloud_filter
     pcl_conversions
 )
 
-# Node: pointcloud_euclidian_cluster_detect
-add_executable(pointcloud_euclidean_cluster_detect 
-    ${PROJECT_NAME}/perception/pointcloud_euclidean_cluster_detect.cpp
-    ${PROJECT_NAME}/perception/cluster.cpp)
-ament_target_dependencies(pointcloud_euclidean_cluster_detect
+# Node: obstacle_detector
+add_executable(obstacle_detector
+    ${PROJECT_NAME}/perception/obstacle_detector.cpp
+    ${PROJECT_NAME}/perception/obstacle.cpp)
+ament_target_dependencies(obstacle_detector
     visualization_msgs 
     rclcpp 
     std_msgs
@@ -169,10 +169,10 @@ ament_target_dependencies(pointcloud_euclidean_cluster_detect
 include_directories(include)
 
 install(TARGETS
-    pointcloud_euclidean_cluster_detect
+    obstacle_detector
     pointcloud_filter
     pointcloud_image_overlay
-    cluster_bbox_overlay
+    obstacle_bbox_overlay
     nav_state_reporter
     stationkeeping_state_reporter
     moos_to_controller
