@@ -10,13 +10,18 @@ from nav_msgs.msg import Odometry
 from protobuf_client_interfaces.msg import Gateway
 from tf_transformations import euler_from_quaternion
 
+
 class BuoyPairFinder(Node):
 
     def __init__(self):
         super().__init__("buoy_pair_finder")
 
-        self.cluster_sub = self.create_subscription(CloudClusterArray, "/labeled_cloud_clusters", self.buoy_cb, 10)
-        self.odom_sub = self.create_subscription(Odometry, "/odometry/filtered", self.odom_cb, 10)
+        self.cluster_sub = self.create_subscription(
+            CloudClusterArray, "/labeled_cloud_clusters", self.buoy_cb, 10
+        )
+        self.odom_sub = self.create_subscription(
+            Odometry, "/odometry/filtered", self.odom_cb, 10
+        )
         self.publisher = self.create_publisher(Gateway, "/send_to_gateway", 10)
         self.nav_x = 0
         self.nav_y = 0
@@ -27,12 +32,17 @@ class BuoyPairFinder(Node):
         angle = math.atan2(y, x)
         new_x = self.nav_x + math.cos(self.nav_heading + angle) * magnitude
         new_y = self.nav_y + math.sin(self.nav_heading + angle) * magnitude
-        return new_x, new_y;
+        return new_x, new_y
 
     def odom_cb(self, msg):
         self.nav_x = msg.pose.pose.position.x
         self.nav_y = msg.pose.pose.position.y
-        orientation = [msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
+        orientation = [
+            msg.pose.pose.orientation.x,
+            msg.pose.pose.orientation.y,
+            msg.pose.pose.orientation.z,
+            msg.pose.pose.orientation.w,
+        ]
         _, _, yaw = euler_from_quaternion(orientation)
         self.nav_heading = yaw
 
