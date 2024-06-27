@@ -2,7 +2,7 @@
 
 ## About
 
-all_seaing_vehicle is the ROS2 ASV codebase for MIT Arcturus.
+all_seaing_vehicle is the ROS 2 Autonomous Surface Vehicle (ASV) autonomy stack developed by the MIT Arcturus Autonomous Robotics Competition Team.
 
 ## Documentation
 
