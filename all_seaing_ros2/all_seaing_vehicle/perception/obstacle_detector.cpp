@@ -148,7 +148,7 @@ void ObstacleDetector::match_obstacles(std::vector<std::shared_ptr<Obstacle>> &r
             if (chosen_indices.find(j) != chosen_indices.end())
                 continue;
 
-            float curr_dist = euclideanDistance(tracked_obstacles[j]->get_local_point(), raw_obstacle->get_local_point());
+            float curr_dist = euclideanDistance(tracked_obstacles[j]->get_global_point(), raw_obstacle->get_global_point());
             if (curr_dist < best_dist)
             {
                 best_match = j;
