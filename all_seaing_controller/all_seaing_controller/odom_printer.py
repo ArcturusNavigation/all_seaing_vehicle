@@ -9,7 +9,7 @@ class OdomPrinter(Node):
 
     def __init__(self):
         super().__init__("odom_printer")
-        self.create_subscription(Odometry, "/odometry/filtered", self.printer, 10)
+        self.create_subscription(Odometry, "odometry/filtered", self.printer, 10)
 
     def printer(self, data):
         pos = data.pose.pose.position

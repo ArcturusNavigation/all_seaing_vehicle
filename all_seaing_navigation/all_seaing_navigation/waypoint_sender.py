@@ -23,7 +23,7 @@ class WaypointSender(Node):
         # Subscribers and publishers
         self.subscription = self.create_subscription(
             PoseArray if self.use_pose_array else PoseStamped,
-            "/waypoints",
+            "waypoints",
             self.wpt_cb,
             10,
         )

@@ -7,10 +7,11 @@ from cv_bridge import CvBridge
 import pyzed.sl as sl
 import cv2
 
+
 class ZEDPublisher(Node):
     def __init__(self):
-        super().__init__('zed_publisher')
-        self.publisher_ = self.create_publisher(Image, 'zed_image', 10)
+        super().__init__("zed_publisher")
+        self.publisher_ = self.create_publisher(Image, "zed_image", 10)
         self.bridge = CvBridge()
         self.init_camera()
 
@@ -36,12 +37,17 @@ class ZEDPublisher(Node):
                 left_image = sl.Mat()
                 self.zed.retrieve_image(left_image, sl.VIEW.LEFT)
                 frame = left_image.get_data()
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB) # cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
-                ros_image = self.bridge.cv2_to_imgmsg(frame_rgb, "bgr8") # I know it says bgr, trust it's rgb
+                frame_rgb = cv2.cvtColor(
+                    frame, cv2.COLOR_RGBA2RGB
+                )  # cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+                ros_image = self.bridge.cv2_to_imgmsg(
+                    frame_rgb, "bgr8"
+                )  # I know it says bgr, trust it's rgb
                 self.publisher_.publish(ros_image)
                 self.get_logger().info("Image published successfully")
             else:
                 self.get_logger().warning("Failed to grab image from ZED camera")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -53,5 +59,6 @@ def main(args=None):
         zed_publisher.destroy_node()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

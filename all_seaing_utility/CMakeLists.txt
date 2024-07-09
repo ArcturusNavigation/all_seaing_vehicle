@@ -10,7 +10,6 @@ ament_auto_find_build_dependencies()
 
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
-    ${PROJECT_NAME}/e_stopped_publisher_test.py
     ${PROJECT_NAME}/onshore_node.py
     ${PROJECT_NAME}/replay_recordings.py
     ${PROJECT_NAME}/rviz_testing_helper.py

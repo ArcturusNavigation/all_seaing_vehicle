@@ -28,9 +28,9 @@ class AcousticTrackingSub(Node):
         )
 
         self.odometry_subscription = self.create_subscription(
-            ASVState, "/asv_state", self.odom_callback, 10
+            ASVState, "asv_state", self.odom_callback, 10
         )
-        self.pinger_coord_pub = self.create_publisher(PoseStamped, "/pinger_coord", 10)
+        self.pinger_coord_pub = self.create_publisher(PoseStamped, "pinger_coord", 10)
 
     def timer_callback(self):
         orientation_angle = math.radians(self.heading)

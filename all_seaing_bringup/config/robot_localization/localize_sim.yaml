@@ -1,0 +1,109 @@
+ekf_filter_node:
+  ros__parameters:
+    use_sim_time: true
+    frequency: 30.0
+    sensor_timeout: 0.1
+    two_d_mode: true
+    transform_time_offset: 0.1
+
+    odom_frame: odom
+    base_link_frame: wamv/wamv/base_link
+    world_frame: odom
+    publish_tf: true
+    reset_on_time_jump: true
+
+    imu0: /wamv/sensors/imu/imu/data
+    imu0_config:
+      [
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+      ]
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 10
+    imu0_remove_gravitational_acceleration: true
+
+    odom0: odometry/gps
+    odom0_config:
+      [
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ]
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 10
+
+    process_noise_covariance:
+      [
+        1e-3,
+        1e-3,
+        1e-3,
+        0.3,
+        0.3,
+        0.01,
+        0.5,
+        0.5,
+        0.1,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+      ]
+    initial_estimate_covariance:
+      [
+        1e-9,
+        1e-9,
+        1e-9,
+        1.0,
+        1.0,
+        1e-9,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+      ]
+
+navsat_transform_node:
+  ros__parameters:
+    frequency: 30.0
+    delay: 3.0
+    zero_altitude: true
+    magnetic_declination_radians: 0.0
+    wait_for_datum: true
+    use_odometry_yaw: false
+    datum: [-33.7228, 150.6740, 0.0]
+    yaw_offset: 0.0
+    publish_filtered_gps: true

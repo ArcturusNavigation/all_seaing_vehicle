@@ -16,7 +16,7 @@ class BuoyPairFinder(Node):
         super().__init__("buoy_pair_finder")
 
         self.map_sub = self.create_subscription(
-            ObstacleMap, "/labeled_map", self.buoy_cb, 10
+            ObstacleMap, "labeled_map", self.buoy_cb, 10
         )
         self.publisher = self.create_publisher(Gateway, "/send_to_gateway", 10)
         

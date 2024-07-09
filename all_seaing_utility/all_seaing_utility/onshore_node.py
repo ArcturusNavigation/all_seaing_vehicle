@@ -17,13 +17,13 @@ class OnshoreNode(Node):
 
         self.control_message = ControlMessage()
         self.control_input_publisher = self.create_publisher(
-            ControlMessage, "/control_input", 10
+            ControlMessage, "control_input", 10
         )
         self.control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
         self.control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
 
         self.heartbeat_message = Heartbeat()
-        self.heartbeat_publisher = self.create_publisher(Heartbeat, "/heartbeat", 10)
+        self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
         self.heartbeat_message.in_teleop = True
         self.heartbeat_message.e_stopped = False
 
@@ -38,17 +38,17 @@ class OnshoreNode(Node):
 
         self.enter_held = False
 
-        self.get_logger().info("starting onshore node, teleop enabled")
+        self.get_logger().info("Starting onshore node, teleop enabled")
 
     def beat_heart(self):
         self.heartbeat_publisher.publish(self.heartbeat_message)
 
     def keyboard_callback(self, msg):
         if self.heartbeat_message.e_stopped:
-            self.get_logger().fatal("we are e-stopped!")
+            self.get_logger().fatal("ASV is e-stopped!")
             return
         if msg.buttons[0]:
-            self.get_logger().info("e-stop pressed!")
+            self.get_logger().info("E-stop pressed!")
             self.heartbeat_message.e_stopped = True
             return
         if msg.buttons[1]:
@@ -56,7 +56,7 @@ class OnshoreNode(Node):
                 self.enter_held = True
                 self.heartbeat_message.in_teleop = not self.heartbeat_message.in_teleop
                 self.get_logger().info(
-                    f"toggled teleop (now {self.heartbeat_message.in_teleop})"
+                    f"Toggled teleop (now {self.heartbeat_message.in_teleop})"
                 )
         elif self.enter_held:
             self.enter_held = False
@@ -74,14 +74,6 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-    # try:
-    #     rclpy.spin(node)
-    # except KeyboardInterrupt:
-    #     pass
-    # finally:
-    #     # Clean up and shutdown
-    #     node.destroy_node()
-    #     rclpy.shutdown()
 
 
 if __name__ == "__main__":

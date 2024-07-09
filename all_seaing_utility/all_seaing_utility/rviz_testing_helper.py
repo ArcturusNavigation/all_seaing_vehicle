@@ -31,10 +31,10 @@ class RvizTestingHelper(Node):
         self.pub = self.create_publisher(Path, self.path_topic, 10)
         self.marker_pub = self.create_publisher(MarkerArray, self.markers_topic, 10)
         self.create_subscription(
-            Odometry, "/odometry/filtered", self.record_odometry, 10
+            Odometry, "odometry/filtered", self.record_odometry, 10
         )
-        self.create_subscription(Heartbeat, "/heartbeat", self.handle_heartbeat, 10)
-        self.create_subscription(ASV2State, "/boat_state", self.update_markers, 10)
+        self.create_subscription(Heartbeat, "heartbeat", self.handle_heartbeat, 10)
+        self.create_subscription(ASV2State, "boat_state", self.update_markers, 10)
 
         self.recorded_poses = []
         self.recorded_markers = []

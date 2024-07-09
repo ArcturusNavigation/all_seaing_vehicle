@@ -1,23 +1,22 @@
-#include <rclcpp/rclcpp.hpp>
+#include <cmath>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <vector>
-#include <cmath>
+#include <rclcpp/rclcpp.hpp>
 #include <unordered_set>
+#include <vector>
 
-#include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Matrix3x3.h"
+#include "tf2/LinearMath/Quaternion.h"
 
-#include "sensor_msgs/msg/point_cloud2.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "visualization_msgs/msg/marker_array.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
 #include "std_msgs/msg/header.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 
-#include "protobuf_client_interfaces/msg/gateway.hpp"
 #include "all_seaing_perception/obstacle.hpp"
+#include "protobuf_client_interfaces/msg/gateway.hpp"
 
-class ObstacleDetector : public rclcpp::Node
-{
+class ObstacleDetector : public rclcpp::Node {
 public:
     ObstacleDetector();
     virtual ~ObstacleDetector() = default;
@@ -28,7 +27,8 @@ private:
     void segment_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr,
                        pcl::PointCloud<pcl::PointXYZI>::Ptr out_cloud_ptr,
                        all_seaing_interfaces::msg::ObstacleMap &out_map);
-    std::vector<std::shared_ptr<Obstacle>> cluster_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr);
+    std::vector<std::shared_ptr<Obstacle>>
+    cluster_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr);
     void match_obstacles(std::vector<std::shared_ptr<Obstacle>> &raw_obstacles,
                          std::vector<std::shared_ptr<Obstacle>> &tracked_obstacles);
     void markers(const all_seaing_interfaces::msg::ObstacleMap &in_map);
@@ -51,10 +51,14 @@ private:
     // Publishers and subscribers
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_obstacle_cloud_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_raw_map_pub;
-    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_unlabeled_map_pub;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_marker_array_pub;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_text_marker_array_pub;
-    rclcpp::Publisher<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_pub;
+    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr
+        m_unlabeled_map_pub;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+        m_marker_array_pub;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+        m_text_marker_array_pub;
+    rclcpp::Publisher<protobuf_client_interfaces::msg::Gateway>::SharedPtr
+        m_gateway_pub;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr m_cloud_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
 };

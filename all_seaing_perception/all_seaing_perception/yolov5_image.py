@@ -21,7 +21,9 @@ class Yolov5Image(Node):
         self.bridge = cv_bridge.CvBridge()
 
         # Get pretrained yolov5 models for colored buoys and cardinal markers
+        # TODO: Don't use getpass.getuser but rather os
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
+        # TODO: should be a ros parameter
         path_model = (
             self.get_package_share_directory("perception_suite")
             + "/models/NJORD_WEIGHTS_ALL.pt"
@@ -33,12 +35,13 @@ class Yolov5Image(Node):
         # Subscribers and publishers
         qos_profile = QoSProfile(depth=1)
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "/perception_suite/bounding_boxes", qos_profile
+            LabeledBoundingBox2DArray, "bounding_boxes", qos_profile
         )
         self.img_pub = self.create_publisher(
-            Image, "/perception_suite/segmented_image", qos_profile
+            Image, "image/detections", qos_profile
         )
 
+        # TODO: should be in a ros timer, and also should be a parameter
         while not rclpy.shutdown():
             # Get image
             img = PIL.Image.open(

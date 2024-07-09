@@ -21,7 +21,6 @@ install(TARGETS
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/angle_printer.py
-    ${PROJECT_NAME}/goal_publisher.py
     ${PROJECT_NAME}/joy_to_control.py
     ${PROJECT_NAME}/odom_printer.py
     ${PROJECT_NAME}/sample_publisher.py

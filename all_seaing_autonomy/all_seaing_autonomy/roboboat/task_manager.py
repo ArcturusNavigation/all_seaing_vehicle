@@ -76,17 +76,17 @@ class TaskManager(Node):
     def __init__(self):
         super().__init__("task_manager")
 
-        self.create_subscription(Heartbeat, "/heartbeat", self.receive_heartbeat, 10)
+        self.create_subscription(Heartbeat, "heartbeat", self.receive_heartbeat, 10)
         self.create_subscription(
-            Odometry, "/odometry/filtered", self.receive_odometry, 10
+            Odometry, "odometry/filtered", self.receive_odometry, 10
         )
-        self.create_subscription(ObstacleMap, "/labeled_map", self.receive_buoys, 10)
+        self.create_subscription(ObstacleMap, "labeled_map", self.receive_buoys, 10)
 
-        self.state_publisher = self.create_publisher(ASV2State, "/boat_state", 10)
+        self.state_publisher = self.create_publisher(ASV2State, "boat_state", 10)
         self.state_message = ASV2State()
 
         self.control_message_publisher = self.create_publisher(
-            ControlMessage, "/control_input", 10
+            ControlMessage, "control_input", 10
         )
 
         self.TASK_LIST = [

@@ -19,6 +19,7 @@ from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 from ament_index_python.packages import get_package_share_directory
 
+
 class Yolov5Detector(Node):
 
     def __init__(self):
@@ -27,26 +28,26 @@ class Yolov5Detector(Node):
         self.bridge = cv_bridge.CvBridge()
 
         # Get pretrained yolov5 models for colored buoys and cardinal markers
+        # TODO: Don't use getpass.getuser but rather os
         path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
+        # TODO: Should be a ros parameter
         path_model = (
-            get_package_share_directory("all_seaing_vehicle")
-            + "/models/yolov5s.pt"
+            get_package_share_directory("all_seaing_perception") + "/models/yolov5s.pt"
         )
         self.model = torch.hub.load(
             path_hubconfig, "custom", path=path_model, source="local"
         )
 
         # Subscribers and publishers
+        # TODO: probably should use BEST_EFFORT QoS (just use sensor data)
         qos_profile = QoSProfile(depth=1)
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "/bounding_boxes", qos_profile
+            LabeledBoundingBox2DArray, "bounding_boxes", qos_profile
         )
-        self.img_pub = self.create_publisher(
-            Image, "/segmented_image", qos_profile
-        )
+        self.img_pub = self.create_publisher(Image, "image/detections", qos_profile)
         self.img_sub = self.create_subscription(
             Image,
-            "/wamv/sensors/cameras/front_left_camera_sensor/image_raw",  # Remap this to correct topic
+            "image",
             self.img_callback,
             qos_profile,
         )
@@ -87,6 +88,7 @@ class Yolov5Detector(Node):
 
         self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
         self.bbox_pub.publish(bboxes)
+
 
 def main(args=None):
     rclpy.init(args=args)

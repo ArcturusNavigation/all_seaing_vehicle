@@ -2,8 +2,8 @@
 
 import rclpy
 from rclpy.qos import QoSProfile, ReliabilityPolicy
-from scipy.spatial.transform import Rotation as R
 from rclpy.node import Node
+from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Imu
 
 
@@ -26,7 +26,8 @@ class AnglePrinter(Node):
 
     def update_imu(self, msg):
         """
-        Callback function for when we receive only IMU data (this doesn't get called if we're using odometry).
+        Callback function for when we receive only IMU data 
+        (this doesn't get called if we're using odometry).
         """
         self.update_theta(msg.orientation)
 

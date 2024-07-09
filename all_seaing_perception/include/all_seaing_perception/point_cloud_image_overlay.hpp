@@ -30,12 +30,12 @@
 #include "pcl/point_types.h"
 #include "pcl_conversions/pcl_conversions.h"
 
-class PclImageOverlay : public rclcpp::Node
-{
+class PclImageOverlay : public rclcpp::Node {
 private:
     // Publishers and subscribers
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_image_pub;
-    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
+    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+        m_image_intrinsics_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> m_cloud_sub;
 
@@ -64,9 +64,8 @@ private:
     void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
 
     // Get transform from source frame to target frame
-    geometry_msgs::msg::TransformStamped
-    get_tf(const std::string &in_target_frame,
-           const std::string &in_src_frame);
+    geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
+                                                const std::string &in_src_frame);
 
 public:
     PclImageOverlay();

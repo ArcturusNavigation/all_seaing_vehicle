@@ -77,6 +77,7 @@ def main(args=None):
     rclpy.init(args=args)
     replay_recordings = ReplayRecordings()
     rclpy.spin(replay_recordings)
+    replay_recordings.destroy_node()
     rclpy.shutdown()
 
 
