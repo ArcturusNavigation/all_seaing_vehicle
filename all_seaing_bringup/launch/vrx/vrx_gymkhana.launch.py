@@ -71,7 +71,7 @@ def generate_launch_description():
         executable="color_segmentation.py",
         output="screen",
         remappings=[
-            ("/in_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ],
     )
 
@@ -80,8 +80,7 @@ def generate_launch_description():
         executable="point_cloud_filter",
         output="screen",
         remappings=[
-            ("/in_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
-            ("/out_cloud", "/filtered_cloud"),
+            ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
         parameters=[
             {"range_min_threshold": 0.0},
@@ -98,7 +97,7 @@ def generate_launch_description():
         executable="obstacle_detector",
         output="screen",
         remappings=[
-            ("/in_cloud", "/filtered_cloud"),
+            ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
             {"obstacle_size_min": 2},

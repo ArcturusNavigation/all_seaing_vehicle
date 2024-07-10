@@ -12,20 +12,28 @@ class ThrustCommander(Node):
     def __init__(self):
         super().__init__("thrust_commander")
 
-        self.declare_parameter("frontright_port", 2)
-        self.declare_parameter("frontleft_port", 3)
-        self.declare_parameter("backright_port", 4)
-        self.declare_parameter("backleft_port", 5)
+        self.declare_parameter("front_right_port", 2)
+        self.declare_parameter("front_left_port", 3)
+        self.declare_parameter("back_right_port", 4)
+        self.declare_parameter("back_left_port", 5)
 
         self.frontright_port = self.get_parameter("frontright_port").value
         self.frontleft_port = self.get_parameter("frontleft_port").value
         self.backright_port = self.get_parameter("backright_port").value
         self.backleft_port = self.get_parameter("backleft_port").value
 
-        self.create_subscription(Int64, "frontright_pwm", self.pwm_callback_FR, 10)
-        self.create_subscription(Int64, "frontleft_pwm", self.pwm_callback_FL, 10)
-        self.create_subscription(Int64, "backright_pwm", self.pwm_callback_BR, 10)
-        self.create_subscription(Int64, "backleft_pwm", self.pwm_callback_BL, 10)
+        self.create_subscription(
+            Int64, "thrusters/front_right/thrust", self.pwm_callback_FR, 10
+        )
+        self.create_subscription(
+            Int64, "thrusters/front_left/thrust", self.pwm_callback_FL, 10
+        )
+        self.create_subscription(
+            Int64, "thrusters/back_right/thrust", self.pwm_callback_BR, 10
+        )
+        self.create_subscription(
+            Int64, "thrusters/back_left/thrust", self.pwm_callback_BL, 10
+        )
         self.proxy = self.create_client(CommandLong, "/mavros/cmd/command")
 
     def pwm_callback_FR(self, msg: Int64):

@@ -20,8 +20,8 @@ class SimpleController(Node):
         self.upper_thrust_limit = self.get_parameter("upper_thrust_limit").value
 
         # publishers (remap left_thrust and right_thrust in launch file to appropriate topics)
-        self.left_thrust_pub = self.create_publisher(Float64, "left_thrust", 10)
-        self.right_thrust_pub = self.create_publisher(Float64, "right_thrust", 10)
+        self.left_thrust_pub = self.create_publisher(Float64, "thrusters/left/thrust", 10)
+        self.right_thrust_pub = self.create_publisher(Float64, "thrusters/right/thrust", 10)
 
         # subscribers
         self.command_sub = self.create_subscription(

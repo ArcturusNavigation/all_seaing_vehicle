@@ -82,7 +82,7 @@ class JoyToControlNode(Node):
 
         # Setup subscriber
         self.joy_control_sub = self.create_subscription(
-            Joy, "joy", self.vel_callback, 10
+            Joy, "/joy", self.vel_callback, 10
         )
         self.m_joy = Joy()
 

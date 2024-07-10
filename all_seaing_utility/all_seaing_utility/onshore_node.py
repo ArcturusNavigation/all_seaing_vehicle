@@ -29,7 +29,7 @@ class OnshoreNode(Node):
 
         # Setup subscriber
         self.joy_control_sub = self.create_subscription(
-            Joy, "joy", self.keyboard_callback, 10
+            Joy, "/joy", self.keyboard_callback, 10
         )
 
         self.heartbeat_timer = self.create_timer(

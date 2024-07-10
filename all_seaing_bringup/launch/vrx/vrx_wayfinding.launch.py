@@ -34,7 +34,7 @@ def generate_launch_description():
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
-        remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
+        remappings=[("gps/fix", "/wamv/sensors/gps/gps/fix")],
         parameters=[localize_params],
     )
 
@@ -53,9 +53,9 @@ def generate_launch_description():
     )
 
     waypoint_sender_node = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
+        package="all_seaing_navigation",
         executable="waypoint_sender.py",
-        remappings=[("/waypoints", "/vrx/wayfinding/waypoints")],
+        remappings=[("waypoints", "/vrx/wayfinding/waypoints")],
         parameters=[
             {"use_pose_array": True},
             {"use_gps": True},

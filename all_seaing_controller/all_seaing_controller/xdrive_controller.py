@@ -228,10 +228,10 @@ class XDriveController(Node):
             self.back_left_name = "/wamv/thrusters/back_left/thrust"
             self.back_right_name = "/wamv/thrusters/back_right/thrust"
         else:
-            self.front_left_name = "/frontleft_pwm"
-            self.front_right_name = "/frontright_pwm"
-            self.back_left_name = "/backleft_pwm"
-            self.back_right_name = "/backright_pwm"
+            self.front_left_name = "thrusters/front_left/thrust"
+            self.front_right_name = "thrusters/front_right/thrust"
+            self.back_left_name = "thrusters/back_left/thrust"
+            self.back_right_name = "thrusters/back_right/thrust"
 
         self.all_thruster_names = (
             self.front_left_name,

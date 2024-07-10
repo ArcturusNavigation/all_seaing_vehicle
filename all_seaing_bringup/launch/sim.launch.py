@@ -39,7 +39,7 @@ def generate_launch_description():
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
-        remappings=[("/gps/fix", "/wamv/sensors/gps/gps/fix")],
+        remappings=[("gps/fix", "/wamv/sensors/gps/gps/fix")],
         parameters=[robot_localization_params],
     )
 
@@ -98,6 +98,9 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            bag_path_launch_arg,
+            launch_rviz_launch_arg,
+            record_bag_launch_arg,
             ekf_node,
             navsat_node,
             protobuf_client_node,

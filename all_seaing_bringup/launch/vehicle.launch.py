@@ -22,7 +22,7 @@ def generate_launch_description():
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
-        remappings=[("/gps/fix", "/mavros/global_position/raw/fix")],
+        remappings=[("gps/fix", "/mavros/global_position/raw/fix")],
         parameters=[robot_localization_params],
     )
 
@@ -37,10 +37,10 @@ def generate_launch_description():
         executable="thrust_commander.py",
         parameters=[
             {
-                "frontright_port": 2,
-                "frontleft_port": 3,
-                "backright_port": 4,
-                "backleft": 5,
+                "front_right_port": 2,
+                "front_left_port": 3,
+                "back_right_port": 4,
+                "back_left_port": 5,
             }
         ],
     )
