@@ -1,5 +1,14 @@
 #include "all_seaing_perception/obstacle_detector.hpp"
 
+#include <pcl/common/distances.h>
+#include <pcl/common/io.h>
+#include <pcl/search/kdtree.h>
+#include <pcl/segmentation/extract_clusters.h>
+#include <pcl_conversions/pcl_conversions.h>
+
+#include "tf2/LinearMath/Matrix3x3.h"
+#include "tf2/LinearMath/Quaternion.h"
+
 ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
     // Initialize parameters
     this->declare_parameter<int>("obstacle_size_min", 20);
@@ -25,8 +34,8 @@ ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
     m_nav_heading = 0;
 
     // Initialize publishers and subscribers
-    m_obstacle_cloud_pub =
-        this->create_publisher<sensor_msgs::msg::PointCloud2>("point_cloud/obstacles", 10);
+    m_obstacle_cloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "point_cloud/obstacles", 10);
     m_raw_map_pub =
         this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>("raw_map", 10);
     m_unlabeled_map_pub =
@@ -152,8 +161,8 @@ void ObstacleDetector::match_obstacles(
                 continue;
 
             float curr_dist =
-                euclideanDistance(tracked_obstacles[j]->get_global_point(),
-                                  raw_obstacle->get_global_point());
+                pcl::euclideanDistance(tracked_obstacles[j]->get_global_point(),
+                                       raw_obstacle->get_global_point());
             if (curr_dist < best_dist) {
                 best_match = j;
                 best_dist = curr_dist;
@@ -247,7 +256,7 @@ void ObstacleDetector::pc_callback(
     // Convert ROS2 PointCloud2 to pcl pointcloud
     pcl::PointCloud<pcl::PointXYZI>::Ptr current_cloud_ptr(
         new pcl::PointCloud<pcl::PointXYZI>);
-    fromROSMsg(*in_cloud, *current_cloud_ptr);
+    pcl::fromROSMsg(*in_cloud, *current_cloud_ptr);
 
     // Segment cloud into clustered obstacles
     pcl::PointCloud<pcl::PointXYZI>::Ptr clustered_cloud_ptr(

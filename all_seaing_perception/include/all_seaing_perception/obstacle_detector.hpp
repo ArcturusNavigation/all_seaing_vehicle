@@ -1,19 +1,20 @@
-#include <cmath>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <rclcpp/rclcpp.hpp>
-#include <unordered_set>
+#ifndef ALL_SEAING_PERCEPTION_OBSTACLE_DETECTOR_HPP
+#define ALL_SEAING_PERCEPTION_OBSTACLE_DETECTOR_HPP
+
+#include "all_seaing_perception/obstacle.hpp"
+
 #include <vector>
 
-#include "tf2/LinearMath/Matrix3x3.h"
-#include "tf2/LinearMath/Quaternion.h"
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+
+#include "rclcpp/rclcpp.hpp"
 
 #include "nav_msgs/msg/odometry.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
-#include "std_msgs/msg/header.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 
-#include "all_seaing_perception/obstacle.hpp"
+#include "all_seaing_interfaces/msg/obstacle_map.hpp"
 #include "protobuf_client_interfaces/msg/gateway.hpp"
 
 class ObstacleDetector : public rclcpp::Node {
@@ -62,3 +63,5 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr m_cloud_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
 };
+
+#endif // ALL_SEAING_PERCEPTION_OBSTACLE_DETECTOR_HPP

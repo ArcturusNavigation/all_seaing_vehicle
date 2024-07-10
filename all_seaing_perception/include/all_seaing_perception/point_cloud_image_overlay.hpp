@@ -1,12 +1,12 @@
+#ifndef ALL_SEAING_PERCEPTION_POINT_CLOUD_IMAGE_OVERLAY_HPP
+#define ALL_SEAING_PERCEPTION_POINT_CLOUD_IMAGE_OVERLAY_HPP
+
 #include <string>
-#include <vector>
 
 #include "rclcpp/rclcpp.hpp"
 
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
-#include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
 
 #include "image_geometry/pinhole_camera_model.h"
 #include "message_filters/subscriber.h"
@@ -14,21 +14,9 @@
 #include "message_filters/synchronizer.h"
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
-#include "sensor_msgs/image_encodings.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
-
-#include "cv_bridge/cv_bridge.h"
-#include "opencv2/calib3d/calib3d.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/imgproc.hpp"
-#include "opencv2/opencv.hpp"
-
-#include "pcl/PCLPointCloud2.h"
-#include "pcl/point_cloud.h"
-#include "pcl/point_types.h"
-#include "pcl_conversions/pcl_conversions.h"
 
 class PclImageOverlay : public rclcpp::Node {
 private:
@@ -71,3 +59,5 @@ public:
     PclImageOverlay();
     virtual ~PclImageOverlay();
 };
+
+#endif // ALL_SEAING_PERCEPTION_POINT_CLOUD_IMAGE_OVERLAY_HPP

@@ -1,5 +1,12 @@
 #include "all_seaing_perception/obstacle.hpp"
 
+#include <limits>
+
+#include <pcl/common/common.h>
+#include <pcl/surface/convex_hull.h>
+
+#include "geometry_msgs/msg/point32.hpp"
+
 std_msgs::msg::Header Obstacle::get_ros_header() { return m_ros_header; }
 
 builtin_interfaces::msg::Time Obstacle::get_last_seen() { return m_last_seen; }

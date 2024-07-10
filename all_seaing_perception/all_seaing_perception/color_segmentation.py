@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile
 import cv_bridge
 import cv2
 from sensor_msgs.msg import Image

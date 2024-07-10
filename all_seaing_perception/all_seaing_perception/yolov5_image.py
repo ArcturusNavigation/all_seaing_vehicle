@@ -1,4 +1,6 @@
-import getpass
+#!/usr/bin/env python3
+import os
+import time
 import torch
 import cv_bridge
 import cv2
@@ -9,8 +11,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
-
-import time
+from ament_index_python.packages import get_package_share_directory
 
 
 class Yolov5Image(Node):
@@ -21,12 +22,11 @@ class Yolov5Image(Node):
         self.bridge = cv_bridge.CvBridge()
 
         # Get pretrained yolov5 models for colored buoys and cardinal markers
-        # TODO: Don't use getpass.getuser but rather os
-        path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
+        path_hubconfig = os.path.expanduser("~/yolov5")
         # TODO: should be a ros parameter
-        path_model = (
-            self.get_package_share_directory("perception_suite")
-            + "/models/NJORD_WEIGHTS_ALL.pt"
+        model_name = "yolov5s.pt"
+        path_model = os.path.join(
+            get_package_share_directory("all_seaing_perception"), "models", model_name
         )
         self.model = torch.hub.load(
             path_hubconfig, "custom", path=path_model, source="local"
@@ -37,11 +37,9 @@ class Yolov5Image(Node):
         self.bbox_pub = self.create_publisher(
             LabeledBoundingBox2DArray, "bounding_boxes", qos_profile
         )
-        self.img_pub = self.create_publisher(
-            Image, "image/detections", qos_profile
-        )
+        self.img_pub = self.create_publisher(Image, "image/detections", qos_profile)
 
-        # TODO: should be in a ros timer, and also should be a parameter
+        # TODO: should be in a ros timer, and input image should also be a ros parameter
         while not rclpy.shutdown():
             # Get image
             img = PIL.Image.open(

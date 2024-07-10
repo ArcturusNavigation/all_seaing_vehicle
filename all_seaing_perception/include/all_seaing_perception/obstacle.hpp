@@ -1,29 +1,13 @@
-#include <pcl/PCLPointCloud2.h>
-#include <pcl/common/distances.h>
-#include <pcl/common/impl/common.hpp>
-#include <pcl/common/transforms.h>
-#include <pcl/filters/conditional_removal.h>
-#include <pcl/filters/extract_indices.h>
-#include <pcl/filters/passthrough.h>
-#include <pcl/filters/radius_outlier_removal.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/impl/instantiate.hpp>
-#include <pcl/kdtree/kdtree.h>
+#ifndef ALL_SEAING_PERCEPTION_OBSTACLE_HPP
+#define ALL_SEAING_PERCEPTION_OBSTACLE_HPP
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/search/impl/search.hpp>
-#include <pcl/segmentation/extract_clusters.h>
-#include <pcl/surface/convex_hull.h>
-#include <pcl_conversions/pcl_conversions.h>
 
-#include "all_seaing_interfaces/msg/obstacle.hpp"
-#include "all_seaing_interfaces/msg/obstacle_map.hpp"
 #include "builtin_interfaces/msg/time.hpp"
-#include "geometry_msgs/msg/point.hpp"
-#include "geometry_msgs/msg/point32.hpp"
 #include "geometry_msgs/msg/polygon.hpp"
 
-#include <limits>
+#include "all_seaing_interfaces/msg/obstacle.hpp"
 
 class Obstacle {
     std_msgs::msg::Header m_ros_header;
@@ -67,3 +51,5 @@ public:
     pcl::PointXYZI convert_to_global(double nav_x, double nav_y, double nav_heading,
                                      pcl::PointXYZI point);
 };
+
+#endif // ALL_SEAING_PERCEPTION_OBSTACLE_HPP

@@ -8,7 +8,7 @@ List of classes:
 https://github.com/ultralytics/yolov5/blob/master/data/coco.yaml
 """
 
-import getpass
+import os
 import torch
 import cv_bridge
 import cv2
@@ -27,12 +27,11 @@ class Yolov5Detector(Node):
 
         self.bridge = cv_bridge.CvBridge()
 
-        # Get pretrained yolov5 models for colored buoys and cardinal markers
-        # TODO: Don't use getpass.getuser but rather os
-        path_hubconfig = f"/home/{getpass.getuser()}/yolov5"
+        path_hubconfig = os.path.expanduser("~/yolov5")
         # TODO: Should be a ros parameter
-        path_model = (
-            get_package_share_directory("all_seaing_perception") + "/models/yolov5s.pt"
+        model_name = "yolov5s.pt"
+        path_model = os.path.join(
+            get_package_share_directory("all_seaing_perception"), "models", model_name
         )
         self.model = torch.hub.load(
             path_hubconfig, "custom", path=path_model, source="local"

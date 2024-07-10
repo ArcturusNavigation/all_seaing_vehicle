@@ -1,5 +1,14 @@
 #include "all_seaing_perception/point_cloud_image_overlay.hpp"
 
+#include "pcl/point_cloud.h"
+#include "pcl/point_types.h"
+#include "pcl_conversions/pcl_conversions.h"
+
+#include "cv_bridge/cv_bridge.h"
+
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
+
 void PclImageOverlay::pc_image_fusion_cb(
     const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg) {
