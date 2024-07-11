@@ -17,36 +17,36 @@ class ThrustCommander(Node):
         self.declare_parameter("back_right_port", 4)
         self.declare_parameter("back_left_port", 5)
 
-        self.frontright_port = self.get_parameter("frontright_port").value
-        self.frontleft_port = self.get_parameter("frontleft_port").value
-        self.backright_port = self.get_parameter("backright_port").value
-        self.backleft_port = self.get_parameter("backleft_port").value
+        self.front_right_port = self.get_parameter("front_right_port").value
+        self.front_left_port = self.get_parameter("front_left_port").value
+        self.back_right_port = self.get_parameter("back_right_port").value
+        self.back_left_port = self.get_parameter("back_left_port").value
 
         self.create_subscription(
-            Int64, "thrusters/front_right/thrust", self.pwm_callback_FR, 10
+            Int64, "thrusters/front_right/thrust", self.front_right_cb, 10
         )
         self.create_subscription(
-            Int64, "thrusters/front_left/thrust", self.pwm_callback_FL, 10
+            Int64, "thrusters/front_left/thrust", self.front_left_cb, 10
         )
         self.create_subscription(
-            Int64, "thrusters/back_right/thrust", self.pwm_callback_BR, 10
+            Int64, "thrusters/back_right/thrust", self.back_right_cb, 10
         )
         self.create_subscription(
-            Int64, "thrusters/back_left/thrust", self.pwm_callback_BL, 10
+            Int64, "thrusters/back_left/thrust", self.back_left_cb, 10
         )
         self.proxy = self.create_client(CommandLong, "/mavros/cmd/command")
 
-    def pwm_callback_FR(self, msg: Int64):
-        self.send_pwm(self.frontright_port, msg.data)
+    def front_right_cb(self, msg: Int64):
+        self.send_pwm(self.front_right_port, msg.data)
 
-    def pwm_callback_FL(self, msg: Int64):
-        self.send_pwm(self.frontleft_port, msg.data)
+    def front_left_cb(self, msg: Int64):
+        self.send_pwm(self.front_left_port, msg.data)
 
-    def pwm_callback_BR(self, msg: Int64):
-        self.send_pwm(self.backright_port, msg.data)
+    def back_right_cb(self, msg: Int64):
+        self.send_pwm(self.back_right_port, msg.data)
 
-    def pwm_callback_BL(self, msg: Int64):
-        self.send_pwm(self.backleft_port, msg.data)
+    def back_left_cb(self, msg: Int64):
+        self.send_pwm(self.back_left_port, msg.data)
 
     def send_pwm(self, channel, value):
         self.get_logger().info(f"Sending PWM value {value} to channel {channel}")

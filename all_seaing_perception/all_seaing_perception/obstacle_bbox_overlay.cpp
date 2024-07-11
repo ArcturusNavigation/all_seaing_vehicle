@@ -158,16 +158,16 @@ ObstacleBboxOverlay::ObstacleBboxOverlay() : Node("obstacle_bbox_overlay") {
         "camera_info", 1,
         std::bind(&ObstacleBboxOverlay::intrinsics_cb, this, std::placeholders::_1));
     m_bbox_sub.subscribe(this, "bounding_boxes", rmw_qos_profile_system_default);
-    m_map_sub.subscribe(this, "unlabeled_map", rmw_qos_profile_system_default);
+    m_map_sub.subscribe(this, "obstacle_map/unlabeled", rmw_qos_profile_system_default);
 
     // Publisher
     m_map_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(
-        "labeled_map", 1);
+        "obstacle_map/labeled", 1);
     m_marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-        "labeled_chull_markers", 10);
+        "chull_markers/labeled", 10);
     m_text_marker_array_pub =
         this->create_publisher<visualization_msgs::msg::MarkerArray>(
-            "labeled_text_markers", 10);
+            "text_markers/labeled", 10);
 
     // Send cluster msg and bbox msg to ClusterBboxFusionCb
     m_obstacle_bbox_sync = std::make_shared<ObstacleBboxSync>(ObstacleBboxPolicy(10),

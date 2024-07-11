@@ -36,16 +36,16 @@ ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
     // Initialize publishers and subscribers
     m_obstacle_cloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         "point_cloud/obstacles", 10);
-    m_raw_map_pub =
-        this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>("raw_map", 10);
+    m_raw_map_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(
+        "obstacle_map/raw", 10);
     m_unlabeled_map_pub =
-        this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>("unlabeled_map",
-                                                                        10);
+        this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(
+            "obstacle_map/unlabeled", 10);
     m_marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-        "unlabeled_chull_markers", 10);
+        "chull_markers/unlabeled", 10);
     m_text_marker_array_pub =
         this->create_publisher<visualization_msgs::msg::MarkerArray>(
-            "unlabeled_text_markers", 10);
+            "text_markers/unlabeled", 10);
     m_gateway_pub = this->create_publisher<protobuf_client_interfaces::msg::Gateway>(
         "/send_to_gateway", 10);
     m_cloud_sub = this->create_subscription<sensor_msgs::msg::PointCloud2>(
