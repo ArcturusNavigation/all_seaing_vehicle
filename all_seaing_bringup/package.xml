@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+    <name>all_seaing_bringup</name>
+    <version>0.0.0</version>
+    <description>Launch file collection for all_seaing_vehicle</description>
+    <maintainer email="arcturus-logistics@mit.edu">arcturus</maintainer>
+    <license>MIT</license>
+
+    <buildtool_depend>ament_cmake_auto</buildtool_depend>
+
+    <depend>all_seaing_autonomy</depend>
+    <depend>all_seaing_controller</depend>
+    <depend>all_seaing_description</depend>
+    <depend>all_seaing_driver</depend>
+    <depend>all_seaing_interfaces</depend>
+    <depend>all_seaing_navigation</depend>
+    <depend>all_seaing_perception</depend>
+    <depend>all_seaing_utility</depend>
+
+    <export>
+        <build_type>ament_cmake</build_type>
+    </export>
+</package>
