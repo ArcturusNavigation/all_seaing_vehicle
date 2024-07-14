@@ -155,14 +155,14 @@ ObstacleBboxOverlay::ObstacleBboxOverlay() : Node("obstacle_bbox_overlay") {
 
     // Subscriptions
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        "camera_info", 1,
+        "camera_info", 10,
         std::bind(&ObstacleBboxOverlay::intrinsics_cb, this, std::placeholders::_1));
-    m_bbox_sub.subscribe(this, "bounding_boxes", rmw_qos_profile_system_default);
-    m_map_sub.subscribe(this, "obstacle_map/unlabeled", rmw_qos_profile_system_default);
+    m_bbox_sub.subscribe(this, "bounding_boxes", rmw_qos_profile_default);
+    m_map_sub.subscribe(this, "obstacle_map/unlabeled", rmw_qos_profile_sensor_data);
 
     // Publisher
     m_map_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(
-        "obstacle_map/labeled", 1);
+        "obstacle_map/labeled", 10);
     m_marker_array_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(
         "chull_markers/labeled", 10);
     m_text_marker_array_pub =

@@ -14,7 +14,7 @@ import cv_bridge
 import cv2
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 from ament_index_python.packages import get_package_share_directory
@@ -38,17 +38,15 @@ class Yolov5Detector(Node):
         )
 
         # Subscribers and publishers
-        # TODO: probably should use BEST_EFFORT QoS (just use sensor data)
-        qos_profile = QoSProfile(depth=1)
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "bounding_boxes", qos_profile
+            LabeledBoundingBox2DArray, "bounding_boxes", 10
         )
-        self.img_pub = self.create_publisher(Image, "image/detections", qos_profile)
+        self.img_pub = self.create_publisher(Image, "image/detections", 5)
         self.img_sub = self.create_subscription(
             Image,
             "image",
             self.img_callback,
-            qos_profile,
+            qos_profile_sensor_data,
         )
 
     def img_callback(self, img):

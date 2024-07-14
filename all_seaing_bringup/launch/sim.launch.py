@@ -46,7 +46,6 @@ def generate_launch_description():
     protobuf_client_node = launch_ros.actions.Node(
         package="protobuf_client",
         executable="protobuf_client_node",
-        output="screen",
     )
 
     moos_to_controller_node = launch_ros.actions.Node(
@@ -88,6 +87,12 @@ def generate_launch_description():
         condition=IfCondition(launch_rviz),
     )
 
+    onshore_node = launch_ros.actions.Node(
+        package="all_seaing_utility",
+        executable="onshore_node.py",
+        output="screen",
+    )
+
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
@@ -110,6 +115,7 @@ def generate_launch_description():
             keyboard_node,
             keyboard_to_joy_node,
             rviz_node,
+            onshore_node,
             sim_ld,
         ]
     )

@@ -33,11 +33,10 @@ class Yolov5Image(Node):
         )
 
         # Subscribers and publishers
-        qos_profile = QoSProfile(depth=1)
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "bounding_boxes", qos_profile
+            LabeledBoundingBox2DArray, "bounding_boxes", 10
         )
-        self.img_pub = self.create_publisher(Image, "image/detections", qos_profile)
+        self.img_pub = self.create_publisher(Image, "image/detections", 5)
 
         # TODO: should be in a ros timer, and input image should also be a ros parameter
         while not rclpy.shutdown():

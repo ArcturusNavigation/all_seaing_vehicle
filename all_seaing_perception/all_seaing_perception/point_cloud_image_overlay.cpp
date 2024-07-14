@@ -36,8 +36,7 @@ void PclImageOverlay::pc_image_fusion_cb(
 
     for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
         // Project 3D point onto the image plane using the intrinsic matrix.
-        // Gazebo has a different coordinate system, so the y, z, and x coordinates are
-        // modified.
+        // Gazebo has a different coordinate system, so xyz are modified.
         cv::Point2d xy_rect = m_cam_model.project3dToPixel(
             cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));
 
@@ -72,8 +71,6 @@ PclImageOverlay::get_tf(const std::string &in_target_frame,
 
 void PclImageOverlay::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
     m_cam_model.fromCameraInfo(info_msg);
-    //    RCLCPP_INFO(this->get_logger(), "Image Intrinsics set: %i, %i",
-    //    cam_model_.cameraInfo().width, cam_model_.cameraInfo().height);
 }
 
 PclImageOverlay::PclImageOverlay() : Node("point_cloud_image_overlay") {
@@ -83,12 +80,12 @@ PclImageOverlay::PclImageOverlay() : Node("point_cloud_image_overlay") {
 
     // Subscriptions
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        "camera_info", 1,
+        "camera_info", 10,
         std::bind(&PclImageOverlay::intrinsics_cb, this, std::placeholders::_1));
-    m_image_sub.subscribe(this, "image", rmw_qos_profile_system_default);
-    m_cloud_sub.subscribe(this, "point_cloud", rmw_qos_profile_system_default);
+    m_image_sub.subscribe(this, "image", rmw_qos_profile_sensor_data);
+    m_cloud_sub.subscribe(this, "point_cloud", rmw_qos_profile_sensor_data);
 
-    // Send pc msg and img msg to PCImageFusionCb
+    // Send pc msg and img msg to pc_image_fusion_cb
     m_pc_cam_sync = std::make_shared<PointCloudCamSync>(PointCloudCamPolicy(10),
                                                         m_image_sub, m_cloud_sub);
     m_pc_cam_sync->registerCallback(std::bind(&PclImageOverlay::pc_image_fusion_cb,
@@ -96,8 +93,7 @@ PclImageOverlay::PclImageOverlay() : Node("point_cloud_image_overlay") {
                                               std::placeholders::_2));
 
     // Publishers
-    m_image_pub =
-        this->create_publisher<sensor_msgs::msg::Image>("image/overlaid", 1);
+    m_image_pub = this->create_publisher<sensor_msgs::msg::Image>("image/overlaid", 5);
 }
 
 PclImageOverlay::~PclImageOverlay() {}
