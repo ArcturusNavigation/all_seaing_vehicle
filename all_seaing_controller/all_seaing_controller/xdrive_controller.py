@@ -71,7 +71,7 @@ class PID:
             return input if self.default_to_input else 0
         error = self.get_error(input)
         if self.debug_name is not None:
-            self.get_logger().info(f"{self.debug_name} error: {error}")
+            self.get_logger().error(f"{self.debug_name} error: {error}")
         self.accumulated_error += error * dt
         derror_dt = (
             0 if self.previousError is None else (error - self.previousError) / dt
@@ -115,7 +115,7 @@ class XDriveController(Node):
 
         self.declare_parameter("in_sim", False)
         self.in_sim = bool(self.get_parameter("in_sim").value)
-        self.get_logger().info(f"in sim: {self.in_sim}")
+        #self.get_logger().info(f"in sim: {self.in_sim}")
 
         l = 3.5 if self.in_sim else 0.7112  # BOAT LENGTH
         w = 2 if self.in_sim else 0.2540  # BOAT WIDTH
@@ -282,7 +282,7 @@ class XDriveController(Node):
         return msg.angular_velocity.z if BLIND_LINEAR else msg.twist.twist.angular.z
 
     def get_theta_feedback(self, _):
-        self.get_logger().info(f"theta: self.theta")
+        #self.get_logger().info(f"theta: self.theta")
         return self.theta
 
     def get_x_position_feedback(self, msg):
@@ -292,7 +292,7 @@ class XDriveController(Node):
         return msg.pose.pose.position.y
 
     def get_x_velocity_local_feedback(self, msg):
-        self.get_logger().info(f"feedback: {msg.twist.twist.linear.x}")
+        #self.get_logger().info(f"feedback: {msg.twist.twist.linear.x}")
         return msg.twist.twist.linear.x
 
     def get_y_velocity_local_feedback(self, msg):
