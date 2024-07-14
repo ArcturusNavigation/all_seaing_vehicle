@@ -7,6 +7,7 @@ import cv2
 from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 import numpy as np
+import yaml
 
 
 class ColorSegmentation(Node):
@@ -28,6 +29,17 @@ class ColorSegmentation(Node):
             qos_profile_sensor_data,
         )
 
+        self.declare_parameter('color_ranges_file', 'config/color_ranges.yaml')
+        self.declare_parameter('color_label_mappings_file', 'config/color_label_mappings.yaml')
+
+        color_ranges_file = self.get_parameter('color_ranges_file').value
+        color_label_mappings_file = self.get_parameter('color_label_mappings_file').value
+
+        with open(color_ranges_file, 'r') as f:
+            self.colors = yaml.safe_load(f)
+        with open(color_label_mappings_file, 'r') as f:
+            self.label_dict = yaml.safe_load(f)
+
     def img_callback(self, img):
 
         bboxes = LabeledBoundingBox2DArray()
@@ -39,15 +51,8 @@ class ColorSegmentation(Node):
             self.get_logger().info(str(e))
         hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
-        colors = {
-            "orange": [10, 31, 125, 255, 60, 255],
-            "red": [0, 10, 175, 255, 70, 255],
-            "red2": [170, 179, 175, 255, 70, 255],
-            "green": [59, 82, 142, 255, 30, 255],
-            "black": [0, 0, 0, 0, 0, 50],
-            "white": [0, 0, 0, 10, 200, 255],
-            # "default": [0, 179, 0, 255, 0, 255]
-        }
+        colors = self.colors
+        label_dict = self.label_dict
 
         rgbs = {
             "red": (255, 0, 0),
@@ -56,12 +61,6 @@ class ColorSegmentation(Node):
             "black": (0, 0, 0),
             "white": (255, 255, 255),
         }
-
-        # TEMPORARY NUMBERS!!!!
-        label_dict = {"orange": 0, "red": 1, "green": 2, "black": 3, "white": 4}
-
-        # change later !!!
-        # threshold_pixels = 1000
 
         for color in colors:
             if color == "red2":
@@ -76,12 +75,7 @@ class ColorSegmentation(Node):
                 upper_limit = np.array([h_max, s_max, v_max])
                 mask = mask + cv2.inRange(hsv_img, lower_limit, upper_limit)
 
-            # findContours on mask
-            # imgray = cv2.cvtColor(mask, cv.COLOR_BGR2GRAY)
-            # ret, thresh = cv2.threshold(mask, 127, 255, 0)
-
             # erode and dilate mask
-            # Define structuring element
             kernel = np.ones((5, 5), np.uint8)
             mask = cv2.erode(mask, kernel, iterations=1)
             kernel2 = np.ones((7, 7), np.uint8)
@@ -112,12 +106,6 @@ class ColorSegmentation(Node):
 
             self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
         self.bbox_pub.publish(bboxes)
-
-        # num_valid = cv2.countNonZero(mask)
-
-        # if num_valid > threshold_pixels:
-        #     result = cv2.bitwise_and(img, img, mask=mask)
-        #     result_dict[color] = result
 
 
 def main(args=None):
