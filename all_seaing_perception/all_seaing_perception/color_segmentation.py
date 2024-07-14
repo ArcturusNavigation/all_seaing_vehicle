@@ -29,8 +29,8 @@ class ColorSegmentation(Node):
             qos_profile_sensor_data,
         )
 
-        self.declare_parameter('color_ranges_file', 'config/color_ranges.yaml')
-        self.declare_parameter('color_label_mappings_file', 'config/color_label_mappings.yaml')
+        self.declare_parameter('color_ranges_file', '')
+        self.declare_parameter('color_label_mappings_file', '')
 
         color_ranges_file = self.get_parameter('color_ranges_file').value
         color_label_mappings_file = self.get_parameter('color_label_mappings_file').value
