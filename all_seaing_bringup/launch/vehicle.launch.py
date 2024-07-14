@@ -10,7 +10,7 @@ def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     robot_localization_params = os.path.join(
-        bringup_prefix, "config", "robot_localization", "localize_seagrant.yaml"
+        bringup_prefix, "config", "robot_localization", "localize_real.yaml"
     )
 
     ekf_node = launch_ros.actions.Node(
