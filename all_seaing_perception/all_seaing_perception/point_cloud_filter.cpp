@@ -21,12 +21,12 @@ public:
 
         // Subscribe to the input point cloud topic
         m_subscription = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "point_cloud", 10,
+            "point_cloud", rclcpp::SensorDataQoS(),
             std::bind(&PointCloudFilter::pc_callback, this, std::placeholders::_1));
 
         // Advertise the filtered point cloud topic
         m_publisher = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-            "point_cloud/filtered", 10);
+            "point_cloud/filtered", rclcpp::SensorDataQoS());
 
         // Get values from parameter server
         m_range_min_threshold = this->get_parameter("range_min_threshold").as_double();

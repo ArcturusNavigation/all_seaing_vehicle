@@ -61,9 +61,10 @@ class OnshoreNode(Node):
         elif self.enter_held:
             self.enter_held = False
         if self.heartbeat_message.in_teleop:
-            self.control_message.y = msg.axes[0] * -0.6
-            self.control_message.x = msg.axes[1] * 0.6
-            self.control_message.angular = msg.axes[2] * -0.3
+            # TODO: Parameterize values here
+            self.control_message.y = msg.axes[0] * -2.0
+            self.control_message.x = msg.axes[1] * 2.0
+            self.control_message.angular = msg.axes[2] * -0.8
             self.control_input_publisher.publish(self.control_message)
 
 
