@@ -46,7 +46,6 @@ def generate_launch_description():
     protobuf_client_node = launch_ros.actions.Node(
         package="protobuf_client",
         executable="protobuf_client_node",
-        output="screen",
     )
 
     moos_to_controller_node = launch_ros.actions.Node(

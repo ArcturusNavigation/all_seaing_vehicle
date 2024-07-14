@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 import cv_bridge
 import cv2
 from sensor_msgs.msg import Image
@@ -17,14 +18,14 @@ class ColorSegmentation(Node):
 
         # Subscribers and publishers
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "bounding_boxes", 1
+            LabeledBoundingBox2DArray, "bounding_boxes", 10
         )
-        self.img_pub = self.create_publisher(Image, "segmented_image", 1)
+        self.img_pub = self.create_publisher(Image, "image/segmented", 5)
         self.img_sub = self.create_subscription(
             Image,
             "image",
             self.img_callback,
-            1,
+            qos_profile_sensor_data,
         )
 
     def img_callback(self, img):
