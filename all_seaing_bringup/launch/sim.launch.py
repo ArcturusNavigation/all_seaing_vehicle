@@ -77,6 +77,62 @@ def generate_launch_description():
         parameters=[{"config_file_name": keyboard_params}],
     )
 
+    obstacle_bbox_overlay_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_bbox_overlay",
+        output="screen",
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
+            ),
+        ],
+    )
+
+    color_segmentation_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="color_segmentation.py",
+        output="screen",
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+    )
+
+    point_cloud_filter_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        output="screen",
+        remappings=[
+            ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
+        ],
+        parameters=[
+            {"range_min_threshold": 0.0},
+            {"range_max_threshold": 40.0},
+            {"intensity_low_threshold": 0.0},
+            {"intensity_high_threshold": 50.0},
+            {"leaf_size": 0.0},
+            {"hfov": 150.0},
+        ],
+    )
+
+    obstacle_detector_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        output="screen",
+        remappings=[
+            ("point_cloud", "point_cloud/filtered"),
+        ],
+        parameters=[
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"polygon_area_thresh": 100000.0},
+            {"viz": True},
+        ],
+    )
+
     rviz_node = launch_ros.actions.Node(
         package="rviz2",
         executable="rviz2",
@@ -114,6 +170,10 @@ def generate_launch_description():
             rviz_testing_helper_node,
             keyboard_node,
             keyboard_to_joy_node,
+            obstacle_bbox_overlay_node,
+            color_segmentation_node,
+            point_cloud_filter_node,
+            obstacle_detector_node,
             rviz_node,
             onshore_node,
             sim_ld,
