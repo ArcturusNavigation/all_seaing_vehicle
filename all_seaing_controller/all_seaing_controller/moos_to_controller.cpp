@@ -8,23 +8,18 @@ using namespace std::chrono_literals;
 class MoosToController : public rclcpp::Node {
 public:
     MoosToController() : Node("moos_to_controller") {
-        m_gateway_sub =
-            this->create_subscription<protobuf_client_interfaces::msg::Gateway>(
-                "/gateway_msg", 10,
-                std::bind(&MoosToController::moos_callback, this,
-                          std::placeholders::_1));
+        m_gateway_sub = this->create_subscription<protobuf_client_interfaces::msg::Gateway>(
+            "/gateway_msg", 10,
+            std::bind(&MoosToController::moos_callback, this, std::placeholders::_1));
 
         m_control_pub =
-            this->create_publisher<all_seaing_interfaces::msg::ControlMessage>(
-                "control_input", 10);
+            this->create_publisher<all_seaing_interfaces::msg::ControlMessage>("control_input", 10);
     }
 
 private:
     // Defining Pubs/Subs
-    rclcpp::Publisher<all_seaing_interfaces::msg::ControlMessage>::SharedPtr
-        m_control_pub;
-    rclcpp::Subscription<protobuf_client_interfaces::msg::Gateway>::SharedPtr
-        m_gateway_sub;
+    rclcpp::Publisher<all_seaing_interfaces::msg::ControlMessage>::SharedPtr m_control_pub;
+    rclcpp::Subscription<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_sub;
 
     double m_moos_thrust;
     double m_moos_heading;
@@ -36,10 +31,8 @@ private:
         all_seaing_interfaces::msg::ControlMessage control =
             all_seaing_interfaces::msg::ControlMessage();
 
-        control.linear_control_mode =
-            all_seaing_interfaces::msg::ControlMessage::LOCAL_VELOCITY;
-        control.angular_control_mode =
-            all_seaing_interfaces::msg::ControlMessage::WORLD_POSITION;
+        control.linear_control_mode = all_seaing_interfaces::msg::ControlMessage::LOCAL_VELOCITY;
+        control.angular_control_mode = all_seaing_interfaces::msg::ControlMessage::WORLD_POSITION;
 
         if (msg.gateway_key == "DESIRED_THRUST") {
             m_moos_thrust = msg.gateway_double;

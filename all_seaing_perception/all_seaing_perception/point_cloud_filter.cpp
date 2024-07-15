@@ -31,10 +31,8 @@ public:
         // Get values from parameter server
         m_range_min_threshold = this->get_parameter("range_min_threshold").as_double();
         m_range_max_threshold = this->get_parameter("range_max_threshold").as_double();
-        m_intensity_low_threshold =
-            this->get_parameter("intensity_low_threshold").as_double();
-        m_intensity_high_threshold =
-            this->get_parameter("intensity_high_threshold").as_double();
+        m_intensity_low_threshold = this->get_parameter("intensity_low_threshold").as_double();
+        m_intensity_high_threshold = this->get_parameter("intensity_high_threshold").as_double();
         m_leaf_size = this->get_parameter("leaf_size").as_double();
         m_hfov = this->get_parameter("hfov").as_double();
     }
@@ -53,11 +51,9 @@ private:
         double hfov = m_hfov * M_PI / 360.0; // Convert hfov to radians / 2
         for (const auto &point : in_cloud_ptr->points) {
             double current_theta = std::atan2(point.y, point.x);
-            double range =
-                sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+            double range = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
 
-            // If in range thresholds, intensity thresholds, fov, and finite, then keep
-            // point
+            // Keep point if in range thresholds, intensity thresholds, fov, and is finite
             if (m_range_min_threshold <= range && range <= m_range_max_threshold &&
                 m_intensity_low_threshold <= point.intensity &&
                 point.intensity <= m_intensity_high_threshold &&
@@ -70,8 +66,7 @@ private:
 
     void pc_callback(const sensor_msgs::msg::PointCloud2 &in_cloud_msg) {
         // Transform in_cloud_msg and convert PointCloud2 to PCL PointCloud
-        pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr(
-            new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
         pcl::fromROSMsg(in_cloud_msg, *in_cloud_ptr);
 
         // Filter out points ouside intensity/distance/fov range, and NaN values

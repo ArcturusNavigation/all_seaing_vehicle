@@ -7,7 +7,7 @@
 
 #include "geometry_msgs/msg/point32.hpp"
 
-std_msgs::msg::Header Obstacle::get_ros_header() { return m_ros_header; }
+namespace all_seaing_perception {
 
 builtin_interfaces::msg::Time Obstacle::get_last_seen() { return m_last_seen; }
 
@@ -21,14 +21,15 @@ pcl::PointXYZI Obstacle::get_local_point() { return m_local_point; }
 
 pcl::PointXYZI Obstacle::get_global_point() { return m_global_point; }
 
-geometry_msgs::msg::Polygon Obstacle::get_local_chull() { return m_local_chull; }
+geometry_msgs::msg::PolygonStamped Obstacle::get_local_chull() { return m_local_chull; }
 
-geometry_msgs::msg::Polygon Obstacle::get_global_chull() { return m_global_chull; }
+geometry_msgs::msg::PolygonStamped Obstacle::get_global_chull() { return m_global_chull; }
 
 float Obstacle::get_polygon_area() { return m_area; }
 
-pcl::PointXYZI Obstacle::convert_to_global(double nav_x, double nav_y,
-                                           double nav_heading, pcl::PointXYZI point) {
+// TODO: do this using tf and not manually
+pcl::PointXYZI Obstacle::convert_to_global(double nav_x, double nav_y, double nav_heading,
+                                           pcl::PointXYZI point) {
     pcl::PointXYZI new_point;
     double magnitude = std::hypot(point.x, point.y);
     double point_angle = std::atan2(point.y, point.x);
@@ -38,21 +39,25 @@ pcl::PointXYZI Obstacle::convert_to_global(double nav_x, double nav_y,
     return new_point;
 }
 
-void Obstacle::to_ros_msg(std_msgs::msg::Header in_ros_header,
+void Obstacle::to_ros_msg(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
                           all_seaing_interfaces::msg::Obstacle &out_obstacle_msg) {
-    out_obstacle_msg.header = in_ros_header;
     out_obstacle_msg.id = this->get_id();
 
-    out_obstacle_msg.local_point.x = this->get_local_point().x;
-    out_obstacle_msg.local_point.y = this->get_local_point().y;
-    out_obstacle_msg.local_point.z = this->get_local_point().z;
+    out_obstacle_msg.local_point.point.x = this->get_local_point().x;
+    out_obstacle_msg.local_point.point.y = this->get_local_point().y;
+    out_obstacle_msg.local_point.point.z = this->get_local_point().z;
+    out_obstacle_msg.local_point.header = local_header;
 
-    out_obstacle_msg.global_point.x = this->get_global_point().x;
-    out_obstacle_msg.global_point.y = this->get_global_point().y;
-    out_obstacle_msg.global_point.z = this->get_global_point().z;
+    out_obstacle_msg.global_point.point.x = this->get_global_point().x;
+    out_obstacle_msg.global_point.point.y = this->get_global_point().y;
+    out_obstacle_msg.global_point.point.z = this->get_global_point().z;
+    out_obstacle_msg.global_point.header = global_header;
 
     out_obstacle_msg.local_chull = this->get_local_chull();
+    out_obstacle_msg.local_chull.header = local_header;
+
     out_obstacle_msg.global_chull = this->get_global_chull();
+    out_obstacle_msg.global_chull.header = local_header;
 
     out_obstacle_msg.polygon_area = this->get_polygon_area();
 
@@ -60,22 +65,18 @@ void Obstacle::to_ros_msg(std_msgs::msg::Header in_ros_header,
 }
 
 Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
-                   const std::vector<int> &in_cluster_indices,
-                   std_msgs::msg::Header in_ros_header, int in_id,
-                   builtin_interfaces::msg::Time in_last_seen, double nav_x,
-                   double nav_y, double nav_heading) {
+                   const std::vector<int> &in_cluster_indices, int in_id,
+                   builtin_interfaces::msg::Time in_last_seen, double nav_x, double nav_y,
+                   double nav_heading) {
     // Set id and header
     m_id = in_id;
-    m_ros_header = in_ros_header;
     m_last_seen = in_last_seen;
 
     // Fill cluster point by point
-    pcl::PointCloud<pcl::PointXYZI>::Ptr current_cluster(
-        new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr current_cluster(new pcl::PointCloud<pcl::PointXYZI>);
     float min_z = std::numeric_limits<float>::max();
     float average_x = 0, average_y = 0, average_z = 0;
-    for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end();
-         pit++) {
+    for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); pit++) {
         pcl::PointXYZI p;
         p.x = in_origin_cloud_ptr->points[*pit].x;
         p.y = in_origin_cloud_ptr->points[*pit].y;
@@ -104,8 +105,7 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
     m_global_point = convert_to_global(nav_x, nav_y, nav_heading, m_local_point);
 
     // Calculate convex hull polygon
-    pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(
-        new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::ConvexHull<pcl::PointXYZI> chull;
     chull.setInputCloud(current_cluster);
     chull.reconstruct(*hull_cloud);
@@ -118,15 +118,14 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
         p.x = hull_cloud->points[i].x;
         p.y = hull_cloud->points[i].y;
         p.z = min_z;
-        m_local_chull.points.push_back(p);
+        m_local_chull.polygon.points.push_back(p);
 
         // Push global point
-        pcl::PointXYZI p_glob =
-            convert_to_global(nav_x, nav_y, nav_heading, hull_cloud->points[i]);
+        pcl::PointXYZI p_glob = convert_to_global(nav_x, nav_y, nav_heading, hull_cloud->points[i]);
         geometry_msgs::msg::Point32 p_glob_msg;
         p_glob_msg.x = p_glob.x;
         p_glob_msg.y = p_glob.y;
-        m_global_chull.points.push_back(p_glob_msg);
+        m_global_chull.polygon.points.push_back(p_glob_msg);
     }
 
     // Speicfy that all points are finite
@@ -137,3 +136,5 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
 }
 
 Obstacle::~Obstacle() {}
+
+} // namespace all_seaing_perception

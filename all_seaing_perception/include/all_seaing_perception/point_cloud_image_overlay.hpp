@@ -1,5 +1,5 @@
-#ifndef ALL_SEAING_PERCEPTION_POINT_CLOUD_IMAGE_OVERLAY_HPP
-#define ALL_SEAING_PERCEPTION_POINT_CLOUD_IMAGE_OVERLAY_HPP
+#ifndef ALL_SEAING_PERCEPTION__POINT_CLOUD_IMAGE_OVERLAY_HPP
+#define ALL_SEAING_PERCEPTION__POINT_CLOUD_IMAGE_OVERLAY_HPP
 
 #include <string>
 
@@ -22,8 +22,7 @@ class PclImageOverlay : public rclcpp::Node {
 private:
     // Publishers and subscribers
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_image_pub;
-    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
-        m_image_intrinsics_sub;
+    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> m_cloud_sub;
 
@@ -37,16 +36,15 @@ private:
     image_geometry::PinholeCameraModel m_cam_model;
 
     // Pointcloud-camera sync policies
-    typedef message_filters::sync_policies::ApproximateTime<
-        sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image,
+                                                            sensor_msgs::msg::PointCloud2>
         PointCloudCamPolicy;
     typedef message_filters::Synchronizer<PointCloudCamPolicy> PointCloudCamSync;
     std::shared_ptr<PointCloudCamSync> m_pc_cam_sync;
 
     // Fuse image and pointcloud data by projecting 3D points onto 2D image.
-    void pc_image_fusion_cb(
-        const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
-        const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg);
+    void pc_image_fusion_cb(const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
+                            const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg);
 
     // Get intrinsic camera model information needed for projection
     void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
@@ -60,4 +58,4 @@ public:
     virtual ~PclImageOverlay();
 };
 
-#endif // ALL_SEAING_PERCEPTION_POINT_CLOUD_IMAGE_OVERLAY_HPP
+#endif // ALL_SEAING_PERCEPTION__POINT_CLOUD_IMAGE_OVERLAY_HPP
