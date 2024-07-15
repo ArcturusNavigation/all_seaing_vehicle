@@ -1,5 +1,5 @@
-#ifndef ALL_SEAING_PERCEPTION_OBSTACLE_BBOX_OVERLAY_HPP
-#define ALL_SEAING_PERCEPTION_OBSTACLE_BBOX_OVERLAY_HPP
+#ifndef ALL_SEAING_PERCEPTION__OBSTACLE_BBOX_OVERLAY_HPP
+#define ALL_SEAING_PERCEPTION__OBSTACLE_BBOX_OVERLAY_HPP
 
 #include <string>
 
@@ -16,7 +16,6 @@
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
-#include "visualization_msgs/msg/marker_array.hpp"
 
 #include "all_seaing_interfaces/msg/labeled_bounding_box2_d_array.hpp"
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
@@ -25,14 +24,8 @@ class ObstacleBboxOverlay : public rclcpp::Node {
 private:
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_map_pub;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
-        m_marker_array_pub;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
-        m_text_marker_array_pub;
-    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
-        m_image_intrinsics_sub;
-    message_filters::Subscriber<all_seaing_interfaces::msg::LabeledBoundingBox2DArray>
-        m_bbox_sub;
+    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
+    message_filters::Subscriber<all_seaing_interfaces::msg::LabeledBoundingBox2DArray> m_bbox_sub;
     message_filters::Subscriber<all_seaing_interfaces::msg::ObstacleMap> m_map_sub;
 
     // Transform variables
@@ -55,8 +48,7 @@ private:
 
     // Fuse image and obstacle by projecting 3D points onto 2D image.
     void obstacle_bbox_fusion_cb(
-        const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr
-            &in_bbox_msg,
+        const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg,
         const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr &in_map_msg);
 
     // Get intrinsic camera model information needed for projection
@@ -66,12 +58,9 @@ private:
     geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
                                                 const std::string &in_src_frame);
 
-    // Publish markers for visualizing matched obstacles
-    void markers(const all_seaing_interfaces::msg::ObstacleMap &in_map_msg);
-
 public:
     ObstacleBboxOverlay();
     virtual ~ObstacleBboxOverlay();
 };
 
-#endif // ALL_SEAING_PERCEPTION_OBSTACLE_BBOX_OVERLAY_HPP
+#endif // ALL_SEAING_PERCEPTION__OBSTACLE_BBOX_OVERLAY_HPP

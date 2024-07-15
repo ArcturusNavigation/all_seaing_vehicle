@@ -26,7 +26,7 @@ class BuoyPairFinder(Node):
         left_buoy_points = []
         right_buoy_points = []
         for obstacle in msg.obstacles:
-            x, y = obstacle.global_point.x, obstacle.global_point.y
+            x, y = obstacle.global_point.point.x, obstacle.global_point.point.y
             if obstacle.label == 2:
                 left_buoy_points.append((x, y))
             elif obstacle.label == 1:

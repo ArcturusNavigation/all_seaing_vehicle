@@ -106,7 +106,6 @@ def generate_launch_description():
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
             {"polygon_area_thresh": 100000.0},
-            {"viz": True},
         ],
     )
 
