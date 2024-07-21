@@ -15,8 +15,9 @@ void ObstacleBboxOverlay::obstacle_bbox_fusion_cb(
 
     // Match clusters and bounding boxes
     all_seaing_interfaces::msg::ObstacleMap new_map;
+    new_map.ns = "labeled";
     new_map.local_header = in_map_msg->local_header;
-    new_map.global_header = in_map_msg->global_header;
+    new_map.header = in_map_msg->header;
     std::unordered_set<int> chosen_indices;
     for (const all_seaing_interfaces::msg::Obstacle &obstacle : in_map_msg->obstacles) {
 

@@ -1,0 +1,10 @@
+<library path="all_seaing_rviz_plugins">
+    <class 
+        name="all_seaing_interfaces/msg/ObstacleMap"
+        type="all_seaing_rviz_plugins::ObstacleMapDisplay"
+        base_class_type="rviz_common::Display"
+    >
+        <description>Displays obstacles as markers with labels</description>
+        <message_type>all_seaing_interfaces/msg/ObstacleMap</message_type>
+    </class>
+</library>

@@ -12,6 +12,7 @@
 ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
 
     // Initialize parameters
+    this->declare_parameter<std::string>("global_frame_id", "odom");
     this->declare_parameter<int>("obstacle_size_min", 20);
     this->declare_parameter<int>("obstacle_size_max", 100000);
     this->declare_parameter<double>("clustering_distance", 0.75);
@@ -20,6 +21,7 @@ ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
     this->declare_parameter<double>("polygon_area_thresh", 100000.0);
 
     // Initialize member variables from parameters
+    m_global_frame_id = this->get_parameter("global_frame_id").as_string();
     m_obstacle_size_min = this->get_parameter("obstacle_size_min").as_int();
     m_obstacle_size_max = this->get_parameter("obstacle_size_max").as_int();
     m_clustering_distance = this->get_parameter("clustering_distance").as_double();
@@ -180,8 +182,9 @@ void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSha
 
     // Publish raw obstacle map
     all_seaing_interfaces::msg::ObstacleMap raw_map;
+    raw_map.ns = "raw";
     raw_map.local_header = in_cloud->header;
-    raw_map.global_header = global_header;
+    raw_map.header = global_header;
     for (unsigned int i = 0; i < raw_obstacles.size(); i++) {
         all_seaing_interfaces::msg::Obstacle raw_obstacle;
         raw_obstacles[i]->to_ros_msg(in_cloud->header, global_header, raw_obstacle);
@@ -191,8 +194,9 @@ void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSha
 
     // Publish tracked obstacle map
     all_seaing_interfaces::msg::ObstacleMap tracked_map;
+    tracked_map.ns = "unlabeled";
     tracked_map.local_header = in_cloud->header;
-    tracked_map.global_header = global_header;
+    tracked_map.header = global_header;
     for (unsigned int i = 0; i < m_tracked_obstacles.size(); i++) {
         all_seaing_interfaces::msg::Obstacle tracked_obstacle;
         m_tracked_obstacles[i]->to_ros_msg(in_cloud->header, global_header, tracked_obstacle);
