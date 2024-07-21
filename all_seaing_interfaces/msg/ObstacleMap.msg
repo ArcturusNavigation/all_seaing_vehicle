@@ -1,3 +1,4 @@
+std_msgs/Header header
 std_msgs/Header local_header
-std_msgs/Header global_header
+string ns
 Obstacle[] obstacles
