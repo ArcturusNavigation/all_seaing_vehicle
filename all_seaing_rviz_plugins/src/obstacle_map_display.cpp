@@ -53,7 +53,7 @@ ObstacleMapDisplay::get_marker(const all_seaing_interfaces::msg::Obstacle &obsta
 
     marker->color.a = 1.0;
     marker->color.r = 1.0;
-    marker->scale.x = 0.2;
+    marker->scale.x = 0.3;
     marker->scale.y = 0.3;
     marker->scale.z = 0.3;
 
