@@ -17,6 +17,8 @@ def generate_launch_description():
         bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
     )
     keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
+    color_label_mappings = os.path.join(bringup_prefix, "config", "perception", "color_label_mappings.yaml")
+    color_ranges = os.path.join(bringup_prefix, "config", "perception", "color_ranges.yaml")
 
     bag_path = LaunchConfiguration("bag_path")
     launch_rviz = LaunchConfiguration("launch_rviz")
@@ -94,6 +96,10 @@ def generate_launch_description():
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ],
+        parameters=[{
+            "color_label_mappings_file": color_label_mappings,
+            "color_ranges_file": color_ranges,
+        }]
     )
 
     point_cloud_filter_node = launch_ros.actions.Node(
