@@ -185,6 +185,7 @@ void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSha
     raw_map.ns = "raw";
     raw_map.local_header = in_cloud->header;
     raw_map.header = global_header;
+    raw_map.is_labeled = false;
     for (unsigned int i = 0; i < raw_obstacles.size(); i++) {
         all_seaing_interfaces::msg::Obstacle raw_obstacle;
         raw_obstacles[i]->to_ros_msg(in_cloud->header, global_header, raw_obstacle);
@@ -197,6 +198,7 @@ void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSha
     tracked_map.ns = "unlabeled";
     tracked_map.local_header = in_cloud->header;
     tracked_map.header = global_header;
+    tracked_map.is_labeled = false;
     for (unsigned int i = 0; i < m_tracked_obstacles.size(); i++) {
         all_seaing_interfaces::msg::Obstacle tracked_obstacle;
         m_tracked_obstacles[i]->to_ros_msg(in_cloud->header, global_header, tracked_obstacle);
