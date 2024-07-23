@@ -80,7 +80,6 @@ def generate_launch_description():
     obstacle_bbox_overlay_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_bbox_overlay",
-        output="screen",
         remappings=[
             (
                 "camera_info",
@@ -92,7 +91,6 @@ def generate_launch_description():
     color_segmentation_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="color_segmentation.py",
-        output="screen",
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ],
@@ -101,7 +99,6 @@ def generate_launch_description():
     point_cloud_filter_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
-        output="screen",
         remappings=[
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
@@ -118,7 +115,6 @@ def generate_launch_description():
     obstacle_detector_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_detector",
-        output="screen",
         remappings=[
             ("point_cloud", "point_cloud/filtered"),
         ],

@@ -60,18 +60,21 @@ def generate_launch_description():
             {"use_pose_array": True},
             {"use_gps": True},
         ],
-        output="screen",
     )
 
     protobuf_client_node = launch_ros.actions.Node(
         package="protobuf_client",
         executable="protobuf_client_node",
-        output="screen",
     )
 
     moos_to_controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="moos_to_controller",
+    )
+
+    onshore_node = launch_ros.actions.Node(
+        package="all_seaing_utility",
+        executable="onshore_node.py",
         output="screen",
     )
 
@@ -94,6 +97,7 @@ def generate_launch_description():
             waypoint_sender_node,
             protobuf_client_node,
             moos_to_controller_node,
+            onshore_node,
             sim_ld,
         ]
     )
