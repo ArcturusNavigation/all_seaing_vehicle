@@ -16,7 +16,6 @@
 #include "std_msgs/msg/header.hpp"
 
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
-#include "protobuf_client_interfaces/msg/gateway.hpp"
 
 class ObstacleDetector : public rclcpp::Node {
 public:
@@ -32,7 +31,9 @@ private:
     void
     track_obstacles(builtin_interfaces::msg::Time current_time,
                     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &raw_obstacles);
-    void send_to_gateway(const all_seaing_interfaces::msg::ObstacleMap &in_map);
+    void publish_map(std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
+                     const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
+                     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub);
 
     // Member variables
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> m_tracked_obstacles;
@@ -44,13 +45,11 @@ private:
     double m_obstacle_seg_thresh;
     double m_obstacle_drop_thresh;
     double m_polygon_area_thresh;
-    bool m_viz;
     float m_nav_x, m_nav_y, m_nav_heading;
 
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_raw_map_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_unlabeled_map_pub;
-    rclcpp::Publisher<protobuf_client_interfaces::msg::Gateway>::SharedPtr m_gateway_pub;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr m_cloud_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
 };

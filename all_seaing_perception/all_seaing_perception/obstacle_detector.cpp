@@ -39,8 +39,6 @@ ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
         this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>("obstacle_map/raw", 10);
     m_unlabeled_map_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(
         "obstacle_map/unlabeled", 10);
-    m_gateway_pub =
-        this->create_publisher<protobuf_client_interfaces::msg::Gateway>("/send_to_gateway", 10);
     m_cloud_sub = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "point_cloud", rclcpp::SensorDataQoS(),
         std::bind(&ObstacleDetector::pc_callback, this, std::placeholders::_1));
@@ -149,16 +147,27 @@ void ObstacleDetector::track_obstacles(
                                    new_obstacles.end());
 }
 
-void ObstacleDetector::send_to_gateway(const all_seaing_interfaces::msg::ObstacleMap &in_map) {
-    for (const auto &obstacle : in_map.obstacles) {
-        for (const auto &p : obstacle.global_chull.polygon.points) {
-            auto gateway_msg = protobuf_client_interfaces::msg::Gateway();
-            gateway_msg.gateway_key = "TRACKED_FEATURE";
-            gateway_msg.gateway_string = "x=" + std::to_string(p.x) + ",y=" + std::to_string(p.y) +
-                                         ",label=" + std::to_string(obstacle.id);
-            m_gateway_pub->publish(gateway_msg);
-        }
+void ObstacleDetector::publish_map(
+    std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
+    const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
+    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub) {
+
+    // Create global header
+    std_msgs::msg::Header global_header = std_msgs::msg::Header();
+    global_header.frame_id = m_global_frame_id;
+    global_header.stamp = local_header.stamp;
+
+    all_seaing_interfaces::msg::ObstacleMap map_msg;
+    map_msg.ns = ns;
+    map_msg.local_header = local_header;
+    map_msg.header = global_header;
+    map_msg.is_labeled = is_labeled;
+    for (unsigned int i = 0; i < map.size(); i++) {
+        all_seaing_interfaces::msg::Obstacle raw_obstacle;
+        map[i]->to_ros_msg(local_header, global_header, raw_obstacle);
+        map_msg.obstacles.push_back(raw_obstacle);
     }
+    pub->publish(map_msg);
 }
 
 // Main callback loop
@@ -175,39 +184,9 @@ void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSha
     // Match raw obstacles and tracked obstacles
     track_obstacles(in_cloud->header.stamp, raw_obstacles);
 
-    // Create global header
-    std_msgs::msg::Header global_header = std_msgs::msg::Header();
-    global_header.frame_id = m_global_frame_id;
-    global_header.stamp = in_cloud->header.stamp;
-
-    // Publish raw obstacle map
-    all_seaing_interfaces::msg::ObstacleMap raw_map;
-    raw_map.ns = "raw";
-    raw_map.local_header = in_cloud->header;
-    raw_map.header = global_header;
-    raw_map.is_labeled = false;
-    for (unsigned int i = 0; i < raw_obstacles.size(); i++) {
-        all_seaing_interfaces::msg::Obstacle raw_obstacle;
-        raw_obstacles[i]->to_ros_msg(in_cloud->header, global_header, raw_obstacle);
-        raw_map.obstacles.push_back(raw_obstacle);
-    }
-    m_raw_map_pub->publish(raw_map);
-
-    // Publish tracked obstacle map
-    all_seaing_interfaces::msg::ObstacleMap tracked_map;
-    tracked_map.ns = "unlabeled";
-    tracked_map.local_header = in_cloud->header;
-    tracked_map.header = global_header;
-    tracked_map.is_labeled = false;
-    for (unsigned int i = 0; i < m_tracked_obstacles.size(); i++) {
-        all_seaing_interfaces::msg::Obstacle tracked_obstacle;
-        m_tracked_obstacles[i]->to_ros_msg(in_cloud->header, global_header, tracked_obstacle);
-        tracked_map.obstacles.push_back(tracked_obstacle);
-    }
-    m_unlabeled_map_pub->publish(tracked_map);
-
-    // Send obstacles to MOOS
-    send_to_gateway(tracked_map);
+    // Publish raw and unlabeled maps
+    publish_map(in_cloud->header, "raw", false, raw_obstacles, m_raw_map_pub);
+    publish_map(in_cloud->header, "unlabeled", true, m_tracked_obstacles, m_unlabeled_map_pub);
 }
 
 // TODO: this can be removed after using TF rather than calculating by ourselves
