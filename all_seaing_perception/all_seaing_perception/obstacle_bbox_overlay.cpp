@@ -18,6 +18,7 @@ void ObstacleBboxOverlay::obstacle_bbox_fusion_cb(
     new_map.ns = "labeled";
     new_map.local_header = in_map_msg->local_header;
     new_map.header = in_map_msg->header;
+    new_map.is_labeled = true;
     std::unordered_set<int> chosen_indices;
     for (const all_seaing_interfaces::msg::Obstacle &obstacle : in_map_msg->obstacles) {
 

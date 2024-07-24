@@ -10,6 +10,7 @@ def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
+    description_prefix = get_package_share_directory("all_seaing_description")
     localize_params = os.path.join(
         bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
     )
@@ -18,7 +19,6 @@ def generate_launch_description():
     state_reporter_node = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="nav_state_reporter",
-        output="screen",
         remappings=[
             ("imu/data", "/wamv/sensors/imu/imu/data"),
             ("gps/fix", "/wamv/sensors/gps/gps/fix"),
@@ -28,14 +28,12 @@ def generate_launch_description():
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="ekf_node",
-        output="screen",
         parameters=[localize_params],
     )
 
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
-        output="screen",
         remappings=[("gps/fix", "/wamv/sensors/gps/gps/fix")],
         parameters=[localize_params],
     )
@@ -57,7 +55,6 @@ def generate_launch_description():
     obstacle_bbox_overlay_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_bbox_overlay",
-        output="screen",
         remappings=[
             (
                 "camera_info",
@@ -69,7 +66,6 @@ def generate_launch_description():
     color_segmentation_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="color_segmentation.py",
-        output="screen",
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ],
@@ -78,7 +74,6 @@ def generate_launch_description():
     point_cloud_filter_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
-        output="screen",
         remappings=[
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
@@ -95,7 +90,6 @@ def generate_launch_description():
     obstacle_detector_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_detector",
-        output="screen",
         remappings=[
             ("point_cloud", "point_cloud/filtered"),
         ],
@@ -112,18 +106,21 @@ def generate_launch_description():
     buoy_pair_finder_node = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="buoy_pair_finder.py",
-        output="screen",
     )
 
     protobuf_client_node = launch_ros.actions.Node(
         package="protobuf_client",
         executable="protobuf_client_node",
-        output="screen",
     )
 
     moos_to_controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="moos_to_controller",
+    )
+
+    onshore_node = launch_ros.actions.Node(
+        package="all_seaing_utility",
+        executable="onshore_node.py",
         output="screen",
     )
 
@@ -131,7 +128,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             "world": "practice_2023_follow_path2_task",
-            "urdf": f"{bringup_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
+            "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
         }.items(),
     )
 
@@ -150,6 +147,7 @@ def generate_launch_description():
             buoy_pair_finder_node,
             protobuf_client_node,
             moos_to_controller_node,
+            onshore_node,
             sim_ld,
         ]
     )

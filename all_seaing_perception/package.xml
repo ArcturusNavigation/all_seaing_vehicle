@@ -18,7 +18,6 @@
     <depend>tf2_ros</depend>
 
     <depend>all_seaing_interfaces</depend>
-    <depend>protobuf_client_interfaces</depend>
     <depend>geometry_msgs</depend>
     <depend>nav_msgs</depend>
     <depend>sensor_msgs</depend>
