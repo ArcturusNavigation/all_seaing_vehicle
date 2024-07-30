@@ -16,9 +16,9 @@ ObstacleBboxVisualizer::ObstacleBboxVisualizer() : Node("obstacle_bbox_visualize
     m_image_pub = this->create_publisher<sensor_msgs::msg::Image>("image/obstacle_visualized", 10);
 
     // Initialize synchronizer
-    m_sync = std::make_shared<Synchronizer>(SyncPolicy(10), m_image_sub, m_obstacle_map_sub);
+    m_sync = std::make_shared<Synchronizer>(SyncPolicy(10), m_image_sub, m_obstacle_map_sub, m_bbox_sub);
     m_sync->registerCallback(std::bind(&ObstacleBboxVisualizer::image_obstacle_cb, this,
-                                       std::placeholders::_1, std::placeholders::_2));
+                                       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
 
 ObstacleBboxVisualizer::~ObstacleBboxVisualizer() {}
@@ -49,20 +49,14 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
             
             // Draw centroid
             cv::circle(cv_ptr->image, pixel_centroid, 5, color, -1);
-            
-            // Draw bounding box
-            cv::Point2d pixel_min = m_cam_model.project3dToPixel(cv::Point3d(
-                obstacle.bounding_box.min.y, obstacle.bounding_box.min.z, -obstacle.bounding_box.min.x));
-            cv::Point2d pixel_max = m_cam_model.project3dToPixel(cv::Point3d(
-                obstacle.bounding_box.max.y, obstacle.bounding_box.max.z, -obstacle.bounding_box.max.x));
-            
-            cv::rectangle(cv_ptr->image, pixel_min, pixel_max, color, 2);
 
-            // Draw label
-            // cv::putText(cv_ptr->image, obstacle.label, 
-            //             cv::Point(pixel_centroid.x + 5, pixel_centroid.y - 5),
-            //             cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
         }
+    }
+
+    // draw the bounding boxes
+    for (const auto& bbox : in_bbox_msg->bounding_boxes) {
+        cv::Scalar color = get_color_for_label(bbox.label);
+        cv::rectangle(cv_ptr->image, (bbox.min_x, bbox.min_y), (bbox.max_x, bbox.max_y), color, 2);
     }
 
     m_image_pub->publish(*cv_ptr->toImageMsg());
@@ -73,7 +67,7 @@ void ObstacleBboxVisualizer::intrinsics_cb(const sensor_msgs::msg::CameraInfo::C
 }
 
 // label -> color hardcoded for now, parametrize later 
-cv::Scalar ObstacleBboxVisualizer::get_color_for_label(const std::string& label) {
+cv::Scalar ObstacleBboxVisualizer::get_color_for_label(const int& label) {
     switch (label) {
         case 0: // orange
             return cv::Scalar(0, 165, 255);
