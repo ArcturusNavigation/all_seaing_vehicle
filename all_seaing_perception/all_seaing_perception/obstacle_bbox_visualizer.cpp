@@ -36,6 +36,8 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
     }
 
     for (const auto& obstacle : in_map_msg->obstacles) {
+
+        // find the centroid and display it.
         cv::Point3d centroid(obstacle.local_point.point.y,
                              obstacle.local_point.point.z,
                              -obstacle.local_point.point.x);
@@ -57,9 +59,9 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
             cv::rectangle(cv_ptr->image, pixel_min, pixel_max, color, 2);
 
             // Draw label
-            cv::putText(cv_ptr->image, obstacle.label, 
-                        cv::Point(pixel_centroid.x + 5, pixel_centroid.y - 5),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
+            // cv::putText(cv_ptr->image, obstacle.label, 
+            //             cv::Point(pixel_centroid.x + 5, pixel_centroid.y - 5),
+            //             cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
         }
     }
 
@@ -70,10 +72,23 @@ void ObstacleBboxVisualizer::intrinsics_cb(const sensor_msgs::msg::CameraInfo::C
     m_cam_model.fromCameraInfo(info_msg);
 }
 
+// label -> color hardcoded for now, parametrize later 
 cv::Scalar ObstacleBboxVisualizer::get_color_for_label(const std::string& label) {
-    if (label == "boat") return cv::Scalar(0, 0, 255);  // Red
-    if (label == "buoy") return cv::Scalar(0, 255, 0);  // Green
-    return cv::Scalar(255, 0, 0);  // Blue (default)
+    switch (label) {
+        case 0: // orange
+            return cv::Scalar(0, 165, 255);
+        case 1: // red
+            return cv::Scalar(0, 0, 255);
+        case 2: // green
+            return cv::Scalar(0, 255, 0);
+        case 3: // black
+            return cv::Scalar(0, 0, 0);
+        case 4: // white
+            return cv::Scalar(255, 255, 255);
+        default: // blue
+            return cv::Scalar(255, 0, 0);
+
+    }
 }
 
 int main(int argc, char* argv[]) {
