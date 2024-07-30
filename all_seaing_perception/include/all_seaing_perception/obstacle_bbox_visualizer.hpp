@@ -10,6 +10,8 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
+#include "all_seaing_interfaces/msg/labeled_bounding_box_2d_array.hpp"
+
 
 class ObstacleBboxVisualizer : public rclcpp::Node {
 private:
@@ -39,10 +41,10 @@ private:
         const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr& in_bbox_msg);
 
     // Callback for camera info
-    void instrinsics_cb(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& info_msg);
+    void intrinsics_cb(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& info_msg);
 
     // Helper function to get color for label
-    cv::Scalar get_color_for_label(const std::string& label);
+    cv::Scalar get_color_for_label(const int& label);
 
 public:
     ObstacleBboxVisualizer();
