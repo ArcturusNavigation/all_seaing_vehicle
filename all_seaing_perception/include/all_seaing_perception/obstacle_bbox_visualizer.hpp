@@ -3,15 +3,18 @@
 
 #include <string>
 #include "rclcpp/rclcpp.hpp"
+
 #include "image_geometry/pinhole_camera_model.h"
+
 #include "message_filters/subscriber.h"
 #include "message_filters/sync_policies/approximate_time.h"
 #include "message_filters/synchronizer.h"
+
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
-#include "all_seaing_interfaces/msg/labeled_bounding_box_2d_array.hpp"
-
+#include "all_seaing_interfaces/msg/labeled_bounding_box2_d_array.hpp"
+#include <opencv2/opencv.hpp>
 
 class ObstacleBboxVisualizer : public rclcpp::Node {
 private:
@@ -30,9 +33,9 @@ private:
         sensor_msgs::msg::Image,
         all_seaing_interfaces::msg::ObstacleMap,
         all_seaing_interfaces::msg::LabeledBoundingBox2DArray>
-    > SyncPolicy;
-    typedef message_filters::Synchronizer<SyncPolicy> Synchronizer;
-    std::shared_ptr<Synchronizer> m_sync;
+        ObstacleBboxVisualizerPolicy;
+    typedef message_filters::Synchronizer<ObstacleBboxVisualizerPolicy> ObstacleBboxVisualizerSync;
+    std::shared_ptr<ObstacleBboxVisualizerSync> m_obstacle_bbox_visualizer_sync;
 
     // Callback for synchronized image and obstacle map
     void image_obstacle_cb(
