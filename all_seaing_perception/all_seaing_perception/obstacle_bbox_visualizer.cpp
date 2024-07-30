@@ -1,0 +1,84 @@
+#include "all_seaing_perception/obstacle_bbox_visualizer.hpp"
+
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/opencv.hpp>
+
+ObstacleBboxVisualizer::ObstacleBboxVisualizer() : Node("obstacle_bbox_visualizer") {
+    // Initialize subscribers
+    m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
+        "camera_info", 10,
+        std::bind(&ObstacleBboxVisualizer::intrinsics_cb, this, std::placeholders::_1));
+    m_image_sub.subscribe(this, "image", rmw_qos_profile_sensor_data);
+    m_obstacle_map_sub.subscribe(this, "obstacle_map/labeled", rmw_qos_profile_default);
+    m_bbox_sub.subscribe(this, "bounding_boxes", rmw_qos_profile_default);
+
+    // Initialize publisher
+    m_image_pub = this->create_publisher<sensor_msgs::msg::Image>("image/obstacle_visualized", 10);
+
+    // Initialize synchronizer
+    m_sync = std::make_shared<Synchronizer>(SyncPolicy(10), m_image_sub, m_obstacle_map_sub);
+    m_sync->registerCallback(std::bind(&ObstacleBboxVisualizer::image_obstacle_cb, this,
+                                       std::placeholders::_1, std::placeholders::_2));
+}
+
+ObstacleBboxVisualizer::~ObstacleBboxVisualizer() {}
+void ObstacleBboxVisualizer::image_obstacle_cb(
+    const sensor_msgs::msg::Image::ConstSharedPtr& in_img_msg,
+    const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr& in_map_msg,
+    const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr& in_bbox_msg) {
+
+    cv_bridge::CvImagePtr cv_ptr;
+    try {
+        cv_ptr = cv_bridge::toCvCopy(in_img_msg, sensor_msgs::image_encodings::BGR8);
+    } catch (cv_bridge::Exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+        return;
+    }
+
+    for (const auto& obstacle : in_map_msg->obstacles) {
+        cv::Point3d centroid(obstacle.local_point.point.y,
+                             obstacle.local_point.point.z,
+                             -obstacle.local_point.point.x);
+        cv::Point2d pixel_centroid = m_cam_model.project3dToPixel(centroid);
+
+        if (pixel_centroid.x >= 0 && pixel_centroid.x < cv_ptr->image.cols &&
+            pixel_centroid.y >= 0 && pixel_centroid.y < cv_ptr->image.rows) {
+            cv::Scalar color = get_color_for_label(obstacle.label);
+            
+            // Draw centroid
+            cv::circle(cv_ptr->image, pixel_centroid, 5, color, -1);
+            
+            // Draw bounding box
+            cv::Point2d pixel_min = m_cam_model.project3dToPixel(cv::Point3d(
+                obstacle.bounding_box.min.y, obstacle.bounding_box.min.z, -obstacle.bounding_box.min.x));
+            cv::Point2d pixel_max = m_cam_model.project3dToPixel(cv::Point3d(
+                obstacle.bounding_box.max.y, obstacle.bounding_box.max.z, -obstacle.bounding_box.max.x));
+            
+            cv::rectangle(cv_ptr->image, pixel_min, pixel_max, color, 2);
+
+            // Draw label
+            cv::putText(cv_ptr->image, obstacle.label, 
+                        cv::Point(pixel_centroid.x + 5, pixel_centroid.y - 5),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
+        }
+    }
+
+    m_image_pub->publish(*cv_ptr->toImageMsg());
+}
+
+void ObstacleBboxVisualizer::intrinsics_cb(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& info_msg) {
+    m_cam_model.fromCameraInfo(info_msg);
+}
+
+cv::Scalar ObstacleBboxVisualizer::get_color_for_label(const std::string& label) {
+    if (label == "boat") return cv::Scalar(0, 0, 255);  // Red
+    if (label == "buoy") return cv::Scalar(0, 255, 0);  // Green
+    return cv::Scalar(255, 0, 0);  // Blue (default)
+}
+
+int main(int argc, char* argv[]) {
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<ObstacleBboxVisualizer>());
+    rclcpp::shutdown();
+    return 0;
+}
