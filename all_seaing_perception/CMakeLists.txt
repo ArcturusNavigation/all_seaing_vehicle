@@ -25,6 +25,10 @@ ament_auto_add_executable(
     point_cloud_image_overlay
     ${PROJECT_NAME}/point_cloud_image_overlay.cpp
 )
+ament_auto_add_executable(
+    obstacle_bbox_visualizer
+    ${PROJECT_NAME}/obstacle_bbox_visualizer.cpp
+)
 
 install(TARGETS
     obstacle_detector
