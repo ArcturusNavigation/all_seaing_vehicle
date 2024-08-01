@@ -16,8 +16,8 @@ ObstacleBboxVisualizer::ObstacleBboxVisualizer() : Node("obstacle_bbox_visualize
     m_image_pub = this->create_publisher<sensor_msgs::msg::Image>("image/obstacle_visualized", 10);
 
     // Initialize synchronizer
-    m_sync = std::make_shared<Synchronizer>(SyncPolicy(10), m_image_sub, m_obstacle_map_sub, m_bbox_sub);
-    m_sync->registerCallback(std::bind(&ObstacleBboxVisualizer::image_obstacle_cb, this,
+    m_obstacle_bbox_visualizer_sync = std::make_shared<ObstacleBboxVisualizerSync>(ObstacleBboxVisualizerPolicy(10), m_image_sub, m_obstacle_map_sub, m_bbox_sub);
+    m_obstacle_bbox_visualizer_sync->registerCallback(std::bind(&ObstacleBboxVisualizer::image_obstacle_cb, this,
                                        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
 
@@ -54,9 +54,11 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
     }
 
     // draw the bounding boxes
-    for (const auto& bbox : in_bbox_msg->bounding_boxes) {
+    for (const auto& bbox : in_bbox_msg->boxes) {
         cv::Scalar color = get_color_for_label(bbox.label);
-        cv::rectangle(cv_ptr->image, (bbox.min_x, bbox.min_y), (bbox.max_x, bbox.max_y), color, 2);
+        cv::Point pt1(bbox.min_x, bbox.min_y);
+        cv::Point pt2(bbox.max_x, bbox.max_y);
+        cv::rectangle(cv_ptr->image, pt1, pt2, color, 2);
     }
 
     m_image_pub->publish(*cv_ptr->toImageMsg());
