@@ -10,6 +10,7 @@ import os
 def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
+
     keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
 
     bag_path = LaunchConfiguration("bag_path")

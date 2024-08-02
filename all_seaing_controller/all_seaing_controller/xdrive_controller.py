@@ -24,7 +24,7 @@ class DoNothingPID:
     def update_feedback_value(self, _):
         pass
 
-    def reset():
+    def reset(self):
         pass
 
 

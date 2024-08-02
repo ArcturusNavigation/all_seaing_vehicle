@@ -8,22 +8,14 @@ import os
 
 def generate_launch_description():
 
-    vrx_gz_prefix = get_package_share_directory("vrx_gz")
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     description_prefix = get_package_share_directory("all_seaing_description")
+    vrx_gz_prefix = get_package_share_directory("vrx_gz")
+
     localize_params = os.path.join(
         bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
     )
     keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
-
-    state_reporter_node = launch_ros.actions.Node(
-        package="all_seaing_navigation",
-        executable="nav_state_reporter",
-        remappings=[
-            ("imu/data", "/wamv/sensors/imu/imu/data"),
-            ("gps/fix", "/wamv/sensors/gps/gps/fix"),
-        ],
-    )
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -52,26 +44,6 @@ def generate_launch_description():
         parameters=[{"config_file_name": keyboard_params}],
     )
 
-    waypoint_sender_node = launch_ros.actions.Node(
-        package="all_seaing_navigation",
-        executable="waypoint_sender.py",
-        remappings=[("waypoints", "/vrx/wayfinding/waypoints")],
-        parameters=[
-            {"use_pose_array": True},
-            {"use_gps": True},
-        ],
-    )
-
-    protobuf_client_node = launch_ros.actions.Node(
-        package="protobuf_client",
-        executable="protobuf_client_node",
-    )
-
-    moos_to_controller_node = launch_ros.actions.Node(
-        package="all_seaing_controller",
-        executable="moos_to_controller",
-    )
-
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_utility",
         executable="onshore_node.py",
@@ -88,15 +60,11 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            state_reporter_node,
             ekf_node,
             navsat_node,
             controller_node,
             keyboard_node,
             keyboard_to_joy_node,
-            waypoint_sender_node,
-            protobuf_client_node,
-            moos_to_controller_node,
             onshore_node,
             sim_ld,
         ]

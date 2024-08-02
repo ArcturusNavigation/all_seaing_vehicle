@@ -13,12 +13,17 @@ def generate_launch_description():
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     description_prefix = get_package_share_directory("all_seaing_description")
+
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
     )
     keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
-    color_label_mappings = os.path.join(bringup_prefix, "config", "perception", "color_label_mappings.yaml")
-    color_ranges = os.path.join(bringup_prefix, "config", "perception", "color_ranges.yaml")
+    color_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+    )
+    color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "color_ranges.yaml"
+    )
 
     bag_path = LaunchConfiguration("bag_path")
     launch_rviz = LaunchConfiguration("launch_rviz")
@@ -43,16 +48,6 @@ def generate_launch_description():
         executable="navsat_transform_node",
         remappings=[("gps/fix", "/wamv/sensors/gps/gps/fix")],
         parameters=[robot_localization_params],
-    )
-
-    protobuf_client_node = launch_ros.actions.Node(
-        package="protobuf_client",
-        executable="protobuf_client_node",
-    )
-
-    moos_to_controller_node = launch_ros.actions.Node(
-        package="all_seaing_controller",
-        executable="moos_to_controller",
     )
 
     controller_node = launch_ros.actions.Node(
@@ -96,10 +91,12 @@ def generate_launch_description():
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ],
-        parameters=[{
-            "color_label_mappings_file": color_label_mappings,
-            "color_ranges_file": color_ranges,
-        }]
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+                "color_ranges_file": color_ranges,
+            }
+        ],
     )
 
     point_cloud_filter_node = launch_ros.actions.Node(
@@ -137,6 +134,9 @@ def generate_launch_description():
     rviz_node = launch_ros.actions.Node(
         package="rviz2",
         executable="rviz2",
+        parameters=[
+            {"use_sim_time": True},
+        ],
         arguments=[
             "-d",
             os.path.join(bringup_prefix, "rviz", "dashboard.rviz"),
@@ -144,10 +144,20 @@ def generate_launch_description():
         condition=IfCondition(launch_rviz),
     )
 
+    control_mux = launch_ros.actions.Node(
+        package="all_seaing_controller",
+        executable="control_mux.py",
+    )
+
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_utility",
         executable="onshore_node.py",
         output="screen",
+    )
+
+    waypoint_sender = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="waypoint_sender.py",
     )
 
     sim_ld = IncludeLaunchDescription(
@@ -165,8 +175,6 @@ def generate_launch_description():
             record_bag_launch_arg,
             ekf_node,
             navsat_node,
-            protobuf_client_node,
-            moos_to_controller_node,
             controller_node,
             rviz_testing_helper_node,
             keyboard_node,
@@ -176,7 +184,9 @@ def generate_launch_description():
             point_cloud_filter_node,
             obstacle_detector_node,
             rviz_node,
+            control_mux,
             onshore_node,
+            waypoint_sender,
             sim_ld,
         ]
     )

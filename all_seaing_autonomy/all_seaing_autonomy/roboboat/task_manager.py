@@ -86,7 +86,7 @@ class TaskManager(Node):
         self.state_message = ASV2State()
 
         self.control_message_publisher = self.create_publisher(
-            ControlMessage, "control_input", 10
+            ControlMessage, "control_options", 10
         )
 
         self.TASK_LIST = [

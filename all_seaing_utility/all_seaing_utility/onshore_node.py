@@ -17,8 +17,10 @@ class OnshoreNode(Node):
 
         self.control_message = ControlMessage()
         self.control_input_publisher = self.create_publisher(
-            ControlMessage, "control_input", 10
+            ControlMessage, "control_options", 10
         )
+        self.control_message.priority = 1
+        self.control_message.state = ControlMessage.TELEOP
         self.control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
         self.control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
 
@@ -34,7 +36,7 @@ class OnshoreNode(Node):
 
         self.heartbeat_timer = self.create_timer(
             HEART_RATE, self.beat_heart
-        )  # start the output loop
+        )
 
         self.enter_held = False
 

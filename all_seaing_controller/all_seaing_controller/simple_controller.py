@@ -9,7 +9,7 @@ class SimpleController(Node):
     def __init__(self):
         super().__init__("simple_controller")
 
-        # scaling MOOS thrust/rudder from -100:100
+        # scaling thrust/rudder
         self.declare_parameter("linear_scaling", rclpy.Parameter.Type.DOUBLE)
         self.declare_parameter("angular_scaling", rclpy.Parameter.Type.DOUBLE)
         self.declare_parameter("lower_thrust_limit", rclpy.Parameter.Type.DOUBLE)
@@ -19,9 +19,13 @@ class SimpleController(Node):
         self.lower_thrust_limit = self.get_parameter("lower_thrust_limit").value
         self.upper_thrust_limit = self.get_parameter("upper_thrust_limit").value
 
-        # publishers (remap left_thrust and right_thrust in launch file to appropriate topics)
-        self.left_thrust_pub = self.create_publisher(Float64, "thrusters/left/thrust", 10)
-        self.right_thrust_pub = self.create_publisher(Float64, "thrusters/right/thrust", 10)
+        # publishers
+        self.left_thrust_pub = self.create_publisher(
+            Float64, "thrusters/left/thrust", 10
+        )
+        self.right_thrust_pub = self.create_publisher(
+            Float64, "thrusters/right/thrust", 10
+        )
 
         # subscribers
         self.command_sub = self.create_subscription(
@@ -51,9 +55,13 @@ class SimpleController(Node):
         self.right_thrust_pub.publish(right_thrust_msg)
 
 
-if __name__ == "__main__":
+def main():
     rclpy.init()
     simple_controller = SimpleController()
     rclpy.spin(simple_controller)
     simple_controller.destroy_node()
     rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
