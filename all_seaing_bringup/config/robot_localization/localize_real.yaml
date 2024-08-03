@@ -4,7 +4,7 @@ ekf_filter_node:
     sensor_timeout: 0.1
     two_d_mode: true
     transform_time_offset: 0.0
-    print_diagnostics: true
+    print_diagnostics: false
     debug: false
 
     odom_frame: odom
@@ -27,7 +27,7 @@ ekf_filter_node:
     imu0_queue_size: 10
     imu0_remove_gravitational_acceleration: true
 
-    odom0: odometry/gps
+    odom0: /odometry/gps
     odom0_config:
       [
         true,  true,  true,
@@ -87,8 +87,8 @@ navsat_transform_node:
     magnetic_declination_radians: 0.0
     yaw_offset: 0.0
     zero_altitude: true
-    broadcast_utm_transform: true
-    publish_filtered_gps: true
+    broadcast_cartesian_transform: true
+    publish_filtered_gps: false
     use_odometry_yaw: false
     wait_for_datum: true
     datum: [42.3599, -71.1046, 0.0]
