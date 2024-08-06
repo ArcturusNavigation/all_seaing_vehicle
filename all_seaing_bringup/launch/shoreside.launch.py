@@ -22,7 +22,7 @@ def generate_launch_description():
         "launch_rviz", default_value="true", choices=["true", "false"]
     )
     record_bag_launch_arg = DeclareLaunchArgument(
-        "record_bag", default_value="true", choices=["true", "false"]
+        "record_bag", default_value="false", choices=["true", "false"]
     )
 
     rviz_testing_helper_node = launch_ros.actions.Node(
