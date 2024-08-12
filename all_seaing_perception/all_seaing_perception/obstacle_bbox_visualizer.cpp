@@ -2,6 +2,8 @@
 
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
+#include "geometry_msgs/msg/point.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 ObstacleBboxVisualizer::ObstacleBboxVisualizer() : Node("obstacle_bbox_visualizer") {
 
@@ -48,11 +50,11 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
     for (const auto& obstacle : in_map_msg->obstacles) {
 
         // transform the lidar point to camera frame
-        geometry_msgs::msg::PointStamped lidar_point;
+        geometry_msgs::msg::Point lidar_point;
         lidar_point.x = obstacle.local_point.point.x;
         lidar_point.y = obstacle.local_point.point.y;
         lidar_point.z = obstacle.local_point.point.z;
-        geometry_msgs::msg::PointStamped camera_point;
+        geometry_msgs::msg::Point camera_point;
         tf2::doTransform(lidar_point, camera_point, m_pc_cam_tf);
 
         // find the centroid and display it.
