@@ -29,7 +29,6 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
     geometry_msgs::msg::TransformStamped m_pc_cam_tf;
-    bool m_viz;
     bool m_pc_cam_tf_ok;
 
     // Camera model
