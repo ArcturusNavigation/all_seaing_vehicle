@@ -25,6 +25,13 @@ private:
     message_filters::Subscriber<all_seaing_interfaces::msg::ObstacleMap> m_obstacle_map_sub;
     message_filters::Subscriber<all_seaing_interfaces::msg::LabeledBoundingBox2DArray> m_bbox_sub;
 
+    // Transform variables
+    std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+    geometry_msgs::msg::TransformStamped m_pc_cam_tf;
+    bool m_viz;
+    bool m_pc_cam_tf_ok;
+
     // Camera model
     image_geometry::PinholeCameraModel m_cam_model;
 
@@ -48,6 +55,9 @@ private:
 
     // Helper function to get color for label
     cv::Scalar get_color_for_label(const int& label);
+
+    geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
+                                                 const std::string &in_src_frame);
 
 public:
     ObstacleBboxVisualizer();
