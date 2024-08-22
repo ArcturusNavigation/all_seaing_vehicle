@@ -155,6 +155,7 @@ def generate_launch_description():
         launch_arguments={
             "world": "sydney_regatta",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
+            "extra_gz_args": "-v 0",
         }.items(),
     )
 
