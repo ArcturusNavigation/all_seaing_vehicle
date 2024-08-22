@@ -278,6 +278,7 @@
       </material>
     </visual>
     <sensor name="contact_sensor" type="contact">
+      <gz_frame_id>wamv/wamv/base_link</gz_frame_id>
       <contact>
         <!-- collisions are renamed during urdf -> sdf fixed joint lumping -->
         <collision>wamv/base_link_fixed_joint_lump__top_base_collision_24</collision>
@@ -635,6 +636,7 @@
       </material>
     </visual>
     <sensor name="front_left_camera_sensor" type="camera">
+      <gz_frame_id>wamv/wamv/front_left_camera_link</gz_frame_id>
       <update_rate>30.0</update_rate>
       <camera name="front_left_camera_camera">
         <horizontal_fov>1.3962634</horizontal_fov>
@@ -769,6 +771,7 @@
       </material>
     </visual>
     <sensor name="front_right_camera_sensor" type="camera">
+      <gz_frame_id>wamv/wamv/front_right_camera_link</gz_frame_id>
       <update_rate>30.0</update_rate>
       <camera name="front_right_camera_camera">
         <horizontal_fov>1.3962634</horizontal_fov>
@@ -903,6 +906,7 @@
       </material>
     </visual>
     <sensor name="far_left_camera_sensor" type="camera">
+      <gz_frame_id>wamv/wamv/far_left_camera_link</gz_frame_id>
       <update_rate>30.0</update_rate>
       <camera name="far_left_camera_camera">
         <horizontal_fov>1.3962634</horizontal_fov>
@@ -958,6 +962,7 @@
   </joint>
   <gazebo reference="wamv/gps_wamv_link">
     <sensor name="navsat" type="navsat">
+      <gz_frame_id>wamv/wamv/gps_wamv_link</gz_frame_id>
       <always_on>1</always_on>
       <update_rate>20</update_rate>
       <!--<topic>${namespace}/${sensor_namespace}gps/gps/fix</topic>-->
@@ -995,6 +1000,7 @@
   </joint>
   <gazebo reference="wamv/imu_wamv_link">
     <sensor name="imu_wamv_sensor" type="imu">
+      <gz_frame_id>wamv/wamv/imu_wamv_link</gz_frame_id>
       <update_rate>100</update_rate>
       <imu>
         <angular_velocity>
@@ -1164,6 +1170,7 @@
       </material>
     </visual>
     <sensor name="lidar_wamv_sensor" type="gpu_ray">
+      <gz_frame_id>wamv/wamv/lidar_wamv_link</gz_frame_id>
       <update_rate>10</update_rate>
       <ray>
         <scan>
