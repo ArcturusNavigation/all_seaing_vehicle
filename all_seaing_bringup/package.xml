@@ -17,6 +17,7 @@
     <depend>all_seaing_navigation</depend>
     <depend>all_seaing_perception</depend>
     <depend>all_seaing_utility</depend>
+    <depend>rviz_satellite</depend>
 
     <export>
         <build_type>ament_cmake</build_type>
