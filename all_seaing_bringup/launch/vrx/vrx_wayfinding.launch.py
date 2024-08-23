@@ -83,6 +83,7 @@ def generate_launch_description():
         launch_arguments={
             "world": "wayfinding_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
+            "extra_gz_args": "-v 0",
         }.items(),
     )
 
