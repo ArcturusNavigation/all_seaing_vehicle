@@ -111,11 +111,10 @@ class XDriveController(Node):
         """
         Initialize the controller.
         """
-        super().__init__("xdrive_controller")  # initialize ROS2
+        super().__init__("xdrive_controller")
 
-        self.declare_parameter("in_sim", False)
-        self.in_sim = bool(self.get_parameter("in_sim").value)
-        #self.get_logger().info(f"in sim: {self.in_sim}")
+        self.in_sim = self.declare_parameter(
+            "in_sim", False).get_parameter_value().bool_value
 
         l = 3.5 if self.in_sim else 0.7112  # BOAT LENGTH
         w = 2 if self.in_sim else 0.2540  # BOAT WIDTH
@@ -323,7 +322,7 @@ class XDriveController(Node):
         """
         if msg.e_stopped:
             self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
-            raise Exception("received e-stop message! killing node")
+            raise Exception("Received e-stop message! Killing node")
         self.last_heartbeat_timestamp = self.get_time()
 
     def get_thrust_values(self, tx, ty, tn):
@@ -421,7 +420,7 @@ class XDriveController(Node):
             > self.required_heartbeat_recentness
         ):
             self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
-            raise Exception("lost heartbeat! killing node")
+            raise Exception("Lost heartbeat! Killing node")
         if self.last_update_timestamp is not None:
             dt = self.time_diff(current_time, self.last_update_timestamp)
             x_output = 0
