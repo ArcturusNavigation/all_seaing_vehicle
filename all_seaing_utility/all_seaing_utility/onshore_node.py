@@ -16,10 +16,7 @@ class OnshoreNode(Node):
         super().__init__("onshore_node")
 
         self.control_message = ControlMessage()
-        self.control_input_publisher = self.create_publisher(
-            ControlMessage, "control_options", 10
-        )
-        self.control_message.priority = 1
+        self.control_message.priority = 1 # TODO: Probably also parameterize this
         self.control_message.state = ControlMessage.TELEOP
         self.control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
         self.control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
@@ -29,16 +26,17 @@ class OnshoreNode(Node):
         self.heartbeat_message.in_teleop = True
         self.heartbeat_message.e_stopped = False
 
-        # Setup subscriber
+        self.enter_held = False
+
+        self.control_input_publisher = self.create_publisher(
+            ControlMessage, "control_options", 10
+        )
         self.joy_control_sub = self.create_subscription(
             Joy, "/joy", self.keyboard_callback, 10
         )
-
         self.heartbeat_timer = self.create_timer(
             HEART_RATE, self.beat_heart
         )
-
-        self.enter_held = False
 
         self.get_logger().info("Starting onshore node, teleop enabled")
 
@@ -49,19 +47,24 @@ class OnshoreNode(Node):
         if self.heartbeat_message.e_stopped:
             self.get_logger().fatal("ASV is e-stopped!")
             return
+
         if msg.buttons[0]:
             self.get_logger().info("E-stop pressed!")
             self.heartbeat_message.e_stopped = True
+            self.heartbeat_publisher.publish(self.heartbeat_message)
             return
+
         if msg.buttons[1]:
             if not self.enter_held:
                 self.enter_held = True
                 self.heartbeat_message.in_teleop = not self.heartbeat_message.in_teleop
+                self.heartbeat_publisher.publish(self.heartbeat_message)
                 self.get_logger().info(
                     f"Toggled teleop (now {self.heartbeat_message.in_teleop})"
                 )
         elif self.enter_held:
             self.enter_held = False
+
         if self.heartbeat_message.in_teleop:
             # TODO: Parameterize values here
             self.control_message.y = msg.axes[0] * -2.0
@@ -71,7 +74,6 @@ class OnshoreNode(Node):
 
 
 def main(args=None):
-    # Start node, and spin
     rclpy.init(args=args)
     node = OnshoreNode()
     rclpy.spin(node)
