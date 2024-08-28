@@ -40,7 +40,10 @@ def generate_launch_description():
     keyboard_to_joy_node = launch_ros.actions.Node(
         package="keyboard",
         executable="keyboard_to_joy.py",
-        parameters=[{"config_file_name": keyboard_params}],
+        parameters=[
+            {"config_file_name": keyboard_params},
+            {"sampling_frequency": 60},
+        ],
     )
 
     rviz_node = launch_ros.actions.Node(
