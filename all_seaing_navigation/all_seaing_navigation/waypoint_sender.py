@@ -2,53 +2,57 @@
 import rclpy
 
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import PoseArray
-from protobuf_client_interfaces.msg import Gateway
+from all_seaing_interfaces.msg import ControlMessage
+from geometry_msgs.msg import PointStamped
+from nav_msgs.msg import Odometry
 
 
 class WaypointSender(Node):
 
     def __init__(self):
         super().__init__("waypoint_sender")
+        self.goal_threshold = self.declare_parameter(
+            "goal_threshold", 0.5).get_parameter_value().double_value
 
-        # True is using PoseArray, False if using PoseStamped
-        self.declare_parameter("use_pose_array", True)
-        self.use_pose_array = bool(self.get_parameter("use_pose_array").value)
+        self.is_running = False
 
-        # True if using GPS, False if using local UTM
-        self.declare_parameter("use_gps", True)
-        self.use_gps = bool(self.get_parameter("use_gps").value)
+        self.control_msg = ControlMessage()
+        self.control_msg.priority = 0
+        self.control_msg.state = ControlMessage.TELEOP
+        self.control_msg.linear_control_mode = ControlMessage.WORLD_POSITION
+        self.control_msg.angular_control_mode = ControlMessage.WORLD_POSITION
+        self.control_msg.angular = 0.0
 
-        # Subscribers and publishers
-        self.subscription = self.create_subscription(
-            PoseArray if self.use_pose_array else PoseStamped,
-            "waypoints",
-            self.wpt_cb,
-            10,
+        self.nav_x = 0.0
+        self.nav_y = 0.0
+
+        self.point_sub = self.create_subscription(
+            PointStamped, "/clicked_point", self.point_callback, 10
         )
-        self.publisher = self.create_publisher(Gateway, "/send_to_gateway", 10)
+        self.odom_sub = self.create_subscription(
+            Odometry, "odometry/filtered", self.odom_callback, 10
+        )
+        self.control_pub = self.create_publisher(
+            ControlMessage, "control_options", 10
+        )
+        self.timer = self.create_timer(1/60, self.timer_callback)
 
-    def wpt_cb(self, msg):
+    
+    def point_callback(self, msg: PointStamped):
+        self.control_msg.x = msg.point.x
+        self.control_msg.y = msg.point.y
+        self.is_running = True
 
-        # Set up in_msg based on different message types
-        in_msg = PoseArray()
-        if self.use_pose_array:
-            in_msg = msg
-        else:
-            in_msg.header = msg.header
-            in_msg.poses.append(msg.pose)
-
-        # Parse waypoint(s) to send to MOOS
-        wpt_msg = Gateway()
-        inner_string = "" if self.use_gps else "points="
-        for i, pose in enumerate(in_msg.poses):
-            inner_string += f"{pose.position.x},{pose.position.y}"
-            if i < len(in_msg.poses) - 1:
-                inner_string += ":"
-        wpt_msg.gateway_key = "WPT_UPDATE_GPS" if self.use_gps else "WPT_UPDATE"
-        wpt_msg.gateway_string = inner_string
-        self.publisher.publish(wpt_msg)
+    def odom_callback(self, msg: Odometry):
+        self.nav_x = msg.pose.pose.position.x
+        self.nav_y = msg.pose.pose.position.y
+    
+    def timer_callback(self):
+        if self.is_running:
+            if (abs(self.nav_x - self.control_msg.x) < self.goal_threshold and
+                abs(self.nav_y - self.control_msg.y) < self.goal_threshold):
+                self.is_running = False
+            self.control_pub.publish(self.control_msg)
 
 
 def main(args=None):

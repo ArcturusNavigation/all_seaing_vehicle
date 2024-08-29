@@ -74,7 +74,7 @@ def main():
     )
     args = parser.parse_args()
 
-    convert(input_path=args.input, topic=args.topic, output_path=args.output)
+    convert(input_path=args.input, input_topic=args.topic, output_path=args.output)
 
 
 if __name__ == "__main__":

@@ -3,9 +3,10 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Global Options1
       Splitter Ratio: 0.5
-    Tree Height: 653
+    Tree Height: 853
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -62,142 +63,12 @@ Visualization Manager:
         Value: /gps/filtered
       Value: true
       Zoom: 16
-    - Class: rviz_default_plugins/TF
-      Enabled: true
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-        odom:
-          Value: true
-        utm:
-          Value: true
-        wamv/wamv/back_left_engine_link:
-          Value: true
-        wamv/wamv/back_left_propeller_link:
-          Value: true
-        wamv/wamv/back_right_engine_link:
-          Value: true
-        wamv/wamv/back_right_propeller_link:
-          Value: true
-        wamv/wamv/ball_shooter_base_link:
-          Value: true
-        wamv/wamv/ball_shooter_launcher_link:
-          Value: true
-        wamv/wamv/base_link:
-          Value: true
-        wamv/wamv/cpu_cases_link:
-          Value: true
-        wamv/wamv/far_left_camera_link:
-          Value: true
-        wamv/wamv/far_left_camera_link_optical:
-          Value: true
-        wamv/wamv/far_left_camera_post_arm_link:
-          Value: true
-        wamv/wamv/far_left_camera_post_link:
-          Value: true
-        wamv/wamv/front_left_camera_link:
-          Value: true
-        wamv/wamv/front_left_camera_link_optical:
-          Value: true
-        wamv/wamv/front_left_camera_post_arm_link:
-          Value: true
-        wamv/wamv/front_left_camera_post_link:
-          Value: true
-        wamv/wamv/front_left_engine_link:
-          Value: true
-        wamv/wamv/front_left_propeller_link:
-          Value: true
-        wamv/wamv/front_right_camera_link:
-          Value: true
-        wamv/wamv/front_right_camera_link_optical:
-          Value: true
-        wamv/wamv/front_right_camera_post_arm_link:
-          Value: true
-        wamv/wamv/front_right_camera_post_link:
-          Value: true
-        wamv/wamv/front_right_engine_link:
-          Value: true
-        wamv/wamv/front_right_propeller_link:
-          Value: true
-        wamv/wamv/gps_wamv_link:
-          Value: true
-        wamv/wamv/imu_wamv_link:
-          Value: true
-        wamv/wamv/left_battery_link:
-          Value: true
-        wamv/wamv/lidar_wamv_link:
-          Value: true
-        wamv/wamv/lidar_wamv_post_arm_link:
-          Value: true
-        wamv/wamv/lidar_wamv_post_link:
-          Value: true
-        wamv/wamv/receiver:
-          Value: true
-        wamv/wamv/right_battery_link:
-          Value: true
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: false
-      Tree:
-        odom:
-          utm:
-            {}
-          wamv/wamv/base_link:
-            wamv/wamv/back_left_engine_link:
-              wamv/wamv/back_left_propeller_link:
-                {}
-            wamv/wamv/back_right_engine_link:
-              wamv/wamv/back_right_propeller_link:
-                {}
-            wamv/wamv/ball_shooter_base_link:
-              wamv/wamv/ball_shooter_launcher_link:
-                {}
-            wamv/wamv/cpu_cases_link:
-              {}
-            wamv/wamv/far_left_camera_post_link:
-              wamv/wamv/far_left_camera_post_arm_link:
-                wamv/wamv/far_left_camera_link:
-                  wamv/wamv/far_left_camera_link_optical:
-                    {}
-            wamv/wamv/front_left_camera_post_link:
-              wamv/wamv/front_left_camera_post_arm_link:
-                wamv/wamv/front_left_camera_link:
-                  wamv/wamv/front_left_camera_link_optical:
-                    {}
-            wamv/wamv/front_left_engine_link:
-              wamv/wamv/front_left_propeller_link:
-                {}
-            wamv/wamv/front_right_camera_post_link:
-              wamv/wamv/front_right_camera_post_arm_link:
-                wamv/wamv/front_right_camera_link:
-                  wamv/wamv/front_right_camera_link_optical:
-                    {}
-            wamv/wamv/front_right_engine_link:
-              wamv/wamv/front_right_propeller_link:
-                {}
-            wamv/wamv/gps_wamv_link:
-              {}
-            wamv/wamv/imu_wamv_link:
-              {}
-            wamv/wamv/left_battery_link:
-              {}
-            wamv/wamv/lidar_wamv_post_link:
-              wamv/wamv/lidar_wamv_post_arm_link:
-                wamv/wamv/lidar_wamv_link:
-                  {}
-            wamv/wamv/receiver:
-              {}
-            wamv/wamv/right_battery_link:
-              {}
-      Update Interval: 0
-      Value: true
     - Class: all_seaing_interfaces/msg/ObstacleMap
       Enabled: true
       Name: ObstacleMap
       Namespaces:
-        {}
+        labeled: true
+        labeled_text: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -205,6 +76,189 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /obstacle_map/labeled
       Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /wamv/robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        wamv/back_left_engine_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/back_left_propeller_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/back_right_engine_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/back_right_propeller_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/ball_shooter_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/ball_shooter_launcher_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/cpu_cases_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/far_left_camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/far_left_camera_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        wamv/far_left_camera_post_arm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/far_left_camera_post_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_left_camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_left_camera_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        wamv/front_left_camera_post_arm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_left_camera_post_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_left_engine_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_left_propeller_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_right_camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_right_camera_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        wamv/front_right_camera_post_arm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_right_camera_post_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_right_engine_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/front_right_propeller_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/gps_wamv_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/imu_wamv_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/left_battery_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/lidar_wamv_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/lidar_wamv_post_arm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/lidar_wamv_post_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/receiver:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wamv/right_battery_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Mass Properties:
+        Inertia: false
+        Mass: false
+      Name: RobotModel
+      TF Prefix: /wamv
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -251,33 +305,33 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 28.726882934570312
+      Distance: 48.98637390136719
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.511256694793701
-        Y: 1.9801838397979736
-        Z: 6.4158616065979
+        X: 1.4723106622695923
+        Y: 20.452299118041992
+        Z: 3.638838291168213
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.37039804458618164
+      Pitch: 0.5203973650932312
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.613579273223877
+      Yaw: 4.648567199707031
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 944
+  Height: 1137
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd00000004000000000000016d00000316fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003b00000316000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c000002610000000100000100000003d7fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003b000003d7000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007780000003efc0100000002fb0000000800540069006d00650100000000000007780000025300fffffffb0000000800540069006d00650100000000000004500000000000000000000006050000031600000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000156000003defc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003b000003de000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c000002610000000100000100000003d7fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003b000003d7000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000003a800000037fc0100000002fb0000000800540069006d00650100000000000003a80000025300fffffffb0000000800540069006d006501000000000000045000000000000000000000024c000003de00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -286,6 +340,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1912
-  X: 0
-  Y: 0
+  Width: 936
+  X: 965
+  Y: 44
