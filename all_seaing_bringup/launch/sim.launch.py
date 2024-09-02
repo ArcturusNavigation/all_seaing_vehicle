@@ -150,10 +150,13 @@ def generate_launch_description():
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="control_mux.py",
+        parameters=[
+            {"goal_threshold": 1.0},
+        ],
     )
 
     onshore_node = launch_ros.actions.Node(
-        package="all_seaing_utility",
+        package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
     )

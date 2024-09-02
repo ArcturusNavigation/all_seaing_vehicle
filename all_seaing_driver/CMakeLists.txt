@@ -10,6 +10,7 @@ ament_auto_find_build_dependencies()
 
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
+    ${PROJECT_NAME}/onshore_node.py
     ${PROJECT_NAME}/thrust_commander.py
     ${PROJECT_NAME}/webcam_publisher.py
     ${PROJECT_NAME}/webcam_splitter.py
