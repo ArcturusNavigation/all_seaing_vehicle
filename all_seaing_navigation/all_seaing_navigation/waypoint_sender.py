@@ -12,7 +12,7 @@ class WaypointSender(Node):
     def __init__(self):
         super().__init__("waypoint_sender")
         self.goal_threshold = self.declare_parameter(
-            "goal_threshold", 0.5).get_parameter_value().double_value
+            "goal_threshold", 1.0).get_parameter_value().double_value
 
         self.is_running = False
 
