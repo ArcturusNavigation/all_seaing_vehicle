@@ -1,0 +1,15 @@
+# Request
+float64 xy_threshold
+float64 theta_threshold
+float64 x
+float64 y
+float64 theta
+bool ignore_theta
+---
+# Result
+bool is_finished
+---
+# Feedback
+float64 x
+float64 y
+float64 theta

@@ -1,8 +1,4 @@
-uint8 TELEOP = 0
-uint8 AUTONOMOUS = 1
-
 uint8 priority
-uint8 state
 
 uint8 OFF = 0
 uint8 WORLD_POSITION = 1
