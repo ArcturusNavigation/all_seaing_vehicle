@@ -9,6 +9,7 @@ find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+    "action/Waypoint.action"
     "msg/ObstacleMap.msg"
     "msg/Obstacle.msg"
     "msg/ControlMessage.msg"
@@ -17,8 +18,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/Heartbeat.msg"
     "msg/ASV2State.msg"
     DEPENDENCIES
-    std_msgs
-    sensor_msgs
     geometry_msgs
 )
 

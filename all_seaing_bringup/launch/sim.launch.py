@@ -150,9 +150,12 @@ def generate_launch_description():
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="control_mux.py",
-        parameters=[
-            {"goal_threshold": 1.0},
-        ],
+    )
+
+    controller_server = launch_ros.actions.Node(
+        package="all_seaing_controller",
+        executable="controller_server.py",
+        output="screen",
     )
 
     onshore_node = launch_ros.actions.Node(
@@ -164,6 +167,11 @@ def generate_launch_description():
     waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="waypoint_sender.py",
+        parameters=[
+            {"xy_threshold": 1.0},
+            {"theta_threshold": 5.0},
+        ],
+        output="screen",
     )
 
     sim_ld = IncludeLaunchDescription(
@@ -192,6 +200,7 @@ def generate_launch_description():
             obstacle_detector_node,
             rviz_node,
             control_mux,
+            controller_server,
             onshore_node,
             waypoint_sender,
             sim_ld,

@@ -64,6 +64,22 @@ def generate_launch_description():
         )
     )
 
+    controller_server = launch_ros.actions.Node(
+        package="all_seaing_controller",
+        executable="controller_server.py",
+        output="screen",
+    )
+
+    waypoint_sender = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="waypoint_sender.py",
+        parameters=[
+            {"xy_threshold": 1.0},
+            {"theta_threshold": 5.0},
+        ],
+        output="screen",
+    )
+
     zed_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -78,6 +94,8 @@ def generate_launch_description():
             ekf_node,
             navsat_node,
             controller_node,
+            controller_server,
+            waypoint_sender,
             thrust_commander_node,
             lidar_ld,
             mavros_ld,

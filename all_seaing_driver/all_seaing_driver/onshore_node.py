@@ -15,12 +15,6 @@ class OnshoreNode(Node):
     def __init__(self):
         super().__init__("onshore_node")
 
-        self.control_message = ControlMessage()
-        self.control_message.priority = 1 # TODO: Probably also parameterize this
-        self.control_message.state = ControlMessage.TELEOP
-        self.control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
-        self.control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
-
         self.heartbeat_message = Heartbeat()
         self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
         self.heartbeat_message.in_teleop = True
@@ -42,6 +36,16 @@ class OnshoreNode(Node):
 
     def beat_heart(self):
         self.heartbeat_publisher.publish(self.heartbeat_message)
+    
+    def send_controls(self, x, y, angular):
+        control_message = ControlMessage()
+        control_message.priority = 0
+        control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
+        control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
+        control_message.x = x
+        control_message.y = y
+        control_message.angular = angular
+        self.control_input_publisher.publish(control_message)
 
     def keyboard_callback(self, msg):
         if self.heartbeat_message.e_stopped:
@@ -66,12 +70,11 @@ class OnshoreNode(Node):
             self.enter_held = False
 
         if self.heartbeat_message.in_teleop:
-            # TODO: Parameterize values here
-            self.control_message.y = msg.axes[0] * -2.0
-            self.control_message.x = msg.axes[1] * 2.0
-            self.control_message.angular = msg.axes[2] * -0.8
-            self.control_input_publisher.publish(self.control_message)
-
+            self.send_controls(
+                msg.axes[1] * 2.0,
+                msg.axes[0] * -2.0,
+                msg.axes[2] * -0.8
+            )
 
 def main(args=None):
     rclpy.init(args=args)
