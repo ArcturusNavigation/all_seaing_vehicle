@@ -9,6 +9,7 @@ import os
 def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
+
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "robot_localization", "localize_real.yaml"
     )
@@ -63,6 +64,22 @@ def generate_launch_description():
         )
     )
 
+    controller_server = launch_ros.actions.Node(
+        package="all_seaing_controller",
+        executable="controller_server.py",
+        output="screen",
+    )
+
+    waypoint_sender = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="waypoint_sender.py",
+        parameters=[
+            {"xy_threshold": 1.0},
+            {"theta_threshold": 5.0},
+        ],
+        output="screen",
+    )
+
     zed_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -77,6 +94,8 @@ def generate_launch_description():
             ekf_node,
             navsat_node,
             controller_node,
+            controller_server,
+            waypoint_sender,
             thrust_commander_node,
             lidar_ld,
             mavros_ld,

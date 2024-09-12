@@ -10,6 +10,7 @@ import os
 def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
+
     keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
 
     bag_path = LaunchConfiguration("bag_path")
@@ -21,7 +22,7 @@ def generate_launch_description():
         "launch_rviz", default_value="true", choices=["true", "false"]
     )
     record_bag_launch_arg = DeclareLaunchArgument(
-        "record_bag", default_value="true", choices=["true", "false"]
+        "record_bag", default_value="false", choices=["true", "false"]
     )
 
     rviz_testing_helper_node = launch_ros.actions.Node(
@@ -39,7 +40,10 @@ def generate_launch_description():
     keyboard_to_joy_node = launch_ros.actions.Node(
         package="keyboard",
         executable="keyboard_to_joy.py",
-        parameters=[{"config_file_name": keyboard_params}],
+        parameters=[
+            {"config_file_name": keyboard_params},
+            {"sampling_frequency": 60},
+        ],
     )
 
     rviz_node = launch_ros.actions.Node(
@@ -53,7 +57,7 @@ def generate_launch_description():
     )
 
     onshore_node = launch_ros.actions.Node(
-        package="all_seaing_utility",
+        package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
     )

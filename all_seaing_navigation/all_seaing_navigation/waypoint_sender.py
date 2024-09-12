@@ -1,54 +1,43 @@
 #!/usr/bin/env python3
 import rclpy
 
+from rclpy.action import ActionClient
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import PoseArray
-from protobuf_client_interfaces.msg import Gateway
+
+from all_seaing_interfaces.action import Waypoint
+from geometry_msgs.msg import PointStamped
 
 
 class WaypointSender(Node):
 
     def __init__(self):
         super().__init__("waypoint_sender")
-
-        # True is using PoseArray, False if using PoseStamped
-        self.declare_parameter("use_pose_array", True)
-        self.use_pose_array = bool(self.get_parameter("use_pose_array").value)
-
-        # True if using GPS, False if using local UTM
-        self.declare_parameter("use_gps", True)
-        self.use_gps = bool(self.get_parameter("use_gps").value)
-
-        # Subscribers and publishers
-        self.subscription = self.create_subscription(
-            PoseArray if self.use_pose_array else PoseStamped,
-            "waypoints",
-            self.wpt_cb,
-            10,
+        self.xy_threshold = (
+            self.declare_parameter("xy_threshold", 1.0)
+            .get_parameter_value()
+            .double_value
         )
-        self.publisher = self.create_publisher(Gateway, "/send_to_gateway", 10)
+        self.theta_threshold = (
+            self.declare_parameter("theta_threshold", 5.0)
+            .get_parameter_value()
+            .double_value
+        )
 
-    def wpt_cb(self, msg):
+        self.action_client = ActionClient(self, Waypoint, "waypoint")
+        self.point_sub = self.create_subscription(
+            PointStamped, "/clicked_point", self.point_callback, 10
+        )
 
-        # Set up in_msg based on different message types
-        in_msg = PoseArray()
-        if self.use_pose_array:
-            in_msg = msg
-        else:
-            in_msg.header = msg.header
-            in_msg.poses.append(msg.pose)
+    def point_callback(self, msg: PointStamped):
+        goal_msg = Waypoint.Goal()
+        goal_msg.xy_threshold = self.xy_threshold
+        goal_msg.theta_threshold = self.theta_threshold
+        goal_msg.x = msg.point.x
+        goal_msg.y = msg.point.y
+        goal_msg.ignore_theta = True
 
-        # Parse waypoint(s) to send to MOOS
-        wpt_msg = Gateway()
-        inner_string = "" if self.use_gps else "points="
-        for i, pose in enumerate(in_msg.poses):
-            inner_string += f"{pose.position.x},{pose.position.y}"
-            if i < len(in_msg.poses) - 1:
-                inner_string += ":"
-        wpt_msg.gateway_key = "WPT_UPDATE_GPS" if self.use_gps else "WPT_UPDATE"
-        wpt_msg.gateway_string = inner_string
-        self.publisher.publish(wpt_msg)
+        self.action_client.wait_for_server()
+        self.send_goal_future = self.action_client.send_goal_async(goal_msg)
 
 
 def main(args=None):

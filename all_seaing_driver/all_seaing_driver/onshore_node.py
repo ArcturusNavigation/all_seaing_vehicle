@@ -15,61 +15,68 @@ class OnshoreNode(Node):
     def __init__(self):
         super().__init__("onshore_node")
 
-        self.control_message = ControlMessage()
-        self.control_input_publisher = self.create_publisher(
-            ControlMessage, "control_input", 10
-        )
-        self.control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
-        self.control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
-
         self.heartbeat_message = Heartbeat()
         self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
         self.heartbeat_message.in_teleop = True
         self.heartbeat_message.e_stopped = False
 
-        # Setup subscriber
+        self.enter_held = False
+
+        self.control_input_publisher = self.create_publisher(
+            ControlMessage, "control_options", 10
+        )
         self.joy_control_sub = self.create_subscription(
             Joy, "/joy", self.keyboard_callback, 10
         )
-
         self.heartbeat_timer = self.create_timer(
             HEART_RATE, self.beat_heart
-        )  # start the output loop
-
-        self.enter_held = False
+        )
 
         self.get_logger().info("Starting onshore node, teleop enabled")
 
     def beat_heart(self):
         self.heartbeat_publisher.publish(self.heartbeat_message)
+    
+    def send_controls(self, x, y, angular):
+        control_message = ControlMessage()
+        control_message.priority = 0
+        control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
+        control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
+        control_message.x = x
+        control_message.y = y
+        control_message.angular = angular
+        self.control_input_publisher.publish(control_message)
 
     def keyboard_callback(self, msg):
         if self.heartbeat_message.e_stopped:
             self.get_logger().fatal("ASV is e-stopped!")
             return
+
         if msg.buttons[0]:
             self.get_logger().info("E-stop pressed!")
             self.heartbeat_message.e_stopped = True
+            self.heartbeat_publisher.publish(self.heartbeat_message)
             return
+
         if msg.buttons[1]:
             if not self.enter_held:
                 self.enter_held = True
                 self.heartbeat_message.in_teleop = not self.heartbeat_message.in_teleop
+                self.heartbeat_publisher.publish(self.heartbeat_message)
                 self.get_logger().info(
                     f"Toggled teleop (now {self.heartbeat_message.in_teleop})"
                 )
         elif self.enter_held:
             self.enter_held = False
-        if self.heartbeat_message.in_teleop:
-            # TODO: Parameterize values here
-            self.control_message.y = msg.axes[0] * -2.0
-            self.control_message.x = msg.axes[1] * 2.0
-            self.control_message.angular = msg.axes[2] * -0.8
-            self.control_input_publisher.publish(self.control_message)
 
+        if self.heartbeat_message.in_teleop:
+            self.send_controls(
+                msg.axes[1] * 2.0,
+                msg.axes[0] * -2.0,
+                msg.axes[2] * -0.8
+            )
 
 def main(args=None):
-    # Start node, and spin
     rclpy.init(args=args)
     node = OnshoreNode()
     rclpy.spin(node)

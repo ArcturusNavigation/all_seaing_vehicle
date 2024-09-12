@@ -1,3 +1,5 @@
+uint8 priority
+
 uint8 OFF = 0
 uint8 WORLD_POSITION = 1
 uint8 WORLD_VELOCITY = 2

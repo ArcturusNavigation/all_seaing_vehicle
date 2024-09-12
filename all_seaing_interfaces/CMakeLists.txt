@@ -9,18 +9,15 @@ find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-    "msg/ASVState.msg"
+    "action/Waypoint.action"
     "msg/ObstacleMap.msg"
     "msg/Obstacle.msg"
     "msg/ControlMessage.msg"
-    "msg/GoalState.msg"
     "msg/LabeledBoundingBox2DArray.msg"
     "msg/LabeledBoundingBox2D.msg"
     "msg/Heartbeat.msg"
     "msg/ASV2State.msg"
     DEPENDENCIES
-    std_msgs
-    sensor_msgs
     geometry_msgs
 )
 

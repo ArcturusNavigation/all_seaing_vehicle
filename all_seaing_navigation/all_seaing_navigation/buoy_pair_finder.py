@@ -7,8 +7,6 @@ from functools import cmp_to_key
 from rclpy.node import Node
 from all_seaing_interfaces.msg import ObstacleMap
 from nav_msgs.msg import Odometry
-from protobuf_client_interfaces.msg import Gateway
-
 
 class BuoyPairFinder(Node):
 
@@ -18,7 +16,6 @@ class BuoyPairFinder(Node):
         self.map_sub = self.create_subscription(
             ObstacleMap, "labeled_map", self.buoy_cb, 10
         )
-        self.publisher = self.create_publisher(Gateway, "/send_to_gateway", 10)
         
     def buoy_cb(self, msg):
 
@@ -54,18 +51,6 @@ class BuoyPairFinder(Node):
         for l_pt, r_pt in zip(left_buoy_points, right_buoy_points):
             midpoint = (l_pt + r_pt) / 2
             midpoints.append(midpoint)
-
-        # Publish midpoints
-        wpt_msg = Gateway()
-        inner_string = "points="
-        for i, midpoint in enumerate(midpoints):
-            inner_string += f"{midpoint[0]},{midpoint[1]}"
-            if i < len(midpoints) - 1:
-                inner_string += ":"
-        wpt_msg.gateway_key = "WPT_UPDATE"
-        wpt_msg.gateway_string = inner_string
-        self.publisher.publish(wpt_msg)
-
 
 def main(args=None):
     rclpy.init(args=args)
