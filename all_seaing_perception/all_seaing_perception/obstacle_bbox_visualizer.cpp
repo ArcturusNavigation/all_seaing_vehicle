@@ -38,7 +38,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
     if (!m_pc_cam_tf_ok) {
         m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_map_msg->header.frame_id);
     }
-
+    
     cv_bridge::CvImagePtr cv_ptr;
     try {
         cv_ptr = cv_bridge::toCvCopy(in_img_msg, sensor_msgs::image_encodings::BGR8);
@@ -57,6 +57,10 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
         geometry_msgs::msg::Point camera_point;
         tf2::doTransform(lidar_point, camera_point, m_pc_cam_tf);
 
+        RCLCPP_INFO(this->get_logger(), "Lidar point: (%f, %f, %f)", lidar_point.x, lidar_point.y, lidar_point.z);
+        RCLCPP_INFO(this->get_logger(), "Camera point: (%f, %f, %f)", camera_point.x, camera_point.y, camera_point.z);
+
+
         // find the centroid and display it.
         cv::Point3d centroid(camera_point.y,
                              camera_point.z,
@@ -69,7 +73,10 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
             
             // Draw centroid
             cv::circle(cv_ptr->image, pixel_centroid, 5, color, -1);
-
+            RCLCPP_INFO(this->get_logger(), "Drawing centroid for obstacle with label %d", obstacle.label);
+        } 
+        else { 
+            RCLCPP_WARN(this->get_logger(), "Centroid outside image bounds: (%f, %f)", pixel_centroid.x, pixel_centroid.y);
         }
     }
 
@@ -99,7 +106,7 @@ geometry_msgs::msg::TransformStamped ObstacleBboxVisualizer::get_tf(const std::s
         RCLCPP_INFO(this->get_logger(), "in_target_frame: %s, in_src_frame: %s",
                     in_target_frame.c_str(), in_src_frame.c_str());
     } catch (tf2::TransformException& ex) {
-        RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+        RCLCPP_ERROR(this->get_logger(), "Error in LiDAR to Camera TF in visualizer: %s", ex.what());
     }
     return tf;
 }
