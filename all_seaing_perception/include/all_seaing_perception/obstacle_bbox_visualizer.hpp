@@ -4,6 +4,10 @@
 #include <string>
 #include "rclcpp/rclcpp.hpp"
 
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
+#include "geometry_msgs/msg/transform_stamped.hpp"
+
 #include "image_geometry/pinhole_camera_model.h"
 
 #include "message_filters/subscriber.h"
@@ -24,6 +28,12 @@ private:
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<all_seaing_interfaces::msg::ObstacleMap> m_obstacle_map_sub;
     message_filters::Subscriber<all_seaing_interfaces::msg::LabeledBoundingBox2DArray> m_bbox_sub;
+
+    // Transform variables
+    std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+    geometry_msgs::msg::TransformStamped m_pc_cam_tf;
+    bool m_pc_cam_tf_ok;
 
     // Camera model
     image_geometry::PinholeCameraModel m_cam_model;
@@ -48,6 +58,9 @@ private:
 
     // Helper function to get color for label
     cv::Scalar get_color_for_label(const int& label);
+
+    geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
+                                                 const std::string &in_src_frame);
 
 public:
     ObstacleBboxVisualizer();
