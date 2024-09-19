@@ -18,40 +18,6 @@ def generate_launch_description():
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
-    localize_params = os.path.join(
-        bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
-    )
-    keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
-
-    ekf_node = launch_ros.actions.Node(
-        package="robot_localization",
-        executable="ekf_node",
-        parameters=[localize_params],
-    )
-
-    navsat_node = launch_ros.actions.Node(
-        package="robot_localization",
-        executable="navsat_transform_node",
-        remappings=[("gps/fix", "/wamv/sensors/gps/gps/fix")],
-        parameters=[localize_params],
-    )
-
-    controller_node = launch_ros.actions.Node(
-        package="all_seaing_controller",
-        executable="xdrive_controller.py",
-        parameters=[{"in_sim": True}],
-    )
-
-    keyboard_node = launch_ros.actions.Node(package="keyboard", executable="keyboard")
-
-    keyboard_to_joy_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard_to_joy.py",
-        parameters=[
-            {"config_file_name": keyboard_params},
-            {"sampling_frequency": 60},
-        ],
-    )
 
     obstacle_bbox_overlay_node = launch_ros.actions.Node(
         package="all_seaing_perception",
@@ -110,11 +76,6 @@ def generate_launch_description():
         ],
     )
 
-    buoy_pair_finder_node = launch_ros.actions.Node(
-        package="all_seaing_navigation",
-        executable="buoy_pair_finder.py",
-    )
-
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_node.py",
@@ -124,7 +85,7 @@ def generate_launch_description():
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "practice_2023_follow_path2_task",
+            "world": "perception_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": "-v 0",
         }.items(),
@@ -132,16 +93,10 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            ekf_node,
-            navsat_node,
-            controller_node,
-            keyboard_node,
-            keyboard_to_joy_node,
             obstacle_bbox_overlay_node,
             color_segmentation_node,
             point_cloud_filter_node,
             obstacle_detector_node,
-            buoy_pair_finder_node,
             onshore_node,
             sim_ld,
         ]
