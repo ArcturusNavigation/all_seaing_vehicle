@@ -170,6 +170,11 @@ def generate_launch_description():
         package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
+        parameters=[
+            {"joy_x_scale": 2.0},
+            {"joy_y_scale": -2.0},
+            {"joy_ang_scale": -0.8},
+        ],
     )
 
     waypoint_sender = launch_ros.actions.Node(
