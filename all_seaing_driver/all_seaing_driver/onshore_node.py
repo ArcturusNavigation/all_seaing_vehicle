@@ -15,6 +15,14 @@ class OnshoreNode(Node):
     def __init__(self):
         super().__init__("onshore_node")
 
+        self.declare_parameter("joy_x_scale", 2.0)
+        self.declare_parameter("joy_y_scale", -2.0)
+        self.declare_parameter("joy_ang_scale", -0.8)
+
+        self.joy_x_scale = self.get_parameter("joy_x_scale").value
+        self.joy_y_scale = self.get_parameter("joy_y_scale").value
+        self.joy_ang_scale = self.get_parameter("joy_ang_scale").value
+
         self.heartbeat_message = Heartbeat()
         self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
         self.heartbeat_message.in_teleop = True
@@ -36,7 +44,7 @@ class OnshoreNode(Node):
 
     def beat_heart(self):
         self.heartbeat_publisher.publish(self.heartbeat_message)
-    
+
     def send_controls(self, x, y, angular):
         control_message = ControlMessage()
         control_message.priority = 0
@@ -71,9 +79,9 @@ class OnshoreNode(Node):
 
         if self.heartbeat_message.in_teleop:
             self.send_controls(
-                msg.axes[1] * 2.0,
-                msg.axes[0] * -2.0,
-                msg.axes[2] * -0.8
+                msg.axes[1] * self.joy_x_scale,
+                msg.axes[0] * self.joy_y_scale,
+                msg.axes[2] * self.joy_ang_scale
             )
 
 def main(args=None):
