@@ -36,9 +36,9 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
 
     // Get the transform from LiDAR to camera
     if (!m_pc_cam_tf_ok) {
-        m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_map_msg->header.frame_id);
+        m_pc_cam_tf = get_tf(in_bbox_msg->header.frame_id, in_map_msg->local_header.frame_id);
     }
-    
+
     cv_bridge::CvImagePtr cv_ptr;
     try {
         cv_ptr = cv_bridge::toCvCopy(in_img_msg, sensor_msgs::image_encodings::BGR8);
@@ -55,11 +55,10 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
         lidar_point.y = obstacle.local_point.point.y;
         lidar_point.z = obstacle.local_point.point.z;
         geometry_msgs::msg::Point camera_point;
-        tf2::doTransform(lidar_point, camera_point, m_pc_cam_tf);
+        tf2::doTransform<geometry_msgs::msg::Point>(lidar_point, camera_point, m_pc_cam_tf);
 
-        RCLCPP_INFO(this->get_logger(), "Lidar point: (%f, %f, %f)", lidar_point.x, lidar_point.y, lidar_point.z);
-        RCLCPP_INFO(this->get_logger(), "Camera point: (%f, %f, %f)", camera_point.x, camera_point.y, camera_point.z);
-
+        // RCLCPP_INFO(this->get_logger(), "Lidar point: (%f, %f, %f)", lidar_point.x, lidar_point.y, lidar_point.z);
+        // RCLCPP_INFO(this->get_logger(), "Camera point: (%f, %f, %f)", camera_point.x, camera_point.y, camera_point.z);
 
         // find the centroid and display it.
         cv::Point3d centroid(camera_point.y,
@@ -72,7 +71,15 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
             cv::Scalar color = get_color_for_label(obstacle.label);
             
             // Draw centroid
-            cv::circle(cv_ptr->image, pixel_centroid, 5, color, -1);
+            cv::Scalar darkenedColor = cv::Scalar(
+                std::max(0.0, color[0] - 70), // Darken blue channel
+                std::max(0.0, color[1] - 70), // Darken green channel
+                std::max(0.0, color[2] - 70)  // Darken red channel
+            );
+            if (darkenedColor[0] == 0 && darkenedColor[1] == 0 && darkenedColor[2] == 0) {
+                darkenedColor = cv::Scalar(70, 70,)
+            }
+            cv::circle(cv_ptr->image, pixel_centroid, 5, darkenedColor, -1);
             RCLCPP_INFO(this->get_logger(), "Drawing centroid for obstacle with label %d", obstacle.label);
         } 
         else { 
