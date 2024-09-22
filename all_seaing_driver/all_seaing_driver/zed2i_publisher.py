@@ -33,8 +33,7 @@ class ZEDPublisher(Node):
                 self.get_logger().info("ZED camera opened successfully")
 
     def publish_zed_image(self):
-        runtime_parameters = sl.RuntimeParameters()
-        if self.zed.grab(runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
             left_image = sl.Mat()
             self.zed.retrieve_image(left_image, sl.VIEW.LEFT)
             frame = left_image.get_data()
