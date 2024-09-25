@@ -31,7 +31,6 @@ def generate_launch_description():
         package="all_seaing_controller",
         executable="xdrive_controller.py",
         parameters=[{
-            "in_sim": False,
             "boat_length": 0.7112,
             "boat_width": 0.2540,
             "min_output": 1100.0,

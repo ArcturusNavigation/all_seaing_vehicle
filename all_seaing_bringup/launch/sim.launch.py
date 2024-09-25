@@ -55,11 +55,10 @@ def generate_launch_description():
         executable="xdrive_controller.py",
         parameters=[
             {
-                "in_sim": True,
                 "boat_length": 3.5,
                 "boat_width": 2.0,
-                "min_output": -1000.0,
-                "max_output": 1000.0,
+                "min_output": -1400.0,
+                "max_output": 1400.0,
             }
         ],
     )
