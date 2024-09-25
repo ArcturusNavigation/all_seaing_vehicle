@@ -14,9 +14,7 @@ class ControlMux(Node):
             ControlMessage, "control_options", self.control_callback, 10
         )
         self.control_pub = self.create_publisher(ControlMessage, "control_input", 10)
-        self.timer = self.create_timer(
-            ZERO_CMD_TIMER_PERIOD, self.timer_callback
-        )
+        self.timer = self.create_timer(ZERO_CMD_TIMER_PERIOD, self.timer_callback)
         self.received_priorities = set()
         self.received_messages = {}
 
@@ -30,7 +28,12 @@ class ControlMux(Node):
 
     def timer_callback(self):
         # "Do-nothing" command sent at 4Hz for safety
-        self.control_pub.publish(ControlMessage())
+        self.control_pub.publish(
+            ControlMessage(
+                linear_control_mode=ControlMessage.OFF,
+                angular_control_mode=ControlMessage.OFF,
+            )
+        )
 
         # Remove from received messages if not received during timer period
         for p in self.received_messages.keys() - self.received_priorities:

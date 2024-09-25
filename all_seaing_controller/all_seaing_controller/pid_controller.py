@@ -6,6 +6,8 @@ class PIDController:
 
         self.integral_min = -float("inf")
         self.integral_max = float("inf")
+        self.effort_min = -float("inf")
+        self.effort_max = float("inf")
         self.reset()
     
     def set_setpoint(self, setpoint):
@@ -16,9 +18,15 @@ class PIDController:
 
     def set_integral_max(self, val):
         self.integral_max = val
+
+    def set_effort_min(self, val):
+        self.effort_min = val
+
+    def set_effort_max(self, val):
+        self.effort_max = val
     
     def get_effort(self):
-        return self.effort
+        return max(min(self.effort, self.effort_max), self.effort_min)
     
     def update(self, feedback, dt):
         error = self.setpoint - feedback
