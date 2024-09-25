@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# python3 rosbag_to_image.py /home/arcturus/arcturus/test_05-21-24/test1/test1_0.db3 /zed/zed_node/rgb/image_rect_color /home/arcturus/arcturus/bag_output
+# python3 /home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_utility/all_seaing_utility/rosbag_to_image.py /home/arcturus/arcturus/test_05-21-24/test1/test1_0.db3 /zed/zed_node/rgb/image_rect_color /home/arcturus/arcturus/bag_output
 
 from argparse import ArgumentParser
 import cv2
@@ -38,10 +38,16 @@ def main():
 
     print(f"Extracting images from {bag_file} on topic {image_topic} into {output_dir}")
 
+    choose_framerate = 5
+    current_rate = 579//38.314721344 #15
+    count1 = 0
+
+    framerate = max(1, current_rate//choose_framerate)
+
     while reader.has_next():
         (topic, data, t) = reader.read_next()
 
-        if topic == image_topic:
+        if topic == image_topic and count1%framerate == 0:
             msg = deserialize_message(data, Image)
 
             # ROS2 Image to format that works with OpenCV
@@ -52,6 +58,7 @@ def main():
             print(f"Wrote image {count} to {image_path}")
 
             count += 1
+        count1 += 1
 
     print(f"Extracted {count} images.")
 
