@@ -12,16 +12,17 @@ class WebcamPublisher(Node):
         super().__init__("webcam_publisher")
         self.publisher_ = self.create_publisher(Image, "webcam_image", 10)
         self.bridge = CvBridge()
+        self.runtime_parameters = sl.RuntimeParameters()
+        self.timer = self.create_timer(1.0/30.0, self.publish_webcam_image)
 
     def publish_webcam_image(self):
         cap = cv2.VideoCapture(0)
-        while True:
-            ret, frame = cap.read()
-            if ret:
-                ros_image = self.bridge.cv2_to_imgmsg(frame, "bgr8")
-                self.publisher_.publish(ros_image)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
+        ret, frame = cap.read()
+        if ret:
+            ros_image = self.bridge.cv2_to_imgmsg(frame, "bgr8")
+            self.publisher_.publish(ros_image)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
         cap.release()
         cv2.destroyAllWindows()
 
@@ -30,6 +31,7 @@ def main(args=None):
     rclpy.init(args=args)
     webcam_publisher = WebcamPublisher()
     webcam_publisher.publish_webcam_image()
+    rclpy.spin(webcam_publisher) #means run continously
     rclpy.shutdown()
 
 
