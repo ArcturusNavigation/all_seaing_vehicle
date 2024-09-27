@@ -44,6 +44,7 @@ from std_srvs.srv import SetBool
 
 class Yolov8Node(Node):
 
+    # Add self.model_path in __init__ later (See yolov5_detector)
     def __init__(self) -> None:
         super().__init__("yolov8_node")
 
