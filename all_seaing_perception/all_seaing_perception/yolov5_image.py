@@ -12,7 +12,7 @@ from rclpy.qos import QoSProfile
 from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 from ament_index_python.packages import get_package_share_directory
-
+from std_msgs.msg import String #ask
 
 class Yolov5Image(Node):
 
@@ -23,11 +23,15 @@ class Yolov5Image(Node):
 
         # Get pretrained yolov5 models for colored buoys and cardinal markers
         path_hubconfig = os.path.expanduser("~/yolov5")
+
         # TODO: should be a ros parameter
-        model_name = "yolov5s.pt"
+        self.declare_parameter("model_name", "yolov5s.pt") # model_name = "yolov5s.pt"
+        model_name = self.get_parameter("model_name").get_parameter_value().string_value
+
         path_model = os.path.join(
             get_package_share_directory("all_seaing_perception"), "models", model_name
         )
+
         self.model = torch.hub.load(
             path_hubconfig, "custom", path=path_model, source="local"
         )
@@ -39,17 +43,22 @@ class Yolov5Image(Node):
         self.img_pub = self.create_publisher(Image, "image/detections", 5)
 
         # TODO: should be in a ros timer, and input image should also be a ros parameter
-        while not rclpy.shutdown():
-            # Get image
-            img = PIL.Image.open(
-                self.get_package_share_directory("perception_suite")
-                + "/images/test_njord_red.jpg"
+        self.declare_parameter("image", "image/test_njord_red.jpg")
+        self.image = self.get_parameter("image").get_parameter_value().string_value
+
+        #ros timer
+        timer_period = 0.1
+        self.timer = self.create_timer(timer_period, self.timer_callback)
+
+
+    def timer_callback(self):
+        img = PIL.Image.open(
+            os.path.join(get_package_share_directory("all_seaing_perception"), self.image)
             )
-            img = np.array(img.convert("RGB"))
 
-            self.predict_image(img)
+        img = np.array(img.convert("RGB"))
 
-            time.sleep(10)  # Sleep for 10 ms
+        self.predict_image(img)
 
     def predict_image(self, img):
         try:

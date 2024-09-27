@@ -29,7 +29,9 @@ class Yolov5Detector(Node):
 
         path_hubconfig = os.path.expanduser("~/yolov5")
         # TODO: Should be a ros parameter
-        model_name = "yolov5s.pt"
+        self.declare_parameter('model_name', 'yolov5s.pt')
+        model_name = self.get_parameter('model_name').get_parameter_value().string_value
+
         path_model = os.path.join(
             get_package_share_directory("all_seaing_perception"), "models", model_name
         )
