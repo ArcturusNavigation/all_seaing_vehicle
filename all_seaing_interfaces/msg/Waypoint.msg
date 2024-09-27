@@ -1,2 +1,2 @@
-Pose point
+geometry_msgs/Pose point
 float64 radius

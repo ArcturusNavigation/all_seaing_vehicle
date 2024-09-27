@@ -111,8 +111,8 @@ def generate_launch_description():
     )
 
     buoy_pair_finder_node = launch_ros.actions.Node(
-        package="all_seaing_navigation",
-        executable="buoy_pair_finder.py",
+        package="all_seaing_autonomy",
+        executable="WaypointFinder.py",
     )
 
     onshore_node = launch_ros.actions.Node(

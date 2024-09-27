@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
-from geometry_msgs.msg import Point, Pose, PoseArray, BuoyPair, BuoyPairArray, Waypoint, WaypointArray
+from geometry_msgs.msg import Point, Pose, PoseArray
+from all_seaing_interfaces.msg import BuoyPair, BuoyPairArray, Waypoint, WaypointArray
 from tf2_msgs.msg import TFMessage
+from nav_msgs.msg import Odometry
 import math
 
 class WaypointFinder(Node):
@@ -11,12 +14,14 @@ class WaypointFinder(Node):
         self.map_sub = self.create_subscription(
             ObstacleMap, "labeled_map", self.map_cb, 10
         )
-        self.odometry_sub = self.create_subscription(TFMessage, "/wamv/pose", self.odometry_cb, 10)
+        self.odometry_sub = self.create_subscription(Odometry, "/odometry/filtered", self.odometry_cb, 10)
         self.buoy_pair_pub = self.create_publisher(BuoyPairArray, "buoy_pairs", 10)
         self.waypoint_pub = self.create_publisher(WaypointArray, "waypoints", 10)
 
         self.robot_pos = (0,0)
         self.safe_margin = 0
+
+        self.first_map = True
 
     def norm_squared(self, vec, ref=(0, 0)):
         return vec[0] ** 2 + vec[1] ** 2
@@ -41,6 +46,7 @@ class WaypointFinder(Node):
         return green_bouy_points, red_bouy_points
 
     def setup_buoys(self):
+        self.get_logger().warning("Setting up starting buoys!")
         green_buoys, red_buoys = zip(*[(ob.global_point.point.x, ob.global_point.point.y) for ob in self.split_buoys(self, self.obstacles) if ob.local_point.point.x > 0])
         self.starting_buoys = (self.get_closest_to((0,0),red_buoys), self.get_closest_to((0,0),green_buoys))
         self.pair_to = self.starting_buoys
@@ -68,6 +74,7 @@ class WaypointFinder(Node):
         # RED BUOYS LEFT, GREEN RIGHT
 
         if len(green_buoys) == 0 or len(red_buoys) == 0:
+            self.get_logger().warning("No buoy pairs!")
             return
         
         # TODO: Match the previous pair of buoys to the new obstacle map (in terms of global position) to eliminate any big drift that may mess up the selection of the next pair
@@ -92,10 +99,13 @@ class WaypointFinder(Node):
 
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
+        if self.first_map:
+            self.setup_buoys()
+            self.first_map = False
         self.generate_waypoints()
         
     def odometry_cb(self, msg):
-        self.robot_pos = (msg.transforms.transform.translation.x, msg.transforms.transform.translation.y)
+        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
         
         
 def main(args=None):
