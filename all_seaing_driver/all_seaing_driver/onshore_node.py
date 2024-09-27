@@ -52,13 +52,13 @@ class OnshoreNode(Node):
             self.get_logger().fatal("ASV is e-stopped!")
             return
 
-        if msg.buttons[0]:
+        if msg.buttons[0]: # msg.buttons[0] = space bar --> e-stop (reference config)
             self.get_logger().info("E-stop pressed!")
             self.heartbeat_message.e_stopped = True
             self.heartbeat_publisher.publish(self.heartbeat_message)
             return
 
-        if msg.buttons[1]:
+        if msg.buttons[1]: # msg.buttons[1] = return key (reference config)
             if not self.enter_held:
                 self.enter_held = True
                 self.heartbeat_message.in_teleop = not self.heartbeat_message.in_teleop
