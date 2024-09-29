@@ -18,8 +18,6 @@ from cv_bridge import CvBridge
 from ultralytics import YOLO
 from ultralytics.engine.results import Results
 from ultralytics.engine.results import Boxes
-from ultralytics.engine.results import Masks
-from ultralytics.engine.results import Keypoints
 
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 
@@ -108,7 +106,7 @@ class Yolov8Node(Node):
                 box_msg = LabeledBoundingBox2D()
 
                 if results.boxes:
-                    #self.yolo.names[int(box_data.cls)]
+                    # self.yolo.names[int(box_data.cls)] for class labels
                     box_msg.label = int(box_data.cls)
                     box_msg.probability = float(box_data.conf)
                     center_x, center_y, width, height = box_data.xywh
@@ -117,7 +115,7 @@ class Yolov8Node(Node):
                     box_msg.min_y = int(center_y - height/2)
                     box_msg.max_y = int(center_y + height/2)
 
-                labeled_bouding_box_msgs.detections.append(box_msg)
+                labeled_bouding_box_msgs.boxes.append(box_msg)
 
             # publish detections
             self._pub.publish(labeled_bouding_box_msgs)
