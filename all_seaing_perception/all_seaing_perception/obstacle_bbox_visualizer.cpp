@@ -1,9 +1,14 @@
-#include "all_seaing_perception/obstacle_bbox_visualizer.hpp"
+#include <iostream>
+#include <fstream>
 
+#include "all_seaing_perception/obstacle_bbox_visualizer.hpp"
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include "geometry_msgs/msg/point.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "yaml-cpp/yaml.h" 
+
+
 
 ObstacleBboxVisualizer::ObstacleBboxVisualizer() : Node("obstacle_bbox_visualizer") {
 
@@ -26,6 +31,24 @@ ObstacleBboxVisualizer::ObstacleBboxVisualizer() : Node("obstacle_bbox_visualize
     m_obstacle_bbox_visualizer_sync = std::make_shared<ObstacleBboxVisualizerSync>(ObstacleBboxVisualizerPolicy(10), m_image_sub, m_obstacle_map_sub, m_bbox_sub);
     m_obstacle_bbox_visualizer_sync->registerCallback(std::bind(&ObstacleBboxVisualizer::image_obstacle_cb, this,
                                        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+                                        
+    this->declare_parameter("color_label_mappings_file", "");
+    color_label_mappings_file = this->get_parameter("color_label_mappings_file").as_string();
+    std::ifstream yamlFile(color_label_mappings_file);
+
+    if (yamlFile.is_open()) {
+        config_yaml = YAML::Load(yamlFile);  // Use YAML::Load with an ifstream
+        for (YAML::const_iterator it = config_yaml.begin(); it != config_yaml.end(); ++it) {
+            RCLCPP_INFO(this->get_logger(), "label %d and color %s", it->second.as<int>(), it->second.as<std::string>().c_str());
+            label_color_map[it->second.as<int>()] = it->second.as<std::string>();
+        }
+    } 
+    else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", color_label_mappings_file.c_str());
+    }
+
+    yamlFile.close();
+
 }
 
 ObstacleBboxVisualizer::~ObstacleBboxVisualizer() {}
@@ -71,16 +94,16 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
             cv::Scalar color = get_color_for_label(obstacle.label);
             
             // Draw centroid
-            cv::Scalar darkenedColor = cv::Scalar(
-                std::max(0.0, color[0] - 70), // Darken blue channel
-                std::max(0.0, color[1] - 70), // Darken green channel
-                std::max(0.0, color[2] - 70)  // Darken red channel
-            );
-            if (darkenedColor[0] == 0 && darkenedColor[1] == 0 && darkenedColor[2] == 0) {
-                darkenedColor = cv::Scalar(70, 70,)
-            }
-            cv::circle(cv_ptr->image, pixel_centroid, 5, darkenedColor, -1);
-            RCLCPP_INFO(this->get_logger(), "Drawing centroid for obstacle with label %d", obstacle.label);
+            // cv::Scalar darkenedColor = cv::Scalar(
+            //     std::max(0.0, color[0] - 70), // Darken blue channel
+            //     std::max(0.0, color[1] - 70), // Darken green channel
+            //     std::max(0.0, color[2] - 70)  // Darken red channel
+            // );
+            // if (darkenedColor[0] == 0 && darkenedColor[1] == 0 && darkenedColor[2] == 0) {
+            //     darkenedColor = cv::Scalar(70, 70,)
+            // }
+            cv::circle(cv_ptr->image, pixel_centroid, 5, color, -1);
+            // RCLCPP_INFO(this->get_logger(), "Drawing centroid for obstacle with label %d", obstacle.label);
         } 
         else { 
             RCLCPP_WARN(this->get_logger(), "Centroid outside image bounds: (%f, %f)", pixel_centroid.x, pixel_centroid.y);
