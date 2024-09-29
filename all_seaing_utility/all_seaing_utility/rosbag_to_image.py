@@ -19,12 +19,15 @@ def main():
     parser.add_argument("bag_file", help="Input ROS2 bag file")
     parser.add_argument("image_topic", help="Image topic to convert")
     parser.add_argument("output_dir", help="Output directory")
+    parser.add_argument("fps", help="Frame per second")
 
     args = parser.parse_args()
 
     bag_file = args.bag_file
     image_topic = args.image_topic
     output_dir = args.output_dir
+    choose_framerate = int (args.fps)
+
 
     reader = rosbag2_py.SequentialReader()
 
@@ -36,13 +39,37 @@ def main():
     bridge = CvBridge()
     count = 0
 
+    msg_count = 0
+    start_time = None
+    end_time = None
+    current_rate = 0
+
+    while reader.has_next():
+        (topic, data, t) = reader.read_next()
+    
+        if topic == image_topic:
+            msg = deserialize_message(data, Image)
+            if msg_count == 0:
+                start_time = t
+            msg_count += 1
+            end_time = t
+
+    if msg_count > 1:
+        duration = (end_time - start_time)/ 1e9  # Convert to seconds
+        current_rate = msg_count / duration
+        print("Current rate:", current_rate)
+    else:
+        print("Not enough messages in the bag.")
+
     print(f"Extracting images from {bag_file} on topic {image_topic} into {output_dir}")
 
-    choose_framerate = 5
-    current_rate = 579//38.314721344 #15
+    #current_rate = 579//38.314721344 #15
     count1 = 0
 
     framerate = max(1, current_rate//choose_framerate)
+    print("framerate :: ", framerate)
+
+    reader.open(storage_options, converter_options)
 
     while reader.has_next():
         (topic, data, t) = reader.read_next()
