@@ -53,7 +53,15 @@ def generate_launch_description():
     controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="xdrive_controller.py",
-        parameters=[{"in_sim": True}],
+        parameters=[
+            {
+                "in_sim": True,
+                "boat_length": 3.5,
+                "boat_width": 2.0,
+                "min_output": -1000.0,
+                "max_output": 1000.0,
+            }
+        ],
     )
 
     rviz_testing_helper_node = launch_ros.actions.Node(
@@ -162,6 +170,11 @@ def generate_launch_description():
         package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
+        parameters=[
+            {"joy_x_scale": 2.0},
+            {"joy_y_scale": -2.0},
+            {"joy_ang_scale": -0.8},
+        ],
     )
 
     waypoint_sender = launch_ros.actions.Node(

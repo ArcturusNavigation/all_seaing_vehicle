@@ -33,11 +33,10 @@ class PID:
     """
 
     def __init__(
-        self, pid_tuple, get_feedback_value, debug_name=None, default_to_input=False
+        self, pid_tuple, get_feedback_value, default_to_input=False
     ):
         """
         Initialize the PID with constant p, i, and d values.
-        If debug_name is not none, we will print the current error value whenever the pid is updated.
         default_value represents the defualt output value for the PID when no feedback has been received yet.
         """
         self.p = pid_tuple[0]
@@ -47,7 +46,6 @@ class PID:
         self.default_to_input = default_to_input
         self.accumulated_error = 0
         self.previousError = None
-        self.debug_name = debug_name
         self.get_feedback_value = get_feedback_value
 
     def update_feedback_value(self, msg):
@@ -69,8 +67,6 @@ class PID:
         if self.feedback is None:
             return input if self.default_to_input else 0
         error = self.get_error(input)
-        if self.debug_name is not None:
-            self.get_logger().error(f"{self.debug_name} error: {error}")
         self.accumulated_error += error * dt
         derror_dt = (
             0 if self.previousError is None else (error - self.previousError) / dt
@@ -107,24 +103,22 @@ class XDriveController(Node):
     """
 
     def __init__(self):
-        """
-        Initialize the controller.
-        """
         super().__init__("xdrive_controller")
 
         self.in_sim = self.declare_parameter(
             "in_sim", False).get_parameter_value().bool_value
+        l = self.declare_parameter(
+            "boat_length", 3.5).get_parameter_value().double_value
+        w = self.declare_parameter(
+            "boat_width", 2.0).get_parameter_value().double_value
+        min_output = self.declare_parameter(
+            "min_output", -1000.0).get_parameter_value().double_value
+        max_output = self.declare_parameter(
+            "max_output", 1000.0).get_parameter_value().double_value
 
-        l = 3.5 if self.in_sim else 0.7112  # BOAT LENGTH
-        w = 2 if self.in_sim else 0.2540  # BOAT WIDTH
         self.msg_type = Float64 if self.in_sim else Int64
         self.py_type = float if self.in_sim else int
-        min_output = (
-            -1000 if self.in_sim else 1100
-        )  # the minimum PWM output value for thrusters
-        max_output = (
-            1000 if self.in_sim else 1900
-        )  # the maximum PWM output value for thrusters
+
         self.max_input = (
             3.5 if self.in_sim else 1.1
         )  # the maximum magnitude of controller input, used to find a conversion between input and output
@@ -157,25 +151,21 @@ class XDriveController(Node):
         pid_vx = PID(
             (1.0, 0.0, 0) if self.in_sim else (0, 0, 0),
             self.get_x_velocity_world_feedback,
-            "x",
             BLIND_LINEAR,
         )
         pid_vy = PID(
             (0.0, 0.0, 0) if self.in_sim else (0, 0, 0),
             self.get_y_velocity_world_feedback,
-            None,
             BLIND_LINEAR,
         )
         local_pid_vx = PID(
             (2.5, 0.1, 0) if self.in_sim else (1, 0, 0),
             self.get_x_velocity_local_feedback,
-            None,
             BLIND_LINEAR,
         )
         local_pid_vy = PID(
             (2.5, 0.1, 0) if self.in_sim else (0.0, 0, 0),
             self.get_y_velocity_local_feedback,
-            None,
             BLIND_LINEAR,
         )
 
