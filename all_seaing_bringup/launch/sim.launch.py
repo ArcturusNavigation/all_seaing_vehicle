@@ -95,6 +95,11 @@ def generate_launch_description():
             ("camera_info", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+            }
+        ],
     )
 
     color_segmentation_node = launch_ros.actions.Node(

@@ -19,6 +19,8 @@
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
 #include "all_seaing_interfaces/msg/labeled_bounding_box2_d_array.hpp"
 #include <opencv2/opencv.hpp>
+#include "yaml-cpp/yaml.h" 
+
 
 class ObstacleBboxVisualizer : public rclcpp::Node {
 private:
@@ -34,6 +36,9 @@ private:
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
     geometry_msgs::msg::TransformStamped m_pc_cam_tf;
     bool m_pc_cam_tf_ok;
+    std::string color_label_mappings_file;
+    YAML::Node config_yaml;
+    std::map<int, std::string> label_color_map;
 
     // Camera model
     image_geometry::PinholeCameraModel m_cam_model;
