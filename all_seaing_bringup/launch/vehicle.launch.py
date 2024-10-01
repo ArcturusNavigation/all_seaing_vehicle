@@ -30,7 +30,13 @@ def generate_launch_description():
     controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="xdrive_controller.py",
-        parameters=[{"in_sim": False}],
+        parameters=[{
+            "in_sim": False,
+            "boat_length": 0.7112,
+            "boat_width": 0.2540,
+            "min_output": 1100.0,
+            "max_output": 1900.0,
+        }],
     )
 
     thrust_commander_node = launch_ros.actions.Node(

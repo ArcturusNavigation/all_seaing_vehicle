@@ -48,7 +48,7 @@ def generate_launch_description():
     )
 
     onshore_node = launch_ros.actions.Node(
-        package="all_seaing_utility",
+        package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
     )
