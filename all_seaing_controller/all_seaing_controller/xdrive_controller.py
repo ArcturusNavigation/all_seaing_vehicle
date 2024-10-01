@@ -10,8 +10,6 @@ from std_msgs.msg import Float64
 from std_msgs.msg import Int64
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
-from all_seaing_controller.pid_controller import PIDController
-from all_seaing_interfaces.msg import Heartbeat
 from all_seaing_interfaces.msg import ControlMessage
 
 # WHETHER TO NOT USE ODOMETRY i.e. ARE WE INSIDE??
@@ -208,8 +206,6 @@ class XDriveController(Node):
         self.required_data_recentness = (
             1  # if we didn't get odometry data in the last X seconds, ignore data
         )
-        self.last_heartbeat_timestamp = self.get_time()
-        self.required_heartbeat_recentness = 3
 
         # TODO: This should be done in the launch file!
         if self.in_sim:  # set output ROS2 topic names
@@ -234,7 +230,7 @@ class XDriveController(Node):
         self.create_subscription(
             ControlMessage, "control_input", self.update_control_input, 10
         )
-        self.create_subscription(Heartbeat, "heartbeat", self.receive_heartbeat, 10)
+
         # subscriber for data from the IMU
         if BLIND_LINEAR:
             imu_topic_name = (
@@ -306,15 +302,6 @@ class XDriveController(Node):
         Get the current time. Written into a function because it's annoying to write every time.
         """
         return self.get_clock().now()
-
-    def receive_heartbeat(self, msg):
-        """
-        Callback function for receiving hearbeat messages, which are necessary for the controller to run.
-        """
-        if msg.e_stopped:
-            self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
-            raise Exception("Received e-stop message! Killing node")
-        self.last_heartbeat_timestamp = self.get_time()
 
     def get_thrust_values(self, tx, ty, tn):
         """
@@ -404,14 +391,6 @@ class XDriveController(Node):
         """
         # self.get_logger().info("updating")
         current_time = self.get_time()
-        # self.get_logger().info(f"current time: {current_time}")
-        # self.get_logger().info(f"heartbeat time: {self.last_heartbeat_timestamp}")
-        if (
-            self.time_diff(current_time, self.last_heartbeat_timestamp)
-            > self.required_heartbeat_recentness
-        ):
-            self.convert_to_pwm_and_send(self.get_thrust_values(0, 0, 0))
-            raise Exception("Lost heartbeat! Killing node")
         if self.last_update_timestamp is not None:
             dt = self.time_diff(current_time, self.last_update_timestamp)
             x_output = 0
