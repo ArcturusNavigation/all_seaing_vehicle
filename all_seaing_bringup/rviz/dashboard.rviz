@@ -1,6 +1,6 @@
 Panels:
   - Class: rviz_common/Displays
-    Help Height: 70
+    Help Height: 78
     Name: Displays
     Property Tree Widget:
       Expanded:
@@ -352,7 +352,7 @@ Window Geometry:
   Tool Properties:
     collapsed: false
   Views:
-    collapsed: false
-  Width: 1200
-  X: 70
-  Y: 60
+    collapsed: true
+  Width: 1886
+  X: 15
+  Y: 44
