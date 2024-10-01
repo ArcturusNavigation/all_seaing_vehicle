@@ -37,6 +37,7 @@ def main(args=None):
         rclpy.spin(webcam_publisher) #means run continously
     except KeyboardInterrupt:
         webcam_publisher.close()
+        webcam_publisher.destroy_node()
     finally:
         rclpy.shutdown()
 
