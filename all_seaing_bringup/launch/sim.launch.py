@@ -96,6 +96,20 @@ def generate_launch_description():
         ],
     )
 
+    obstacle_bbox_visualizer_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_bbox_visualizer",
+        remappings=[
+            ("camera_info", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+            }
+        ],
+    )
+
     color_segmentation_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="color_segmentation.py",
@@ -208,6 +222,7 @@ def generate_launch_description():
             keyboard_node,
             keyboard_to_joy_node,
             obstacle_bbox_overlay_node,
+            obstacle_bbox_visualizer_node,
             color_segmentation_node,
             point_cloud_filter_node,
             obstacle_detector_node,
