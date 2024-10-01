@@ -37,10 +37,9 @@ ObstacleBboxVisualizer::ObstacleBboxVisualizer() : Node("obstacle_bbox_visualize
     std::ifstream yamlFile(color_label_mappings_file);
 
     if (yamlFile.is_open()) {
-        config_yaml = YAML::Load(yamlFile);  // Use YAML::Load with an ifstream
+        config_yaml = YAML::Load(yamlFile);  
         for (YAML::const_iterator it = config_yaml.begin(); it != config_yaml.end(); ++it) {
-            RCLCPP_INFO(this->get_logger(), "label %d and color %s", it->second.as<int>(), it->second.as<std::string>().c_str());
-            label_color_map[it->second.as<int>()] = it->second.as<std::string>();
+            label_color_map[it->second.as<int>()] = it->first.as<std::string>();
         }
     } 
     else {
@@ -141,23 +140,16 @@ geometry_msgs::msg::TransformStamped ObstacleBboxVisualizer::get_tf(const std::s
     return tf;
 }
 
-// label -> color hardcoded for now, parametrize later 
 cv::Scalar ObstacleBboxVisualizer::get_color_for_label(const int& label) {
-    switch (label) {
-        case 0: // orange
-            return cv::Scalar(0, 165, 255);
-        case 1: // red
-            return cv::Scalar(0, 0, 255);
-        case 2: // green
-            return cv::Scalar(0, 255, 0);
-        case 3: // black
-            return cv::Scalar(0, 0, 0);
-        case 4: // white
-            return cv::Scalar(255, 255, 255);
-        default: // blue
-            return cv::Scalar(255, 0, 0);
+    std::string color = label_color_map[label];
 
-    }
+    // case statements don't work on strings :(
+    if (color == "orange") return cv::Scalar(0, 165, 255);
+    if (color == "red") return cv::Scalar(0, 0, 255);
+    if (color == "green") return cv::Scalar(0, 255, 0);
+    if (color == "black") return cv::Scalar(0, 0, 0);
+    if (color == "white") return cv::Scalar(255, 255, 255);
+    return cv::Scalar(255, 0, 0);  // blue
 }
 
 int main(int argc, char* argv[]) {
