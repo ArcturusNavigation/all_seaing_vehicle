@@ -39,6 +39,7 @@ ObstacleBboxVisualizer::ObstacleBboxVisualizer() : Node("obstacle_bbox_visualize
     if (yamlFile.is_open()) {
         config_yaml = YAML::Load(yamlFile);  
         for (YAML::const_iterator it = config_yaml.begin(); it != config_yaml.end(); ++it) {
+            // RCLCPP_INFO(this->get_logger(), "label %d and color %s", it->second.as<int>(), it->second.as<std::string>().c_str());
             label_color_map[it->second.as<int>()] = it->first.as<std::string>();
         }
     } 
@@ -92,17 +93,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
             pixel_centroid.y >= 0 && pixel_centroid.y < cv_ptr->image.rows) {
             cv::Scalar color = get_color_for_label(obstacle.label);
             
-            // Draw centroid
-            // cv::Scalar darkenedColor = cv::Scalar(
-            //     std::max(0.0, color[0] - 70), // Darken blue channel
-            //     std::max(0.0, color[1] - 70), // Darken green channel
-            //     std::max(0.0, color[2] - 70)  // Darken red channel
-            // );
-            // if (darkenedColor[0] == 0 && darkenedColor[1] == 0 && darkenedColor[2] == 0) {
-            //     darkenedColor = cv::Scalar(70, 70,)
-            // }
             cv::circle(cv_ptr->image, pixel_centroid, 5, color, -1);
-            // RCLCPP_INFO(this->get_logger(), "Drawing centroid for obstacle with label %d", obstacle.label);
         } 
         else { 
             RCLCPP_WARN(this->get_logger(), "Centroid outside image bounds: (%f, %f)", pixel_centroid.x, pixel_centroid.y);
@@ -143,7 +134,6 @@ geometry_msgs::msg::TransformStamped ObstacleBboxVisualizer::get_tf(const std::s
 cv::Scalar ObstacleBboxVisualizer::get_color_for_label(const int& label) {
     std::string color = label_color_map[label];
 
-    // case statements don't work on strings :(
     if (color == "orange") return cv::Scalar(0, 165, 255);
     if (color == "red") return cv::Scalar(0, 0, 255);
     if (color == "green") return cv::Scalar(0, 255, 0);
