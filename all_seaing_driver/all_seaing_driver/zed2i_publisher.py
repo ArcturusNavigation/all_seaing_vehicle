@@ -57,7 +57,7 @@ def main(args=None):
     finally:
         zed_publisher.zed.close()
         zed_publisher.destroy_node()
-        rclpy.shutdown()
+        rclpy.shutdown() #haha i make big change
 
 
 if __name__ == "__main__":
