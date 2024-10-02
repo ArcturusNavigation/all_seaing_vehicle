@@ -61,6 +61,7 @@ class WaypointFinder(Node):
             marker_array.markers.append(Marker(type=Marker.ARROW, pose=buoy_pair.waypoint.point, header = Header(frame_id="odom"), scale=Vector3(x=1.0,y=0.05,z=0.05), color=ColorRGBA(a=1.0), id=3*i))
             marker_array.markers.append(Marker(type=Marker.SPHERE, pose=buoy_pair.left, header = Header(frame_id="odom"), scale=Vector3(x=1.0,y=1.0,z=1.0), color=ColorRGBA(r = 1.0, a=1.0), id=3*i+1))
             marker_array.markers.append(Marker(type=Marker.SPHERE, pose=buoy_pair.right, header = Header(frame_id="odom"), scale=Vector3(x=1.0,y=1.0,z=1.0), color=ColorRGBA(g = 1.0, a=1.0), id=3*i+2))
+            i+=1
         return marker_array
 
     def setup_buoys(self):
@@ -86,7 +87,8 @@ class WaypointFinder(Node):
             return True
         else:
             return False
-        
+    
+    # euler <-> quaternion transformation code from: https://gist.github.com/salmagro/2e698ad4fbf9dae40244769c5ab74434
     def euler_from_quaternion(self, quaternion):
         """
         Converts quaternion (w in last place) to euler roll, pitch, yaw
@@ -139,13 +141,13 @@ class WaypointFinder(Node):
     def next_pair(self, prev_pair, red, green):
         """Find the next buoy pair (red left, green right) from the previous pair,
         by checking the closes one to the middle of the previous buoy pair that's in front of the pair"""
-        return (self.get_closest_to(self.midpoint_pair(prev_pair), self.filter_front_buoys(prev_pair, red)), self.get_closest_to(self.midpoint(prev_pair), self.filter_front_buoys(prev_pair, green)))
+        return (self.get_closest_to(self.midpoint_pair(prev_pair), self.filter_front_buoys(prev_pair, red)), self.get_closest_to(self.midpoint_pair(prev_pair), self.filter_front_buoys(prev_pair, green)))
     
     def pair_to_pose(self, pair):
         return Pose(position = Point(x = pair[0], y = pair[1]))
     
     def pair_angle_to_pose(self, pair, angle):
-        quat = self.quaternion_from_euler(0,0,angle)
+        quat = self.quaternion_from_euler(0,angle,0)
         return Pose(position = Point(x = pair[0], y = pair[1]), orientation = Quaternion(x = quat[0], y = quat[2], z = quat[2], w = quat[3]))
 
     def generate_waypoints(self):
@@ -166,7 +168,8 @@ class WaypointFinder(Node):
         if self.ccw(self.pair_to[0],self.pair_to[1], self.robot_pos):
             try:
                 self.pair_to = self.next_pair(self.pair_to, red_buoys, green_buoys)
-            except:
+            except Exception as e:
+                self.get_logger().warning(repr(e))
                 self.get_logger().warning("No next buoy pair to go to!")
 
         buoy_pairs = [self.pair_to]
@@ -174,14 +177,14 @@ class WaypointFinder(Node):
 
         # will terminate if we run out of either of the points
         while True:
-            last_waypoint = self.midpoint_pair(buoy_pairs[-1])
             try:
-                buoy_pairs.append(self.next_pair(last_waypoint))
-                waypoints.append(self.midpoint(buoy_pairs[-1]))
-            except:
+                buoy_pairs.append(self.next_pair(buoy_pairs[-1], red_buoys, green_buoys))
+                waypoints.append(self.midpoint_pair(buoy_pairs[-1]))
+            except Exception as e:
+                self.get_logger().warning(repr(e))
                 break
         
-        waypoint_arr = WaypointArray(waypoints = [Waypoint(point = self.pair_angle_to_pose(wpt,-math.atan(pair[1][0]-pair[0][0])/(pair[1][1]-pair[0][1])), radius = math.sqrt(self.norm_squared(pair[0], pair[1])) - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)])
+        waypoint_arr = WaypointArray(waypoints = [Waypoint(point = self.pair_angle_to_pose(wpt,math.pi/2+math.atan(pair[1][1]-pair[0][1])/(pair[1][0]-pair[0][0])), radius = math.sqrt(self.norm_squared(pair[0], pair[1])) - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)])
         buoy_pair_arr = BuoyPairArray(pairs = [BuoyPair(left = self.pair_to_pose(pair[0]), right = self.pair_to_pose(pair[1]), waypoint = waypoint) for pair, waypoint in zip(buoy_pairs, waypoint_arr.waypoints)])
         
         self.buoy_pair_pub.publish(buoy_pair_arr)
@@ -191,6 +194,7 @@ class WaypointFinder(Node):
 
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
+        self.get_logger().info("number of obstacles:"+str(len(msg.obstacles)))
         self.get_logger().info("obstacles: "+str(self.obs_to_pos_label(self.obstacles)))
         
         success = False
