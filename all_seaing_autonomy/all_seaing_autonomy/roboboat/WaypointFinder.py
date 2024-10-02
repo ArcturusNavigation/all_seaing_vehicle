@@ -2,10 +2,12 @@
 import rclpy
 from rclpy.node import Node
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
-from geometry_msgs.msg import Point, Pose, PoseArray
+from geometry_msgs.msg import Point, Pose, PoseArray, Vector3, Quaternion
 from all_seaing_interfaces.msg import BuoyPair, BuoyPairArray, Waypoint, WaypointArray
 from tf2_msgs.msg import TFMessage
 from nav_msgs.msg import Odometry
+from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import Header, ColorRGBA
 import math
 
 class WaypointFinder(Node):
@@ -17,6 +19,7 @@ class WaypointFinder(Node):
         self.odometry_sub = self.create_subscription(Odometry, "/odometry/filtered", self.odometry_cb, 10)
         self.buoy_pair_pub = self.create_publisher(BuoyPairArray, "buoy_pairs", 10)
         self.waypoint_pub = self.create_publisher(WaypointArray, "waypoints", 10)
+        self.waypoint_marker_pub = self.create_publisher(MarkerArray, "waypoint_markers", 10)
 
         self.robot_pos = (0,0)
         self.safe_margin = 0
@@ -51,6 +54,15 @@ class WaypointFinder(Node):
     def obs_to_pos_label(self, obs):
         return [(ob.global_point.point.x, ob.global_point.point.y, ob.label) for ob in obs]
 
+    def buoy_pairs_to_markers(self, buoy_pairs):
+        marker_array = MarkerArray()
+        i = 0
+        for buoy_pair in buoy_pairs.pairs:
+            marker_array.markers.append(Marker(type=Marker.ARROW, pose=buoy_pair.waypoint.point, header = Header(frame_id="odom"), scale=Vector3(x=1.0,y=0.05,z=0.05), color=ColorRGBA(a=1.0), id=3*i))
+            marker_array.markers.append(Marker(type=Marker.SPHERE, pose=buoy_pair.left, header = Header(frame_id="odom"), scale=Vector3(x=1.0,y=1.0,z=1.0), color=ColorRGBA(r = 1.0, a=1.0), id=3*i+1))
+            marker_array.markers.append(Marker(type=Marker.SPHERE, pose=buoy_pair.right, header = Header(frame_id="odom"), scale=Vector3(x=1.0,y=1.0,z=1.0), color=ColorRGBA(g = 1.0, a=1.0), id=3*i+2))
+        return marker_array
+
     def setup_buoys(self):
         self.get_logger().info("Setting up starting buoys!")
         self.get_logger().info("obstacles: "+str(self.obs_to_pos_label(self.obstacles)))
@@ -74,6 +86,51 @@ class WaypointFinder(Node):
             return True
         else:
             return False
+        
+    def euler_from_quaternion(self, quaternion):
+        """
+        Converts quaternion (w in last place) to euler roll, pitch, yaw
+        quaternion = [x, y, z, w]
+        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
+        """
+        x = quaternion.x
+        y = quaternion.y
+        z = quaternion.z
+        w = quaternion.w
+
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+
+        sinp = 2 * (w * y - z * x)
+        pitch = math.asin(sinp)
+
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = math.atan(siny_cosp, cosy_cosp)
+
+        return roll, pitch, yaw
+    
+    def quaternion_from_euler(self, roll, pitch, yaw):
+        """
+        Converts euler roll, pitch, yaw to quaternion (w in last place)
+        quat = [x, y, z, w]
+        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
+        """
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        q = [0] * 4
+        q[0] = cy * cp * cr + sy * sp * sr
+        q[1] = cy * cp * sr - sy * sp * cr
+        q[2] = sy * cp * sr + cy * sp * cr
+        q[3] = sy * cp * cr - cy * sp * sr
+
+        return q
     
     def filter_front_buoys(self, pair, buoys):
         # (red, green)
@@ -87,6 +144,10 @@ class WaypointFinder(Node):
     def pair_to_pose(self, pair):
         return Pose(position = Point(x = pair[0], y = pair[1]))
     
+    def pair_angle_to_pose(self, pair, angle):
+        quat = self.quaternion_from_euler(0,0,angle)
+        return Pose(position = Point(x = pair[0], y = pair[1]), orientation = Quaternion(x = quat[0], y = quat[2], z = quat[2], w = quat[3]))
+
     def generate_waypoints(self):
         self.get_logger().info("obstacles: "+str(self.obs_to_pos_label(self.obstacles)))
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
@@ -95,9 +156,9 @@ class WaypointFinder(Node):
         self.get_logger().info("red buoys: "+str(red_buoys)+", green buoys: "+str(green_buoys))
         # RED BUOYS LEFT, GREEN RIGHT
 
-        if len(green_buoys) == 0 or len(red_buoys) == 0:
-            self.get_logger().warning("No buoy pairs!")
-            return
+        # if len(green_buoys) == 0 or len(red_buoys) == 0:
+        #     self.get_logger().warning("No buoy pairs (other than start)!")
+        #     return
         
         # TODO: Match the previous pair of buoys to the new obstacle map (in terms of global position) to eliminate any big drift that may mess up the selection of the next pair
         
@@ -120,11 +181,13 @@ class WaypointFinder(Node):
             except:
                 break
         
-        waypoint_arr = WaypointArray(waypoints = [Waypoint(point = self.pair_to_pose(wpt), radius = math.sqrt(self.norm_squared(pair[0], pair[1])) - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)])
-        buoy_pairs = BuoyPairArray(pairs = [BuoyPair(left = self.pair_to_pose(pair[0]), right = self.pair_to_pose(pair[1]), waypoint = waypoint) for pair, waypoint in zip(buoy_pairs, waypoint_arr.waypoints)])
-        self.buoy_pair_pub.publish(buoy_pairs)
+        waypoint_arr = WaypointArray(waypoints = [Waypoint(point = self.pair_angle_to_pose(wpt,-math.atan(pair[1][0]-pair[0][0])/(pair[1][1]-pair[0][1])), radius = math.sqrt(self.norm_squared(pair[0], pair[1])) - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)])
+        buoy_pair_arr = BuoyPairArray(pairs = [BuoyPair(left = self.pair_to_pose(pair[0]), right = self.pair_to_pose(pair[1]), waypoint = waypoint) for pair, waypoint in zip(buoy_pairs, waypoint_arr.waypoints)])
+        
+        self.buoy_pair_pub.publish(buoy_pair_arr)
         self.waypoint_pub.publish(waypoint_arr)
-        self.get_logger().info("buoy pairs: "+str(buoy_pairs)+", waypoints: "+str(waypoint_arr))
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers(buoy_pair_arr))
+        self.get_logger().info("buoy pairs: "+str(buoy_pairs)+", waypoints: "+str(waypoints))
 
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
