@@ -21,12 +21,9 @@ class WebcamPublisher(Node):
         if ret:
             ros_image = self.bridge.cv2_to_imgmsg(frame, "bgr8")
             self.publisher_.publish(ros_image)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            return
     
     def close(self):
         self.cap.release()
-        cv2.destroyAllWindows() 
 
 
 
