@@ -53,7 +53,15 @@ def generate_launch_description():
     controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="xdrive_controller.py",
-        parameters=[{"in_sim": True}],
+        parameters=[
+            {
+                "in_sim": True,
+                "boat_length": 3.5,
+                "boat_width": 2.0,
+                "min_output": -1000.0,
+                "max_output": 1000.0,
+            }
+        ],
     )
 
     rviz_testing_helper_node = launch_ros.actions.Node(
@@ -85,6 +93,20 @@ def generate_launch_description():
                 "camera_info",
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
             ),
+        ],
+    )
+
+    obstacle_bbox_visualizer_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_bbox_visualizer",
+        remappings=[
+            ("camera_info", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+            }
         ],
     )
 
@@ -162,6 +184,11 @@ def generate_launch_description():
         package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
+        parameters=[
+            {"joy_x_scale": 2.0},
+            {"joy_y_scale": -2.0},
+            {"joy_ang_scale": -0.8},
+        ],
     )
 
     waypoint_sender = launch_ros.actions.Node(
@@ -195,6 +222,7 @@ def generate_launch_description():
             keyboard_node,
             keyboard_to_joy_node,
             obstacle_bbox_overlay_node,
+            obstacle_bbox_visualizer_node,
             color_segmentation_node,
             point_cloud_filter_node,
             obstacle_detector_node,
