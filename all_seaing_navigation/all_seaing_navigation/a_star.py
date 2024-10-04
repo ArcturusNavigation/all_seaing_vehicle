@@ -1,14 +1,13 @@
-# A* star template from RSS (WIP) :)
-
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 
 assert rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray, PointStamped, Pose
 from nav_msgs.msg import OccupancyGrid
-from .utils import LineTrajectory, Map, PriorityQueue
-from tf_transformations import euler_from_quaternion, quaternion_from_euler
-from visualization_msgs.msg import Marker, MarkerArray
+from .light_utils import PriorityQueue
+# from tf_transformations import euler_from_quaternion, quaternion_from_euler
+# from visualization_msgs.msg import Marker, MarkerArray
 
 from math import inf, sqrt #Caution: only in Python 3.5
 import time
@@ -23,15 +22,6 @@ class PathPlan(Node):
 
     def __init__(self):
         super().__init__("astar_path_planner")
-        self.odom_topic = "default"
-        # self.declare_parameter('map_topic', "default")
-        # self.declare_parameter('initial_pose_topic', "default")
-        # self.declare_parameter('clicked_point_topic',"default")
-
-        # self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
-        # self.map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
-        # self.initial_pose_topic = self.get_parameter('initial_pose_topic').get_parameter_value().string_value
-        # self.clicked_point_topic = self.get_parameter('clicked_point_topic').get_parameter_value().string_value
 
         self.map_topic = "map" # occupancy grid
         self.waypoints_topic = "default"
@@ -77,7 +67,9 @@ class PathPlan(Node):
         total_path = []
         for i in range(0, self.waypoints.length-1):
             total_path.append(self.plan_path(self.waypoints[i], self.waypoints[i+1]))
-        self.publish_path(total_path)
+        PA = PoseArray()
+        PA.poses = total_path
+        self.publish_path(PA)
 
 
     def plan_path(self, s, t):
@@ -89,29 +81,30 @@ class PathPlan(Node):
         """
         W = self.map_info.width
         H = self.map_info.height
-        dxy = [[1,0], [0,1], [-1,0], [0,-1]]
+        dxy = [(1,0), (0,1), (-1,0), (0,-1)]
         # index occupancy grid (self.map_grid) with self.map_grid.data[r*W+c]
         gscore = [inf] * (H*W)
-        parent = [[0,0]] * (H*W)
-        spos = [s.x, s.y]
-        tpos = [t.x, t.y]
+        parent = [(0,0)] * (H*W)
+        spos = (s.x, s.y)
+        tpos = (t.x, t.y)
         self.target = tpos
 
         gscore[spos[0]*W + spos[1]] = 0
-        parent[spos[0]*W + spos[1]] = spos[0]*W + spos[1]
+        parent[spos[0]*W + spos[1]] = spos
 
         pq = PriorityQueue()
-        pq.put([0, spos[0], spos[1]])
+        pq.put((self.heuristic(spos), spos[0], spos[1]))
 
         while not pq.empty():
             node = pq.get()
 
-            if node[0] != gscore[node[1]*W+node[2]] + self.heuristic(node):
+            if abs(node[0] - (gscore[node[1]*W+node[2]] + self.heuristic(node[1:3]))) < 0.005 :
                 continue
-            if node[1:3] == tpos:
+            node = node[1:3]
+            if node == tpos:
                 break
             for d in dxy:
-                nxt = [node[0]+d[0], node[1]+d[1]]
+                nxt = (node[0]+d[0], node[1]+d[1])
                 if nxt[0] < 0 or nxt[0] > W or nxt[1] < 0 or nxt[1] > H:
                     continue
 
@@ -120,34 +113,25 @@ class PathPlan(Node):
 
                 if gscore[node[0] * W + node[1]] + 1 < gscore[nxt[0] * W + nxt[1]]:
                     gscore[nxt[0] * W + nxt[1]] = gscore[node[0] * W + node[1]] + 1
-                    parent[nxt[0] * W + nxt[1]] = node[0] * W + node[1]
-                    pq.put([gscore[nxt[0] * W + nxt[1]], nxt[0], nxt[1]])
+                    parent[nxt[0] * W + nxt[1]] = node
+                    pq.put((gscore[nxt[0] * W + nxt[1]] + self.heuristic(nxt), nxt[0], nxt[1]))
 
         # Backtracing
-        ret = PoseArray()
         path = []
         cur = tpos
         while cur != spos:
-            r = Pose()
-            r.x = cur[0]
-            r.y = cur[1]
             path.append(cur)
             cur = parent[cur[0] * W + cur[1]]
-        path.append(spos) ####
+        path.append(spos) 
         path = list(reversed(path))
-        ret.poses = path
-        return ret
+        return path
 
     def pose_to_string(self, pos):
         return "{" + str(pos.position.x) + ", " + str(pos.position.y) + ", " + str(pos.position.z) + "}"
 
     def publish_path(self,path):
-
         self.publisher.publish(path)
         self.get_logger().info(f"Publishing: path from " + self.pose_to_string(self.waypoints[0]) + " to " + self.pose_to_string(self.waypoints[-1]))
-        # self.trajectory.updatePoints(path)
-        # self.traj_pub.publish(self.trajectory.toPoseArray())
-        # self.trajectory.publish_viz()
 
 
 def main(args=None):

@@ -378,13 +378,13 @@ class PriorityQueue:
 
     def put(self, item):
         heapq.heappush(self.elements, item)
-        self.element_set.add(item.pose)
+        self.element_set.add(item)
 
     def get(self):
         return heapq.heappop(self.elements)
 
     def __contains__(self,item):
-        return item.pose in self.element_set
+        return item in self.element_set
 
 class Map():
     """
@@ -1145,3 +1145,6 @@ class Map():
                 new_x += mid
 
         return (new_x, new_y)
+
+if __name__ == "__main__":
+	main()
