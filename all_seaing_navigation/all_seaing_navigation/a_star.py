@@ -17,23 +17,23 @@ import numpy as np
 # import cProfile
 
 class PathPlan(Node):
-    """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path to follow (PoseArray) 
+    """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path to follow (PoseArray)
         using Astar
     """
 
     def __init__(self):
         super().__init__("astar_path_planner")
         self.odom_topic = "default"
-        self.declare_parameter('map_topic', "default")
-        self.declare_parameter('initial_pose_topic', "default")
-        self.declare_parameter('clicked_point_topic',"default")
+        # self.declare_parameter('map_topic', "default")
+        # self.declare_parameter('initial_pose_topic', "default")
+        # self.declare_parameter('clicked_point_topic',"default")
 
-        self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
-        self.map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
-        self.initial_pose_topic = self.get_parameter('initial_pose_topic').get_parameter_value().string_value
-        self.clicked_point_topic = self.get_parameter('clicked_point_topic').get_parameter_value().string_value
+        # self.odom_topic = self.get_parameter('odom_topic').get_parameter_value().string_value
+        # self.map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
+        # self.initial_pose_topic = self.get_parameter('initial_pose_topic').get_parameter_value().string_value
+        # self.clicked_point_topic = self.get_parameter('clicked_point_topic').get_parameter_value().string_value
 
-        self.map_topic = "default" # occupancy grid
+        self.map_topic = "map" # occupancy grid
         self.waypoints_topic = "default"
         # 2-D grid map, each cell represents the probability of occupancy
         self.map_sub = self.create_subscription(
@@ -57,7 +57,7 @@ class PathPlan(Node):
         self.target = None
         self.cutoff = 50
 
-        self.waypoints = None 
+        self.waypoints = None
 
 
     def map_cb(self, msg):
@@ -122,8 +122,8 @@ class PathPlan(Node):
                     gscore[nxt[0] * W + nxt[1]] = gscore[node[0] * W + node[1]] + 1
                     parent[nxt[0] * W + nxt[1]] = node[0] * W + node[1]
                     pq.put([gscore[nxt[0] * W + nxt[1]], nxt[0], nxt[1]])
-        
-        # Backtracing 
+
+        # Backtracing
         ret = PoseArray()
         path = []
         cur = tpos
@@ -131,7 +131,7 @@ class PathPlan(Node):
             r = Pose()
             r.x = cur[0]
             r.y = cur[1]
-            path.append(cur) 
+            path.append(cur)
             cur = parent[cur[0] * W + cur[1]]
         path.append(spos) ####
         path = list(reversed(path))

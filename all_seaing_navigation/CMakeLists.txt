@@ -12,6 +12,15 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/waypoint_sender.py
     DESTINATION lib/${PROJECT_NAME}
+
+    ${PROJECT_NAME}/a_star.py
+    DESTINATION lib/${PROJECT_NAME}
+)
+
+# Optionally, install launch files (if you have any)
+install(DIRECTORY
+  launch/
+  DESTINATION share/${PROJECT_NAME}/launch
 )
 
 ament_auto_package()
