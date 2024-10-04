@@ -19,7 +19,7 @@ def generate_launch_description():
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
     localize_params = os.path.join(
-        bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
+        bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
     keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
 
