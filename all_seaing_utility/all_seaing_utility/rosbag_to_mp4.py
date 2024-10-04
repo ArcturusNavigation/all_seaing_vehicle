@@ -59,19 +59,10 @@ def convert(input_path: str, input_topic: str, output_path: str):
 
 
 def main():
-    parser = ArgumentParser(
-        prog="rosbag_to_mp4.py",
-        description="converts a rosbag image topic to an mp4",
-    )
-    parser.add_argument(
-        "-i", "--input", help="input rosbag path", type=str, required=True
-    )
-    parser.add_argument(
-        "-t", "--topic", help="image topic to convert", type=str, required=True
-    )
-    parser.add_argument(
-        "-o", "--output", help="output mp4 path", type=str, required=True
-    )
+    parser = ArgumentParser(description="converts a rosbag image topic to an mp4")
+    parser.add_argument("-i", "--input", help="input rosbag path", type=str, required=True)
+    parser.add_argument("-t", "--topic", help="image topic to convert", type=str, required=True)
+    parser.add_argument("-o", "--output", help="output mp4 path", type=str, required=True)
     args = parser.parse_args()
 
     convert(input_path=args.input, input_topic=args.topic, output_path=args.output)

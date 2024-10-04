@@ -6,6 +6,7 @@ from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 import launch_ros
 import os
+import subprocess
 
 
 def generate_launch_description():
@@ -15,7 +16,7 @@ def generate_launch_description():
     description_prefix = get_package_share_directory("all_seaing_description")
 
     robot_localization_params = os.path.join(
-        bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
+        bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
     keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
     color_label_mappings = os.path.join(
@@ -25,16 +26,12 @@ def generate_launch_description():
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
 
-    bag_path = LaunchConfiguration("bag_path")
-    launch_rviz = LaunchConfiguration("launch_rviz")
-    record_bag = LaunchConfiguration("record_bag")
+    subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
-    bag_path_launch_arg = DeclareLaunchArgument("bag_path", default_value=".")
+    launch_rviz = LaunchConfiguration("launch_rviz")
+
     launch_rviz_launch_arg = DeclareLaunchArgument(
         "launch_rviz", default_value="true", choices=["true", "false"]
-    )
-    record_bag_launch_arg = DeclareLaunchArgument(
-        "record_bag", default_value="false", choices=["true", "false"]
     )
 
     ekf_node = launch_ros.actions.Node(
@@ -62,13 +59,6 @@ def generate_launch_description():
                 "max_output": 1000.0,
             }
         ],
-    )
-
-    rviz_testing_helper_node = launch_ros.actions.Node(
-        package="all_seaing_utility",
-        executable="rviz_testing_helper.py",
-        parameters=[{"bag_path": bag_path}],
-        condition=IfCondition(record_bag),
     )
 
     keyboard_node = launch_ros.actions.Node(
@@ -212,13 +202,10 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            bag_path_launch_arg,
             launch_rviz_launch_arg,
-            record_bag_launch_arg,
             ekf_node,
             navsat_node,
             controller_node,
-            rviz_testing_helper_node,
             keyboard_node,
             keyboard_to_joy_node,
             obstacle_bbox_overlay_node,

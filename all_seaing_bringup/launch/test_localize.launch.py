@@ -5,6 +5,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 import launch_ros
 import os
+import subprocess
 import yaml
 
 
@@ -21,6 +22,17 @@ def launch_setup(context, *args, **kwargs):
     )
 
     location = context.perform_substitution(LaunchConfiguration("location"))
+
+    subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
+
+    rviz_node = launch_ros.actions.Node(
+        package="rviz2",
+        executable="rviz2",
+        arguments=[
+            "-d",
+            os.path.join(bringup_prefix, "rviz", "dashboard.rviz"),
+        ],
+    )
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -42,40 +54,6 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    controller_node = launch_ros.actions.Node(
-        package="all_seaing_controller",
-        executable="xdrive_controller.py",
-        parameters=[{
-            "in_sim": False,
-            "boat_length": 0.7112,
-            "boat_width": 0.2540,
-            "min_output": 1100.0,
-            "max_output": 1900.0,
-        }],
-    )
-
-    thrust_commander_node = launch_ros.actions.Node(
-        package="all_seaing_driver",
-        executable="thrust_commander.py",
-        parameters=[
-            {
-                "front_right_port": 2,
-                "front_left_port": 3,
-                "back_right_port": 4,
-                "back_left_port": 5,
-            }
-        ],
-    )
-
-    lidar_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                driver_prefix,
-                "/launch/32e_points.launch.py",
-            ]
-        )
-    )
-
     mavros_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -85,48 +63,18 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
-    controller_server = launch_ros.actions.Node(
-        package="all_seaing_controller",
-        executable="controller_server.py",
-        output="screen",
-    )
-
-    waypoint_sender = launch_ros.actions.Node(
-        package="all_seaing_navigation",
-        executable="waypoint_sender.py",
-        parameters=[
-            {"xy_threshold": 1.0},
-            {"theta_threshold": 5.0},
-        ],
-        output="screen",
-    )
-
-    zed_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                driver_prefix,
-                "/launch/zed2i.launch.py",
-            ]
-        )
-    )
-
     return [
+        rviz_node,
         ekf_node,
         navsat_node,
-        controller_node,
-        controller_server,
-        waypoint_sender,
-        thrust_commander_node,
-        lidar_ld,
         mavros_ld,
-        zed_ld,
     ]
 
 
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="boathouse"),
+            DeclareLaunchArgument("location", default_value="seagrant"),
             OpaqueFunction(function=launch_setup),
         ]
     )

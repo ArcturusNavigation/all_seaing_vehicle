@@ -13,7 +13,7 @@ def generate_launch_description():
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
     localize_params = os.path.join(
-        bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
+        bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
     keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
 
