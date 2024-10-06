@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# Does not build.
+# Do not use this node as a dependency.
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
