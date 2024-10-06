@@ -20,7 +20,6 @@ from rclpy.qos import QoSHistoryPolicy
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSReliabilityPolicy
 
-
 from cv_bridge import CvBridge
 
 from ultralytics import YOLO
@@ -30,7 +29,6 @@ from ultralytics.engine.results import Boxes
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 
 import os
-from ament_index_python.packages import get_package_share_directory
 
 from sensor_msgs.msg import Image
 from std_srvs.srv import SetBool
@@ -57,13 +55,17 @@ class Yolov8Node(Node):
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
 
         # Get the model's path
-        package_path = get_package_share_directory('all_seaing_perception')
-        model_path = os.path.join(package_path, 'models', model_name)
+        self.model_dir = os.path.expanduser("~/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
+        model_path = os.path.join(self.model_dir, model_name)
 
         # Initialize YOLO model
-        self.cv_bridge = CvBridge()
-        self.yolo = YOLO(model_path)
-        self.yolo.fuse()
+        if not os.path.isfile(model_path):
+            self.get_logger().error(f"Model file does not exist at path: {model_path}")
+        else:
+            self.get_logger().info(f"Loading model from: {model_path}")
+            self.cv_bridge = CvBridge()
+            self.yolo = YOLO(model_path)
+            self.yolo.fuse()
 
         # Setup QoS profile
         image_qos_profile = QoSProfile(
@@ -81,6 +83,8 @@ class Yolov8Node(Node):
         # Service for enabling/disabling
         self._srv = self.create_service(SetBool, "enable", self.enable_cb)
 
+        self.get_logger().info(f"Yolov8Node initialized")
+
     def enable_cb(
         self,
         req: SetBool.Request,
@@ -90,13 +94,12 @@ class Yolov8Node(Node):
         res.success = True
         return res
 
-
     def image_cb(self, msg: Image) -> None:
 
         if self.enable:
-
             # convert image + predict
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg)
+
             results = self.yolo.predict(
                 source=cv_image,
                 verbose=False,
@@ -117,7 +120,7 @@ class Yolov8Node(Node):
                     # self.yolo.names[int(box_data.cls)] for class labels
                     box_msg.label = int(box_data.cls)
                     box_msg.probability = float(box_data.conf)
-                    center_x, center_y, width, height = box_data.xywh
+                    center_x, center_y, width, height = box_data.xywh[0]
                     box_msg.min_x = int(center_x - width/2)
                     box_msg.max_x = int(center_x + width/2)
                     box_msg.min_y = int(center_y - height/2)
@@ -135,3 +138,7 @@ def main():
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
