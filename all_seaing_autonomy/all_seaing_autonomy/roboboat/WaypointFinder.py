@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import yaml
 import rclpy
 from rclpy.node import Node
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
@@ -9,6 +10,8 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header, ColorRGBA
 import math
+import os
+from ament_index_python.packages import get_package_share_directory
 
 # TODO: DOCUMENT THE CODE IN THE AUTONOMY WIKI (SEE PERCEPTION WIKI FOR REFERENCE)
 
@@ -32,20 +35,17 @@ class WaypointFinder(Node):
 
         self.declare_parameter("safe_margin", 0)
 
-        self.first_map = True
+        bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-        self.safe_margin = (
-            self.get_parameter("safe_margin").get_parameter_value().double_value
+        self.declare_parameter("color_label_mappings_file",
+            os.path.join(
+            bringup_prefix, "config", "perception", "color_label_mappings.yaml")
         )
 
-        """
-        todo: add this to the parameters for the launch file
-        parameters=[
-            {
-                "color_label_mappings_file": color_label_mappings,
-            }
-        ],
-        """
+        self.first_map = True
+
+        self.safe_margin = self.get_parameter("safe_margin").get_parameter_value().double_value
+        
         color_label_mappings_file = self.get_parameter(
             "color_label_mappings_file"
         ).value
@@ -56,7 +56,7 @@ class WaypointFinder(Node):
         return vec[0] ** 2 + vec[1] ** 2
 
     def norm(self, vec, ref=(0, 0)):
-        return math.sqrt(norm_squared(vec, ref))
+        return math.sqrt(self.norm_squared(vec, ref))
 
     def ob_coords(self, buoy, local=False):
         if local:
@@ -133,6 +133,7 @@ class WaypointFinder(Node):
                 )
             )
             i += 1
+            # TODO: add a cylinder marker to visualize the acceptable area radius and the safety margin
         return marker_array
 
     def setup_buoys(self):
