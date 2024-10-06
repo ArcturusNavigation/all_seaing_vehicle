@@ -33,7 +33,7 @@ class WaypointFinder(Node):
 
         self.robot_pos = (0, 0)
 
-        self.declare_parameter("safe_margin", 0)
+        self.declare_parameter("safe_margin", 0.2)
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
@@ -109,7 +109,7 @@ class WaypointFinder(Node):
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=0.05, z=0.05),
                     color=ColorRGBA(a=1.0),
-                    id=(3 * i),
+                    id=(4 * i),
                 )
             )
             marker_array.markers.append(
@@ -119,7 +119,7 @@ class WaypointFinder(Node):
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=ColorRGBA(r=1.0, a=1.0),
-                    id=(3 * i) + 1,
+                    id=(4 * i) + 1,
                 )
             )
             marker_array.markers.append(
@@ -129,11 +129,20 @@ class WaypointFinder(Node):
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=ColorRGBA(g=1.0, a=1.0),
-                    id=(3 * i) + 2,
+                    id=(4 * i) + 2,
+                )
+            )
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.CYLINDER,
+                    pose=Pose(position=Point(x=buoy_pair.waypoint.point.position.x, y=buoy_pair.waypoint.point.position.y)),
+                    header=Header(frame_id="odom"),
+                    scale=Vector3(x=buoy_pair.waypoint.radius, y=buoy_pair.waypoint.radius, z=1.0),
+                    color=ColorRGBA(g=1.0, a=0.5),
+                    id=(4 * i) + 3,
                 )
             )
             i += 1
-            # TODO: add a cylinder marker to visualize the acceptable area radius and the safety margin
         return marker_array
 
     def setup_buoys(self):
@@ -338,7 +347,7 @@ class WaypointFinder(Node):
                             (self.ob_coords(pair[1])[0] - self.ob_coords(pair[0])[0])
                         ) + (math.pi / 2),
                     ),
-                    radius=self.norm(self.ob_coords(pair[0]), self.ob_coords(pair[1])) - self.safe_margin,
+                    radius=self.norm(self.ob_coords(pair[0]), self.ob_coords(pair[1]))/2 - self.safe_margin,
                 )
                 for wpt, pair in zip(waypoints, buoy_pairs)
             ]

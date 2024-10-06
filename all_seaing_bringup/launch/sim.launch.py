@@ -197,7 +197,7 @@ def generate_launch_description():
         executable="WaypointFinder.py",
         parameters=[
             {"color_label_mappings_file": color_label_mappings},
-            {"safe_margin": 0}
+            {"safe_margin": 0.2}
         ]
     )
 
