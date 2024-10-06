@@ -98,13 +98,14 @@ class WaypointFinder(Node):
         are the front buoys of the robot starting box.
         """
         self.get_logger().info("Setting up starting buoys!")
-        self.get_logger().info("obstacles: "+str(self.obs_to_pos_label(self.obstacles)))
+        self.get_logger().info(f"list of obstacles: {self.obs_to_pos_label(self.obstacles)}")
+
         green_init, red_init = self.split_buoys(self.obstacles) # split all the buoys into red and green
         # lambda function that filters the buoys that are in front of the robot (using their local coordinates, but provides the global ones as output)
         obstacles_in_front = lambda obs: [ob for ob in obs if ob.local_point.point.x > 0]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
-        self.get_logger().info("initial red buoys: "+str(red_buoys)+", green buoys: "+str(green_buoys))
+        self.get_logger().info("initial red buoys: {red_buoys}, green buoys: {green_buoys}")
         if(len(red_buoys)==0 or len(green_buoys)==0):
             # didn't find starting buoys
             self.get_logger().warning("No starting buoy pairs!")
@@ -113,7 +114,7 @@ class WaypointFinder(Node):
         # this pair is the front pair of the starting box of the robot
         self.starting_buoys = (self.get_closest_to((0,0),red_buoys,local=True), self.get_closest_to((0,0),green_buoys,local=True))
         self.pair_to = self.starting_buoys
-        self.get_logger().info("starting buoys: "+str(self.starting_buoys))
+        self.get_logger().info(f"{=self.starting_buoys}")
         return True
     
     def ccw(self, a, b, c):
@@ -206,13 +207,13 @@ class WaypointFinder(Node):
         and the next_pair() function to compute the next pair from each one in the sequence,
         as long as there is a next pair from the buoys that are stored in the obstacle map.
         """
-        self.get_logger().info("obstacles: "+str(self.obs_to_pos_label(self.obstacles)))
+        self.get_logger().info(f"list of obstacles: {self.obs_to_pos_label(self.obstacles)}")
         # split the buoys into red and green
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
         # get the positions of the buoys
         # green_buoys = self.obs_to_pos(green_buoys)
         # red_buoys = self.obs_to_pos(red_buoys)
-        self.get_logger().info("red buoys: "+str(self.obs_to_pos(red_buoys))+", green buoys: "+str(self.obs_to_pos(green_buoys)))
+        self.get_logger().info(f"red buoys: {self.obs_to_pos(red_buoys)}, green buoys: {self.obs_to_pos(green_buoys)}")
         # RED BUOYS LEFT, GREEN RIGHT
         
         # TODO: Match the previous pair of buoys to the new obstacle map (in terms of global position) to eliminate any big drift that may mess up the selection of the next pair
@@ -248,7 +249,7 @@ class WaypointFinder(Node):
         self.waypoint_pub.publish(waypoint_arr)
         # publish the markers that show up in RViz
         self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers(buoy_pair_arr))
-        self.get_logger().info("buoy pairs: "+str(buoy_pairs)+", waypoints: "+str(waypoints))
+        self.get_logger().info(f"{buoy_pairs=}, {waypoints=}")
 
     def map_cb(self, msg):
         """
@@ -256,8 +257,8 @@ class WaypointFinder(Node):
         and then (if the starting buoys are successfully computed) form the buoy pair / waypoint sequence
         """
         self.obstacles = msg.obstacles
-        self.get_logger().info("number of obstacles:"+str(len(msg.obstacles)))
-        self.get_logger().info("obstacles: "+str(self.obs_to_pos_label(self.obstacles)))
+        self.get_logger().info(f"number of obstacles: {len(msg.obstacles)}")
+        self.get_logger().info(f"list of obstacles: {self.obs_to_pos_label(self.obstacles)}")
         
         success = False
         if self.first_map:
