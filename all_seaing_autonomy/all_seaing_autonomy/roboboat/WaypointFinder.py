@@ -28,6 +28,18 @@ class WaypointFinder(Node):
         self.declare_parameter('safe_margin', 0)
 
         self.first_map = True
+        
+        """
+        todo: add this to the parameters for the launch file
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+            }
+        ],
+        """
+        color_label_mappings_file = self.get_parameter('color_label_mappings_file').value
+        with open(color_label_mappings_file, 'r') as f:
+            self.color_label_mappings = yaml.safe_load(f)
 
     def norm_squared(self, vec, ref=(0, 0)):
         return vec[0] ** 2 + vec[1] ** 2
@@ -54,9 +66,9 @@ class WaypointFinder(Node):
         green_bouy_points = []
         red_bouy_points = []
         for obstacle in obstacles:
-            if obstacle.label == 2:
+            if obstacle.label == self.color_label_mappings["green"]:
                 green_bouy_points.append(obstacle)
-            elif obstacle.label == 1:
+            elif obstacle.label == self.color_label_mappings["red"]:
                 red_bouy_points.append(obstacle)
         return green_bouy_points, red_bouy_points
     
