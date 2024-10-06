@@ -5,8 +5,8 @@ https://github.com/mgonzs13/yolov8_ros
 
 
 Instructions (run this in terminal):
-ros2 run all_seaing_perception yolov8_node --ros-args \
-  -p model:=yolov8m.pt \
+ros2 run all_seaing_perception yolov8_node.py --ros-args \
+  -p model:=yolov8_roboboat_model.pt \
   -p device:=cuda:0 \
   -p threshold:=0.5 \
   -p enable:=true \
@@ -29,6 +29,7 @@ from ultralytics.engine.results import Boxes
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 
 import os
+import cv2
 
 from sensor_msgs.msg import Image
 from std_srvs.srv import SetBool
@@ -78,6 +79,7 @@ class Yolov8Node(Node):
 
         # Publisher and Subscriber
         self._pub = self.create_publisher(LabeledBoundingBox2DArray, "bounding_boxes", 10)
+        self._image_pub = self.create_publisher(Image, "annotated_image", 10)
         self._sub = self.create_subscription(Image, image_topic, self.image_cb, image_qos_profile)
 
         # Service for enabling/disabling
@@ -97,9 +99,10 @@ class Yolov8Node(Node):
     def image_cb(self, msg: Image) -> None:
 
         if self.enable:
-            # convert image + predict
+            # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg)
 
+            # Predict based on image
             results = self.yolo.predict(
                 source=cv_image,
                 verbose=False,
@@ -109,8 +112,8 @@ class Yolov8Node(Node):
             )
             results: Results = results[0].cpu()
 
-            # create labeled_bounding_box msgs
-            labeled_bouding_box_msgs = LabeledBoundingBox2DArray()
+            # Create labeled_bounding_box msgs
+            labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
 
             for box_data in results.boxes:
 
@@ -121,15 +124,27 @@ class Yolov8Node(Node):
                     box_msg.label = int(box_data.cls)
                     box_msg.probability = float(box_data.conf)
                     center_x, center_y, width, height = box_data.xywh[0]
-                    box_msg.min_x = int(center_x - width/2)
-                    box_msg.max_x = int(center_x + width/2)
-                    box_msg.min_y = int(center_y - height/2)
-                    box_msg.max_y = int(center_y + height/2)
+                    box_msg.min_x = int(center_x - width / 2)
+                    box_msg.max_x = int(center_x + width / 2)
+                    box_msg.min_y = int(center_y - height / 2)
+                    box_msg.max_y = int(center_y + height / 2)
 
-                labeled_bouding_box_msgs.boxes.append(box_msg)
+                    labeled_bounding_box_msgs.boxes.append(box_msg)
 
-            # publish detections
-            self._pub.publish(labeled_bouding_box_msgs)
+                    # Draw the bounding box on the image
+                    cv2.rectangle(cv_image, 
+                                  (box_msg.min_x, box_msg.min_y), 
+                                  (box_msg.max_x, box_msg.max_y), 
+                                  (0, 255, 0),  # Green color
+                                  2)  # Thickness
+
+            # Publish detections
+            self._pub.publish(labeled_bounding_box_msgs)
+
+            # Convert annotated image back to ROS Image message
+            annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(cv_image, encoding="bgr8")
+            self._image_pub.publish(annotated_image_msg)  # Publish annotated image
+
 
 
 def main():
