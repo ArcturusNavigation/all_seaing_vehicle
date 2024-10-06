@@ -11,7 +11,7 @@ ament_auto_find_build_dependencies()
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/roboboat/FollowThePath.py
-    ${PROJECT_NAME}/roboboat/WaypointFinder.py
+    ${PROJECT_NAME}/roboboat/waypoint_finder.py
     ${PROJECT_NAME}/roboboat/task_manager.py
     ${PROJECT_NAME}/roboboat/Task.py
     ${PROJECT_NAME}/vrx/acoustic_tracking/vrx_acoustic_tracking_sub.py

@@ -194,7 +194,7 @@ def generate_launch_description():
 
     waypoint_finder = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="WaypointFinder.py",
+        executable="waypoint_finder.py",
         parameters=[
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2}
