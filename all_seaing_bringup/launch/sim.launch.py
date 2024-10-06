@@ -96,6 +96,11 @@ def generate_launch_description():
         ],
     )
 
+    perception_eval_node = launch_ros.actions.Node(
+        package="all_seaing_utility",
+        executable="perception_eval.py",
+    )
+
     obstacle_bbox_visualizer_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_bbox_visualizer",
@@ -204,7 +209,8 @@ def generate_launch_description():
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "sydney_regatta",
+            # "world": "practice_2023_follow_path2_task",
+            "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": "-v 0",
         }.items(),
@@ -232,5 +238,6 @@ def generate_launch_description():
             onshore_node,
             waypoint_sender,
             sim_ld,
+            perception_eval_node,
         ]
     )

@@ -17,6 +17,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/LabeledBoundingBox2D.msg"
     "msg/Heartbeat.msg"
     "msg/ASV2State.msg"
+    "msg/ObstacleCounter.msg"
+    "msg/ObstacleCounterArray.msg"
     DEPENDENCIES
     geometry_msgs
 )
