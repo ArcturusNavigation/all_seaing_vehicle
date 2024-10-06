@@ -3,6 +3,14 @@
 References:
 https://github.com/mgonzs13/yolov8_ros
 
+
+Instructions (run this in terminal):
+ros2 run all_seaing_perception yolov8_node --ros-args \
+  -p model:=yolov8m.pt \
+  -p device:=cuda:0 \
+  -p threshold:=0.5 \
+  -p enable:=true \
+  -p image_topic:=your_custom_image_topic
 """
 
 
@@ -65,8 +73,11 @@ class Yolov8Node(Node):
         self._pub = self.create_publisher(LabeledBoundingBox2DArray, "bounding_boxes", 10)
 
         # subs
+        self.declare_parameter("image_topic", "image_raw") 
+        image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
+
         self._sub = self.create_subscription(
-            Image, "image_raw", self.image_cb,
+            Image, image_topic, self.image_cb,
             image_qos_profile
         )
 
