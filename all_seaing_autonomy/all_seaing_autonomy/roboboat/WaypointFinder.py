@@ -114,7 +114,7 @@ class WaypointFinder(Node):
         # this pair is the front pair of the starting box of the robot
         self.starting_buoys = (self.get_closest_to((0,0),red_buoys,local=True), self.get_closest_to((0,0),green_buoys,local=True))
         self.pair_to = self.starting_buoys
-        self.get_logger().info(f"{=self.starting_buoys}")
+        self.get_logger().info(f"{self.starting_buoys=}")
         return True
     
     def ccw(self, a, b, c):
