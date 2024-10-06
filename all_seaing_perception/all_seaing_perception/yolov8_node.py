@@ -6,7 +6,7 @@ https://github.com/mgonzs13/yolov8_ros
 
 Instructions (run this in terminal):
 ros2 run all_seaing_perception yolov8_node.py --ros-args \
-  -p model:=yolov8_roboboat_model.pt \
+  -p model:=model_name.pt \
   -p device:=cuda:0 \
   -p threshold:=0.5 \
   -p enable:=true \
@@ -120,7 +120,7 @@ class Yolov8Node(Node):
                 box_msg = LabeledBoundingBox2D()
 
                 if results.boxes:
-                    # self.yolo.names[int(box_data.cls)] for class labels
+
                     box_msg.label = int(box_data.cls)
                     box_msg.probability = float(box_data.conf)
                     center_x, center_y, width, height = box_data.xywh[0]
@@ -137,6 +137,9 @@ class Yolov8Node(Node):
                                   (box_msg.max_x, box_msg.max_y), 
                                   (0, 255, 0),  # Green color
                                   2)  # Thickness
+
+                    class_name = self.yolo.names[box_msg.label]
+                    self.get_logger().info(f"Detected: {class_name}")
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
