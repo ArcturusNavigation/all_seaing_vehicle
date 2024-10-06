@@ -1,3 +1,3 @@
-geometry_msgs/Pose left
-geometry_msgs/Pose right
+Obstacle left
+Obstacle right
 Waypoint waypoint
