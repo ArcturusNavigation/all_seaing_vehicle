@@ -5,7 +5,7 @@ from rclpy.node import Node
 assert rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray, PointStamped, Pose
 from nav_msgs.msg import OccupancyGrid
-from .light_utils import PriorityQueue
+from utils import PriorityQueue
 # from tf_transformations import euler_from_quaternion, quaternion_from_euler
 # from visualization_msgs.msg import Marker, MarkerArray
 
@@ -48,7 +48,6 @@ class PathPlan(Node):
         self.cutoff = 50
 
         self.waypoints = None
-
 
     def map_cb(self, msg):
         self.get_logger().info("Initialized Map" if self.map_info == None else "Updated Map")
@@ -122,7 +121,7 @@ class PathPlan(Node):
         while cur != spos:
             path.append(cur)
             cur = parent[cur[0] * W + cur[1]]
-        path.append(spos) 
+        path.append(spos)
         path = list(reversed(path))
         return path
 
@@ -132,7 +131,6 @@ class PathPlan(Node):
     def publish_path(self,path):
         self.publisher.publish(path)
         self.get_logger().info(f"Publishing: path from " + self.pose_to_string(self.waypoints[0]) + " to " + self.pose_to_string(self.waypoints[-1]))
-
 
 def main(args=None):
     rclpy.init(args=args)

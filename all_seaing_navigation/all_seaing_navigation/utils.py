@@ -419,22 +419,6 @@ class Map():
         self.grid = erosion(self.grid, disk(6))
         # self.grid = dilation(self.grid, disk(6))
 
-        # # RRT stuff
-        # self.one_grid = self.grid.flatten()
-
-        # # Crazy RRT ball shit
-        # v_unit_ball = 4/3 * math.pi
-
-        # L = self._resolution
-        # A = L**2
-        # v_cell = A * math.pi
-
-        # num_free_cells = np.count_nonzero(self.grid == 0)
-        # print(num_free_cells)
-        # v_free = v_cell * num_free_cells
-
-        # self.gamma_estimate = (2**3) * (1 + 1/3) * (v_free / v_unit_ball)
-
     @property
     def height(self) -> int: return self._height
 
