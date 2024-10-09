@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 
 assert rclpy
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray, PointStamped, Pose
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, Pose
 from nav_msgs.msg import OccupancyGrid
 from utils import PriorityQueue
 # from tf_transformations import euler_from_quaternion, quaternion_from_euler
@@ -24,7 +24,7 @@ class PathPlan(Node):
         super().__init__("astar_path_planner")
 
         self.map_topic = "map" # occupancy grid
-        self.waypoints_topic = "clicked_point"
+        self.waypoints_topic = "waypoints"
         # 2-D grid map, each cell represents the probability of occupancy
         self.map_sub = self.create_subscription(
             OccupancyGrid,
@@ -35,7 +35,7 @@ class PathPlan(Node):
         self.get_logger().info("initialized")
 
         self.goal_sub = self.create_subscription(
-            PoseStamped,
+            PoseArray,
             self.waypoints_topic,
             self.waypoints_cb,
             10
@@ -64,10 +64,14 @@ class PathPlan(Node):
 
     def full_path(self):
         total_path = []
-        for i in range(0, self.waypoints.length-1):
-            total_path.append(self.plan_path(self.waypoints[i], self.waypoints[i+1]))
+        for i in range(0, len(self.waypoints.poses)-1):
+            total_path.extend(self.plan_path(self.waypoints.poses[i], self.waypoints.poses[i+1]))
         PA = PoseArray()
-        PA.poses = total_path
+        for position in total_path:
+            p = Pose()
+            p.position.x = float(position[0])
+            p.position.y = float(position[1])
+            PA.poses.append(p)
         self.publish_path(PA)
 
 
@@ -84,8 +88,8 @@ class PathPlan(Node):
         # index occupancy grid (self.map_grid) with self.map_grid.data[r*W+c]
         gscore = [inf] * (H*W)
         parent = [(0,0)] * (H*W)
-        spos = (s.x, s.y)
-        tpos = (t.x, t.y)
+        spos = (int(s.position.x), int(s.position.y))
+        tpos = (int(t.position.x), int(t.position.y))
         self.target = tpos
 
         gscore[spos[0]*W + spos[1]] = 0
@@ -96,15 +100,14 @@ class PathPlan(Node):
 
         while not pq.empty():
             node = pq.get()
-
-            if abs(node[0] - (gscore[node[1]*W+node[2]] + self.heuristic(node[1:3]))) < 0.005 :
+            if abs(node[0] - (gscore[node[1]*W+node[2]] + self.heuristic(node[1:3]))) > 0.005 :
                 continue
             node = node[1:3]
             if node == tpos:
                 break
             for d in dxy:
                 nxt = (node[0]+d[0], node[1]+d[1])
-                if nxt[0] < 0 or nxt[0] > W or nxt[1] < 0 or nxt[1] > H:
+                if nxt[0] < 0 or nxt[0] >= W or nxt[1] < 0 or nxt[1] >= H:
                     continue
 
                 if self.map_grid[nxt[0]*W+nxt[1]] > self.cutoff:
@@ -114,15 +117,18 @@ class PathPlan(Node):
                     gscore[nxt[0] * W + nxt[1]] = gscore[node[0] * W + node[1]] + 1
                     parent[nxt[0] * W + nxt[1]] = node
                     pq.put((gscore[nxt[0] * W + nxt[1]] + self.heuristic(nxt), nxt[0], nxt[1]))
+        self.get_logger().info("up to backtracking")
 
         # Backtracing
         path = []
         cur = tpos
         while cur != spos:
+            # self.get_logger().info(f"{cur[0]}, {cur[1]}")
             path.append(cur)
             cur = parent[cur[0] * W + cur[1]]
         path.append(spos)
         path = list(reversed(path))
+        self.get_logger().info("finished backtracking")
         return path
 
     def pose_to_string(self, pos):
@@ -130,7 +136,7 @@ class PathPlan(Node):
 
     def publish_path(self,path):
         self.publisher.publish(path)
-        self.get_logger().info(f"Publishing: path from " + self.pose_to_string(self.waypoints[0]) + " to " + self.pose_to_string(self.waypoints[-1]))
+        self.get_logger().info(f"Publishing: path from " + self.pose_to_string(self.waypoints.poses[0]) + " to " + self.pose_to_string(self.waypoints.poses[-1]))
 
 def main(args=None):
     rclpy.init(args=args)

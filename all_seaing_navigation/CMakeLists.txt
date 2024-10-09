@@ -13,6 +13,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/waypoint_sender.py
     ${PROJECT_NAME}/utils.py
+    ${PROJECT_NAME}/waypoint_publisher.py
     ${PROJECT_NAME}/a_star.py
     ${PROJECT_NAME}/map_publisher.py
     DESTINATION lib/${PROJECT_NAME}
