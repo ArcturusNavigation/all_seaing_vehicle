@@ -11,7 +11,6 @@ ament_auto_find_build_dependencies()
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/waypoint_sender.py
-    ${PROJECT_NAME}/light_utils.py
     ${PROJECT_NAME}/a_star.py
     DESTINATION lib/${PROJECT_NAME}
 )

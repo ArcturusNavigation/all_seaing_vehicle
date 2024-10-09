@@ -5,7 +5,7 @@ from rclpy.node import Node
 assert rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, PoseArray, PointStamped, Pose
 from nav_msgs.msg import OccupancyGrid
-from .light_utils import PriorityQueue
+from utils import PriorityQueue
 # from tf_transformations import euler_from_quaternion, quaternion_from_euler
 # from visualization_msgs.msg import Marker, MarkerArray
 
