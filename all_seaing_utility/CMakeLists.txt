@@ -13,6 +13,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/replay_recordings.py
     ${PROJECT_NAME}/rosbag_to_mp4.py
     ${PROJECT_NAME}/rviz_testing_helper.py
+    ${PROJECT_NAME}/perception_eval.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
