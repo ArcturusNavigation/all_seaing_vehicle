@@ -49,7 +49,6 @@ class PathPlan(Node):
 
         self.waypoints = None
 
-
     def map_cb(self, msg):
         self.get_logger().info("Initialized Map" if self.map_info == None else "Updated Map")
         self.map_info = msg.info
@@ -122,7 +121,7 @@ class PathPlan(Node):
         while cur != spos:
             path.append(cur)
             cur = parent[cur[0] * W + cur[1]]
-        path.append(spos) 
+        path.append(spos)
         path = list(reversed(path))
         return path
 
@@ -132,7 +131,6 @@ class PathPlan(Node):
     def publish_path(self,path):
         self.publisher.publish(path)
         self.get_logger().info(f"Publishing: path from " + self.pose_to_string(self.waypoints[0]) + " to " + self.pose_to_string(self.waypoints[-1]))
-
 
 def main(args=None):
     rclpy.init(args=args)
