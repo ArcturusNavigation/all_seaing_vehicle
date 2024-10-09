@@ -1,11 +1,12 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
-
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import OccupancyGrid, MapMetaData
 from std_msgs.msg import Header
-import numpy as np  # For easier manipulation of grid data
-import random  # For random obstacle placement
+import numpy as np
+import random
 
 class MapPublisher(Node):
 
@@ -16,24 +17,35 @@ class MapPublisher(Node):
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         # Define map properties
-        self.map_width = 10  # In cells
-        self.map_height = 10  # In cells
-        self.map_resolution = 0.1  # In meters/cell
-        self.origin_position = [0.0, 0.0, 0.0]  # [x, y, theta]
+        self.map_width = 10
+        self.map_height = 10
+        self.map_resolution = 0.1
+        self.origin_position = [0.0, 0.0, 0.0]
 
-        # Initialize the grid (e.g., all cells as free space initially)
-        self.grid_data = np.zeros((self.map_width * self.map_height), dtype=int)  # Free space = 0
+        # Initialize grid (unknown = -1, free space = 0)
+        self.grid_data = np.full((self.map_height, self.map_width), -1, dtype=np.int8)  # Change to 2D array
 
-        # Randomly populate some cells with obstacles
-        self.populate_obstacles(obstacle_count=20)  # Place 20 obstacles randomly
+        # Populate some cells with obstacles (occupied = 100) and free space (0)
+        self.populate_obstacles_and_free_space(obstacle_count=20)
 
-    def populate_obstacles(self, obstacle_count):
+    def populate_obstacles_and_free_space(self, obstacle_count):
         """
-        Randomly place obstacles in the grid. Obstacles are marked with value 100.
+        Randomly place obstacles and free space in the grid. Obstacles are marked with value 100, free space with 0.
         """
-        for _ in range(obstacle_count):
-            random_index = random.randint(0, self.map_width * self.map_height - 1)
-            self.grid_data[random_index] = 100  # Mark cell as an obstacle (occupied)
+        total_cells = self.map_height * self.map_width
+
+        # Randomly choose obstacle locations
+        obstacle_indices = random.sample(range(total_cells), obstacle_count)
+        for index in obstacle_indices:
+            row = index // self.map_width
+            col = index % self.map_width
+            self.grid_data[row, col] = 100  # Mark cell as an obstacle (occupied)
+
+        # Randomly assign free space (0) to the remaining unknown cells
+        for row in range(self.map_height):
+            for col in range(self.map_width):
+                if self.grid_data[row, col] == -1:  # If the cell is unknown
+                    self.grid_data[row, col] = random.choice([0, -1])  # Randomly make it free space or keep as unknown
 
     def timer_callback(self):
         # Create OccupancyGrid message
@@ -42,11 +54,11 @@ class MapPublisher(Node):
         # Populate the header
         msg.header = Header()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'map'  # Frame of the map
+        msg.header.frame_id = 'map'
 
         # Populate the MapMetaData
         msg.info = MapMetaData()
-        msg.info.resolution = self.map_resolution  # Meters per cell
+        msg.info.resolution = self.map_resolution
         msg.info.width = self.map_width
         msg.info.height = self.map_height
 
@@ -55,14 +67,23 @@ class MapPublisher(Node):
         msg.info.origin.position.x = self.origin_position[0]
         msg.info.origin.position.y = self.origin_position[1]
         msg.info.origin.position.z = 0.0
-        msg.info.origin.orientation.w = 1.0  # No rotation, quaternion identity
+        msg.info.origin.orientation.w = 1.0
 
-        # Populate the map data (row-major order)
-        msg.data = list(self.grid_data)  # Flatten and convert to a list
+        # Flatten the 2D array and ensure it is within the valid int8 range
+        msg.data = self.grid_data.flatten().astype(np.int8).tolist()
 
         # Publish the occupancy grid
         self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: OccupancyGrid map with random obstacles')
+        self.get_logger().info('Publishing: OccupancyGrid map with random obstacles and free space')
+
+        # For visualization purposes, print the grid as a 2D array
+        self.print_grid()
+
+    def print_grid(self):
+        """Print the grid as a 2D array for visualization."""
+        grid_2d = self.grid_data  # This is already a 2D array
+        for row in grid_2d:
+            print(' '.join(f'{cell:3}' for cell in row))  # Format each cell for better visualization
 
 def main(args=None):
     rclpy.init(args=args)
@@ -73,7 +94,6 @@ def main(args=None):
 
     map_publisher.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
