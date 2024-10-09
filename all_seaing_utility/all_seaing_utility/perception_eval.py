@@ -36,10 +36,10 @@ class PerceptionEval(Node):
         for obstacle in obs_map.obstacles:
             # self.get_logger().info(f"Obstacle {obstacle.label} at {obstacle.pose.position.x}, {obstacle.pose.position.y}")
 
-            if obstacle.label in obstacle_counter:
-                obstacle_counter[str(obstacle.label)].append(obstacle.id)
+            if str(obstacle.label) in obstacle_counter:
+                obstacle_counter[str(obstacle.label)].add(obstacle.id)
             else:
-                obstacle_counter[str(obstacle.label)] = [obstacle.id]
+                obstacle_counter[str(obstacle.label)] = {obstacle.id}
         #rosify results
         obstacle_counter_arr_msg = ObstacleCounterArray()
         obstacle_counter_arr_msg.obstacle_counter_array = []
