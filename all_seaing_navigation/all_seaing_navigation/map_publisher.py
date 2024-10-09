@@ -17,35 +17,34 @@ class MapPublisher(Node):
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         # Define map properties
-        self.map_width = 10
-        self.map_height = 10
+        self.map_width = 100
+        self.map_height = 100
         self.map_resolution = 0.1
         self.origin_position = [0.0, 0.0, 0.0]
 
         # Initialize grid (unknown = -1, free space = 0)
-        self.grid_data = np.full((self.map_height, self.map_width), -1, dtype=np.int8)  # Change to 2D array
+        self.grid_data = np.full((self.map_height, self.map_width), -1, dtype=np.int8)  # Start with all unknown
 
-        # Populate some cells with obstacles (occupied = 100) and free space (0)
-        self.populate_obstacles_and_free_space(obstacle_count=20)
+        # Populate the grid with random values
+        self.populate_grid_with_random_values()
 
-    def populate_obstacles_and_free_space(self, obstacle_count):
+    def populate_grid_with_random_values(self):
         """
-        Randomly place obstacles and free space in the grid. Obstacles are marked with value 100, free space with 0.
+        Populate the grid with random probabilities for free space, obstacles, and unknowns.
+        Free space will be 0-99, obstacles will be 100, and unknown will be -1.
         """
-        total_cells = self.map_height * self.map_width
-
-        # Randomly choose obstacle locations
-        obstacle_indices = random.sample(range(total_cells), obstacle_count)
-        for index in obstacle_indices:
-            row = index // self.map_width
-            col = index % self.map_width
-            self.grid_data[row, col] = 100  # Mark cell as an obstacle (occupied)
-
-        # Randomly assign free space (0) to the remaining unknown cells
         for row in range(self.map_height):
             for col in range(self.map_width):
-                if self.grid_data[row, col] == -1:  # If the cell is unknown
-                    self.grid_data[row, col] = random.choice([0, -1])  # Randomly make it free space or keep as unknown
+                rand_val = random.randint(0, 100)
+                if rand_val < 5:  # 5% chance of being an obstacle
+                    self.grid_data[row, col] = 100  # Mark cell as an obstacle
+                elif rand_val >= 5 and rand_val < 90:  # 85% chance of being free space
+                    self.grid_data[row, col] = 0  # Mark cell as free space
+                elif rand_val >= 90 and rand_val < 100:  # 10% chance of being unknown
+                    self.grid_data[row, col] = -1  # Mark cell as unknown
+                else:
+                    # Introduce intermediate values for uncertainty (optional)
+                    self.grid_data[row, col] = random.randint(1, 99)  # Mark cell with a value between 1 and 99
 
     def timer_callback(self):
         # Create OccupancyGrid message
@@ -74,7 +73,7 @@ class MapPublisher(Node):
 
         # Publish the occupancy grid
         self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: OccupancyGrid map with random obstacles and free space')
+        self.get_logger().info('Publishing: OccupancyGrid map with random obstacles')
 
         # For visualization purposes, print the grid as a 2D array
         self.print_grid()

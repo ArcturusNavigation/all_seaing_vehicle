@@ -24,7 +24,7 @@ class PathPlan(Node):
         super().__init__("astar_path_planner")
 
         self.map_topic = "map" # occupancy grid
-        self.waypoints_topic = "default"
+        self.waypoints_topic = "clicked_point"
         # 2-D grid map, each cell represents the probability of occupancy
         self.map_sub = self.create_subscription(
             OccupancyGrid,
