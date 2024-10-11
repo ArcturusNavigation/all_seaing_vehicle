@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
-# https://www.latlong.net
-# https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+'''
+Resources:
+- https://www.latlong.net
+- https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+'''
 
-from ament_index_python.packages import get_package_share_directory
 from argparse import ArgumentParser
 import math
 import os

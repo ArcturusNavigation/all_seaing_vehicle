@@ -11,14 +11,14 @@ import subprocess
 
 def generate_launch_description():
 
-    vrx_gz_prefix = get_package_share_directory("vrx_gz")
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     description_prefix = get_package_share_directory("all_seaing_description")
+    driver_prefix = get_package_share_directory("all_seaing_driver")
+    vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
-    keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -58,20 +58,6 @@ def generate_launch_description():
                 "min_output": -1000.0,
                 "max_output": 1000.0,
             }
-        ],
-    )
-
-    keyboard_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard",
-    )
-
-    keyboard_to_joy_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard_to_joy.py",
-        parameters=[
-            {"config_file_name": keyboard_params},
-            {"sampling_frequency": 60},
         ],
     )
 
@@ -191,6 +177,10 @@ def generate_launch_description():
         output="screen",
     )
 
+    keyboard_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
+    )
+
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
@@ -206,8 +196,6 @@ def generate_launch_description():
             ekf_node,
             navsat_node,
             controller_node,
-            keyboard_node,
-            keyboard_to_joy_node,
             obstacle_bbox_overlay_node,
             obstacle_bbox_visualizer_node,
             color_segmentation_node,
@@ -218,6 +206,7 @@ def generate_launch_description():
             controller_server,
             onshore_node,
             waypoint_sender,
+            keyboard_ld,
             sim_ld,
         ]
     )

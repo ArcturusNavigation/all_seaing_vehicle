@@ -47,11 +47,20 @@ def launch_setup(context, *args, **kwargs):
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
-        remappings=[("gps/fix", "/mavros/global_position/raw/fix")],
+        remappings=[("gps/fix", "/fix")],
         parameters=[
             robot_localization_params,
             {"datum": [lat, lon, 0.0]},
         ],
+    )
+
+    ublox_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                driver_prefix,
+                "/launch/ublox_gps.launch.py",
+            ]
+        )
     )
 
     mavros_ld = IncludeLaunchDescription(
@@ -67,6 +76,7 @@ def launch_setup(context, *args, **kwargs):
         rviz_node,
         ekf_node,
         navsat_node,
+        ublox_ld,
         mavros_ld,
     ]
 

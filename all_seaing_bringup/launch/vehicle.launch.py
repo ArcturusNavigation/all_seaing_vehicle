@@ -101,6 +101,15 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    ublox_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                driver_prefix,
+                "/launch/ublox_gps.launch.py",
+            ]
+        )
+    )
+
     zed_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -119,6 +128,7 @@ def launch_setup(context, *args, **kwargs):
         thrust_commander_node,
         lidar_ld,
         mavros_ld,
+        ublox_ld,
         zed_ld,
     ]
 
