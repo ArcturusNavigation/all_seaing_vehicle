@@ -67,24 +67,6 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    lidar_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                driver_prefix,
-                "/launch/32e_points.launch.py",
-            ]
-        )
-    )
-
-    mavros_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                driver_prefix,
-                "/launch/mavros.launch.py",
-            ]
-        )
-    )
-
     controller_server = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="controller_server.py",
@@ -101,13 +83,37 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    lidar_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                driver_prefix,
+                "/launch/32e_points.launch.py",
+            ]
+        )
+    )
+
+    mavros_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                driver_prefix,
+                "/launch/mavros.launch.py",
+            ]
+        ),
+        launch_arguments={
+            "port": "/dev/ttyACM0",
+        }.items(),
+    )
+
     ublox_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
                 driver_prefix,
                 "/launch/ublox_gps.launch.py",
             ]
-        )
+        ),
+        launch_arguments={
+            "port": "/dev/ttyACM1",
+        }.items(),
     )
 
     zed_ld = IncludeLaunchDescription(
