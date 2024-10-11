@@ -10,9 +10,9 @@ ament_auto_find_build_dependencies()
 
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
-    ${PROJECT_NAME}/replay_recordings.py
+    ${PROJECT_NAME}/nav_to_tile.py
+    ${PROJECT_NAME}/rosbag_to_image.py
     ${PROJECT_NAME}/rosbag_to_mp4.py
-    ${PROJECT_NAME}/rviz_testing_helper.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

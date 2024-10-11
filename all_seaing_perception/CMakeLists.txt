@@ -8,6 +8,8 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
+find_package(yaml-cpp REQUIRED)
+
 ament_auto_add_executable(
     obstacle_detector
     ${PROJECT_NAME}/obstacle_detector.cpp
@@ -25,12 +27,19 @@ ament_auto_add_executable(
     point_cloud_image_overlay
     ${PROJECT_NAME}/point_cloud_image_overlay.cpp
 )
+ament_auto_add_executable(
+    obstacle_bbox_visualizer
+    ${PROJECT_NAME}/obstacle_bbox_visualizer.cpp
+)
+
+target_link_libraries(obstacle_bbox_visualizer yaml-cpp)
 
 install(TARGETS
     obstacle_detector
     obstacle_bbox_overlay
     point_cloud_filter
     point_cloud_image_overlay
+    obstacle_bbox_visualizer  
     DESTINATION lib/${PROJECT_NAME}
 )
 
