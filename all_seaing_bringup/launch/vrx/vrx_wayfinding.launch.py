@@ -10,12 +10,12 @@ def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     description_prefix = get_package_share_directory("all_seaing_description")
+    driver_prefix = get_package_share_directory("all_seaing_driver")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
     localize_params = os.path.join(
-        bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
+        bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
-    keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -36,21 +36,14 @@ def generate_launch_description():
         parameters=[{"in_sim": True}],
     )
 
-    keyboard_node = launch_ros.actions.Node(package="keyboard", executable="keyboard")
-
-    keyboard_to_joy_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard_to_joy.py",
-        parameters=[
-            {"config_file_name": keyboard_params},
-            {"sampling_frequency": 60},
-        ],
-    )
-
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
+    )
+
+    keyboard_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
     sim_ld = IncludeLaunchDescription(
@@ -67,9 +60,8 @@ def generate_launch_description():
             ekf_node,
             navsat_node,
             controller_node,
-            keyboard_node,
-            keyboard_to_joy_node,
             onshore_node,
+            keyboard_ld,
             sim_ld,
         ]
     )
