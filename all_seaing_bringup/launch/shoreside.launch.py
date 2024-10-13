@@ -1,49 +1,25 @@
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 import launch_ros
 import os
+import subprocess
 
 
 def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
+    driver_prefix = get_package_share_directory("all_seaing_driver")
 
-    keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
+    subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
-    bag_path = LaunchConfiguration("bag_path")
     launch_rviz = LaunchConfiguration("launch_rviz")
-    record_bag = LaunchConfiguration("record_bag")
 
-    bag_path_launch_arg = DeclareLaunchArgument("bag_path", default_value=".")
     launch_rviz_launch_arg = DeclareLaunchArgument(
         "launch_rviz", default_value="true", choices=["true", "false"]
-    )
-    record_bag_launch_arg = DeclareLaunchArgument(
-        "record_bag", default_value="false", choices=["true", "false"]
-    )
-
-    rviz_testing_helper_node = launch_ros.actions.Node(
-        package="all_seaing_utility",
-        executable="rviz_testing_helper.py",
-        parameters=[{"bag_path": bag_path}],
-        condition=IfCondition(record_bag),
-    )
-
-    keyboard_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard",
-    )
-
-    keyboard_to_joy_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard_to_joy.py",
-        parameters=[
-            {"config_file_name": keyboard_params},
-            {"sampling_frequency": 60},
-        ],
     )
 
     rviz_node = launch_ros.actions.Node(
@@ -60,17 +36,22 @@ def generate_launch_description():
         package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
+        parameters=[
+            {"joy_x_scale": 2.0},
+            {"joy_y_scale": -2.0},
+            {"joy_ang_scale": -0.8},
+        ],
+    )
+
+    keyboard_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
     return LaunchDescription(
         [
-            bag_path_launch_arg,
             launch_rviz_launch_arg,
-            record_bag_launch_arg,
-            rviz_testing_helper_node,
-            keyboard_node,
-            keyboard_to_joy_node,
             rviz_node,
             onshore_node,
+            keyboard_ld,
         ]
     )
