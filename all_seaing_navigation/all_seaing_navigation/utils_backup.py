@@ -312,6 +312,7 @@ class LineTrajectory:
         if not self.visualize:
             print("Cannot visualize path, not initialized with visualization enabled")
             return
+
         self.publish_start_point(duration=duration)
         self.publish_trajectory(duration=duration)
         self.publish_end_point(duration=duration)
@@ -1068,8 +1069,6 @@ class Map():
             u, v = self.xy_to_pixel(x + dx/2, y + dy/2)
             if (0 <= u and u < self._width) and (0 <= v and v < self._height) and self.is_free(u,v):
                 neighbors.append((x + dx/2, y + dy/2))
-
-
 
         # radius = 4
         # step = 0.5

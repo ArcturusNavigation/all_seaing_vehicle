@@ -2,141 +2,168 @@
 import rclpy
 from rclpy.node import Node
 
-assert rclpy
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, Pose
-from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import PoseStamped, PoseArray, Pose
+from nav_msgs.msg import OccupancyGrid, Path
 from utils import PriorityQueue
-# from tf_transformations import euler_from_quaternion, quaternion_from_euler
-# from visualization_msgs.msg import Marker, MarkerArray
-
-from math import inf, sqrt #Caution: only in Python 3.5
-import time
+from math import inf, sqrt
 import numpy as np
 
-# import cProfile
-
 class PathPlan(Node):
-    """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path to follow (PoseArray)
-        using Astar
-    """
+    """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path using A* """
 
     def __init__(self):
         super().__init__("astar_path_planner")
 
-        self.map_topic = "map" # occupancy grid
+        self.map_topic = "map"  # OccupancyGrid
         self.waypoints_topic = "waypoints"
-        # 2-D grid map, each cell represents the probability of occupancy
-        self.map_sub = self.create_subscription(
-            OccupancyGrid,
-            self.map_topic,
-            self.map_cb,
-            10)
 
-        self.get_logger().info("initialized")
+        # Subscriptions to map and waypoints
+        self.map_sub = self.create_subscription(
+            OccupancyGrid, self.map_topic, self.map_cb, 10)
 
         self.goal_sub = self.create_subscription(
-            PoseArray,
-            self.waypoints_topic,
-            self.waypoints_cb,
-            10
-        )
-        self.publisher = self.create_publisher(PoseArray, "path_planning", 10)
+            PoseArray, self.waypoints_topic, self.waypoints_cb, 10)
+
+        # Publishers for path and PoseArray
+        self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
+        self.path_pub = self.create_publisher(Path, "a_star_path", 10)
 
         self.map_grid = None
-        self.map_info = None #m/cell, resolution of the map
+        self.map_info = None  # Resolution of the map (m/cell)
         self.target = None
-        self.cutoff = 50
-
+        self.cutoff = 50  # Threshold for obstacle cells
         self.waypoints = None
 
+        self.get_logger().info("Initialized A* Path Planner")
+
+    def world_to_grid(self, x, y):
+        """Convert world coordinates to grid coordinates."""
+        origin = self.map_info.origin.position
+        resolution = self.map_info.resolution
+        gx = int((x - origin.x) / resolution)
+        gy = int((y - origin.y) / resolution)
+        return gx, gy
+
+    def grid_to_world(self, gx, gy):
+        """Convert grid coordinates back to world coordinates."""
+        origin = self.map_info.origin.position
+        resolution = self.map_info.resolution
+        x = gx * resolution + origin.x
+        y = gy * resolution + origin.y
+        return x, y
+
     def map_cb(self, msg):
-        self.get_logger().info("Initialized Map" if self.map_info == None else "Updated Map")
         self.map_info = msg.info
         self.map_grid = msg.data
+        self.get_logger().info("Initialized Map" if self.map_info is None else "Updated Map")
 
     def waypoints_cb(self, msg):
-        self.get_logger().info("New Waypoints Added, Running Astar")
         self.waypoints = msg
+        self.get_logger().info("New Waypoints Added, Running A*")
         self.full_path()
 
-    def heuristic(self, node): #currently uses euclidean distance as heuristic
-        return sqrt((node[0]-self.target[0])**2 + (node[1]-self.target[1])**2)
+    def heuristic(self, node):
+        """Euclidean distance as heuristic"""
+        return sqrt((node[0] - self.target[0]) ** 2 + (node[1] - self.target[1]) ** 2)
 
     def full_path(self):
         total_path = []
-        for i in range(0, len(self.waypoints.poses)-1):
-            total_path.extend(self.plan_path(self.waypoints.poses[i], self.waypoints.poses[i+1]))
-        PA = PoseArray()
-        for position in total_path:
-            p = Pose()
-            p.position.x = float(position[0])
-            p.position.y = float(position[1])
-            PA.poses.append(p)
-        self.publish_path(PA)
+        for i in range(len(self.waypoints.poses) - 1):
+            total_path.extend(self.plan_path(self.waypoints.poses[i], self.waypoints.poses[i + 1]))
 
+        # Convert total path to PoseArray for publishing
+        pose_array = PoseArray()
+        for position in total_path:
+            pose = Pose()
+            pose.position.x = float(position[0])
+            pose.position.y = float(position[1])
+            pose_array.poses.append(pose)
+
+        self.publish_path(pose_array)
 
     def plan_path(self, s, t):
-        """
-        start_point s: Ros2 Pose
-        end_point t: Ros2 Pose
-        return: Pose array
-        astar algorithm
-        """
+        """A* Algorithm to compute the path"""
         W = self.map_info.width
         H = self.map_info.height
-        dxy = [(1,0), (0,1), (-1,0), (0,-1)]
-        # index occupancy grid (self.map_grid) with self.map_grid.data[r*W+c]
-        gscore = [inf] * (H*W)
-        parent = [(0,0)] * (H*W)
-        spos = (int(s.position.x), int(s.position.y))
-        tpos = (int(t.position.x), int(t.position.y))
+        dxy = [(1, 0), (0, 1), (-1, 0), (0, -1)]  # Neighbor offsets
+
+        gscore = [inf] * (H * W)
+        parent = [(0, 0)] * (H * W)
+
+        # Convert waypoints to grid coordinates
+        spos = self.world_to_grid(s.position.x, s.position.y)
+        tpos = self.world_to_grid(t.position.x, t.position.y)
         self.target = tpos
 
-        gscore[spos[0]*W + spos[1]] = 0
-        parent[spos[0]*W + spos[1]] = spos
+        gscore[spos[0] * W + spos[1]] = 0
+        parent[spos[0] * W + spos[1]] = spos
 
         pq = PriorityQueue()
         pq.put((self.heuristic(spos), spos[0], spos[1]))
 
         while not pq.empty():
             node = pq.get()
-            if abs(node[0] - (gscore[node[1]*W+node[2]] + self.heuristic(node[1:3]))) > 0.005 :
+            if abs(node[0] - (gscore[node[1] * W + node[2]] + self.heuristic(node[1:3]))) > 0.005:
                 continue
+
             node = node[1:3]
             if node == tpos:
                 break
+
             for d in dxy:
-                nxt = (node[0]+d[0], node[1]+d[1])
+                nxt = (node[0] + d[0], node[1] + d[1])
                 if nxt[0] < 0 or nxt[0] >= W or nxt[1] < 0 or nxt[1] >= H:
                     continue
-
-                if self.map_grid[nxt[0]*W+nxt[1]] > self.cutoff:
+                if self.map_grid[nxt[0] * W + nxt[1]] > self.cutoff:
                     continue
 
                 if gscore[node[0] * W + node[1]] + 1 < gscore[nxt[0] * W + nxt[1]]:
                     gscore[nxt[0] * W + nxt[1]] = gscore[node[0] * W + node[1]] + 1
                     parent[nxt[0] * W + nxt[1]] = node
                     pq.put((gscore[nxt[0] * W + nxt[1]] + self.heuristic(nxt), nxt[0], nxt[1]))
-        self.get_logger().info("up to backtracking")
 
-        # Backtracing
+        # Backtrace the path
         path = []
         cur = tpos
         while cur != spos:
-            # self.get_logger().info(f"{cur[0]}, {cur[1]}")
             path.append(cur)
             cur = parent[cur[0] * W + cur[1]]
         path.append(spos)
-        path = list(reversed(path))
-        self.get_logger().info("finished backtracking")
+        path.reverse()
+        self.get_logger().info("Finished Backtracking Path")
+
+        # Publish path as nav_msgs/Path
+        self.publish_nav_path(path)
         return path
 
-    def pose_to_string(self, pos):
-        return "{" + str(pos.position.x) + ", " + str(pos.position.y) + ", " + str(pos.position.z) + "}"
+    def publish_nav_path(self, path):
+        """Publish path as nav_msgs/Path"""
+        path_msg = Path()
+        path_msg.header.stamp = self.get_clock().now().to_msg()
+        path_msg.header.frame_id = 'map'
 
-    def publish_path(self,path):
-        self.publisher.publish(path)
-        self.get_logger().info(f"Publishing: path from " + self.pose_to_string(self.waypoints.poses[0]) + " to " + self.pose_to_string(self.waypoints.poses[-1]))
+        for point in path:
+            wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
+            pose = PoseStamped()
+            pose.header = path_msg.header
+            pose.pose.position.x = float(wx)
+            pose.pose.position.y = float(wy)
+            path_msg.poses.append(pose)
+
+        self.path_pub.publish(path_msg)
+        self.get_logger().info("Published A* Path")
+
+
+    def publish_path(self, pose_array):
+        """Publish PoseArray path"""
+        self.pose_array_pub.publish(pose_array)
+        self.get_logger().info(
+            f"Publishing path from {self.pose_to_string(self.waypoints.poses[0])} "
+            f"to {self.pose_to_string(self.waypoints.poses[-1])}"
+        )
+
+    def pose_to_string(self, pos):
+        return f"{{{pos.position.x}, {pos.position.y}, {pos.position.z}}}"
 
 def main(args=None):
     rclpy.init(args=args)
@@ -146,4 +173,4 @@ def main(args=None):
     rclpy.shutdown()
 
 if __name__ == "__main__":
-	main()
+    main()

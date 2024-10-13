@@ -43,7 +43,7 @@ class MapPublisher(Node):
                 elif rand_val >= 90 and rand_val < 100:  # 10% chance of being unknown
                     self.grid_data[row, col] = -1  # Mark cell as unknown
                 else:
-                    # Introduce intermediate values for uncertainty (optional)
+                    # Introduce intermediate values for uncertainty
                     self.grid_data[row, col] = random.randint(1, 99)  # Mark cell with a value between 1 and 99
 
     def timer_callback(self):
