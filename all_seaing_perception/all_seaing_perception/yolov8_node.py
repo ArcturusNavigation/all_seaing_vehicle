@@ -100,7 +100,7 @@ class Yolov8Node(Node):
 
         if self.enable:
             # Convert image to cv_image
-            cv_image = self.cv_bridge.imgmsg_to_cv2(msg)
+            cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "rgb8")
 
             # Predict based on image
             results = self.yolo.predict(
@@ -145,7 +145,7 @@ class Yolov8Node(Node):
             self._pub.publish(labeled_bounding_box_msgs)
 
             # Convert annotated image back to ROS Image message
-            annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(cv_image, encoding="bgr8")
+            annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(cv_image, encoding="rgb8")
             self._image_pub.publish(annotated_image_msg)  # Publish annotated image
 
 
