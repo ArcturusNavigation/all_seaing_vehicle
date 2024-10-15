@@ -90,6 +90,12 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    rover_lora_controller = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="rover_lora_controller.py",
+        output="screen",
+    )
+
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -138,6 +144,7 @@ def launch_setup(context, *args, **kwargs):
         controller_node,
         controller_server,
         waypoint_sender,
+        rover_lora_controller,
         thrust_commander_node,
         lidar_ld,
         mavros_ld,

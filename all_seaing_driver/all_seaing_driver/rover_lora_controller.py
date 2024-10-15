@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import ControlMessage
+from all_seaing_interfaces.msg import ControlOption
 import serial
 import struct
 import time
@@ -15,10 +15,10 @@ class RoverLoraController(Node):
         self.serial_port = serial.Serial('/dev/ttyUSB0', 57600, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
         
-        self.data_size = struct.calcsize('BdddBB')
+        self.data_size = struct.calcsize('Bddd')
 
         # Create ROS 2 publisher for ControlMessage
-        self.publisher_ = self.create_publisher(ControlMessage, 'control_options', 10)
+        self.publisher_ = self.create_publisher(ControlOption, 'control_options', 10)
 
         # Start a ROS 2 timer to check for serial data
         self.timer = self.create_timer(0.1, self.check_serial_data)
@@ -31,16 +31,15 @@ class RoverLoraController(Node):
             if len(serialized_data) != self.data_size:
                 return
             
-            priority, x, y, angular, linear_control_mode, angular_control_mode = struct.unpack('BdddBB', serialized_data)
+            priority, x, y, angular = struct.unpack('Bddd', serialized_data)
 
             # Create a ControlMessage ROS 2 message
-            control_msg = ControlMessage()
+            control_msg = ControlOption()
             control_msg.priority = priority
-            control_msg.x = x
-            control_msg.y = y
-            control_msg.angular = angular
-            control_msg.linear_control_mode = linear_control_mode
-            control_msg.angular_control_mode = angular_control_mode
+            control_msg.twist.linear.x = x
+            control_msg.twist.linear.y = y
+            control_msg.twist.angular.z = angular
+
             # Publish the ControlMessage
             self.publisher_.publish(control_msg)
             self.get_logger().info(f"Published: {control_msg}")

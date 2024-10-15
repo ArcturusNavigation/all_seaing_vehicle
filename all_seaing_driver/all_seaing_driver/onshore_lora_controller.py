@@ -5,7 +5,7 @@ import struct
 import serial
 import time
 
-from all_seaing_interfaces.msg import ControlMessage
+from all_seaing_interfaces.msg import ControlOption
 
 # Initialize Pygame
 pygame.init()
@@ -22,11 +22,9 @@ control_msg = {
     "x": 0.0,
     "y": 0.0,
     "angular": 0.0,
-    "linear_control_mode": 3,
-    "angular_control_mode": 3
 }
 
-print(ControlMessage._fields_and_field_types)
+print(ControlOption._fields_and_field_types)
 
 running = True
 while running:
@@ -63,13 +61,11 @@ while running:
     
     # Serialize to binary format
     serialized_msg = struct.pack(
-        'BdddBB',
+        'Bddd',
         control_msg["priority"],
         control_msg["x"],
         control_msg["y"],
         control_msg["angular"],
-        control_msg["linear_control_mode"],
-        control_msg["angular_control_mode"]
     )
 
     # Send over serial
