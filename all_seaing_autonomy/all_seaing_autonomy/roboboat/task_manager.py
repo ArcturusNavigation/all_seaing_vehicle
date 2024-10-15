@@ -27,11 +27,9 @@ class NavigationChannel(Task):
     def start(self):
         # start moos behavior of path following
         control_message = ControlMessage()
-        control_message.x = 0.5
-        control_message.y = 0.0
-        control_message.linear_control_mode = ControlMessage.LOCAL_VELOCITY
-        control_message.angular = 0.0
-        control_message.angular_control_mode = ControlMessage.WORLD_VELOCITY
+        control_message.twist.linear.x = 0.5
+        control_message.twist.linear.y = 0.0
+        control_message.twist.angular.z = 0.0
 
         self.control_message_pub.publish(control_message)
 

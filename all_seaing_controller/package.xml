@@ -13,6 +13,7 @@
     <depend>rclcpp</depend>
 
     <depend>all_seaing_interfaces</depend>
+    <depend>geometry_msgs</depend>
     <depend>sensor_msgs</depend>
     <depend>std_msgs</depend>
     <depend>tf_transformations</depend>

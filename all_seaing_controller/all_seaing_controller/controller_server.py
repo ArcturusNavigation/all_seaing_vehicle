@@ -8,7 +8,7 @@ from rclpy.node import Node
 import time
 
 from all_seaing_interfaces.action import Waypoint
-from all_seaing_interfaces.msg import ControlMessage
+from all_seaing_interfaces.msg import ControlOption
 from nav_msgs.msg import Odometry
 from tf_transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
@@ -46,7 +46,7 @@ class ControllerServer(Node):
             10,
             callback_group=self.group,
         )
-        self.control_pub = self.create_publisher(ControlMessage, "control_options", 10)
+        self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
         self.marker_pub = self.create_publisher(Marker, "control_marker", 10)
 
         self.nav_x = 0.0
@@ -68,10 +68,10 @@ class ControllerServer(Node):
         )
 
     def send_waypoint(self, x, y, angular):
-        control_msg = ControlMessage()
+        control_msg = ControlOption()
         control_msg.priority = 1
-        control_msg.linear_control_mode = ControlMessage.WORLD_POSITION
-        control_msg.angular_control_mode = ControlMessage.WORLD_POSITION
+        control_msg.linear_control_mode = ControlOption.WORLD_POSITION
+        control_msg.angular_control_mode = ControlOption.WORLD_POSITION
         control_msg.x = x
         control_msg.y = y
         control_msg.angular = angular

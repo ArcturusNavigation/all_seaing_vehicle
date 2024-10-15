@@ -50,12 +50,24 @@ def generate_launch_description():
     controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="xdrive_controller.py",
+        remappings=[
+            ("thrusters/front_left/thrust", "/wamv/thrusters/front_left/thrust"),
+            ("thrusters/front_right/thrust", "/wamv/thrusters/front_right/thrust"),
+            ("thrusters/back_left/thrust", "/wamv/thrusters/back_left/thrust"),
+            ("thrusters/back_right/thrust", "/wamv/thrusters/back_right/thrust"),
+        ],
         parameters=[
             {
-                "boat_length": 3.5,
-                "boat_width": 2.0,
-                "min_output": -1400.0,
-                "max_output": 1400.0,
+                "front_right_xy": [1.1, -1.0],
+                "back_left_xy": [-2.4, 1.0],
+                "front_left_xy": [1.1, 1.0],
+                "back_right_xy": [-2.4, -1.0],
+                "thruster_angle": 45.0,
+                "drag_x_const": 5.0,
+                "drag_y_const": 5.0,
+                "drag_z_const": 40.0,
+                "min_output": -1500.0,
+                "max_output": 1500.0,
             }
         ],
     )
@@ -160,9 +172,9 @@ def generate_launch_description():
         executable="onshore_node.py",
         output="screen",
         parameters=[
-            {"joy_x_scale": 2.0},
+            {"joy_x_scale": 4.0},
             {"joy_y_scale": -2.0},
-            {"joy_ang_scale": -0.8},
+            {"joy_ang_scale": -1.0},
         ],
     )
 

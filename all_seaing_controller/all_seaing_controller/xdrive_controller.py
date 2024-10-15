@@ -1,185 +1,140 @@
 #!/usr/bin/env python3
 
+import scipy.optimize
 import rclpy
 import rclpy.time
 import math
-from tf_transformations import euler_from_quaternion
+import numpy as np
+import scipy
 from rclpy.node import Node
 
+from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64
-from nav_msgs.msg import Odometry
-from all_seaing_controller.pid_controller import PIDController
-from all_seaing_interfaces.msg import ControlMessage
-
 
 class XDriveController(Node):
 
     def __init__(self):
         super().__init__("xdrive_controller")
 
-        l = self.declare_parameter(
-            "boat_length", 3.5).get_parameter_value().double_value
-        w = self.declare_parameter(
-            "boat_width", 2.0).get_parameter_value().double_value
-        min_output = self.declare_parameter(
-            "min_output", -1400.0).get_parameter_value().double_value
-        max_output = self.declare_parameter(
-            "max_output", 1400.0).get_parameter_value().double_value
-        timer_period = self.declare_parameter(
-            "timer_period", 1/8).get_parameter_value().double_value
+        #--------------- CONSTANT PARAMETERS ---------------#
 
-        self.thrust_factor = (max_output - min_output)
-        self.midpoint = (max_output + min_output) / 2
-        self.r = ((l**2 + w**2) / 2 - l*w) ** 0.5 / 2
+        # Thruster locations
+        front_right_xy = np.array(self.declare_parameter(
+            "front_right_xy", [1.1, -1.0]).get_parameter_value().double_array_value)
+        back_left_xy = np.array(self.declare_parameter(
+            "back_left_xy", [-2.4, 1.0]).get_parameter_value().double_array_value)
+        front_left_xy = np.array(self.declare_parameter(
+            "front_left_xy", [1.1, 1.0]).get_parameter_value().double_array_value)
+        back_right_xy = np.array(self.declare_parameter(
+            "back_right_xy", [-2.4, -1.0]).get_parameter_value().double_array_value)
+        thruster_locations = np.array([front_right_xy, back_left_xy, front_left_xy, back_right_xy])
 
-        self.x = 0
-        self.y = 0
-        self.theta = 0
-        self.local_vx = 0
-        self.local_vy= 0
-        self.global_vx = 0
-        self.global_vy= 0
-        self.omega = 0
+        # Distance from the center to each thruster
+        thruster_distances = np.linalg.norm(thruster_locations, axis=1)
 
-        pid_x = PIDController(0.1, 0, 0)
-        pid_y = PIDController(0.1, 0, 0)
-        pid_theta = PIDController(1, 0, 0)
-        pid_vx = PIDController(1, 0, 0)
-        pid_vy = PIDController(1, 0, 0)
-        pid_omega = PIDController(2, 0.5, 0)
-        do_nothing_pid = PIDController(0, 0, 0)
-
-        self.x_controllers = {
-            ControlMessage.OFF: do_nothing_pid,
-            ControlMessage.WORLD_POSITION: pid_x,
-            ControlMessage.WORLD_VELOCITY: pid_vx,
-            ControlMessage.LOCAL_VELOCITY: pid_vx,
-        }
-
-        self.y_controllers = {
-            ControlMessage.OFF: do_nothing_pid,
-            ControlMessage.WORLD_POSITION: pid_y,
-            ControlMessage.WORLD_VELOCITY: pid_vy,
-            ControlMessage.LOCAL_VELOCITY: pid_vy,
-        }
-
-        self.angular_controllers = {
-            ControlMessage.OFF: do_nothing_pid,
-            ControlMessage.WORLD_POSITION: pid_theta,
-            ControlMessage.WORLD_VELOCITY: pid_omega,
-            ControlMessage.LOCAL_VELOCITY: pid_omega,
-        }
-
-        self.curr_angular_mode = ControlMessage.OFF
-        self.curr_linear_mode = ControlMessage.OFF
-        self.prev_update_time = self.get_clock().now()
-
-        self.control_sub = self.create_subscription(
-            ControlMessage, "control_input", self.control_msg_cb, 10)
-        self.odom_sub = self.create_subscription(
-            Odometry, "odometry/filtered", self.odom_cb, 10)
-        
-        self.thrust_topic_names = (
-            "thrusters/front_left/thrust",
-            "thrusters/front_right/thrust",
-            "thrusters/back_left/thrust",
-            "thrusters/back_right/thrust",
+        # Angle from the center to each thruster
+        thruster_loc_angles = np.arctan2(
+            np.abs(thruster_locations[:,0]),
+            np.abs(thruster_locations[:,1])
         )
 
-        self.thrust_publishers = {}
-        for topic in self.thrust_topic_names:
-            self.thrust_publishers[topic] = self.create_publisher(
-                Float64, topic, 10
-            )
+        # Angle of the thruster in degrees (e.g. 60 if facing 15 degrees "more forward")
+        thruster_angle = math.radians(self.declare_parameter(
+            "thruster_angle", 45.0).get_parameter_value().double_value)
 
-        self.timer = self.create_timer(timer_period, self.control_loop)
+        # 0.5 * fluid density * drag coefficient * reference area (empirically determined)
+        drag_x_const = self.declare_parameter(
+            "drag_x_const", 5.0).get_parameter_value().double_value
+        drag_y_const = self.declare_parameter(
+            "drag_y_const", 30.0).get_parameter_value().double_value
+        drag_z_const = self.declare_parameter(
+            "drag_z_const", 20.0).get_parameter_value().double_value
 
-    def get_thrust_values(self, target_x, target_y, target_angular):
-        d = 2 ** (3 / 2)
-        ang = target_angular / (4 * self.r)
-        return {
-            self.back_right_name: (target_x - target_y) / d + ang,
-            self.back_left_name: (target_y + target_x) / d - ang,
-            self.front_left_name: (target_x - target_y) / d - ang,
-            self.front_right_name: (target_y + target_x) / d + ang,
-        }
+        # Minimum control output
+        self.min_output = self.declare_parameter(
+            "min_output", -2000.0).get_parameter_value().double_value
 
-    def odom_cb(self, msg: Odometry):
-        self.x = msg.pose.pose.position.x
-        self.y = msg.pose.pose.position.y
-        self.local_vx = msg.twist.twist.linear.x
-        self.local_vy = msg.twist.twist.linear.y
-        self.omega = msg.twist.twist.angular.z
-        _, _, self.theta = euler_from_quaternion([
-            msg.pose.pose.orientation.x,
-            msg.pose.pose.orientation.y,
-            msg.pose.pose.orientation.z,
-            msg.pose.pose.orientation.w,
+        # Maximum control output
+        self.max_output = self.declare_parameter(
+            "max_output", 2000.0).get_parameter_value().double_value
+        
+        # From the T200 datasheet, approximately 40N maximum force
+        THRUST_CONST = 40.0
+        thrust_force_x = THRUST_CONST * math.sin(thruster_angle)
+        thrust_force_y = THRUST_CONST * math.cos(thruster_angle)
+        thrust_torque = THRUST_CONST * thruster_distances * np.sin(thruster_angle + thruster_loc_angles)
+
+        # Matrix of thrust forces and torques
+        self.thrust_forces = np.array([
+            [thrust_force_x, thrust_force_x, thrust_force_x, thrust_force_x],
+            [thrust_force_y, thrust_force_y, -thrust_force_y, -thrust_force_y],
+            [thrust_torque[0], -thrust_torque[1], -thrust_torque[2], thrust_torque[3]],
         ])
-        self.global_vx = self.local_vx * math.cos(self.theta) - self.local_vy * math.sin(self.theta)
-        self.global_vy = self.local_vy * math.cos(self.theta) + self.local_vx * math.sin(self.theta)
 
-    def convert_to_pwm_and_send(self, thrust_values):
-        for topic in self.thrust_topic_names:
-            float_msg = Float64()
-            float_msg.data = thrust_values[topic] * self.thrust_factor + self.midpoint
-            self.thrust_publishers[topic].publish(float_msg)
+        # Matrix of drag constants
+        self.drag_constants = np.array([
+            [drag_x_const, 0, 0],
+            [0, drag_y_const, 0],
+            [0, 0, drag_z_const],
+        ])
 
-    def update_controllers(self):
-        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.x_controllers[ControlMessage.WORLD_POSITION].update(self.x, dt)
-        self.x_controllers[ControlMessage.WORLD_VELOCITY].update(self.global_vx, dt)
-        self.x_controllers[ControlMessage.LOCAL_VELOCITY].update(self.local_vx, dt)
-        self.y_controllers[ControlMessage.WORLD_POSITION].update(self.y, dt)
-        self.y_controllers[ControlMessage.WORLD_VELOCITY].update(self.global_vy, dt)
-        self.y_controllers[ControlMessage.LOCAL_VELOCITY].update(self.local_vy, dt)
-        self.angular_controllers[ControlMessage.WORLD_POSITION].update(self.theta, dt)
-        self.angular_controllers[ControlMessage.WORLD_VELOCITY].update(self.omega, dt)
-        self.angular_controllers[ControlMessage.LOCAL_VELOCITY].update(self.omega, dt)
+        #--------------- SUBSCRIBERS, PUBLISHERS, AND TIMERS ---------------#
 
-    def control_loop(self):
-        self.update_controllers()
-        x_output = self.x_controllers[self.curr_linear_mode].get_effort()
-        y_output = self.y_controllers[self.curr_linear_mode].get_effort()
-        angular_output = self.angular_controllers[self.curr_angular_mode].get_effort()
+        self.cmd_vel_sub = self.create_subscription(Twist, "cmd_vel", self.cmd_vel_cb, 10)
+        self.front_right_pub = self.create_publisher(Float64, "thrusters/front_right/thrust", 10)
+        self.back_left_pub = self.create_publisher(Float64, "thrusters/back_left/thrust", 10)
+        self.front_left_pub = self.create_publisher(Float64, "thrusters/front_left/thrust", 10)
+        self.back_right_pub = self.create_publisher(Float64, "thrusters/back_right/thrust", 10)
+    
+    def calculate_control_output(self, target_vel):
+        target_vel_sq = np.sign(target_vel) * np.square(target_vel)
+        constraint_bounds = self.drag_constants @ target_vel_sq
+        result = scipy.optimize.minimize(
+            lambda u: np.linalg.norm(u),
+            np.ones(4),
+            constraints=scipy.optimize.LinearConstraint(
+                self.thrust_forces, lb=constraint_bounds, ub=constraint_bounds
+            )
+        )
 
-        if (self.curr_linear_mode == ControlMessage.WORLD_VELOCITY
-            or self.curr_linear_mode == ControlMessage.WORLD_POSITION):
-            x_boat_space = x_output * math.cos(self.theta) + y_output * math.sin(self.theta)
-            y_boat_space = y_output * math.cos(self.theta) - x_output * math.sin(self.theta)
-        else:
-            x_boat_space = x_output
-            y_boat_space = y_output
+        if not result.success:
+            self.get_logger().error("Optimization failed to converge!")
+            return None
+        
+        control_output = result.x.reshape(4)
+        if np.any(np.abs(control_output) > 1):
+            control_output = control_output / np.max(np.abs(control_output))
+        return control_output
 
-        results = self.get_thrust_values(x_boat_space, y_boat_space, angular_output)
-        self.convert_to_pwm_and_send(results)
+    def cmd_vel_cb(self, msg: Twist):
+        target_vel = np.array([
+            msg.linear.x,
+            msg.linear.y,
+            msg.angular.z,
+        ])
+        control_output = self.calculate_control_output(target_vel)
 
-        self.prev_update_time = self.get_clock().now()
+        # Don't respond if optimization failed to converge
+        if control_output is None:
+            return
+        
+        # Scale control_output from [-1,1] to [min_output,max_output]
+        output_range_mean = (self.max_output + self.min_output) / 2
+        scaled_control_output = control_output * (self.max_output - self.min_output) / 2
+        thrust_cmd = scaled_control_output + output_range_mean
 
-    def control_msg_cb(self, msg: ControlMessage):
-        if msg.linear_control_mode != self.curr_linear_mode:
-            self.x_controllers[msg.linear_control_mode].reset()
-            self.y_controllers[msg.linear_control_mode].reset()
-
-        if msg.angular_control_mode != self.curr_angular_mode:
-            self.angular_controllers[msg.angular_control_mode].reset()
-
-        for controller in self.x_controllers.values():
-            controller.set_setpoint(msg.x)
-        for controller in self.y_controllers.values():
-            controller.set_setpoint(msg.y)
-        for controller in self.angular_controllers.values():
-            controller.set_setpoint(msg.angular)
-
-        self.curr_linear_mode = msg.linear_control_mode
-        self.curr_angular_mode = msg.angular_control_mode
+        # Publish thrust commands
+        self.front_right_pub.publish(Float64(data=thrust_cmd[0]))
+        self.back_left_pub.publish(Float64(data=thrust_cmd[1]))
+        self.front_left_pub.publish(Float64(data=thrust_cmd[2]))
+        self.back_right_pub.publish(Float64(data=thrust_cmd[3]))
 
 
 def main(args=None):
     rclpy.init(args=args)
-    xdrive_control_node = XDriveController()
-    rclpy.spin(xdrive_control_node)
-    xdrive_control_node.destroy_node()
+    node = XDriveController()
+    rclpy.spin(node)
+    node.destroy_node()
     rclpy.shutdown()
 
 

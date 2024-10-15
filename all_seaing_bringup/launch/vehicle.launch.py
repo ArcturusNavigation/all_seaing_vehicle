@@ -45,12 +45,20 @@ def launch_setup(context, *args, **kwargs):
     controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="xdrive_controller.py",
-        parameters=[{
-            "boat_length": 0.7112,
-            "boat_width": 0.2540,
-            "min_output": 1100.0,
-            "max_output": 1900.0,
-        }],
+        parameters=[
+            {
+                "front_right_xy": [0.5, -0.5],
+                "back_left_xy": [-0.5, 0.5],
+                "front_left_xy": [0.5, 0.5],
+                "back_right_xy": [-0.5, -0.5],
+                "thruster_angle": 45.0,
+                "drag_x_const": 5.0,
+                "drag_y_const": 5.0,
+                "drag_z_const": 40.0,
+                "min_output": 1100.0,
+                "max_output": 1900.0,
+            }
+        ],
     )
 
     thrust_commander_node = launch_ros.actions.Node(
