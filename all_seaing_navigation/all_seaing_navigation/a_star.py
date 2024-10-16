@@ -42,7 +42,7 @@ class PathPlan(Node):
         resolution = self.map_info.resolution
         gx = int((x - origin.x) / resolution)
         gy = int((y - origin.y) / resolution)
-        return gx, gy
+        return (gx, gy)
 
     def grid_to_world(self, gx, gy):
         """Convert grid coordinates back to world coordinates."""
@@ -79,7 +79,7 @@ class PathPlan(Node):
             pose.position.y = float(position[1])
             pose_array.poses.append(pose)
 
-        self.publish_path(pose_array)
+        # self.publish_path(pose_array)
 
     def plan_path(self, s, t):
         """A* Algorithm to compute the path"""
@@ -95,15 +95,21 @@ class PathPlan(Node):
         tpos = self.world_to_grid(t.position.x, t.position.y)
         self.target = tpos
 
-        gscore[spos[0] * W + spos[1]] = 0
-        parent[spos[0] * W + spos[1]] = spos
+        # Check if the starting position and/or the ending position is occupied
+        if (self.map_grid[spos[0] + spos[1] * W] > self.cutoff or self.map_grid[spos[0] + spos[1] * W] == -1):
+            self.map_grid[spos[0] + spos[1] * W] = 0 
+        if (self.map_grid[tpos[0] + tpos[1] * W] > self.cutoff or self.map_grid[tpos[0] + tpos[1] * W] == -1):
+            self.map_grid[tpos[0] + tpos[1] * W] = 0 
+
+        gscore[spos[0] + spos[1] * W] = 0
+        parent[spos[0] + spos[1] * W] = spos
 
         pq = PriorityQueue()
         pq.put((self.heuristic(spos), spos[0], spos[1]))
 
         while not pq.empty():
             node = pq.get()
-            if abs(node[0] - (gscore[node[1] * W + node[2]] + self.heuristic(node[1:3]))) > 0.005:
+            if abs(node[0] - (gscore[node[1] + node[2] * W] + self.heuristic(node[1:3]))) > 0.005:
                 continue
 
             node = node[1:3]
@@ -112,22 +118,27 @@ class PathPlan(Node):
 
             for d in dxy:
                 nxt = (node[0] + d[0], node[1] + d[1])
-                if nxt[0] < 0 or nxt[0] >= W or nxt[1] < 0 or nxt[1] >= H:
+                if nxt[0] < 0 or nxt[0] >= H or nxt[1] < 0 or nxt[1] >= W:
                     continue
-                if self.map_grid[nxt[0] * W + nxt[1]] > self.cutoff:
+                if self.map_grid[nxt[0] + nxt[1] * W] > self.cutoff or self.map_grid[nxt[0] + nxt[1] * W] == -1:
                     continue
 
-                if gscore[node[0] * W + node[1]] + 1 < gscore[nxt[0] * W + nxt[1]]:
-                    gscore[nxt[0] * W + nxt[1]] = gscore[node[0] * W + node[1]] + 1
-                    parent[nxt[0] * W + nxt[1]] = node
-                    pq.put((gscore[nxt[0] * W + nxt[1]] + self.heuristic(nxt), nxt[0], nxt[1]))
+                if gscore[node[0] + node[1] * W] + 1 < gscore[nxt[0] + nxt[1] * W]:
+                    gscore[nxt[0]+ nxt[1] * W] = gscore[node[0] + node[1] * W] + 1
+                    parent[nxt[0] + nxt[1] * W] = node
+                    pq.put((gscore[nxt[0]+ nxt[1] * W] + self.heuristic(nxt), nxt[0], nxt[1]))
+
+        if gscore[tpos[0] + tpos[1]] == 0:
+            self.get_logger().info("Error: Path not found")
+            path = []
+            return path
 
         # Backtrace the path
         path = []
         cur = tpos
         while cur != spos:
             path.append(cur)
-            cur = parent[cur[0] * W + cur[1]]
+            cur = parent[cur[0] + cur[1] * W]
         path.append(spos)
         path.reverse()
         self.get_logger().info("Finished Backtracking Path")
@@ -154,13 +165,13 @@ class PathPlan(Node):
         self.get_logger().info("Published A* Path")
 
 
-    def publish_path(self, pose_array):
-        """Publish PoseArray path"""
-        self.pose_array_pub.publish(pose_array)
-        self.get_logger().info(
-            f"Publishing path from {self.pose_to_string(self.waypoints.poses[0])} "
-            f"to {self.pose_to_string(self.waypoints.poses[-1])}"
-        )
+    # def publish_path(self, pose_array):
+    #     """Publish PoseArray path"""
+    #     self.pose_array_pub.publish(pose_array)
+    #     self.get_logger().info(
+    #         f"Publishing path from {self.pose_to_string(self.waypoints.poses[0])} "
+    #         f"to {self.pose_to_string(self.waypoints.poses[-1])}"
+    #     )
 
     def pose_to_string(self, pos):
         return f"{{{pos.position.x}, {pos.position.y}, {pos.position.z}}}"
