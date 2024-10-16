@@ -47,6 +47,9 @@ class MapPublisher(Node):
                     self.grid_data[row, col] = random.randint(1, 99)  # Mark cell with a value between 1 and 99
 
     def timer_callback(self):
+        # Modify the grid data before publishing
+        self.populate_grid_with_random_values()
+
         # Create OccupancyGrid message
         msg = OccupancyGrid()
 
@@ -77,6 +80,7 @@ class MapPublisher(Node):
 
         # For visualization purposes, print the grid as a 2D array
         self.print_grid()
+
 
     def print_grid(self):
         """Print the grid as a 2D array for visualization."""
