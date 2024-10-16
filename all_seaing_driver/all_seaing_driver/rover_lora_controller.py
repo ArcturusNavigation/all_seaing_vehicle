@@ -17,7 +17,7 @@ class RoverLoraController(Node):
         
         self.data_size = struct.calcsize('Bddd')
 
-        # Create ROS 2 publisher for ControlMessage
+        # Create ROS 2 publisher for ControlOption
         self.publisher_ = self.create_publisher(ControlOption, 'control_options', 10)
 
         # Start a ROS 2 timer to check for serial data
@@ -33,16 +33,13 @@ class RoverLoraController(Node):
             
             priority, x, y, angular = struct.unpack('Bddd', serialized_data)
 
-            # Create a ControlMessage ROS 2 message
             control_msg = ControlOption()
             control_msg.priority = priority
             control_msg.twist.linear.x = x
             control_msg.twist.linear.y = y
             control_msg.twist.angular.z = angular
-
-            # Publish the ControlMessage
             self.publisher_.publish(control_msg)
-            self.get_logger().info(f"Published: {control_msg}")
+
 
 def main(args=None):
     rclpy.init(args=args)

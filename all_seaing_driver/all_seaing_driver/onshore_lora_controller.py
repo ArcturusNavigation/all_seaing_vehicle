@@ -5,15 +5,13 @@ import struct
 import serial
 import time
 
-from all_seaing_interfaces.msg import ControlOption
-
 # Initialize Pygame
 pygame.init()
 screen = pygame.display.set_mode((400, 400))
-pygame.display.set_caption('Control Message Input')
+pygame.display.set_caption("Keyboard Controller")
 
 # Serial setup
-serial_port = serial.Serial('/dev/ttyUSB0', 57600, timeout=1)
+serial_port = serial.Serial("/dev/ttyUSB0", 57600, timeout=1)
 time.sleep(2)  # Allow serial port to stabilize
 
 # Control message format
@@ -23,8 +21,6 @@ control_msg = {
     "y": 0.0,
     "angular": 0.0,
 }
-
-print(ControlOption._fields_and_field_types)
 
 running = True
 while running:
@@ -56,12 +52,9 @@ while running:
     else:
         control_msg["angular"] = 0.0
 
-    # Serialize to JSON
-    # serialized_msg = json.dumps(control_msg).encode('utf-8') + b'\n'
-    
     # Serialize to binary format
     serialized_msg = struct.pack(
-        'Bddd',
+        "Bddd",
         control_msg["priority"],
         control_msg["x"],
         control_msg["y"],

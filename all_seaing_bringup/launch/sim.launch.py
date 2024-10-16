@@ -63,11 +63,9 @@ def generate_launch_description():
                 "front_left_xy": [1.1, 1.0],
                 "back_right_xy": [-2.4, -1.0],
                 "thruster_angle": 45.0,
-                "drag_x_const": 5.0,
-                "drag_y_const": 5.0,
-                "drag_z_const": 40.0,
-                "min_output": -1500.0,
-                "max_output": 1500.0,
+                "drag_constants": [5.0, 5.0, 40.0],
+                "output_range": [-1500.0, 1500.0],
+                "smoothing_factor": 0.8,
             }
         ],
     )
@@ -164,6 +162,13 @@ def generate_launch_description():
     controller_server = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="controller_server.py",
+        parameters=[
+            {"global_frame_id": "odom"},
+            {"Kpid_x": [1.0, 0.0, 0.0]},
+            {"Kpid_y": [1.0, 0.0, 0.0]},
+            {"Kpid_theta": [1.0, 0.0, 0.0]},
+            {"max_vel": [4.0, 2.0, 1.0]},
+        ],
         output="screen",
     )
 

@@ -35,7 +35,7 @@ class ThrustCommander(Node):
         self.back_left_sub = self.create_subscription(
             Float64, "thrusters/back_left/thrust", self.back_left_cb, 10)
         self.heartbeat_sub = self.create_subscription(Heartbeat, "heartbeat", self.receive_heartbeat, 10)
-        self.timer = self.create_timer(1/8, self.timer_callback)
+        self.timer = self.create_timer(1 / 8, self.timer_callback)
         self.proxy = self.create_client(CommandLong, "/mavros/cmd/command")
 
     def front_right_cb(self, msg: Float64):

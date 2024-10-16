@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
-import scipy.optimize
-import rclpy
-import rclpy.time
 import math
 import numpy as np
-import scipy
+import rclpy
+import rclpy.time
+import scipy.optimize
 from rclpy.node import Node
 
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64
+
+TIMER_PERIOD = 1 / 60
 
 class XDriveController(Node):
 
@@ -43,20 +44,18 @@ class XDriveController(Node):
             "thruster_angle", 45.0).get_parameter_value().double_value)
 
         # 0.5 * fluid density * drag coefficient * reference area (empirically determined)
-        drag_x_const = self.declare_parameter(
-            "drag_x_const", 5.0).get_parameter_value().double_value
-        drag_y_const = self.declare_parameter(
-            "drag_y_const", 30.0).get_parameter_value().double_value
-        drag_z_const = self.declare_parameter(
-            "drag_z_const", 20.0).get_parameter_value().double_value
+        self.drag_constants = np.diag(np.array(self.declare_parameter(
+            "drag_constants", [5.0, 5.0, 40.0]).get_parameter_value().double_array_value))
 
-        # Minimum control output
-        self.min_output = self.declare_parameter(
-            "min_output", -2000.0).get_parameter_value().double_value
+        # Control output range
+        self.output_range = np.array(self.declare_parameter(
+            "output_range", [-1500.0, 1500.0]).get_parameter_value().double_array_value)
 
-        # Maximum control output
-        self.max_output = self.declare_parameter(
-            "max_output", 2000.0).get_parameter_value().double_value
+        # Smoothing factor with 0 corresponding to no smoothing
+        self.smoothing = self.declare_parameter(
+            "smoothing_factor", 0.8).get_parameter_value().double_value
+        self.curr_output = np.zeros(4)
+        self.prev_output = np.zeros(4)
         
         # From the T200 datasheet, approximately 40N maximum force
         THRUST_CONST = 40.0
@@ -71,13 +70,6 @@ class XDriveController(Node):
             [thrust_torque[0], -thrust_torque[1], -thrust_torque[2], thrust_torque[3]],
         ])
 
-        # Matrix of drag constants
-        self.drag_constants = np.array([
-            [drag_x_const, 0, 0],
-            [0, drag_y_const, 0],
-            [0, 0, drag_z_const],
-        ])
-
         #--------------- SUBSCRIBERS, PUBLISHERS, AND TIMERS ---------------#
 
         self.cmd_vel_sub = self.create_subscription(Twist, "cmd_vel", self.cmd_vel_cb, 10)
@@ -85,6 +77,7 @@ class XDriveController(Node):
         self.back_left_pub = self.create_publisher(Float64, "thrusters/back_left/thrust", 10)
         self.front_left_pub = self.create_publisher(Float64, "thrusters/front_left/thrust", 10)
         self.back_right_pub = self.create_publisher(Float64, "thrusters/back_right/thrust", 10)
+        self.timer = self.create_timer(TIMER_PERIOD, self.timer_cb)
     
     def calculate_control_output(self, target_vel):
         target_vel_sq = np.sign(target_vel) * np.square(target_vel)
@@ -117,17 +110,29 @@ class XDriveController(Node):
         # Don't respond if optimization failed to converge
         if control_output is None:
             return
+
+        self.curr_output = control_output
+
+    def timer_cb(self):
+        """
+        Using a separate timer callback allows consistent smoothing even if the callback gets called
+        at different rates depending on how fast cmd_vel gets published by other nodes.
+        """
+
+        # Smoothing via low-pass filter
+        control_output = self.smoothing * self.prev_output + (1 - self.smoothing) * self.curr_output
+        self.prev_output = control_output
         
-        # Scale control_output from [-1,1] to [min_output,max_output]
-        output_range_mean = (self.max_output + self.min_output) / 2
-        scaled_control_output = control_output * (self.max_output - self.min_output) / 2
-        thrust_cmd = scaled_control_output + output_range_mean
+        # Scale control_output from [-1,1] to output range
+        scaled_control_output = control_output * (self.output_range[1] - self.output_range[0]) / 2
+        thrust_cmd = scaled_control_output + np.mean(self.output_range)
 
         # Publish thrust commands
         self.front_right_pub.publish(Float64(data=thrust_cmd[0]))
         self.back_left_pub.publish(Float64(data=thrust_cmd[1]))
         self.front_left_pub.publish(Float64(data=thrust_cmd[2]))
         self.back_right_pub.publish(Float64(data=thrust_cmd[3]))
+
 
 
 def main(args=None):

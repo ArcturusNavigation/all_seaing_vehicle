@@ -52,11 +52,9 @@ def launch_setup(context, *args, **kwargs):
                 "front_left_xy": [0.5, 0.5],
                 "back_right_xy": [-0.5, -0.5],
                 "thruster_angle": 45.0,
-                "drag_x_const": 5.0,
-                "drag_y_const": 5.0,
-                "drag_z_const": 40.0,
-                "min_output": 1100.0,
-                "max_output": 1900.0,
+                "drag_constants": [5.0, 5.0, 40.0],
+                "output_range": [1100.0, 1900.0],
+                "smoothing_factor": 0.8,
             }
         ],
     )
@@ -74,9 +72,21 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    control_mux = launch_ros.actions.Node(
+        package="all_seaing_controller",
+        executable="control_mux.py",
+    )
+
     controller_server = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="controller_server.py",
+        parameters=[
+            {"global_frame_id": "odom"},
+            {"Kpid_x": [1.0, 0.0, 0.0]},
+            {"Kpid_y": [1.0, 0.0, 0.0]},
+            {"Kpid_theta": [1.0, 0.0, 0.0]},
+            {"max_vel": [2.0, 1.0, 0.8]},
+        ],
         output="screen",
     )
 
@@ -141,6 +151,7 @@ def launch_setup(context, *args, **kwargs):
     return [
         ekf_node,
         navsat_node,
+        control_mux,
         controller_node,
         controller_server,
         waypoint_sender,

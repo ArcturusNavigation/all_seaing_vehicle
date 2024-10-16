@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlMessage
+from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlOption
 from nav_msgs.msg import Odometry
 from all_seaing_autonomy.roboboat.Task import Task
 from all_seaing_autonomy.roboboat.FollowThePath import FollowThePath
@@ -26,7 +26,7 @@ class NavigationChannel(Task):
 
     def start(self):
         # start moos behavior of path following
-        control_message = ControlMessage()
+        control_message = ControlOption()
         control_message.twist.linear.x = 0.5
         control_message.twist.linear.y = 0.0
         control_message.twist.angular.z = 0.0
@@ -84,7 +84,7 @@ class TaskManager(Node):
         self.state_message = ASV2State()
 
         self.control_message_publisher = self.create_publisher(
-            ControlMessage, "control_options", 10
+            ControlOption, "control_options", 10
         )
 
         self.TASK_LIST = [
