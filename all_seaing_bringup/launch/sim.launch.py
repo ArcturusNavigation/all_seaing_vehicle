@@ -72,6 +72,11 @@ def generate_launch_description():
         ],
     )
 
+    perception_eval_node = launch_ros.actions.Node(
+        package="all_seaing_utility",
+        executable="perception_eval.py",
+    )
+
     obstacle_bbox_visualizer_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_bbox_visualizer",
@@ -208,5 +213,6 @@ def generate_launch_description():
             waypoint_sender,
             keyboard_ld,
             sim_ld,
+            perception_eval_node,
         ]
     )
