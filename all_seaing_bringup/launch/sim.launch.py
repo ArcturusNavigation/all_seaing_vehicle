@@ -189,8 +189,7 @@ def generate_launch_description():
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            # "world": "practice_2023_follow_path2_task",
-            "world": "follow_path_task",
+            "world": "sydney_regatta",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": "-v 0",
         }.items(),
