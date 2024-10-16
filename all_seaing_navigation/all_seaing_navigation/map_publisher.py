@@ -20,7 +20,7 @@ class MapPublisher(Node):
         self.map_width = 100
         self.map_height = 100
         self.map_resolution = 0.1
-        self.origin_position = [0.0, 0.0, 0.0]
+        self.origin_position = [0.0, 0.0, 0.0] # [-5.0, -5.0, 0.0]
 
         # Initialize grid (unknown = -1, free space = 0)
         self.grid_data = np.full((self.map_height, self.map_width), -1, dtype=np.int8)  # Start with all unknown
@@ -48,7 +48,7 @@ class MapPublisher(Node):
 
     def timer_callback(self):
         # Modify the grid data before publishing
-        self.populate_grid_with_random_values()
+        # self.populate_grid_with_random_values()
 
         # Create OccupancyGrid message
         msg = OccupancyGrid()
