@@ -134,7 +134,6 @@ class XDriveController(Node):
         self.back_right_pub.publish(Float64(data=thrust_cmd[3]))
 
 
-
 def main(args=None):
     rclpy.init(args=args)
     node = XDriveController()
