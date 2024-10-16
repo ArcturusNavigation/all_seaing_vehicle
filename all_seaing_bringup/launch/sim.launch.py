@@ -167,7 +167,7 @@ def generate_launch_description():
             {"Kpid_x": [1.0, 0.0, 0.0]},
             {"Kpid_y": [1.0, 0.0, 0.0]},
             {"Kpid_theta": [1.0, 0.0, 0.0]},
-            {"max_vel": [4.0, 2.0, 1.0]},
+            {"max_vel": [5.0, 3.0, 1.5]},
         ],
         output="screen",
     )
@@ -177,9 +177,9 @@ def generate_launch_description():
         executable="onshore_node.py",
         output="screen",
         parameters=[
-            {"joy_x_scale": 4.0},
-            {"joy_y_scale": -2.0},
-            {"joy_ang_scale": -1.0},
+            {"joy_x_scale": 5.0},
+            {"joy_y_scale": -3.0},
+            {"joy_ang_scale": -1.5},
         ],
     )
 
