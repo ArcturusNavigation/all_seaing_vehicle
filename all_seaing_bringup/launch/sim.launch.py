@@ -183,6 +183,16 @@ def generate_launch_description():
         ],
     )
 
+
+    waypoint_finder = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="waypoint_finder.py",
+        parameters=[
+            {"color_label_mappings_file": color_label_mappings},
+            {"safe_margin": 0.2}
+        ]
+    )
+
     waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="waypoint_sender.py",
@@ -200,7 +210,7 @@ def generate_launch_description():
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "sydney_regatta",
+            "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": "-v 0",
         }.items(),
@@ -221,6 +231,7 @@ def generate_launch_description():
             control_mux,
             controller_server,
             onshore_node,
+            waypoint_finder,
             waypoint_sender,
             keyboard_ld,
             sim_ld,
