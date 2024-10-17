@@ -45,13 +45,18 @@ def launch_setup(context, *args, **kwargs):
     controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="xdrive_controller.py",
-        parameters=[{
-            "in_sim": False,
-            "boat_length": 0.7112,
-            "boat_width": 0.2540,
-            "min_output": 1100.0,
-            "max_output": 1900.0,
-        }],
+        parameters=[
+            {
+                "front_right_xy": [0.5, -0.5],
+                "back_left_xy": [-0.5, 0.5],
+                "front_left_xy": [0.5, 0.5],
+                "back_right_xy": [-0.5, -0.5],
+                "thruster_angle": 45.0,
+                "drag_constants": [5.0, 5.0, 40.0],
+                "output_range": [1100.0, 1900.0],
+                "smoothing_factor": 0.8,
+            }
+        ],
     )
 
     thrust_commander_node = launch_ros.actions.Node(
@@ -67,9 +72,21 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    control_mux = launch_ros.actions.Node(
+        package="all_seaing_controller",
+        executable="control_mux.py",
+    )
+
     controller_server = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="controller_server.py",
+        parameters=[
+            {"global_frame_id": "odom"},
+            {"Kpid_x": [1.0, 0.0, 0.0]},
+            {"Kpid_y": [1.0, 0.0, 0.0]},
+            {"Kpid_theta": [1.0, 0.0, 0.0]},
+            {"max_vel": [2.0, 1.0, 0.8]},
+        ],
         output="screen",
     )
 
@@ -80,6 +97,12 @@ def launch_setup(context, *args, **kwargs):
             {"xy_threshold": 1.0},
             {"theta_threshold": 5.0},
         ],
+        output="screen",
+    )
+
+    rover_lora_controller = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="rover_lora_controller.py",
         output="screen",
     )
 
@@ -128,9 +151,11 @@ def launch_setup(context, *args, **kwargs):
     return [
         ekf_node,
         navsat_node,
+        control_mux,
         controller_node,
         controller_server,
         waypoint_sender,
+        rover_lora_controller,
         thrust_commander_node,
         lidar_ld,
         mavros_ld,

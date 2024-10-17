@@ -12,7 +12,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "action/Waypoint.action"
     "msg/ObstacleMap.msg"
     "msg/Obstacle.msg"
-    "msg/ControlMessage.msg"
+    "msg/ControlOption.msg"
     "msg/LabeledBoundingBox2DArray.msg"
     "msg/LabeledBoundingBox2D.msg"
     "msg/Heartbeat.msg"
