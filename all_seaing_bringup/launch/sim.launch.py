@@ -50,13 +50,22 @@ def generate_launch_description():
     controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="xdrive_controller.py",
+        remappings=[
+            ("thrusters/front_left/thrust", "/wamv/thrusters/front_left/thrust"),
+            ("thrusters/front_right/thrust", "/wamv/thrusters/front_right/thrust"),
+            ("thrusters/back_left/thrust", "/wamv/thrusters/back_left/thrust"),
+            ("thrusters/back_right/thrust", "/wamv/thrusters/back_right/thrust"),
+        ],
         parameters=[
             {
-                "in_sim": True,
-                "boat_length": 3.5,
-                "boat_width": 2.0,
-                "min_output": -1000.0,
-                "max_output": 1000.0,
+                "front_right_xy": [1.1, -1.0],
+                "back_left_xy": [-2.4, 1.0],
+                "front_left_xy": [1.1, 1.0],
+                "back_right_xy": [-2.4, -1.0],
+                "thruster_angle": 45.0,
+                "drag_constants": [5.0, 5.0, 40.0],
+                "output_range": [-1500.0, 1500.0],
+                "smoothing_factor": 0.8,
             }
         ],
     )
@@ -153,6 +162,13 @@ def generate_launch_description():
     controller_server = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="controller_server.py",
+        parameters=[
+            {"global_frame_id": "odom"},
+            {"Kpid_x": [1.0, 0.0, 0.0]},
+            {"Kpid_y": [1.0, 0.0, 0.0]},
+            {"Kpid_theta": [1.0, 0.0, 0.0]},
+            {"max_vel": [5.0, 3.0, 1.5]},
+        ],
         output="screen",
     )
 
@@ -161,10 +177,20 @@ def generate_launch_description():
         executable="onshore_node.py",
         output="screen",
         parameters=[
-            {"joy_x_scale": 2.0},
-            {"joy_y_scale": -2.0},
-            {"joy_ang_scale": -0.8},
+            {"joy_x_scale": 5.0},
+            {"joy_y_scale": -3.0},
+            {"joy_ang_scale": -1.5},
         ],
+    )
+
+
+    waypoint_finder = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="waypoint_finder.py",
+        parameters=[
+            {"color_label_mappings_file": color_label_mappings},
+            {"safe_margin": 0.2}
+        ]
     )
 
     waypoint_sender = launch_ros.actions.Node(
@@ -184,7 +210,7 @@ def generate_launch_description():
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "sydney_regatta",
+            "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": "-v 0",
         }.items(),
@@ -205,6 +231,7 @@ def generate_launch_description():
             control_mux,
             controller_server,
             onshore_node,
+            waypoint_finder,
             waypoint_sender,
             keyboard_ld,
             sim_ld,

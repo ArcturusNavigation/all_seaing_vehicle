@@ -14,6 +14,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/thrust_commander.py
     ${PROJECT_NAME}/webcam_publisher.py
     ${PROJECT_NAME}/zed2i_publisher.py
+    ${PROJECT_NAME}/rover_lora_controller.py
+    ${PROJECT_NAME}/onshore_lora_controller.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

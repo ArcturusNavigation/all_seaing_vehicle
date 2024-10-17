@@ -7,37 +7,43 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 import time
 
+from all_seaing_controller.pid_controller import CircularPID, PIDController
 from all_seaing_interfaces.action import Waypoint
-from all_seaing_interfaces.msg import ControlMessage
+from all_seaing_interfaces.msg import ControlOption
 from nav_msgs.msg import Odometry
 from tf_transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
 
+TIMER_PERIOD = 1 / 60
+MARKER_NS = "control"
 
 class ControllerServer(Node):
     def __init__(self):
         super().__init__("controller_server")
 
+        #--------------- PARAMETERS ---------------#
+
+        self.global_frame_id = self.declare_parameter(
+            "global_frame_id", "odom").get_parameter_value().string_value
+        Kpid_x = self.declare_parameter(
+            "Kpid_x", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
+        Kpid_y = self.declare_parameter(
+            "Kpid_y", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
+        Kpid_theta= self.declare_parameter(
+            "Kpid_theta", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
+        self.max_vel = self.declare_parameter(
+            "max_vel", [4.0, 2.0, 1.0]).get_parameter_value().double_array_value
+
+        #--------------- SUBSCRIBERS, PUBLISHERS, AND SERVERS ---------------#
+
         self.group = MutuallyExclusiveCallbackGroup()
-
-        self.timer_period = (
-            self.declare_parameter("timer_period", 1 / 60)
-            .get_parameter_value()
-            .double_value
-        )
-        self.global_frame_id = (
-            self.declare_parameter("global_frame_id", "odom")
-            .get_parameter_value()
-            .string_value
-        )
-
         self.waypoint_server = ActionServer(
             self,
             Waypoint,
             "waypoint",
-            callback_group=self.group,
             execute_callback=self.waypoint_callback,
             cancel_callback=self.cancel_callback,
+            callback_group=self.group,
         )
         self.odom_sub = self.create_subscription(
             Odometry,
@@ -46,15 +52,25 @@ class ControllerServer(Node):
             10,
             callback_group=self.group,
         )
-        self.control_pub = self.create_publisher(ControlMessage, "control_options", 10)
+        self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
         self.marker_pub = self.create_publisher(Marker, "control_marker", 10)
+
+        #--------------- PID CONTROLLERS ---------------#
+
+        self.x_pid = PIDController(*Kpid_x)
+        self.y_pid = PIDController(*Kpid_y)
+        self.theta_pid = CircularPID(*Kpid_theta)
+        self.theta_pid.set_effort_min(-self.max_vel[2])
+        self.theta_pid.set_effort_max(self.max_vel[2])
+
+        #--------------- MEMBER VARIABLES ---------------#
 
         self.nav_x = 0.0
         self.nav_y = 0.0
         self.heading = 0.0
         self.proc_count = 0
-        self.marker_ns = "control"
-
+        self.prev_update_time = self.get_clock().now()
+    
     def odom_callback(self, msg: Odometry):
         self.nav_x = msg.pose.pose.position.x
         self.nav_y = msg.pose.pose.position.y
@@ -67,22 +83,12 @@ class ControllerServer(Node):
             ]
         )
 
-    def send_waypoint(self, x, y, angular):
-        control_msg = ControlMessage()
-        control_msg.priority = 1
-        control_msg.linear_control_mode = ControlMessage.WORLD_POSITION
-        control_msg.angular_control_mode = ControlMessage.WORLD_POSITION
-        control_msg.x = x
-        control_msg.y = y
-        control_msg.angular = angular
-        self.control_pub.publish(control_msg)
-
     def start_process(self, msg=None):
         self.proc_count += 1
         while self.proc_count >= 2:
-            time.sleep(self.timer_period)
+            time.sleep(TIMER_PERIOD)
         if msg is not None:
-            time.sleep(self.timer_period)
+            time.sleep(TIMER_PERIOD)
             self.get_logger().info(msg)
 
     def end_process(self, msg=None):
@@ -95,7 +101,7 @@ class ControllerServer(Node):
         marker_msg = Marker()
         marker_msg.header.frame_id = self.global_frame_id
         marker_msg.header.stamp = self.get_clock().now().to_msg()
-        marker_msg.ns = self.marker_ns
+        marker_msg.ns = MARKER_NS
         marker_msg.action = Marker.DELETEALL
         self.marker_pub.publish(marker_msg)
 
@@ -103,7 +109,7 @@ class ControllerServer(Node):
         marker_msg = Marker()
         marker_msg.header.frame_id = self.global_frame_id
         marker_msg.header.stamp = self.get_clock().now().to_msg()
-        marker_msg.ns = self.marker_ns
+        marker_msg.ns = MARKER_NS
         marker_msg.type = Marker.CYLINDER
         marker_msg.action = Marker.ADD
         marker_msg.pose.position.x = x
@@ -121,6 +127,47 @@ class ControllerServer(Node):
     def cancel_callback(self, cancel_request):
         return CancelResponse.ACCEPT
 
+    def reset_pid(self):
+        self.prev_update_time = self.get_clock().now()
+        self.x_pid.reset()
+        self.y_pid.reset()
+        self.theta_pid.reset()
+    
+    def set_pid_setpoints(self, x, y, theta):
+        self.x_pid.set_setpoint(x)
+        self.y_pid.set_setpoint(y)
+        self.theta_pid.set_setpoint(theta)
+    
+    def update_pid(self):
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        self.x_pid.update(self.nav_x, dt)
+        self.y_pid.update(self.nav_y, dt)
+        self.theta_pid.update(self.heading, dt)
+        self.prev_update_time = self.get_clock().now()
+    
+    def scale_thrust(self, x_vel, y_vel):
+        if abs(x_vel) <= self.max_vel[0] and abs(y_vel) <= self.max_vel[1]:
+            return x_vel, y_vel
+
+        scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
+        return scale * x_vel, scale * y_vel
+
+    def control_loop(self):
+        self.update_pid()
+        x_output = self.x_pid.get_effort()
+        y_output = self.y_pid.get_effort()
+        theta_output = self.theta_pid.get_effort()
+        x_vel = x_output * math.cos(self.heading) + y_output * math.sin(self.heading)
+        y_vel = y_output * math.cos(self.heading) - x_output * math.sin(self.heading)
+
+        x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
+        control_msg = ControlOption()
+        control_msg.priority = 1
+        control_msg.twist.linear.x = x_vel
+        control_msg.twist.linear.y = y_vel
+        control_msg.twist.angular.z = theta_output
+        self.control_pub.publish(control_msg)
+
     def waypoint_callback(self, goal_handle):
         self.start_process("Waypoint following started!")
 
@@ -128,19 +175,18 @@ class ControllerServer(Node):
         theta_threshold = goal_handle.request.theta_threshold
         goal_x = goal_handle.request.x
         goal_y = goal_handle.request.y
-        goal_theta = (
-            math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
-            if goal_handle.request.ignore_theta
-            else goal_handle.request.theta
-        )
+        if goal_handle.request.ignore_theta:
+            goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
+        else:
+            goal_theta = goal_handle.request.theta
         self.visualize_waypoint(goal_x, goal_y)
 
-        feedback_msg = Waypoint.Feedback()
-        while (
-            abs(goal_x - self.nav_x) > xy_threshold
-            or abs(goal_y - self.nav_y) > xy_threshold
-            or abs(goal_theta - self.heading) > math.radians(theta_threshold)
-        ):
+        self.reset_pid()
+        self.set_pid_setpoints(goal_x, goal_y, goal_theta)
+        while (not self.x_pid.is_done(self.nav_x, xy_threshold) or
+               not self.y_pid.is_done(self.nav_y, xy_threshold) or
+               not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))):
+
             if self.proc_count >= 2:
                 self.end_process("Waypoint following aborted!")
                 goal_handle.abort()
@@ -151,12 +197,8 @@ class ControllerServer(Node):
                 goal_handle.canceled()
                 return Waypoint.Result()
 
-            self.send_waypoint(goal_x, goal_y, goal_theta)
-            feedback_msg.x = self.nav_x
-            feedback_msg.y = self.nav_y
-            feedback_msg.theta = self.heading
-            goal_handle.publish_feedback(feedback_msg)
-            time.sleep(self.timer_period)
+            self.control_loop()
+            time.sleep(TIMER_PERIOD)
 
         self.end_process("Waypoint following completed!")
         goal_handle.succeed()
