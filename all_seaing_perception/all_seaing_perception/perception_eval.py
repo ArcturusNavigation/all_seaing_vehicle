@@ -3,12 +3,9 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-import cv_bridge
-import cv2
 from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import ObstacleMap, ObstacleCounter, ObstacleCounterArray
 import numpy as np
-import yaml
 
 class PerceptionEval(Node):
     """

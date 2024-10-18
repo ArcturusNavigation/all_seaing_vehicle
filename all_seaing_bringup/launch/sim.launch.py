@@ -82,7 +82,7 @@ def generate_launch_description():
     )
 
     perception_eval_node = launch_ros.actions.Node(
-        package="all_seaing_utility",
+        package="all_seaing_perception",
         executable="perception_eval.py",
     )
 
