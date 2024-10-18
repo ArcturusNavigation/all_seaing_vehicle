@@ -33,6 +33,8 @@ class PathPlan(Node):
         self.target = None
         self.cutoff = 50  # Threshold for obstacle cells
         self.waypoints = None
+        self.failed_runs = 0
+        self.completed_runs = 0
 
         self.get_logger().info("Initialized A* Path Planner")
 
@@ -60,6 +62,9 @@ class PathPlan(Node):
     def waypoints_cb(self, msg):
         self.waypoints = msg
         self.get_logger().info("New Waypoints Added, Running A*")
+        if self.map_info is None:
+            self.get_logger().info("No occupancy grid in memory")
+            return
         self.full_path()
 
     def heuristic(self, node):
@@ -85,7 +90,12 @@ class PathPlan(Node):
         """A* Algorithm to compute the path"""
         W = self.map_info.width
         H = self.map_info.height
-        dxy = [(1, 0), (0, 1), (-1, 0), (0, -1)]  # Neighbor offsets
+        # dxy = [(1, 0), (0, 1), (-1, 0), (0, -1),(1,1),(-1,-1),(-1,1),(1,-1)]  # Neighbor offsets
+        dxy = [(1, 0), (0, 1), (-1, 0), (0, -1),(1,1),(-1,-1),(-1,1),(1,-1)] 
+        for i in range(-1, 1, 2):
+            for j in range(-2, 2, 4):
+                dxy.append((i,j))
+                dxy.append((j,i))
 
         gscore = [inf] * (H * W)
         parent = [(0, 0)] * (H * W)
@@ -106,7 +116,6 @@ class PathPlan(Node):
 
         pq = PriorityQueue()
         pq.put((self.heuristic(spos), spos[0], spos[1]))
-
         while not pq.empty():
             node = pq.get()
             if abs(node[0] - (gscore[node[1] + node[2] * W] + self.heuristic(node[1:3]))) > 0.005:
@@ -128,20 +137,25 @@ class PathPlan(Node):
                     parent[nxt[0] + nxt[1] * W] = node
                     pq.put((gscore[nxt[0]+ nxt[1] * W] + self.heuristic(nxt), nxt[0], nxt[1]))
 
-        if gscore[tpos[0] + tpos[1]] == 0:
+        if gscore[tpos[0] + tpos[1]*W] == inf:
             self.get_logger().info("Error: Path not found")
             path = []
+            self.failed_runs += 1
             return path
 
         # Backtrace the path
         path = []
         cur = tpos
         while cur != spos:
+            # self.get_logger().info(f"Current node {cur[0]}, {cur[1]}")
             path.append(cur)
             cur = parent[cur[0] + cur[1] * W]
         path.append(spos)
         path.reverse()
         self.get_logger().info("Finished Backtracking Path")
+
+        self.completed_runs += 1
+        self.get_logger().info(f"Failed runs/Completed runs: {self.failed_runs}/{self.completed_runs}")
 
         # Publish path as nav_msgs/Path
         self.publish_nav_path(path)

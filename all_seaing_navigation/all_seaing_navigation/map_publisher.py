@@ -12,7 +12,7 @@ class MapPublisher(Node):
 
     def __init__(self):
         super().__init__('map_publisher')
-        self.publisher_ = self.create_publisher(OccupancyGrid, 'map', 10)
+        self.publisher_ = self.create_publisher(OccupancyGrid, 'map', 100)
         timer_period = 0.5
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
@@ -36,11 +36,11 @@ class MapPublisher(Node):
         for row in range(self.map_height):
             for col in range(self.map_width):
                 rand_val = random.randint(0, 100)
-                if rand_val < 5:  # 5% chance of being an obstacle
+                if rand_val < 1:  # 5% chance of being an obstacle
                     self.grid_data[row, col] = 100  # Mark cell as an obstacle
-                elif rand_val >= 5 and rand_val < 90:  # 85% chance of being free space
+                elif rand_val >= 2 and rand_val < 99:  # 85% chance of being free space
                     self.grid_data[row, col] = 0  # Mark cell as free space
-                elif rand_val >= 90 and rand_val < 100:  # 10% chance of being unknown
+                elif rand_val >= 98 and rand_val < 100:  # 10% chance of being unknown
                     self.grid_data[row, col] = -1  # Mark cell as unknown
                 else:
                     # Introduce intermediate values for uncertainty
