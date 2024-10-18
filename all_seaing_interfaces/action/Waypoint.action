@@ -9,7 +9,3 @@ bool ignore_theta
 # Result
 bool is_finished
 ---
-# Feedback
-float64 x
-float64 y
-float64 theta
