@@ -38,7 +38,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {"joy_x_scale": 2.0},
-            {"joy_y_scale": -2.0},
+            {"joy_y_scale": -1.0},
             {"joy_ang_scale": -0.8},
         ],
     )
