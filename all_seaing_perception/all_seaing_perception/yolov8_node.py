@@ -45,8 +45,9 @@ class Yolov8Node(Node):
         self.declare_parameter("device", "cuda:0")
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-        self.declare_parameter("image_topic", "image_raw") 
+        self.declare_parameter("image_topic", "image_raw")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
+        self.declare_parameter("tensorRT", True)
 
         # Get parameters
         model_name = self.get_parameter("model").get_parameter_value().string_value
@@ -54,6 +55,7 @@ class Yolov8Node(Node):
         self.threshold = self.get_parameter("threshold").get_parameter_value().double_value
         self.enable = self.get_parameter("enable").get_parameter_value().bool_value
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
+        use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
         # Get the model's path
         self.model_dir = os.path.expanduser("~/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
@@ -66,6 +68,18 @@ class Yolov8Node(Node):
             self.get_logger().info(f"Loading model from: {model_path}")
             self.cv_bridge = CvBridge()
             self.yolo = YOLO(model_path)
+            if use_tensorRT:
+                self.yolo.export(
+                    format="engine",
+                    dynamic=True,
+                    batch=8,
+                    workspace=4,
+                    int8=True,
+                    data="coco.yaml",
+                )
+                dot_loc = model_name.index('.')
+                to_new_model_name = model_name[:dot_loc]
+                self.yolo = YOLO(to_new_model_name+'.engine', task='detect')
             self.yolo.fuse()
 
         # Setup QoS profile
@@ -132,9 +146,9 @@ class Yolov8Node(Node):
                     labeled_bounding_box_msgs.boxes.append(box_msg)
 
                     # Draw the bounding box on the image
-                    cv2.rectangle(cv_image, 
-                                  (box_msg.min_x, box_msg.min_y), 
-                                  (box_msg.max_x, box_msg.max_y), 
+                    cv2.rectangle(cv_image,
+                                  (box_msg.min_x, box_msg.min_y),
+                                  (box_msg.max_x, box_msg.max_y),
                                   (0, 255, 0),  # Green color
                                   2)  # Thickness
 
