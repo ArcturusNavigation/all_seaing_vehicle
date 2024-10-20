@@ -31,6 +31,10 @@ ament_auto_add_executable(
     obstacle_bbox_visualizer
     ${PROJECT_NAME}/obstacle_bbox_visualizer.cpp
 )
+ament_auto_add_executable(
+    bbox_project_pcloud
+    ${PROJECT_NAME}/bbox_project_pcloud.cpp
+)
 
 target_link_libraries(obstacle_bbox_visualizer yaml-cpp)
 
@@ -39,7 +43,8 @@ install(TARGETS
     obstacle_bbox_overlay
     point_cloud_filter
     point_cloud_image_overlay
-    obstacle_bbox_visualizer  
+    obstacle_bbox_visualizer
+    bbox_project_pcloud
     DESTINATION lib/${PROJECT_NAME}
 )
 
