@@ -18,13 +18,26 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 
+#include "pcl/point_cloud.h"
+#include "pcl/point_types.h"
+#include "pcl_conversions/pcl_conversions.h"
+
+#include "cv_bridge/cv_bridge.h"
+
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
+
+#include "all_seaing_interfaces/msg/labeled_bounding_box2_d_array.hpp"
+
 class BBoxProjectPointCloud : public rclcpp::Node{
 private:
     // Publishers and subscribers
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_image_pub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
+    rclcpp::Subscription<>
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> m_cloud_sub;
+    message_filters::Subscriber<all_seaing_interfaces::msg::LabeledBoundingBox2DArray> m_bbox_sub;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
@@ -38,9 +51,9 @@ private:
     // Pointcloud-camera sync policies
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image,
                                                             sensor_msgs::msg::PointCloud2>
-        PointCloudCamPolicy;
-    typedef message_filters::Synchronizer<PointCloudCamPolicy> PointCloudCamSync;
-    std::shared_ptr<PointCloudCamSync> m_pc_cam_sync;
+        PointCloudCamBBoxPolicy;
+    typedef message_filters::Synchronizer<PointCloudCamPolicy> PointCloudCamBBoxSync;
+    std::shared_ptr<PointCloudCamSync> m_pc_cam_bbox_sync;
 public:
     BBoxProjectPointCloud();
     virtual ~BBoxProjectPointCloud();
