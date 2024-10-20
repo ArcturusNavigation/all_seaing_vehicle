@@ -21,6 +21,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/BuoyPairArray.msg"
     "msg/Waypoint.msg"
     "msg/WaypointArray.msg"
+    "msg/ObstacleCounter.msg"
+    "msg/ObstacleCounterArray.msg"
     DEPENDENCIES
     geometry_msgs
 )
