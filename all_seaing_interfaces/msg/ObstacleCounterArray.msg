@@ -1,0 +1,1 @@
+all_seaing_interfaces/ObstacleCounter[] obstacle_counter_array

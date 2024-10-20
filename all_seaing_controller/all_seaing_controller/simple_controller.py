@@ -6,7 +6,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
-from all_seaing_interfaces.msg import ASVState
+from all_seaing_interfaces.msg import ASV2State
 
 
 class SimpleController(Node):
@@ -31,7 +31,7 @@ class SimpleController(Node):
             Float64, "thrusters/right/thrust", 10
         )
         self.command_sub = self.create_subscription(
-            ASVState, "asv_state", self.command_callback, 10
+            ASV2State, "asv_state", self.command_callback, 10
         )
 
     def command_callback(self, msg):
