@@ -69,7 +69,7 @@ class ThrustCommander(Node):
         )
     
     def receive_heartbeat(self, msg):
-        self.get_logger().info("Heartbeat received!")
+        self.get_logger().debug("Heartbeat received!")
         self.prev_heartbeat = self.get_clock().now()
         if msg.e_stopped:
             self.e_stopped = True
@@ -78,7 +78,7 @@ class ThrustCommander(Node):
         time_since_last_heartbeat = (self.get_clock().now() - self.prev_heartbeat).nanoseconds / 1e9
 
         if time_since_last_heartbeat > self.heartbeat_threshold and not self.e_stopped:
-            self.get_logger().warn("Lost heartbeat! Entering e-stop mode.")
+            self.get_logger().warning("Lost heartbeat! Entering e-stop mode.")
             self.e_stopped = True
 
         if self.e_stopped:
