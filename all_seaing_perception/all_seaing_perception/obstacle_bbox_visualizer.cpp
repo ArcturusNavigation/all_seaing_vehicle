@@ -89,6 +89,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
                              -camera_point.x);
         cv::Point2d pixel_centroid = m_cam_model.project3dToPixel(centroid);
 
+
         if (pixel_centroid.x >= 0 && pixel_centroid.x < cv_ptr->image.cols &&
             pixel_centroid.y >= 0 && pixel_centroid.y < cv_ptr->image.rows) {
             cv::Scalar color = get_color_for_label(obstacle.label);
@@ -98,6 +99,25 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
         else { 
             RCLCPP_WARN(this->get_logger(), "Centroid outside image bounds: (%f, %f)", pixel_centroid.x, pixel_centroid.y);
         }
+
+        // display bbox -> 2d bbox
+        geometry_msgs::msg::Point camera_bbox_min;
+        geometry_msgs::msg::Point camera_bbox_max;
+        tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_min, camera_bbox_min, m_pc_cam_tf);
+        tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_max, camera_bbox_max, m_pc_cam_tf);
+        cv::Point3d ptmin(camera_bbox_min.y, camera_bbox_min.z, -camera_bbox_min.x);
+        cv::Point3d ptmax(camera_bbox_max.y, camera_bbox_max.z, -camera_bbox_max.x);
+        cv::Point2d pt1 = m_cam_model.project3dToPixel(ptmin);
+        cv::Point2d pt2 = m_cam_model.project3dToPixel(ptmax);
+        cv::Scalar color(0, 255, 255);
+        cv::rectangle(cv_ptr->image, pt1, pt2, color, 2);
+
+        // RCLCPP_INFO(this->get_logger(), "3d lidar point: (%f, %f, %f)", lidar_point.x, lidar_point.y, lidar_point.z);
+        // RCLCPP_INFO(this->get_logger(), "3d bbox min point: (%f, %f, %f)", lidar_bbox_min.x, lidar_bbox_min.y, lidar_bbox_min.z);
+        // RCLCPP_INFO(this->get_logger(), "3d camera point: (%f, %f, %f)", centroid.x, centroid.y, centroid.z);
+        // RCLCPP_INFO(this->get_logger(), "3d Bbox min: (%f, %f, %f)", ptmin.x, ptmin.y, ptmin.z);
+        // RCLCPP_INFO(this->get_logger(), "camera point: (%f, %f)", pixel_centroid.x, pixel_centroid.y);
+        // RCLCPP_INFO(this->get_logger(), "Bbox min: (%f, %f)", pt1.x, pt1.y);
     }
 
     // draw the bounding boxes
@@ -107,6 +127,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
         cv::Point pt2(bbox.max_x, bbox.max_y);
         cv::rectangle(cv_ptr->image, pt1, pt2, color, 2);
     }
+
 
     m_image_pub->publish(*cv_ptr->toImageMsg());
 }
