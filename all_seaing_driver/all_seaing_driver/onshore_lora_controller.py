@@ -32,23 +32,23 @@ while running:
     
     # Adjust control message based on arrow keys
     if keys[pygame.K_a]:
-        control_msg["y"] = 1.0  # Move left
+        control_msg["y"] = 0.8  # Move left
     elif keys[pygame.K_d]:
-        control_msg["y"] = -1.0  # Move right
+        control_msg["y"] = -0.8  # Move right
     else:
         control_msg["y"] = 0.0  # Stop horizontal movement
     
     if keys[pygame.K_w]:
-        control_msg["x"] = 1.0  # Move forward
+        control_msg["x"] = 1.5  # Move forward
     elif keys[pygame.K_s]:
-        control_msg["x"] = -1.0  # Move backward
+        control_msg["x"] = -1.5  # Move backward
     else:
         control_msg["x"] = 0.0  # Stop vertical movement
         
     if keys[pygame.K_q]:
-        control_msg["angular"] = 1.0
+        control_msg["angular"] = 0.5
     elif keys[pygame.K_e]:
-        control_msg["angular"] = -1.0
+        control_msg["angular"] = -0.5
     else:
         control_msg["angular"] = 0.0
 

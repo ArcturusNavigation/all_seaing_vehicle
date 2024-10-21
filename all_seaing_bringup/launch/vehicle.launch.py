@@ -47,14 +47,14 @@ def launch_setup(context, *args, **kwargs):
         executable="xdrive_controller.py",
         parameters=[
             {
-                "front_right_xy": [0.5, -0.5],
-                "back_left_xy": [-0.5, 0.5],
-                "front_left_xy": [0.5, 0.5],
-                "back_right_xy": [-0.5, -0.5],
-                "thruster_angle": 45.0,
-                "drag_constants": [5.0, 5.0, 40.0],
+                "front_right_xy": [0.27, -0.27],
+                "back_left_xy": [-0.27, 0.27],
+                "front_left_xy": [0.27, 0.27],
+                "back_right_xy": [-0.27, -0.27],
+                "thruster_angle": 67.5,
+                "drag_constants": [50.0, 50.0, 200.0],
                 "output_range": [1100.0, 1900.0],
-                "smoothing_factor": 0.8,
+                "smoothing_factor": 0.95,
             }
         ],
     )
@@ -149,18 +149,18 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        ekf_node,
-        navsat_node,
+        #ekf_node,
+        #navsat_node,
         control_mux,
         controller_node,
         controller_server,
         waypoint_sender,
         rover_lora_controller,
         thrust_commander_node,
-        lidar_ld,
+        #lidar_ld,
         mavros_ld,
-        ublox_ld,
-        zed_ld,
+        #ublox_ld,
+        #zed_ld,
     ]
 
 
