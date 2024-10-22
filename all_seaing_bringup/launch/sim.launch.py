@@ -6,18 +6,19 @@ from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 import launch_ros
 import os
+import subprocess
 
 
 def generate_launch_description():
 
-    vrx_gz_prefix = get_package_share_directory("vrx_gz")
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     description_prefix = get_package_share_directory("all_seaing_description")
+    driver_prefix = get_package_share_directory("all_seaing_driver")
+    vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
     robot_localization_params = os.path.join(
-        bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
+        bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
-    keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -25,16 +26,12 @@ def generate_launch_description():
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
 
-    bag_path = LaunchConfiguration("bag_path")
-    launch_rviz = LaunchConfiguration("launch_rviz")
-    record_bag = LaunchConfiguration("record_bag")
+    subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
-    bag_path_launch_arg = DeclareLaunchArgument("bag_path", default_value=".")
+    launch_rviz = LaunchConfiguration("launch_rviz")
+
     launch_rviz_launch_arg = DeclareLaunchArgument(
         "launch_rviz", default_value="true", choices=["true", "false"]
-    )
-    record_bag_launch_arg = DeclareLaunchArgument(
-        "record_bag", default_value="false", choices=["true", "false"]
     )
 
     ekf_node = launch_ros.actions.Node(
@@ -53,35 +50,23 @@ def generate_launch_description():
     controller_node = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="xdrive_controller.py",
+        remappings=[
+            ("thrusters/front_left/thrust", "/wamv/thrusters/front_left/thrust"),
+            ("thrusters/front_right/thrust", "/wamv/thrusters/front_right/thrust"),
+            ("thrusters/back_left/thrust", "/wamv/thrusters/back_left/thrust"),
+            ("thrusters/back_right/thrust", "/wamv/thrusters/back_right/thrust"),
+        ],
         parameters=[
             {
-                "in_sim": True,
-                "boat_length": 3.5,
-                "boat_width": 2.0,
-                "min_output": -1000.0,
-                "max_output": 1000.0,
+                "front_right_xy": [1.1, -1.0],
+                "back_left_xy": [-2.4, 1.0],
+                "front_left_xy": [1.1, 1.0],
+                "back_right_xy": [-2.4, -1.0],
+                "thruster_angle": 45.0,
+                "drag_constants": [5.0, 5.0, 40.0],
+                "output_range": [-1500.0, 1500.0],
+                "smoothing_factor": 0.8,
             }
-        ],
-    )
-
-    rviz_testing_helper_node = launch_ros.actions.Node(
-        package="all_seaing_utility",
-        executable="rviz_testing_helper.py",
-        parameters=[{"bag_path": bag_path}],
-        condition=IfCondition(record_bag),
-    )
-
-    keyboard_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard",
-    )
-
-    keyboard_to_joy_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard_to_joy.py",
-        parameters=[
-            {"config_file_name": keyboard_params},
-            {"sampling_frequency": 60},
         ],
     )
 
@@ -94,6 +79,11 @@ def generate_launch_description():
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
             ),
         ],
+    )
+
+    perception_eval_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="perception_eval.py",
     )
 
     obstacle_bbox_visualizer_node = launch_ros.actions.Node(
@@ -177,6 +167,13 @@ def generate_launch_description():
     controller_server = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="controller_server.py",
+        parameters=[
+            {"global_frame_id": "odom"},
+            {"Kpid_x": [1.0, 0.0, 0.0]},
+            {"Kpid_y": [1.0, 0.0, 0.0]},
+            {"Kpid_theta": [1.0, 0.0, 0.0]},
+            {"max_vel": [5.0, 3.0, 1.5]},
+        ],
         output="screen",
     )
 
@@ -185,10 +182,20 @@ def generate_launch_description():
         executable="onshore_node.py",
         output="screen",
         parameters=[
-            {"joy_x_scale": 2.0},
-            {"joy_y_scale": -2.0},
-            {"joy_ang_scale": -0.8},
+            {"joy_x_scale": 5.0},
+            {"joy_y_scale": -3.0},
+            {"joy_ang_scale": -1.5},
         ],
+    )
+
+
+    waypoint_finder = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="waypoint_finder.py",
+        parameters=[
+            {"color_label_mappings_file": color_label_mappings},
+            {"safe_margin": 0.2}
+        ]
     )
 
     waypoint_sender = launch_ros.actions.Node(
@@ -201,10 +208,14 @@ def generate_launch_description():
         output="screen",
     )
 
+    keyboard_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
+    )
+
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "sydney_regatta",
+            "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": "-v 0",
         }.items(),
@@ -212,15 +223,10 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            bag_path_launch_arg,
             launch_rviz_launch_arg,
-            record_bag_launch_arg,
             ekf_node,
             navsat_node,
             controller_node,
-            rviz_testing_helper_node,
-            keyboard_node,
-            keyboard_to_joy_node,
             obstacle_bbox_overlay_node,
             obstacle_bbox_visualizer_node,
             color_segmentation_node,
@@ -230,7 +236,10 @@ def generate_launch_description():
             control_mux,
             controller_server,
             onshore_node,
+            waypoint_finder,
             waypoint_sender,
+            keyboard_ld,
             sim_ld,
+            perception_eval_node,
         ]
     )
