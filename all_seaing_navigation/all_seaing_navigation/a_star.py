@@ -36,7 +36,7 @@ class PathPlan(Node):
         self.failed_runs = 0
         self.completed_runs = 0
 
-        self.get_logger().info("Initialized A* Path Planner")
+        self.get_logger().debug("Initialized A* Path Planner")
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -57,13 +57,13 @@ class PathPlan(Node):
     def map_cb(self, msg):
         self.map_info = msg.info
         self.map_grid = msg.data
-        self.get_logger().info("Initialized Map" if self.map_info is None else "Updated Map")
+        self.get_logger().debug("Initialized Map" if self.map_info is None else "Updated Map")
 
     def waypoints_cb(self, msg):
         self.waypoints = msg
-        self.get_logger().info("New Waypoints Added, Running A*")
+        self.get_logger().debug("New Waypoints Added, Running A*")
         if self.map_info is None:
-            self.get_logger().info("No occupancy grid in memory")
+            self.get_logger().debug("No occupancy grid in memory")
             return
         self.full_path()
 
@@ -144,7 +144,7 @@ class PathPlan(Node):
                     pq.put((gscore[nxt[0]+ nxt[1] * W] + self.heuristic(nxt), nxt[0], nxt[1]))
 
         if gscore[tpos[0] + tpos[1]*W] == inf:
-            self.get_logger().info("Error: Path not found")
+            self.get_logger().debug("Error: Path not found")
             path = []
             self.failed_runs += 1
             return path
@@ -153,15 +153,14 @@ class PathPlan(Node):
         path = []
         cur = tpos
         while cur != spos:
-            # self.get_logger().info(f"Current node {cur[0]}, {cur[1]}")
             path.append(cur)
             cur = parent[cur[0] + cur[1] * W]
         path.append(spos)
         path.reverse()
-        self.get_logger().info("Finished Backtracking Path")
+        self.get_logger().debug("Finished Backtracking Path")
 
         self.completed_runs += 1
-        self.get_logger().info(f"Failed runs/Completed runs: {self.failed_runs}/{self.completed_runs}")
+        self.get_logger().debug(f"Failed runs/Completed runs: {self.failed_runs}/{self.completed_runs}")
 
         # Publish path as nav_msgs/Path
         self.publish_nav_path(path)
@@ -182,7 +181,7 @@ class PathPlan(Node):
             path_msg.poses.append(pose)
 
         self.path_pub.publish(path_msg)
-        self.get_logger().info("Published A* Path")
+        self.get_logger().debug("Published A* Path")
 
     def pose_to_string(self, pos):
         return f"{{{pos.position.x}, {pos.position.y}, {pos.position.z}}}"
