@@ -16,6 +16,9 @@ install(PROGRAMS
     ${PROJECT_NAME}/zed2i_publisher.py
     ${PROJECT_NAME}/rover_lora_controller.py
     ${PROJECT_NAME}/onshore_lora_controller.py
+    ${PROJECT_NAME}/gpsraw_converter.py
+    ${PROJECT_NAME}/test_gps_publisher.py
+    ${PROJECT_NAME}/test_gps.csv
     DESTINATION lib/${PROJECT_NAME}
 )
 

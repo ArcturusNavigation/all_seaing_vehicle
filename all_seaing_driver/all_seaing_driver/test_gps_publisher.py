@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 from mavros_msgs.msg import GPSRAW  # Import the GPSRAW message type
 import csv  # Assuming the file is in CSV format
+import os
 
 class GPSFilePublisher(Node):
     def __init__(self):
@@ -10,7 +12,8 @@ class GPSFilePublisher(Node):
 
         # Timer to periodically publish messages
         self.timer = self.create_timer(1.0, self.publish_from_file)  # Publish every second
-        self.file_path = './test_gps_data.csv'  # Path to your CSV file
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        self.file_path = os.path.join(script_dir, 'test_gps.csv')
         self.data = self.read_file(self.file_path)
         self.counter = 0  # To keep track of which row to publish
 
@@ -29,16 +32,18 @@ class GPSFilePublisher(Node):
         row = self.data[self.counter]
         gpsraw_msg = GPSRAW()
 
-        # Fill in the GPSRAW fields based on the CSV data
-        gpsraw_msg.lat = int(row['lat'])
-        gpsraw_msg.lon = int(row['lon'])
-        gpsraw_msg.alt = int(row['alt'])
+        # Convert lat/lon from microdegrees to degrees, alt from mm to meters
+        gpsraw_msg.lat = int(row['lat'])  # Convert from microdegrees to degrees
+        gpsraw_msg.lon = int(row['lon'])  # Convert from microdegrees to degrees
+        gpsraw_msg.alt = int(row['alt'])  # Convert from millimeters to meters
+        
+        # Fill in other GPSRAW fields
         gpsraw_msg.fix_type = int(row['fix_type'])
         gpsraw_msg.eph = int(row['eph'])
         gpsraw_msg.epv = int(row['epv'])
         gpsraw_msg.vel = int(row['vel'])
         gpsraw_msg.satellites_visible = int(row['satellites_visible'])
-        
+
         self.publisher_.publish(gpsraw_msg)
         self.get_logger().info(f'Published GPSRAW message: {gpsraw_msg}')
 
