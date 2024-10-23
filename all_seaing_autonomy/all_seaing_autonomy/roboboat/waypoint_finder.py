@@ -2,10 +2,9 @@
 import yaml
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import ObstacleMap, Obstacle
-from geometry_msgs.msg import Point, Pose, PoseArray, Vector3, Quaternion
+from all_seaing_interfaces.msg import ObstacleMap
+from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from all_seaing_interfaces.msg import BuoyPair, BuoyPairArray, Waypoint, WaypointArray
-from tf2_msgs.msg import TFMessage
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header, ColorRGBA
@@ -148,8 +147,8 @@ class WaypointFinder(Node):
         and finds (and stores) the closest green one and the closest red one, and because the robot is in the starting position these
         are the front buoys of the robot starting box.
         """
-        self.get_logger().info("Setting up starting buoys!")
-        self.get_logger().info(
+        self.get_logger().debug("Setting up starting buoys!")
+        self.get_logger().debug(
             f"list of obstacles: {self.obs_to_pos_label(self.obstacles)}"
         )
 
@@ -164,12 +163,12 @@ class WaypointFinder(Node):
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(
             red_init
         )
-        self.get_logger().info(
+        self.get_logger().debug(
             "initial red buoys: {red_buoys}, green buoys: {green_buoys}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
             # didn't find starting buoys
-            self.get_logger().warning("No starting buoy pairs!")
+            self.get_logger().debug("No starting buoy pairs!")
             return False
         # from the red buoys that are in front of the robot, take the one that is closest to it, and do the same for the green buoys
         # this pair is the front pair of the starting box of the robot
@@ -290,15 +289,9 @@ class WaypointFinder(Node):
         and the next_pair() function to compute the next pair from each one in the sequence,
         as long as there is a next pair from the buoys that are stored in the obstacle map.
         """
-        self.get_logger().info(
-            f"list of obstacles: {self.obs_to_pos_label(self.obstacles)}"
-        )
         # split the buoys into red and green
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
-        # get the positions of the buoys
-        # green_buoys = self.obs_to_pos(green_buoys)
-        # red_buoys = self.obs_to_pos(red_buoys)
-        self.get_logger().info(
+        self.get_logger().debug(
             f"red buoys: {self.obs_to_pos(red_buoys)}, green buoys: {self.obs_to_pos(green_buoys)}"
         )
         # RED BUOYS LEFT, GREEN RIGHT
@@ -315,8 +308,8 @@ class WaypointFinder(Node):
                 # keep the next pair as the one the robot is heading to
                 self.pair_to = self.next_pair(self.pair_to, red_buoys, green_buoys)
             except Exception as e:
-                self.get_logger().warning(repr(e))
-                self.get_logger().warning("No next buoy pair to go to!")
+                self.get_logger().debug(repr(e))
+                self.get_logger().debug("No next buoy pair to go to!")
 
         buoy_pairs = [self.pair_to]
         waypoints = [self.midpoint_pair(self.pair_to)]
@@ -330,7 +323,7 @@ class WaypointFinder(Node):
                 )
                 waypoints.append(self.midpoint_pair(buoy_pairs[-1]))
             except Exception as e:
-                self.get_logger().warning(repr(e))
+                self.get_logger().debug(repr(e))
                 break
 
         # convert the sequence to a format appropriate to publishing for the path planner to use
@@ -361,7 +354,6 @@ class WaypointFinder(Node):
         self.waypoint_pub.publish(waypoint_arr)
         # publish the markers that show up in RViz
         self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers(buoy_pair_arr))
-        self.get_logger().info(f"{buoy_pairs=}, {waypoints=}")
 
     def map_cb(self, msg):
         """
@@ -369,10 +361,6 @@ class WaypointFinder(Node):
         and then (if the starting buoys are successfully computed) form the buoy pair / waypoint sequence
         """
         self.obstacles = msg.obstacles
-        self.get_logger().info(f"number of obstacles: {len(msg.obstacles)}")
-        self.get_logger().info(
-            f"list of obstacles: {self.obs_to_pos_label(self.obstacles)}"
-        )
 
         success = False
         if self.first_map:
