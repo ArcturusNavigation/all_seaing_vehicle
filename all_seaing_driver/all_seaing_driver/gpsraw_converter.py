@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Header
-from my_package.msg import GPSRAW  # Import your custom GPSRAW message
+from mavros_msgs.msg import GPSRAW 
 
 class GPSRawConverter(Node):
     def __init__(self):
@@ -12,7 +12,7 @@ class GPSRawConverter(Node):
         self.subscription = self.create_subscription(GPSRAW, "test_topic", self.gpsraw_callback, 10)
         # change test topic to actual gps 
 
-        self.publisher_natsavfix = self.create_publisher(NavSatFix, 'gps_natsatfix', 10)
+        self.publisher_navsatfix = self.create_publisher(NavSatFix, 'gps_navsatfix', 10)
         self.publisher_imu = self.create_publisher(Imu, 'gps_imu', 10)
 
     def gpsraw_to_navsatfix(self, gpsraw_msg):
@@ -51,7 +51,7 @@ class GPSRawConverter(Node):
     def gpsraw_callback(self, gpsraw_msg):
         # Convert GPSRAW to NavSatFix
         navsatfix_msg = self.gpsraw_to_navsatfix(gpsraw_msg)
-        self.publisher_natsavfix.publish(navsatfix_msg)
+        self.publisher_navsatfix.publish(navsatfix_msg)
         # Convert GPSRAW to Imu
         imu_msg = self.gpsraw_to_imu(gpsraw_msg)
         self.publisher_imu.publish(imu_msg)
