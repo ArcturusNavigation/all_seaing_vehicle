@@ -13,9 +13,6 @@ import math
 import os
 from ament_index_python.packages import get_package_share_directory
 
-# TODO: DOCUMENT THE CODE IN THE AUTONOMY WIKI (SEE PERCEPTION WIKI FOR REFERENCE)
-
-
 class WaypointFinder(Node):
     def __init__(self):
         super().__init__("waypoint_finder")

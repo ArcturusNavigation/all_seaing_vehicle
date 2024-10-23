@@ -1,0 +1,3 @@
+int8 label
+float64 probability
+sensor_msgs/PointCloud2 cloud
