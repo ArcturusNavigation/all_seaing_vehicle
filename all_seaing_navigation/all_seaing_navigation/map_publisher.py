@@ -27,6 +27,7 @@ class MapPublisher(Node):
 
         # Populate the grid with random values
         self.populate_grid_with_random_values()
+        # self.populate_blobs()
 
     def populate_grid_with_random_values(self):
         """
@@ -36,19 +37,47 @@ class MapPublisher(Node):
         for row in range(self.map_height):
             for col in range(self.map_width):
                 rand_val = random.randint(0, 100)
-                if rand_val < 1:  # 5% chance of being an obstacle
+                if rand_val < 5:  # 5% chance of being an obstacle
                     self.grid_data[row, col] = 100  # Mark cell as an obstacle
-                elif rand_val >= 2 and rand_val < 99:  # 85% chance of being free space
+                elif rand_val >= 5 and rand_val < 90:  # 85% chance of being free space
                     self.grid_data[row, col] = 0  # Mark cell as free space
-                elif rand_val >= 98 and rand_val < 100:  # 10% chance of being unknown
+                elif rand_val >= 90 and rand_val < 100:  # 10% chance of being unknown
                     self.grid_data[row, col] = -1  # Mark cell as unknown
                 else:
                     # Introduce intermediate values for uncertainty
                     self.grid_data[row, col] = random.randint(1, 99)  # Mark cell with a value between 1 and 99
+        
+
+    def populate_blobs(self):
+        """
+        Populate the grid with blobs with random probabilities for free space, obstacles, and unknowns.
+        Free space will be 0-99, obstacles will be 100, and unknown will be -1.
+        """
+        for row in range(self.map_height):
+            for col in range(self.map_width):
+                rand_val = random.randint(0, 1000)
+                if rand_val >= 1:  # .1% chance of being an obstacle
+                    continue
+                #make blobs of radius 10
+                rad = 10
+                for dr in range(-rad, rad+1):
+                    for dc in range(-rad, rad+1):
+                        nr = row+dr
+                        nc = col+dc
+                        if dr*dr+dc*dc > rad**2:
+                            continue
+                        if nr<0 or nr >= 100 or nc <0 or nc >=100:
+                            continue
+                        self.grid_data[nr,nc] = 90
+        for row in range(self.map_height):
+            for col in range(self.map_width):
+                if self.grid_data[row, col] != 90:
+                    self.grid_data[row, col] = 0
 
     def timer_callback(self):
         # Modify the grid data before publishing
         # self.populate_grid_with_random_values()
+        # self.populate_blobs()
 
         # Create OccupancyGrid message
         msg = OccupancyGrid()

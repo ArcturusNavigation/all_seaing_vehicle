@@ -90,12 +90,9 @@ class PathPlan(Node):
         """A* Algorithm to compute the path"""
         W = self.map_info.width
         H = self.map_info.height
-        # dxy = [(1, 0), (0, 1), (-1, 0), (0, -1),(1,1),(-1,-1),(-1,1),(1,-1)]  # Neighbor offsets
-        dxy = [(1, 0), (0, 1), (-1, 0), (0, -1),(1,1),(-1,-1),(-1,1),(1,-1)] 
-        for i in range(-1, 1, 2):
-            for j in range(-2, 2, 4):
-                dxy.append((i,j))
-                dxy.append((j,i))
+
+        dxy = [(1, 0), (0, 1), (-1, 0), (0, -1),(1,1),(-1,-1),(-1,1),(1,-1), 
+                (1,-2), (1,2), (-1, 2), (-1,-2), (2,1), (-2,1), (2,-1), (-2,-1)] # Neighbor offsets
 
         gscore = [inf] * (H * W)
         parent = [(0, 0)] * (H * W)
@@ -126,14 +123,23 @@ class PathPlan(Node):
                 break
 
             for d in dxy:
+                skip = False
                 nxt = (node[0] + d[0], node[1] + d[1])
                 if nxt[0] < 0 or nxt[0] >= H or nxt[1] < 0 or nxt[1] >= W:
                     continue
+                if d[0]**2+d[1]**2 == 2 or d[0]**2+d[1]**2 == 5:
+                    for tx in range(min(node[0], nxt[0]), max(node[0],nxt[0])+1):
+                        for ty in range(min(node[1],nxt[1]), max(node[1], nxt[1])+1):
+                            if self.map_grid[tx + ty * W] > self.cutoff or self.map_grid[tx + ty * W] == -1:
+                                skip = True
+                if skip:
+                    continue
+
                 if self.map_grid[nxt[0] + nxt[1] * W] > self.cutoff or self.map_grid[nxt[0] + nxt[1] * W] == -1:
                     continue
 
-                if gscore[node[0] + node[1] * W] + 1 < gscore[nxt[0] + nxt[1] * W]:
-                    gscore[nxt[0]+ nxt[1] * W] = gscore[node[0] + node[1] * W] + 1
+                if gscore[node[0] + node[1] * W] + sqrt(d[0]**2+d[1]**2) < gscore[nxt[0] + nxt[1] * W]:
+                    gscore[nxt[0]+ nxt[1] * W] = gscore[node[0] + node[1] * W] + sqrt(d[0]**2+d[1]**2)
                     parent[nxt[0] + nxt[1] * W] = node
                     pq.put((gscore[nxt[0]+ nxt[1] * W] + self.heuristic(nxt), nxt[0], nxt[1]))
 
@@ -177,15 +183,6 @@ class PathPlan(Node):
 
         self.path_pub.publish(path_msg)
         self.get_logger().info("Published A* Path")
-
-
-    # def publish_path(self, pose_array):
-    #     """Publish PoseArray path"""
-    #     self.pose_array_pub.publish(pose_array)
-    #     self.get_logger().info(
-    #         f"Publishing path from {self.pose_to_string(self.waypoints.poses[0])} "
-    #         f"to {self.pose_to_string(self.waypoints.poses[-1])}"
-    #     )
 
     def pose_to_string(self, pos):
         return f"{{{pos.position.x}, {pos.position.y}, {pos.position.z}}}"
