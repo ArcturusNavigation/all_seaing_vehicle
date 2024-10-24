@@ -97,9 +97,9 @@ class PathPlan(Node):
 
         # Check if the starting position and/or the ending position is occupied
         if (self.map_grid[spos[0] + spos[1] * W] > self.cutoff or self.map_grid[spos[0] + spos[1] * W] == -1):
-            self.map_grid[spos[0] + spos[1] * W] = 0 
+            self.map_grid[spos[0] + spos[1] * W] = 0
         if (self.map_grid[tpos[0] + tpos[1] * W] > self.cutoff or self.map_grid[tpos[0] + tpos[1] * W] == -1):
-            self.map_grid[tpos[0] + tpos[1] * W] = 0 
+            self.map_grid[tpos[0] + tpos[1] * W] = 0
 
         gscore[spos[0] + spos[1] * W] = 0
         parent[spos[0] + spos[1] * W] = spos
@@ -163,15 +163,6 @@ class PathPlan(Node):
 
         self.path_pub.publish(path_msg)
         self.get_logger().info("Published A* Path")
-
-
-    # def publish_path(self, pose_array):
-    #     """Publish PoseArray path"""
-    #     self.pose_array_pub.publish(pose_array)
-    #     self.get_logger().info(
-    #         f"Publishing path from {self.pose_to_string(self.waypoints.poses[0])} "
-    #         f"to {self.pose_to_string(self.waypoints.poses[-1])}"
-    #     )
 
     def pose_to_string(self, pos):
         return f"{{{pos.position.x}, {pos.position.y}, {pos.position.z}}}"
