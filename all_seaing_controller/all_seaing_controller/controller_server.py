@@ -70,7 +70,7 @@ class ControllerServer(Node):
         self.heading = 0.0
         self.proc_count = 0
         self.prev_update_time = self.get_clock().now()
-    
+
     def odom_callback(self, msg: Odometry):
         self.nav_x = msg.pose.pose.position.x
         self.nav_y = msg.pose.pose.position.y
@@ -107,7 +107,7 @@ class ControllerServer(Node):
 
     def visualize_waypoint(self, x, y):
         marker_msg = Marker()
-        marker_msg.header.frame_id = self.global_frame_id
+        marker_msg.header.frame_id = self.global_frame_idc
         marker_msg.header.stamp = self.get_clock().now().to_msg()
         marker_msg.ns = MARKER_NS
         marker_msg.type = Marker.CYLINDER
@@ -132,19 +132,19 @@ class ControllerServer(Node):
         self.x_pid.reset()
         self.y_pid.reset()
         self.theta_pid.reset()
-    
+
     def set_pid_setpoints(self, x, y, theta):
         self.x_pid.set_setpoint(x)
         self.y_pid.set_setpoint(y)
         self.theta_pid.set_setpoint(theta)
-    
+
     def update_pid(self):
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.x_pid.update(self.nav_x, dt)
         self.y_pid.update(self.nav_y, dt)
         self.theta_pid.update(self.heading, dt)
         self.prev_update_time = self.get_clock().now()
-    
+
     def scale_thrust(self, x_vel, y_vel):
         if abs(x_vel) <= self.max_vel[0] and abs(y_vel) <= self.max_vel[1]:
             return x_vel, y_vel

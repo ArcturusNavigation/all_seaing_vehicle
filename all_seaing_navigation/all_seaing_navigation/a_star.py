@@ -33,8 +33,10 @@ class PathPlan(Node):
         self.target = None
         self.cutoff = 50  # Threshold for obstacle cells
         self.waypoints = None
+        self.failed_runs = 0
+        self.completed_runs = 0
 
-        self.get_logger().info("Initialized A* Path Planner")
+        self.get_logger().debug("Initialized A* Path Planner")
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -55,11 +57,14 @@ class PathPlan(Node):
     def map_cb(self, msg):
         self.map_info = msg.info
         self.map_grid = msg.data
-        self.get_logger().info("Initialized Map" if self.map_info is None else "Updated Map")
+        self.get_logger().debug("Initialized Map" if self.map_info is None else "Updated Map")
 
     def waypoints_cb(self, msg):
         self.waypoints = msg
-        self.get_logger().info("New Waypoints Added, Running A*")
+        self.get_logger().debug("New Waypoints Added, Running A*")
+        if self.map_info is None:
+            self.get_logger().debug("No occupancy grid in memory")
+            return
         self.full_path()
 
     def heuristic(self, node):
@@ -85,7 +90,9 @@ class PathPlan(Node):
         """A* Algorithm to compute the path"""
         W = self.map_info.width
         H = self.map_info.height
-        dxy = [(1, 0), (0, 1), (-1, 0), (0, -1)]  # Neighbor offsets
+
+        dxy = [(1, 0), (0, 1), (-1, 0), (0, -1),(1,1),(-1,-1),(-1,1),(1,-1),
+                (1,-2), (1,2), (-1, 2), (-1,-2), (2,1), (-2,1), (2,-1), (-2,-1)] # Neighbor offsets
 
         gscore = [inf] * (H * W)
         parent = [(0, 0)] * (H * W)
@@ -106,7 +113,6 @@ class PathPlan(Node):
 
         pq = PriorityQueue()
         pq.put((self.heuristic(spos), spos[0], spos[1]))
-
         while not pq.empty():
             node = pq.get()
             if abs(node[0] - (gscore[node[1] + node[2] * W] + self.heuristic(node[1:3]))) > 0.005:
@@ -117,20 +123,30 @@ class PathPlan(Node):
                 break
 
             for d in dxy:
+                skip = False
                 nxt = (node[0] + d[0], node[1] + d[1])
                 if nxt[0] < 0 or nxt[0] >= H or nxt[1] < 0 or nxt[1] >= W:
                     continue
+                if d[0]**2+d[1]**2 == 2 or d[0]**2+d[1]**2 == 5:
+                    for tx in range(min(node[0], nxt[0]), max(node[0],nxt[0])+1):
+                        for ty in range(min(node[1],nxt[1]), max(node[1], nxt[1])+1):
+                            if self.map_grid[tx + ty * W] > self.cutoff or self.map_grid[tx + ty * W] == -1:
+                                skip = True
+                if skip:
+                    continue
+
                 if self.map_grid[nxt[0] + nxt[1] * W] > self.cutoff or self.map_grid[nxt[0] + nxt[1] * W] == -1:
                     continue
 
-                if gscore[node[0] + node[1] * W] + 1 < gscore[nxt[0] + nxt[1] * W]:
-                    gscore[nxt[0]+ nxt[1] * W] = gscore[node[0] + node[1] * W] + 1
+                if gscore[node[0] + node[1] * W] + sqrt(d[0]**2+d[1]**2) < gscore[nxt[0] + nxt[1] * W]:
+                    gscore[nxt[0]+ nxt[1] * W] = gscore[node[0] + node[1] * W] + sqrt(d[0]**2+d[1]**2)
                     parent[nxt[0] + nxt[1] * W] = node
                     pq.put((gscore[nxt[0]+ nxt[1] * W] + self.heuristic(nxt), nxt[0], nxt[1]))
 
-        if gscore[tpos[0] + tpos[1]] == 0:
-            self.get_logger().info("Error: Path not found")
+        if gscore[tpos[0] + tpos[1]*W] == inf:
+            self.get_logger().debug("Error: Path not found")
             path = []
+            self.failed_runs += 1
             return path
 
         # Backtrace the path
@@ -141,7 +157,10 @@ class PathPlan(Node):
             cur = parent[cur[0] + cur[1] * W]
         path.append(spos)
         path.reverse()
-        self.get_logger().info("Finished Backtracking Path")
+        self.get_logger().debug("Finished Backtracking Path")
+
+        self.completed_runs += 1
+        self.get_logger().debug(f"Failed runs/Completed runs: {self.failed_runs}/{self.completed_runs}")
 
         # Publish path as nav_msgs/Path
         self.publish_nav_path(path)
@@ -162,7 +181,7 @@ class PathPlan(Node):
             path_msg.poses.append(pose)
 
         self.path_pub.publish(path_msg)
-        self.get_logger().info("Published A* Path")
+        self.get_logger().debug("Published A* Path")
 
     def pose_to_string(self, pos):
         return f"{{{pos.position.x}, {pos.position.y}, {pos.position.z}}}"

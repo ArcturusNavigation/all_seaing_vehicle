@@ -81,6 +81,11 @@ def generate_launch_description():
         ],
     )
 
+    perception_eval_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="perception_eval.py",
+    )
+
     obstacle_bbox_visualizer_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_bbox_visualizer",
@@ -193,9 +198,9 @@ def generate_launch_description():
         ]
     )
 
-    waypoint_sender = launch_ros.actions.Node(
+    rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
-        executable="waypoint_sender.py",
+        executable="rviz_waypoint_sender.py",
         parameters=[
             {"xy_threshold": 1.0},
             {"theta_threshold": 5.0},
@@ -232,8 +237,9 @@ def generate_launch_description():
             controller_server,
             onshore_node,
             waypoint_finder,
-            waypoint_sender,
+            rviz_waypoint_sender,
             keyboard_ld,
             sim_ld,
+            perception_eval_node,
         ]
     )
