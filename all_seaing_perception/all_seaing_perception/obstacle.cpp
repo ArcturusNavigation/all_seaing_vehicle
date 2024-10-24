@@ -85,9 +85,10 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
     float min_x = std::numeric_limits<float>::max();
     float min_y = std::numeric_limits<float>::max();
     float min_z = std::numeric_limits<float>::max();
-    float max_x = std::numeric_limits<float>::min();
-    float max_y = std::numeric_limits<float>::min();
-    float max_z = std::numeric_limits<float>::min();
+    // lowest() gives the lowest negative float. min() just gives lowest positive float.
+    float max_x = std::numeric_limits<float>::lowest();
+    float max_y = std::numeric_limits<float>::lowest();
+    float max_z = std::numeric_limits<float>::lowest();
     
     float average_x = 0, average_y = 0, average_z = 0;
     for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); pit++) {
