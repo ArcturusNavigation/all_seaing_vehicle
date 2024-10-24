@@ -11,7 +11,7 @@ from geometry_msgs.msg import PointStamped
 class WaypointSender(Node):
 
     def __init__(self):
-        super().__init__("waypoint_sender")
+        super().__init__("rviz_waypoint_sender")
         self.xy_threshold = (
             self.declare_parameter("xy_threshold", 1.0)
             .get_parameter_value()
