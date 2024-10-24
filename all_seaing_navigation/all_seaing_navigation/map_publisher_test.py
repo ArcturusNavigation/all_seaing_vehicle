@@ -8,7 +8,7 @@ from std_msgs.msg import Header
 import numpy as np
 import random
 
-class MapPublisher(Node):
+class MapPublisherTest(Node):
 
     def __init__(self):
         super().__init__('map_publisher')
@@ -120,7 +120,7 @@ class MapPublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    map_publisher = MapPublisher()
+    map_publisher = MapPublisherTest()
 
     rclpy.spin(map_publisher)
 

@@ -11,11 +11,11 @@ ament_auto_find_build_dependencies()
 
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
-    ${PROJECT_NAME}/waypoint_sender.py
+    ${PROJECT_NAME}/rviz_waypoint_sender.py
     ${PROJECT_NAME}/utils.py
-    ${PROJECT_NAME}/waypoint_publisher.py
+    ${PROJECT_NAME}/waypoint_publisher_test.py
     ${PROJECT_NAME}/a_star.py
-    ${PROJECT_NAME}/map_publisher.py
+    ${PROJECT_NAME}/map_publisher_test.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

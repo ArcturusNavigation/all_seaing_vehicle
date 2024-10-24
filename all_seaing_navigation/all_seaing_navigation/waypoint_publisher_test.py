@@ -7,9 +7,9 @@ from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
 import random
 
-class WayPointPublisher(Node):
+class WayPointPublisherTest(Node):
     def __init__(self):
-        super().__init__('waypoint_publisher')
+        super().__init__('waypoint_publisher_test')
 
         # Create publishers for waypoints and markers
         self.waypoints_publisher = self.create_publisher(PoseArray, 'waypoints', 10)
@@ -58,7 +58,7 @@ class WayPointPublisher(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    waypoint_publisher = WayPointPublisher()
+    waypoint_publisher = WayPointPublisherTest()
     rclpy.spin(waypoint_publisher)
     waypoint_publisher.destroy_node()
     rclpy.shutdown()

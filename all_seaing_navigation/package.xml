@@ -12,7 +12,6 @@
     <depend>rclpy</depend>
     <depend>rclcpp</depend>
     <depend>tf2</depend>
-    <depend>heapq</depend>
 
     <depend>all_seaing_interfaces</depend>
     <depend>geometry_msgs</depend>
