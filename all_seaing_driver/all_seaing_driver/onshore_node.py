@@ -50,7 +50,7 @@ class OnshoreNode(Node):
         control_option.twist.linear.x = x
         control_option.twist.linear.y = y
         control_option.twist.angular.z = angular
-        self.control_option_pub.publish(control_option)
+        #self.control_option_pub.publish(control_option)
 
     def keyboard_callback(self, msg):
         if self.heartbeat_message.e_stopped:

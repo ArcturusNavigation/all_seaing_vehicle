@@ -39,16 +39,16 @@ while running:
         control_msg["y"] = 0.0  # Stop horizontal movement
     
     if keys[pygame.K_w]:
-        control_msg["x"] = 1.5  # Move forward
+        control_msg["x"] = 1.0  # Move forward
     elif keys[pygame.K_s]:
-        control_msg["x"] = -1.5  # Move backward
+        control_msg["x"] = -1.0  # Move backward
     else:
         control_msg["x"] = 0.0  # Stop vertical movement
         
     if keys[pygame.K_q]:
-        control_msg["angular"] = 0.5
+        control_msg["angular"] = -0.3
     elif keys[pygame.K_e]:
-        control_msg["angular"] = -0.5
+        control_msg["angular"] = 0.3
     else:
         control_msg["angular"] = 0.0
 
