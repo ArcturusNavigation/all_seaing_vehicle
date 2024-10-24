@@ -75,7 +75,7 @@ class Yolov8Node(Node):
                     batch=8,
                     workspace=4,
                     int8=True,
-                    data="coco.yaml",
+                    data="args.yaml",
                 )
                 dot_loc = model_name.index('.')
                 to_new_model_name = model_name[:dot_loc]
