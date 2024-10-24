@@ -58,7 +58,7 @@ class Yolov8Node(Node):
         use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
         # Get the model's path
-        self.model_dir = os.path.expanduser("~/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
+        self.model_dir = os.path.expanduser("~/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception")
         model_path = os.path.join(self.model_dir, model_name)
 
         # Initialize YOLO model
