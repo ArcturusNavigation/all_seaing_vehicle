@@ -41,7 +41,7 @@ class Yolov8Node(Node):
         super().__init__("yolov8_node")
 
         # Declare parameters
-        self.declare_parameter("model", "yolov8m.pt")
+        self.declare_parameter("model", "yolov8m_roboboat_current_model.pt")
         self.declare_parameter("device", "cuda:0")
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
@@ -58,7 +58,7 @@ class Yolov8Node(Node):
         use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
         # Get the model's path
-        self.model_dir = os.path.expanduser("~/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception")
+        self.model_dir = os.path.expanduser("~/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
         model_path = os.path.join(self.model_dir, model_name)
 
         # Initialize YOLO model
@@ -68,18 +68,21 @@ class Yolov8Node(Node):
             self.get_logger().info(f"Loading model from: {model_path}")
             self.cv_bridge = CvBridge()
             self.yolo = YOLO(model_path)
+            #print("YOLO BEFORE EXPORT", self.yolo)
             if use_tensorRT:
-                self.yolo.export(
-                    format="engine",
-                    dynamic=True,
-                    batch=8,
-                    workspace=4,
-                    int8=True,
-                    data="args.yaml",
-                )
-                dot_loc = model_name.index('.')
-                to_new_model_name = model_name[:dot_loc]
-                self.yolo = YOLO(to_new_model_name+'.engine', task='detect')
+                self.yolo.export(format="engine", dynamic=True)
+                #print("YOLO AFTER EXPORT", self.yolo)
+                #self.yolo.export(
+                    #format="engine",
+                    #dynamic=True,
+                    #batch=8,
+                    #workspace=4,
+                    #int8=True,
+                    #data="args.yaml",
+                #)
+                #dot_loc = model_name.index('.')
+                #to_new_model_name = model_name[:dot_loc]
+                #self.yolo = YOLO(to_new_model_name+'.engine', task='detect')
             self.yolo.fuse()
 
         # Setup QoS profile
