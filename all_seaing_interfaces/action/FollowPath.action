@@ -1,0 +1,11 @@
+# Request
+Header header
+Pose[] poses
+---
+# Result
+bool is_finished
+---
+# Feedback
+float64 x
+float64 y
+float64 theta

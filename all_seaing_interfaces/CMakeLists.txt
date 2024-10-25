@@ -10,6 +10,7 @@ ament_auto_find_build_dependencies()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     "action/Waypoint.action"
+    "action/FollowPath.action"
     "msg/ObstacleMap.msg"
     "msg/Obstacle.msg"
     "msg/ControlMessage.msg"
