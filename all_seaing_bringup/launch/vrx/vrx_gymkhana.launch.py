@@ -10,12 +10,18 @@ def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     description_prefix = get_package_share_directory("all_seaing_description")
+    driver_prefix = get_package_share_directory("all_seaing_driver")
     vrx_gz_prefix = get_package_share_directory("vrx_gz")
 
-    localize_params = os.path.join(
-        bringup_prefix, "config", "robot_localization", "localize_sim.yaml"
+    color_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
-    keyboard_params = os.path.join(bringup_prefix, "config", "keyboard_controls.yaml")
+    color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "color_ranges.yaml"
+    )
+    localize_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_sim.yaml"
+    )
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -36,17 +42,6 @@ def generate_launch_description():
         parameters=[{"in_sim": True}],
     )
 
-    keyboard_node = launch_ros.actions.Node(package="keyboard", executable="keyboard")
-
-    keyboard_to_joy_node = launch_ros.actions.Node(
-        package="keyboard",
-        executable="keyboard_to_joy.py",
-        parameters=[
-            {"config_file_name": keyboard_params},
-            {"sampling_frequency": 60},
-        ],
-    )
-
     obstacle_bbox_overlay_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_bbox_overlay",
@@ -63,6 +58,12 @@ def generate_launch_description():
         executable="color_segmentation.py",
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+                "color_ranges_file": color_ranges,
+            }
         ],
     )
 
@@ -99,14 +100,18 @@ def generate_launch_description():
     )
 
     buoy_pair_finder_node = launch_ros.actions.Node(
-        package="all_seaing_navigation",
-        executable="buoy_pair_finder.py",
+        package="all_seaing_autonomy",
+        executable="waypoint_finder.py",
     )
 
     onshore_node = launch_ros.actions.Node(
-        package="all_seaing_utility",
+        package="all_seaing_driver",
         executable="onshore_node.py",
         output="screen",
+    )
+
+    keyboard_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
     sim_ld = IncludeLaunchDescription(
@@ -123,14 +128,13 @@ def generate_launch_description():
             ekf_node,
             navsat_node,
             controller_node,
-            keyboard_node,
-            keyboard_to_joy_node,
             obstacle_bbox_overlay_node,
             color_segmentation_node,
             point_cloud_filter_node,
             obstacle_detector_node,
             buoy_pair_finder_node,
             onshore_node,
+            keyboard_ld,
             sim_ld,
         ]
     )

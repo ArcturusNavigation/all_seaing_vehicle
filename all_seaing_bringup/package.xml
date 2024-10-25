@@ -17,6 +17,7 @@
     <depend>all_seaing_navigation</depend>
     <depend>all_seaing_perception</depend>
     <depend>all_seaing_utility</depend>
+    <depend>robot_localization</depend>
     <depend>rviz_satellite</depend>
 
     <export>

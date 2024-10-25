@@ -20,18 +20,22 @@ from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2D
 from ament_index_python.packages import get_package_share_directory
 
 
-class Yolov5Detector(Node):
+class Yolov5Node(Node):
 
     def __init__(self):
-        super().__init__("yolov5_detector")
+        super().__init__("yolov5_node")
 
         self.bridge = cv_bridge.CvBridge()
 
         path_hubconfig = os.path.expanduser("~/yolov5")
+<<<<<<< HEAD
         # TODO: Should be a ros parameter
         self.declare_parameter('model_name', 'yolov5s.pt')
         model_name = self.get_parameter('model_name').get_parameter_value().string_value
 
+=======
+        model_name = "yolov5s.pt"
+>>>>>>> 7f1257de76ee65d055dcede7157286e7a9bd2bf6
         path_model = os.path.join(
             get_package_share_directory("all_seaing_perception"), "models", model_name
         )
@@ -91,9 +95,9 @@ class Yolov5Detector(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    detector = Yolov5Detector()
-    rclpy.spin(detector)
-    detector.destroy_node()
+    node = Yolov5Node()
+    rclpy.spin(node)
+    node.destroy_node()
     rclpy.shutdown()
 
 
