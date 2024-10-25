@@ -71,8 +71,7 @@ class ThrustCommander(Node):
     def receive_heartbeat(self, msg):
         self.get_logger().debug("Heartbeat received!")
         self.prev_heartbeat = self.get_clock().now()
-        if msg.e_stopped:
-            self.e_stopped = True
+        self.e_stopped = msg.e_stopped
 
     def timer_callback(self):
         time_since_last_heartbeat = (self.get_clock().now() - self.prev_heartbeat).nanoseconds / 1e9
