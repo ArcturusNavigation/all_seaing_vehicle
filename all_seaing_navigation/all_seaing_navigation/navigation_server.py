@@ -38,8 +38,6 @@ class NavigationServer(Node):
         control_msg.angular = angular
         self.control_pub.publish(control_msg)
 
-
-
     #TODO: return result
     def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
