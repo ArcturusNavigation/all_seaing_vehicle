@@ -5,6 +5,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Header
 from mavros_msgs.msg import GPSRAW 
+import math
 
 class GPSRawConverter(Node):
     def __init__(self):
@@ -33,9 +34,11 @@ class GPSRawConverter(Node):
         imu_msg.linear_acceleration.x = gpsraw_msg.vel / 1000.0  # Convert overall velocity to m/s²
         imu_msg.linear_acceleration.y = 0.0  # You may want to adjust this based on available data
         imu_msg.linear_acceleration.z = 0.0  # Adjust accordingly if you have vertical velocity data
-        imu_msg.angular_velocity.x = 0
-        imu_msg.angular_velocity.y = 0
-        imu_msg.angular_velocity.z = 0
+        imu_msg.angular_velocity.x = 0.0
+        imu_msg.angular_velocity.y = 0.0
+        imu_msg.angular_velocity.z = 0.0
+        imu_msg.orientation.z = math.sin(math.radians(gpsraw_msg.yaw)/2)
+        imu_msg.orientation.w = math.cos(math.radians(gpsraw_msg.yaw)/2)
         imu_msg.orientation_covariance[0] = -1  # Indicate no orientation data
         return imu_msg
 

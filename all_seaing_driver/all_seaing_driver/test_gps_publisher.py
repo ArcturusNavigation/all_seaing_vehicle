@@ -43,6 +43,8 @@ class GPSFilePublisher(Node):
         gpsraw_msg.epv = int(row['epv'])
         gpsraw_msg.vel = int(row['vel'])
         gpsraw_msg.satellites_visible = int(row['satellites_visible'])
+        gpsraw_msg.yaw = int(row['yaw'])
+
 
         self.publisher_.publish(gpsraw_msg)
         self.get_logger().info(f'Published GPSRAW message: {gpsraw_msg}')
