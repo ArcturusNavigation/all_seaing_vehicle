@@ -219,6 +219,15 @@ def generate_launch_description():
     #     ],
     #     output="screen",
     # )
+    rviz_waypoint_sender = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="rviz_waypoint_sender.py",
+        parameters=[
+            {"xy_threshold": 1.0},
+            {"theta_threshold": 5.0},
+        ],
+        output="screen",
+    )
 
     keyboard_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
@@ -249,8 +258,8 @@ def generate_launch_description():
             control_mux,
             controller_server,
             onshore_node,
-            # waypoint_finder,
-            # waypoint_sender,
+            waypoint_finder,
+            rviz_waypoint_sender,
             keyboard_ld,
             sim_ld,
             perception_eval_node,
