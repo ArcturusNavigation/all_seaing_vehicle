@@ -34,32 +34,34 @@ class ThrustCommander(Node):
             Float64, "thrusters/back_right/thrust", self.back_right_cb, 10)
         self.back_left_sub = self.create_subscription(
             Float64, "thrusters/back_left/thrust", self.back_left_cb, 10)
+
+        self.front_right_command = 1500
+        self.front_left_command = 1500
+        self.back_right_command = 1500
+        self.back_left_command = 1500
+
         self.heartbeat_sub = self.create_subscription(Heartbeat, "heartbeat", self.receive_heartbeat, 10)
         self.timer = self.create_timer(1 / 8, self.timer_callback)
         self.proxy = self.create_client(CommandLong, "/mavros/cmd/command")
 
     def front_right_cb(self, msg: Float64):
-        if not self.e_stopped:
-            self.send_pwm(self.front_right_port, msg.data)
+        self.front_right_command = msg.data
 
     def front_left_cb(self, msg: Float64):
-        if not self.e_stopped:
-            self.send_pwm(self.front_left_port, msg.data)
+        self.front_left_command = msg.data
 
     def back_right_cb(self, msg: Float64):
-        if not self.e_stopped:
-            self.send_pwm(self.back_right_port, msg.data)
+        self.back_right_command = msg.data
 
     def back_left_cb(self, msg: Float64):
-        if not self.e_stopped:
-            self.send_pwm(self.back_left_port, msg.data)
+        self.back_left_command = msg.data
 
     def turn_off_thrusters(self):
-        self.send_pwm(self.front_right_port, 1500)
-        self.send_pwm(self.front_left_port, 1500)
-        self.send_pwm(self.back_right_port, 1500)
-        self.send_pwm(self.back_left_port, 1500)
-
+        self.front_right_command = 1500
+        self.front_left_command = 1500
+        self.back_right_command = 1500
+        self.back_left_command = 1500
+        
     def send_pwm(self, channel: int, value: float):
         self.get_logger().debug(f"Sending PWM value {value} to channel {channel}")
         return self.proxy.call_async(
@@ -67,18 +69,27 @@ class ThrustCommander(Node):
         )
     
     def receive_heartbeat(self, msg):
-        self.get_logger().info("Heartbeat received!")
+        self.get_logger().debug("Heartbeat received!")
         self.prev_heartbeat = self.get_clock().now()
         if msg.e_stopped:
             self.e_stopped = True
 
     def timer_callback(self):
         time_since_last_heartbeat = (self.get_clock().now() - self.prev_heartbeat).nanoseconds / 1e9
+
         if time_since_last_heartbeat > self.heartbeat_threshold and not self.e_stopped:
-            self.get_logger().warn("Lost heartbeat! Entering e-stop mode.")
+            self.get_logger().warning("Lost heartbeat! Entering e-stop mode.")
             self.e_stopped = True
+
         if self.e_stopped:
             self.turn_off_thrusters()
+        
+        self.send_pwm(self.front_right_port, self.front_right_command)
+        self.send_pwm(self.front_left_port, self.front_left_command)
+        self.send_pwm(self.back_right_port, self.back_right_command)
+        self.send_pwm(self.back_left_port, self.back_left_command)
+
+            
 
 def main(args=None):
     rclpy.init(args=args)

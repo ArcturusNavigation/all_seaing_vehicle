@@ -114,18 +114,6 @@ def generate_launch_description():
         ],
     )
 
-    yolov8_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {
-                "device": "cpu",
-                "image_topic": "/wamv/sensors/cameras/front_left_camera_sensor/image_raw",
-                "model": "yolov8m_roboboat_current_model.pt"
-            }
-        ],
-    )
-
     point_cloud_filter_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -210,9 +198,9 @@ def generate_launch_description():
         ]
     )
 
-    waypoint_sender = launch_ros.actions.Node(
+    rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
-        executable="waypoint_sender.py",
+        executable="rviz_waypoint_sender.py",
         parameters=[
             {"xy_threshold": 1.0},
             {"theta_threshold": 5.0},
@@ -242,7 +230,6 @@ def generate_launch_description():
             obstacle_bbox_overlay_node,
             obstacle_bbox_visualizer_node,
             color_segmentation_node,
-            yolov8_node,
             point_cloud_filter_node,
             obstacle_detector_node,
             rviz_node,
@@ -250,7 +237,7 @@ def generate_launch_description():
             controller_server,
             onshore_node,
             waypoint_finder,
-            waypoint_sender,
+            rviz_waypoint_sender,
             keyboard_ld,
             sim_ld,
             perception_eval_node,
