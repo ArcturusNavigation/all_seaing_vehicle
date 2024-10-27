@@ -100,6 +100,15 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    lidar_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                driver_prefix,
+                "/launch/32e_points.launch.py",
+            ]
+        )
+    )
+
     mavros_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -121,6 +130,7 @@ def launch_setup(context, *args, **kwargs):
         rviz_waypoint_sender,
         thrust_commander_node,
         mavros_ld,
+        lidar_ld
     ]
 
 
