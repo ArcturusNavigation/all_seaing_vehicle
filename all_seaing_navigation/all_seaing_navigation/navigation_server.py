@@ -10,9 +10,10 @@ import time
 from all_seaing_controller.pid_controller import CircularPID, PIDController
 from all_seaing_interfaces.action import Waypoint
 from all_seaing_interfaces.msg import ControlOption
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 from tf_transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
+from geometry_msgs.msg import PoseStamped
 
 TIMER_PERIOD = 1 / 60
 MARKER_NS = "control"
@@ -52,6 +53,15 @@ class ControllerServer(Node):
             10,
             callback_group=self.group,
         )
+
+        self.path_sub = self.create_subscription(
+            Path,
+            "/a_star_path",  # Subscribing to the path published by the A* algorithm
+            self.path_callback,
+            10,
+            callback_group=self.group,
+        )
+
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
         self.marker_pub = self.create_publisher(Marker, "control_marker", 10)
 
@@ -82,6 +92,12 @@ class ControllerServer(Node):
                 msg.pose.pose.orientation.w,
             ]
         )
+
+    def path_callback(self, msg: Path):
+        """Receive the A* path and store it for navigation"""
+        self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
+        self.current_target_index = 0  # Reset the target index to start following the path
+        self.get_logger().info(f"Received path with {len(self.path)} waypoints")
 
     def start_process(self, msg=None):
         self.proc_count += 1
@@ -171,39 +187,69 @@ class ControllerServer(Node):
     def waypoint_callback(self, goal_handle):
         self.start_process("Waypoint following started!")
 
+        # Initialize the waypoint index to 0 (start of path)
+        waypoint_index = 0
+
+        # Thresholds for reaching a waypoint
         xy_threshold = goal_handle.request.xy_threshold
         theta_threshold = goal_handle.request.theta_threshold
-        goal_x = goal_handle.request.x
-        goal_y = goal_handle.request.y
-        if goal_handle.request.ignore_theta:
-            goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
-        else:
-            goal_theta = goal_handle.request.theta
-        self.visualize_waypoint(goal_x, goal_y)
 
-        self.reset_pid()
-        self.set_pid_setpoints(goal_x, goal_y, goal_theta)
-        while (not self.x_pid.is_done(self.nav_x, xy_threshold) or
-               not self.y_pid.is_done(self.nav_y, xy_threshold) or
-               not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))):
+        # Check if the path is available from A* (it should be set in path_callback)
+        if not hasattr(self, 'path') or len(self.path) == 0:
+            self.end_process("No path available to follow!")
+            goal_handle.abort()
+            return Waypoint.Result()
 
-            if self.proc_count >= 2:
-                self.end_process("Waypoint following aborted!")
-                goal_handle.abort()
-                return Waypoint.Result()
+        self.get_logger().info(f"Starting to follow path with {len(self.path)} waypoints.")
 
-            if goal_handle.is_cancel_requested:
-                self.end_process("Waypoint following canceled!")
-                goal_handle.canceled()
-                return Waypoint.Result()
+        # Loop through the waypoints in the path
+        while waypoint_index < len(self.path):
 
-            self.control_loop()
-            time.sleep(TIMER_PERIOD)
+            # Get the current target waypoint from the path
+            goal_x, goal_y = self.path[waypoint_index]
+            self.get_logger().info(f"Following waypoint {waypoint_index + 1}/{len(self.path)}: ({goal_x}, {goal_y})")
 
-        self.end_process("Waypoint following completed!")
+            # Visualize the waypoint
+            self.visualize_waypoint(goal_x, goal_y)
+
+            # Set the target orientation (goal_theta), either towards next point or given in request
+            if goal_handle.request.ignore_theta:
+                goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
+            else:
+                goal_theta = goal_handle.request.theta
+
+            # Reset the PID controllers and set new waypoints
+            self.reset_pid()
+            self.set_pid_setpoints(goal_x, goal_y, goal_theta)
+
+            # Control loop: move towards the current waypoint
+            while (not self.x_pid.is_done(self.nav_x, xy_threshold) or
+                   not self.y_pid.is_done(self.nav_y, xy_threshold) or
+                   not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))):
+
+                # Abort if another process or cancellation request
+                if self.proc_count >= 2:
+                    self.end_process("Waypoint following aborted!")
+                    goal_handle.abort()
+                    return Waypoint.Result()
+
+                if goal_handle.is_cancel_requested:
+                    self.end_process("Waypoint following canceled!")
+                    goal_handle.canceled()
+                    return Waypoint.Result()
+
+                # Execute the control loop to move towards the waypoint
+                self.control_loop()
+
+                time.sleep(TIMER_PERIOD)
+
+            # Move to the next waypoint once the current one is reached
+            waypoint_index += 1
+
+        # All waypoints have been followed successfully
+        self.end_process("All waypoints followed successfully!")
         goal_handle.succeed()
         return Waypoint.Result(is_finished=True)
-
 
 def main(args=None):
     rclpy.init(args=args)
