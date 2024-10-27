@@ -147,11 +147,19 @@ class NavigationServer(Node):
             ]
         )
 
-    def path_callback(self, msg: Path):
-        """Receive the A* path and store it for navigation"""
-        self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
-        self.current_target_index = 0  # Reset the target index to start following the path
-        self.get_logger().info(f"Received path with {len(self.path)} waypoints")
+    # -> path_callback removed since no longer accessing a* via subscription
+    # def path_callback(self, msg: Path):
+    #     """Receive the A* path and store it for navigation"""
+    #     self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
+    #     self.current_target_index = 0  # Reset the target index to start following the path
+    #     self.get_logger().info(f"Received path with {len(self.path)} waypoints")
+
+    # -> new path generator calling a* algo
+    def generate_path(self, start, goal):
+        """Calls A* algorithm to generate a path."""
+        self.path = self.plan_path(start, goal) #TODO: change (start, goal) to inputs of plan_path()
+        self.current_target_index = 0
+        self.get_logger().info(f"Generated path with {len(self.path)} waypoints")
 
     def start_process(self, msg=None):
         self.proc_count += 1
@@ -241,8 +249,21 @@ class NavigationServer(Node):
     def waypoint_callback(self, goal_handle):
         self.start_process("Waypoint following started!")
 
-        # Initialize the waypoint index to 0 (start of path)
-        waypoint_index = 0
+        #TODO: verify if path is correctly inputted and accessed
+        if self.path and self.current_target_index < len(self.path):
+        # Get the next target position from the path
+            target_x, target_y = self.path[self.current_target_index]
+
+        #TODO: Compute and issue position command to move towards target_x, target_y
+        # (Use ROS2 publishers for this)
+
+        #TODO: Check if the current target has been reached w/ some threshold, then increment the target index
+        if self.reached_target(target_x, target_y):  # Define `reached_target` as needed
+            self.current_target_index += 1
+
+        # -> REMOVED bc waypoint should be following current_target_index which is updated every step
+        # # Initialize the waypoint index to 0 (start of path)
+        # waypoint_index = 0
 
         # Thresholds for reaching a waypoint
         xy_threshold = goal_handle.request.xy_threshold
