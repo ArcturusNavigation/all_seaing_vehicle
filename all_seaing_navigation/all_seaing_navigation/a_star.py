@@ -15,7 +15,7 @@ class PathPlan(Node):
         super().__init__("astar_path_planner")
 
         self.map_topic = "map"  # OccupancyGrid
-        self.waypoints_topic = "waypoints"
+        self.waypoints_topic = "clicked_point"
 
         # Subscriptions to map and waypoints
         self.map_sub = self.create_subscription(
