@@ -10,7 +10,6 @@ import numpy as np
 
 class PathPlan(Node):
     """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path using A* """
-
     def __init__(self):
         super().__init__("astar_path_planner")
 
