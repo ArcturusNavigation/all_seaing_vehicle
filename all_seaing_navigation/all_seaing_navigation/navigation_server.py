@@ -1,186 +1,268 @@
+Nav_server
+
+
 #!/usr/bin/env python3
+import math
 import rclpy
+from rclpy.action import ActionServer, CancelResponse
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+import time
 
-from geometry_msgs.msg import PoseStamped, PoseArray, Pose
-from nav_msgs.msg import OccupancyGrid, Path
-from utils import PriorityQueue
-from math import inf, sqrt
+from all_seaing_controller.pid_controller import CircularPID, PIDController
+from all_seaing_interfaces.action import Waypoint
+from all_seaing_interfaces.msg import ControlOption
+from nav_msgs.msg import Odometry, Path
+from tf_transformations import euler_from_quaternion
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import PoseStamped
 
-class PathPlan(Node):
-    """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path using A* """
+TIMER_PERIOD = 1 / 60
+MARKER_NS = "control"
 
+class NavigationServer(Node):
     def __init__(self):
-        super().__init__("astar_path_planner")
+        super().__init__("navigation_server")
 
-        self.map_topic = "map"  # OccupancyGrid
-        self.waypoints_topic = "clicked_point"
+        #--------------- PARAMETERS ---------------#
 
-        # Subscriptions to map and waypoints
-        self.map_sub = self.create_subscription(
-            OccupancyGrid, self.map_topic, self.map_cb, 10)
+        self.global_frame_id = self.declare_parameter(
+            "global_frame_id", "odom").get_parameter_value().string_value
+        Kpid_x = self.declare_parameter(
+            "Kpid_x", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
+        Kpid_y = self.declare_parameter(
+            "Kpid_y", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
+        Kpid_theta= self.declare_parameter(
+            "Kpid_theta", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
+        self.max_vel = self.declare_parameter(
+            "max_vel", [4.0, 2.0, 1.0]).get_parameter_value().double_array_value
 
-        self.goal_sub = self.create_subscription(
-            PoseArray, self.waypoints_topic, self.waypoints_cb, 10)
+        #--------------- SUBSCRIBERS, PUBLISHERS, AND SERVERS ---------------#
 
-        # Publishers for path and PoseArray
-        self.path_pub = self.create_publisher(Path, "a_star_path", 10)
+        self.group = MutuallyExclusiveCallbackGroup()
+        self.waypoint_server = ActionServer(
+            self,
+            Waypoint,
+            "waypoint",
+            execute_callback=self.waypoint_callback,
+            cancel_callback=self.cancel_callback,
+            callback_group=self.group,
+        )
+        self.odom_sub = self.create_subscription(
+            Odometry,
+            "odometry/filtered",
+            self.odom_callback,
+            10,
+            callback_group=self.group,
+        )
 
-        self.map_grid = None
-        self.map_info = None  # Resolution of the map (m/cell)
-        self.target = None
-        self.cutoff = 50  # Threshold for obstacle cells
-        self.waypoints = None
-        self.failed_runs = 0
-        self.completed_runs = 0
+        self.path_sub = self.create_subscription(
+            Path,
+            "/a_star_path",  # Subscribing to the path published by the A* algorithm
+            self.path_callback,
+            10,
+            callback_group=self.group,
+        )
 
-        self.get_logger().debug("Initialized A* Path Planner")
+        self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
+        self.marker_pub = self.create_publisher(Marker, "control_marker", 10)
 
-    def world_to_grid(self, x, y):
-        """Convert world coordinates to grid coordinates."""
-        origin = self.map_info.origin.position
-        resolution = self.map_info.resolution
-        gx = int((x - origin.x) / resolution)
-        gy = int((y - origin.y) / resolution)
-        return (gx, gy)
+        #--------------- PID CONTROLLERS ---------------#
 
-    def grid_to_world(self, gx, gy):
-        """Convert grid coordinates back to world coordinates."""
-        origin = self.map_info.origin.position
-        resolution = self.map_info.resolution
-        x = gx * resolution + origin.x
-        y = gy * resolution + origin.y
-        return x, y
+        self.x_pid = PIDController(*Kpid_x)
+        self.y_pid = PIDController(*Kpid_y)
+        self.theta_pid = CircularPID(*Kpid_theta)
+        self.theta_pid.set_effort_min(-self.max_vel[2])
+        self.theta_pid.set_effort_max(self.max_vel[2])
 
-    def map_cb(self, msg):
-        self.map_info = msg.info
-        self.map_grid = msg.data
-        self.get_logger().debug("Initialized Map" if self.map_info is None else "Updated Map")
+        #--------------- MEMBER VARIABLES ---------------#
 
-    def waypoints_cb(self, msg):
-        self.waypoints = msg
-        self.get_logger().debug("New Waypoints Added, Running A*")
-        if self.map_info is None:
-            self.get_logger().debug("No occupancy grid in memory")
-            return
-        self.full_path()
+        self.nav_x = 0.0
+        self.nav_y = 0.0
+        self.heading = 0.0
+        self.proc_count = 0
+        self.prev_update_time = self.get_clock().now()
 
-    def heuristic(self, node):
-        """Euclidean distance as heuristic"""
-        return sqrt((node[0] - self.target[0]) ** 2 + (node[1] - self.target[1]) ** 2)
+    def odom_callback(self, msg: Odometry):
+        self.nav_x = msg.pose.pose.position.x
+        self.nav_y = msg.pose.pose.position.y
+        _, _, self.heading = euler_from_quaternion(
+            [
+                msg.pose.pose.orientation.x,
+                msg.pose.pose.orientation.y,
+                msg.pose.pose.orientation.z,
+                msg.pose.pose.orientation.w,
+            ]
+        )
 
-    def full_path(self):
-        total_path = []
-        for i in range(len(self.waypoints.poses) - 1):
-            total_path.extend(self.plan_path(self.waypoints.poses[i], self.waypoints.poses[i + 1]))
+    def path_callback(self, msg: Path):
+        """Receive the A* path and store it for navigation"""
+        self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
+        self.current_target_index = 0  # Reset the target index to start following the path
+        self.get_logger().info(f"Received path with {len(self.path)} waypoints")
 
-        # Publish path as nav_msgs/Path
-        self.publish_nav_path(total_path)
+    def start_process(self, msg=None):
+        self.proc_count += 1
+        while self.proc_count >= 2:
+            time.sleep(TIMER_PERIOD)
+        if msg is not None:
+            time.sleep(TIMER_PERIOD)
+            self.get_logger().info(msg)
 
-    def plan_path(self, s, t):
-        """A* Algorithm to compute the path"""
-        W = self.map_info.width
-        H = self.map_info.height
+    def end_process(self, msg=None):
+        self.delete_all_marker()
+        self.proc_count -= 1
+        if msg is not None:
+            self.get_logger().info(msg)
 
-        dxy = [(1, 0), (0, 1), (-1, 0), (0, -1),(1,1),(-1,-1),(-1,1),(1,-1),
-                (1,-2), (1,2), (-1, 2), (-1,-2), (2,1), (-2,1), (2,-1), (-2,-1)] # Neighbor offsets
+    def delete_all_marker(self):
+        marker_msg = Marker()
+        marker_msg.header.frame_id = self.global_frame_id
+        marker_msg.header.stamp = self.get_clock().now().to_msg()
+        marker_msg.ns = MARKER_NS
+        marker_msg.action = Marker.DELETEALL
+        self.marker_pub.publish(marker_msg)
 
-        gscore = [inf] * (H * W)
-        parent = [(0, 0)] * (H * W)
+    def visualize_waypoint(self, x, y):
+        marker_msg = Marker()
+        marker_msg.header.frame_id = self.global_frame_idc
+        marker_msg.header.stamp = self.get_clock().now().to_msg()
+        marker_msg.ns = MARKER_NS
+        marker_msg.type = Marker.CYLINDER
+        marker_msg.action = Marker.ADD
+        marker_msg.pose.position.x = x
+        marker_msg.pose.position.y = y
+        marker_msg.pose.position.z = 2.0
+        marker_msg.scale.x = 0.4
+        marker_msg.scale.y = 0.4
+        marker_msg.scale.z = 8.0
+        marker_msg.color.a = 1.0
+        marker_msg.color.r = 1.0
+        marker_msg.color.g = 1.0
+        marker_msg.color.b = 1.0
+        self.marker_pub.publish(marker_msg)
 
-        # Convert waypoints to grid coordinates
-        spos = self.world_to_grid(s.position.x, s.position.y)
-        tpos = self.world_to_grid(t.position.x, t.position.y)
-        self.target = tpos
+    def cancel_callback(self, cancel_request):
+        return CancelResponse.ACCEPT
 
-        # Check if the starting position and/or the ending position is occupied
-        if (self.map_grid[spos[0] + spos[1] * W] > self.cutoff or self.map_grid[spos[0] + spos[1] * W] == -1):
-            self.map_grid[spos[0] + spos[1] * W] = 0
-        if (self.map_grid[tpos[0] + tpos[1] * W] > self.cutoff or self.map_grid[tpos[0] + tpos[1] * W] == -1):
-            self.map_grid[tpos[0] + tpos[1] * W] = 0
+    def reset_pid(self):
+        self.prev_update_time = self.get_clock().now()
+        self.x_pid.reset()
+        self.y_pid.reset()
+        self.theta_pid.reset()
 
-        gscore[spos[0] + spos[1] * W] = 0
-        parent[spos[0] + spos[1] * W] = spos
+    def set_pid_setpoints(self, x, y, theta):
+        self.x_pid.set_setpoint(x)
+        self.y_pid.set_setpoint(y)
+        self.theta_pid.set_setpoint(theta)
 
-        pq = PriorityQueue()
-        pq.put((self.heuristic(spos), spos[0], spos[1]))
-        while not pq.empty():
-            node = pq.get()
-            if abs(node[0] - (gscore[node[1] + node[2] * W] + self.heuristic(node[1:3]))) > 0.005:
-                continue
+    def update_pid(self):
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        self.x_pid.update(self.nav_x, dt)
+        self.y_pid.update(self.nav_y, dt)
+        self.theta_pid.update(self.heading, dt)
+        self.prev_update_time = self.get_clock().now()
 
-            node = node[1:3]
-            if node == tpos:
-                break
+    def scale_thrust(self, x_vel, y_vel):
+        if abs(x_vel) <= self.max_vel[0] and abs(y_vel) <= self.max_vel[1]:
+            return x_vel, y_vel
 
-            for d in dxy:
-                skip = False
-                nxt = (node[0] + d[0], node[1] + d[1])
-                if nxt[0] < 0 or nxt[0] >= H or nxt[1] < 0 or nxt[1] >= W:
-                    continue
-                if d[0]**2+d[1]**2 == 2 or d[0]**2+d[1]**2 == 5:
-                    for tx in range(min(node[0], nxt[0]), max(node[0],nxt[0])+1):
-                        for ty in range(min(node[1],nxt[1]), max(node[1], nxt[1])+1):
-                            if self.map_grid[tx + ty * W] > self.cutoff or self.map_grid[tx + ty * W] == -1:
-                                skip = True
-                if skip:
-                    continue
+        scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
+        return scale * x_vel, scale * y_vel
 
-                if self.map_grid[nxt[0] + nxt[1] * W] > self.cutoff or self.map_grid[nxt[0] + nxt[1] * W] == -1:
-                    continue
+    def control_loop(self):
+        self.update_pid()
+        x_output = self.x_pid.get_effort()
+        y_output = self.y_pid.get_effort()
+        theta_output = self.theta_pid.get_effort()
+        x_vel = x_output * math.cos(self.heading) + y_output * math.sin(self.heading)
+        y_vel = y_output * math.cos(self.heading) - x_output * math.sin(self.heading)
 
-                if gscore[node[0] + node[1] * W] + sqrt(d[0]**2+d[1]**2) < gscore[nxt[0] + nxt[1] * W]:
-                    gscore[nxt[0]+ nxt[1] * W] = gscore[node[0] + node[1] * W] + sqrt(d[0]**2+d[1]**2)
-                    parent[nxt[0] + nxt[1] * W] = node
-                    pq.put((gscore[nxt[0]+ nxt[1] * W] + self.heuristic(nxt), nxt[0], nxt[1]))
+        x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
+        control_msg = ControlOption()
+        control_msg.priority = 1
+        control_msg.twist.linear.x = x_vel
+        control_msg.twist.linear.y = y_vel
+        control_msg.twist.angular.z = theta_output
+        self.control_pub.publish(control_msg)
 
-        if gscore[tpos[0] + tpos[1]*W] == inf:
-            self.get_logger().debug("Error: Path not found")
-            path = []
-            self.failed_runs += 1
-            return path
+    def waypoint_callback(self, goal_handle):
+        self.start_process("Waypoint following started!")
 
-        # Backtrace the path
-        path = []
-        cur = tpos
-        while cur != spos:
-            path.append(cur)
-            cur = parent[cur[0] + cur[1] * W]
-        path.append(spos)
-        path.reverse()
-        self.get_logger().debug("Finished Backtracking Path")
+        # Initialize the waypoint index to 0 (start of path)
+        waypoint_index = 0
 
-        self.completed_runs += 1
-        self.get_logger().debug(f"Failed runs/Completed runs: {self.failed_runs}/{self.completed_runs}")
+        # Thresholds for reaching a waypoint
+        xy_threshold = goal_handle.request.xy_threshold
+        theta_threshold = goal_handle.request.theta_threshold
 
-        return path
+        # Check if the path is available from A* (it should be set in path_callback)
+        if not hasattr(self, 'path') or len(self.path) == 0:
+            self.end_process("No path available to follow!")
+            goal_handle.abort()
+            return Waypoint.Result()
 
-    def publish_nav_path(self, path):
-        """Publish path as nav_msgs/Path"""
-        path_msg = Path()
-        path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map'
+        self.get_logger().info(f"Starting to follow path with {len(self.path)} waypoints.")
 
-        for point in path:
-            wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
-            pose = PoseStamped()
-            pose.header = path_msg.header
-            pose.pose.position.x = float(wx)
-            pose.pose.position.y = float(wy)
-            path_msg.poses.append(pose)
+        # Loop through the waypoints in the path
+        while waypoint_index < len(self.path):
 
-        self.path_pub.publish(path_msg)
-        self.get_logger().debug("Published A* Path")
+            # Get the current target waypoint from the path
+            goal_x, goal_y = self.path[waypoint_index]
+            self.get_logger().info(f"Following waypoint {waypoint_index + 1}/{len(self.path)}: ({goal_x}, {goal_y})")
 
-    def pose_to_string(self, pos):
-        return f"{{{pos.position.x}, {pos.position.y}, {pos.position.z}}}"
+            # Visualize the waypoint
+            self.visualize_waypoint(goal_x, goal_y)
+
+            # Set the target orientation (goal_theta), either towards next point or given in request
+            if goal_handle.request.ignore_theta:
+                goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
+            else:
+                goal_theta = goal_handle.request.theta
+
+            # Reset the PID controllers and set new waypoints
+            self.reset_pid()
+            self.set_pid_setpoints(goal_x, goal_y, goal_theta)
+
+            # Control loop: move towards the current waypoint
+            while (not self.x_pid.is_done(self.nav_x, xy_threshold) or
+                   not self.y_pid.is_done(self.nav_y, xy_threshold) or
+                   not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))):
+
+                # Abort if another process or cancellation request
+                if self.proc_count >= 2:
+                    self.end_process("Waypoint following aborted!")
+                    goal_handle.abort()
+                    return Waypoint.Result()
+
+                if goal_handle.is_cancel_requested:
+                    self.end_process("Waypoint following canceled!")
+                    goal_handle.canceled()
+                    return Waypoint.Result()
+
+                # Execute the control loop to move towards the waypoint
+                self.control_loop()
+
+                time.sleep(TIMER_PERIOD)
+
+            # Move to the next waypoint once the current one is reached
+            waypoint_index += 1
+
+        # All waypoints have been followed successfully
+        self.end_process("All waypoints followed successfully!")
+        goal_handle.succeed()
+        return Waypoint.Result(is_finished=True)
 
 def main(args=None):
     rclpy.init(args=args)
-    planner = PathPlan()
-    rclpy.spin(planner)
-    planner.destroy_node()
+    node = NavigationServer()
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
+    executor.spin()
+    node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()
