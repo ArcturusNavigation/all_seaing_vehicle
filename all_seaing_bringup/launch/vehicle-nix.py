@@ -90,9 +90,9 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    waypoint_sender = launch_ros.actions.Node(
+    rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
-        executable="waypoint_sender.py",
+        executable="rviz_waypoint_sender.py",
         parameters=[
             {"xy_threshold": 1.0},
             {"theta_threshold": 5.0},
@@ -124,7 +124,7 @@ def launch_setup(context, *args, **kwargs):
         control_mux,
         controller_node,
         controller_server,
-        waypoint_sender,
+        rviz_waypoint_sender,
         rover_lora_controller,
         thrust_commander_node,
         mavros_ld,
