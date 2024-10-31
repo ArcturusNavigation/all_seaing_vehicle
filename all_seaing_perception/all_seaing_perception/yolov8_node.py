@@ -71,6 +71,7 @@ class Yolov8Node(Node):
             #print("YOLO BEFORE EXPORT", self.yolo)
             if use_tensorRT:
                 self.yolo.export(format="engine", dynamic=True)
+                self.tensorrtmodel = YOLO(model_name[:-3]+'.engine')
                 #print("YOLO AFTER EXPORT", self.yolo)
                 #self.yolo.export(
                     #format="engine",
@@ -120,13 +121,14 @@ class Yolov8Node(Node):
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "rgb8")
 
             # Predict based on image
-            results = self.yolo.predict(
-                source=cv_image,
-                verbose=False,
-                stream=False,
-                conf=self.threshold,
-                device=self.device
-            )
+            # results = self.yolo.predict(
+            #     source=cv_image,
+            #     verbose=False,
+            #     stream=False,
+            #     conf=self.threshold,
+            #     device=self.device
+            # )
+            results = self.tensorrtmodel(cv_image)
             results: Results = results[0].cpu()
 
             # Create labeled_bounding_box msgs
