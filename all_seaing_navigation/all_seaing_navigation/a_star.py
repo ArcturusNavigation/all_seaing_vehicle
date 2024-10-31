@@ -8,35 +8,6 @@ from utils import PriorityQueue
 from math import inf, sqrt
 import numpy as np
 
-class PathPlan(Node):
-    """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path using A* """
-
-    def __init__(self):
-        super().__init__("astar_path_planner")
-
-        self.map_topic = "map"  # OccupancyGrid
-        self.waypoints_topic = "clicked_point"
-
-        # Subscriptions to map and waypoints
-        self.map_sub = self.create_subscription(
-            OccupancyGrid, self.map_topic, self.map_cb, 10)
-
-        self.goal_sub = self.create_subscription(
-            PoseArray, self.waypoints_topic, self.waypoints_cb, 10)
-
-        # Publishers for path and PoseArray
-        self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
-        self.path_pub = self.create_publisher(Path, "a_star_path", 10)
-
-        self.map_grid = None
-        self.map_info = None  # Resolution of the map (m/cell)
-        self.target = None
-        self.cutoff = 50  # Threshold for obstacle cells
-        self.waypoints = None
-        self.failed_runs = 0
-        self.completed_runs = 0
-
-        self.get_logger().debug("Initialized A* Path Planner")
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -162,36 +133,19 @@ class PathPlan(Node):
         self.completed_runs += 1
         self.get_logger().debug(f"Failed runs/Completed runs: {self.failed_runs}/{self.completed_runs}")
 
-        # Publish path as nav_msgs/Path
-        self.publish_nav_path(path)
+        # # Publish path as nav_msgs/Path -> moved to nav server
+        # self.publish_nav_path(path)
         return path
-
-    def publish_nav_path(self, path):
-        """Publish path as nav_msgs/Path"""
-        path_msg = Path()
-        path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map'
-
-        for point in path:
-            wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
-            pose = PoseStamped()
-            pose.header = path_msg.header
-            pose.pose.position.x = float(wx)
-            pose.pose.position.y = float(wy)
-            path_msg.poses.append(pose)
-
-        self.path_pub.publish(path_msg)
-        self.get_logger().debug("Published A* Path")
 
     def pose_to_string(self, pos):
         return f"{{{pos.position.x}, {pos.position.y}, {pos.position.z}}}"
 
-def main(args=None):
-    rclpy.init(args=args)
-    planner = PathPlan()
-    rclpy.spin(planner)
-    planner.destroy_node()
-    rclpy.shutdown()
+# def main(args=None):
+#     rclpy.init(args=args)
+#     planner = PathPlan()
+#     rclpy.spin(planner)
+#     planner.destroy_node()
+#     rclpy.shutdown()
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

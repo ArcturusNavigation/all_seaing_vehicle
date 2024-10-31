@@ -11,13 +11,63 @@ import time
 from all_seaing_controller.pid_controller import CircularPID, PIDController
 from all_seaing_interfaces.action import Waypoint
 from all_seaing_interfaces.msg import ControlOption
-from nav_msgs.msg import Odometry, Path
+from nav_msgs.msg import Odometry, OccupancyGrid, Path
 from tf_transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseArray, Pose
+from a_star import *
 
 TIMER_PERIOD = 1 / 60
 MARKER_NS = "control"
+
+#TODO: PathNode (subscriptions)
+class PathPlan(Node):
+    """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path using A* """
+
+    def __init__(self):
+        super().__init__("astar_path_planner")
+
+        self.map_topic = "map"  # OccupancyGrid
+        self.waypoints_topic = "clicked_point"
+
+        # Subscriptions to map and waypoints
+        self.map_sub = self.create_subscription(
+            OccupancyGrid, self.map_topic, self.map_cb, 10)
+
+        self.goal_sub = self.create_subscription(
+            PoseArray, self.waypoints_topic, self.waypoints_cb, 10)
+
+        # Publishers for path and PoseArray
+        self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
+        self.path_pub = self.create_publisher(Path, "a_star_path", 10)
+
+        self.map_grid = None
+        self.map_info = None  # Resolution of the map (m/cell)
+        self.target = None
+        self.cutoff = 50  # Threshold for obstacle cells
+        self.waypoints = None
+        self.failed_runs = 0
+        self.completed_runs = 0
+
+        self.get_logger().debug("Initialized A* Path Planner")
+
+    def publish_nav_path(self, path):
+        """Publish path as nav_msgs/Path"""
+        path_msg = Path()
+        path_msg.header.stamp = self.get_clock().now().to_msg()
+        path_msg.header.frame_id = 'map'
+
+        for point in path:
+            wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
+            pose = PoseStamped()
+            pose.header = path_msg.header
+            pose.pose.position.x = float(wx)
+            pose.pose.position.y = float(wy)
+            path_msg.poses.append(pose)
+
+        self.path_pub.publish(path_msg)
+        self.get_logger().debug("Published A* Path")
+
 
 class NavigationServer(Node):
     def __init__(self):
@@ -55,13 +105,14 @@ class NavigationServer(Node):
             callback_group=self.group,
         )
 
-        self.path_sub = self.create_subscription(
-            Path,
-            "/a_star_path",  # Subscribing to the path published by the A* algorithm
-            self.path_callback,
-            10,
-            callback_group=self.group,
-        )
+        # -> subscription removed bc calling plan_path()
+        # self.path_sub = self.create_subscription(
+        #     Path,
+        #     "/a_star_path",  # Subscribing to the path published by the A* algorithm
+        #     self.path_callback,
+        #     10,
+        #     callback_group=self.group,
+        # )
 
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
         self.marker_pub = self.create_publisher(Marker, "control_marker", 10)
@@ -94,11 +145,19 @@ class NavigationServer(Node):
             ]
         )
 
-    def path_callback(self, msg: Path):
-        """Receive the A* path and store it for navigation"""
-        self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
-        self.current_target_index = 0  # Reset the target index to start following the path
-        self.get_logger().info(f"Received path with {len(self.path)} waypoints")
+    # -> path_callback removed since no longer accessing a* via subscription
+    # def path_callback(self, msg: Path):
+    #     """Receive the A* path and store it for navigation"""
+    #     self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
+    #     self.current_target_index = 0  # Reset the target index to start following the path
+    #     self.get_logger().info(f"Received path with {len(self.path)} waypoints")
+
+    # -> new path generator calling a* algo
+    def generate_path(self, start, goal):
+        """Calls A* algorithm to generate a path."""
+        self.path = self.plan_path(start, goal) #TODO: change (start, goal) to inputs of plan_path()
+        self.current_target_index = 0
+        self.get_logger().info(f"Generated path with {len(self.path)} waypoints")
 
     def start_process(self, msg=None):
         self.proc_count += 1
@@ -188,8 +247,21 @@ class NavigationServer(Node):
     def waypoint_callback(self, goal_handle):
         self.start_process("Waypoint following started!")
 
-        # Initialize the waypoint index to 0 (start of path)
-        waypoint_index = 0
+        #TODO: verify if path is correctly inputted and accessed
+        if self.path and self.current_target_index < len(self.path):
+        # Get the next target position from the path
+            target_x, target_y = self.path[self.current_target_index]
+
+        #TODO: Compute and issue position command to move towards target_x, target_y
+        # (Use ROS2 publishers for this)
+
+        #TODO: Check if the current target has been reached w/ some threshold, then increment the target index
+        if self.reached_target(target_x, target_y):  # Define `reached_target` as needed
+            self.current_target_index += 1
+
+        # -> REMOVED bc waypoint should be following current_target_index which is updated every step
+        # # Initialize the waypoint index to 0 (start of path)
+        # waypoint_index = 0
 
         # Thresholds for reaching a waypoint
         xy_threshold = goal_handle.request.xy_threshold
