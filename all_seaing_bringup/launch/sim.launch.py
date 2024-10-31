@@ -258,7 +258,7 @@ def generate_launch_description():
             control_mux,
             controller_server,
             onshore_node,
-            waypoint_finder,
+            # waypoint_finder,
             rviz_waypoint_sender,
             keyboard_ld,
             sim_ld,
