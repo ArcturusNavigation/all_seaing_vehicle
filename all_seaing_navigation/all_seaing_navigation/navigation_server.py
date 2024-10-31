@@ -1,5 +1,3 @@
-Nav_server
-
 
 #!/usr/bin/env python3
 import math
