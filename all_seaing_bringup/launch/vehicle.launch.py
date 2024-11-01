@@ -1,6 +1,10 @@
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 import launch_ros
@@ -28,14 +32,13 @@ def launch_setup(context, *args, **kwargs):
         parameters=[robot_localization_params],
     )
 
-    with open(locations_file, 'r') as f:
+    with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
-        remappings=[("gps/fix", "/mavros/global_position/raw/fix")],
         parameters=[
             robot_localization_params,
             {"datum": [lat, lon, 0.0]},
@@ -127,18 +130,6 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
-    ublox_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                driver_prefix,
-                "/launch/ublox_gps.launch.py",
-            ]
-        ),
-        launch_arguments={
-            "port": "/dev/ttyACM1",
-        }.items(),
-    )
-
     zed_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -149,18 +140,17 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        #ekf_node,
-        #navsat_node,
+        ekf_node,
+        navsat_node,
         control_mux,
         controller_node,
         controller_server,
         rviz_waypoint_sender,
         rover_lora_controller,
         thrust_commander_node,
-        #lidar_ld,
+        # lidar_ld,
         mavros_ld,
-        #ublox_ld,
-        #zed_ld,
+        # zed_ld,
     ]
 
 

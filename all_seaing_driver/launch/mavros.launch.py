@@ -8,6 +8,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+
             DeclareLaunchArgument(
                 "port",
                 default_value='/dev/ttyACM0',
@@ -19,6 +20,10 @@ def generate_launch_description():
                     {"fcu_url": LaunchConfiguration("port")},
                 ],
                 output="both",
+            ),
+            launch_ros.actions.Node(
+                package="all_seaing_driver",
+                executable="gps_converter.py",
             ),
             ExecuteProcess(
                 cmd=['ros2', 'run', 'mavros', 'mav', 'sys', 'rate', '--all', '10'],

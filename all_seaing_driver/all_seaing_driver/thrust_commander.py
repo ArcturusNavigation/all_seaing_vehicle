@@ -69,6 +69,9 @@ class ThrustCommander(Node):
         )
     
     def receive_heartbeat(self, msg):
+        if self.e_stopped:
+            self.get_logger().info("Regained heartbeat!")
+
         self.get_logger().debug("Heartbeat received!")
         self.prev_heartbeat = self.get_clock().now()
         self.e_stopped = msg.e_stopped
@@ -88,7 +91,6 @@ class ThrustCommander(Node):
         self.send_pwm(self.back_right_port, self.back_right_command)
         self.send_pwm(self.back_left_port, self.back_left_command)
 
-            
 
 def main(args=None):
     rclpy.init(args=args)
@@ -96,7 +98,6 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()
