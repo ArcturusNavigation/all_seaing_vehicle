@@ -72,6 +72,7 @@ class Yolov8Node(Node):
             if use_tensorRT:
                 print('In tensorRT if loop :)')
                 self.yolo.export(format="engine", dynamic=True)
+                print('Exported!')
                 self.tensorrtmodel = YOLO(model_name[:-3]+'.engine')
                 print("Attached model to exported tensorRT ones")
                 #print("YOLO AFTER EXPORT", self.yolo)
