@@ -20,26 +20,11 @@ from a_star import *
 TIMER_PERIOD = 1 / 60
 MARKER_NS = "control"
 
-#TODO: PathNode (subscriptions)
-class PathPlan(Node):
-    """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path using A* """
-
+class NavigationServer(Node):
     def __init__(self):
-        super().__init__("astar_path_planner")
+        super().__init__("navigation_server")
 
-        self.map_topic = "map"  # OccupancyGrid
-        self.waypoints_topic = "clicked_point"
-
-        # Subscriptions to map and waypoints
-        self.map_sub = self.create_subscription(
-            OccupancyGrid, self.map_topic, self.map_cb, 10)
-
-        self.goal_sub = self.create_subscription(
-            PoseArray, self.waypoints_topic, self.waypoints_cb, 10)
-
-        # Publishers for path and PoseArray
-        self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
-        self.path_pub = self.create_publisher(Path, "a_star_path", 10)
+        #--------------- PARAMETERS ---------------#
 
         self.map_grid = None
         self.map_info = None  # Resolution of the map (m/cell)
@@ -48,32 +33,6 @@ class PathPlan(Node):
         self.waypoints = None
         self.failed_runs = 0
         self.completed_runs = 0
-
-        self.get_logger().debug("Initialized A* Path Planner")
-
-    def publish_nav_path(self, path):
-        """Publish path as nav_msgs/Path"""
-        path_msg = Path()
-        path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map'
-
-        for point in path:
-            wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
-            pose = PoseStamped()
-            pose.header = path_msg.header
-            pose.pose.position.x = float(wx)
-            pose.pose.position.y = float(wy)
-            path_msg.poses.append(pose)
-
-        self.path_pub.publish(path_msg)
-        self.get_logger().debug("Published A* Path")
-
-
-class NavigationServer(Node):
-    def __init__(self):
-        super().__init__("navigation_server")
-
-        #--------------- PARAMETERS ---------------#
 
         self.global_frame_id = self.declare_parameter(
             "global_frame_id", "odom").get_parameter_value().string_value
@@ -87,6 +46,8 @@ class NavigationServer(Node):
             "max_vel", [4.0, 2.0, 1.0]).get_parameter_value().double_array_value
 
         #--------------- SUBSCRIBERS, PUBLISHERS, AND SERVERS ---------------#
+
+        self.map_topic = "map"  # OccupancyGrid
 
         self.group = MutuallyExclusiveCallbackGroup()
         self.waypoint_server = ActionServer(
@@ -105,15 +66,13 @@ class NavigationServer(Node):
             callback_group=self.group,
         )
 
-        # -> subscription removed bc calling plan_path()
-        # self.path_sub = self.create_subscription(
-        #     Path,
-        #     "/a_star_path",  # Subscribing to the path published by the A* algorithm
-        #     self.path_callback,
-        #     10,
-        #     callback_group=self.group,
-        # )
+        # Subscriptions to map and waypoints
+        self.map_sub = self.create_subscription(
+            OccupancyGrid, self.map_topic, self.map_cb, 10)
 
+        # Publishers for path and PoseArray
+        self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
+        self.path_pub = self.create_publisher(Path, "a_star_path", 10)
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
         self.marker_pub = self.create_publisher(Marker, "control_marker", 10)
 
@@ -323,6 +282,24 @@ class NavigationServer(Node):
         self.end_process("All waypoints followed successfully!")
         goal_handle.succeed()
         return Waypoint.Result(is_finished=True)
+
+
+    def publish_nav_path(self, path):
+        """Publish path as nav_msgs/Path"""
+        path_msg = Path()
+        path_msg.header.stamp = self.get_clock().now().to_msg()
+        path_msg.header.frame_id = 'map'
+
+        for point in path:
+            wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
+            pose = PoseStamped()
+            pose.header = path_msg.header
+            pose.pose.position.x = float(wx)
+            pose.pose.position.y = float(wy)
+            path_msg.poses.append(pose)
+
+        self.path_pub.publish(path_msg)
+        self.get_logger().debug("Published A* Path")
 
 def main(args=None):
     rclpy.init(args=args)
