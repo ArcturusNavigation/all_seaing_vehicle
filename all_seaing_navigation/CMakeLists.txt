@@ -16,6 +16,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/waypoint_publisher_test.py
     ${PROJECT_NAME}/a_star.py
     ${PROJECT_NAME}/map_publisher_test.py
+    ${PROJECT_NAME}/mapping_server/mapping_server.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
