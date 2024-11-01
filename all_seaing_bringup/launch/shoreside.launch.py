@@ -42,6 +42,12 @@ def generate_launch_description():
             {"joy_ang_scale": -0.8},
         ],
     )
+    
+    onshore_lora_node = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="onshore_lora_controller.py",
+        output="screen",
+    )
 
     onshore_lora_node = launch_ros.actions.Node(
         package="all_seaing_driver",
@@ -57,8 +63,14 @@ def generate_launch_description():
         [
             launch_rviz_launch_arg,
             rviz_node,
+<<<<<<< HEAD
             onshore_node,
             #onshore_lora_node,
             #keyboard_ld,
+=======
+            onshore_lora_node
+            # onshore_node,
+            # keyboard_ld,
+>>>>>>> 1bc7fdedf3e9f54f872c0598ee42f6849f025f0e
         ]
     )
