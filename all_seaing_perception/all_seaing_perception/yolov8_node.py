@@ -45,7 +45,7 @@ class Yolov8Node(Node):
         self.declare_parameter("device", "cuda:0")
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-        self.declare_parameter("image_topic", "image_raw")
+        self.declare_parameter("image_topic", "/zed/zed_node/rgb_raw/image_raw_color")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
         self.declare_parameter("tensorRT", True)
 
