@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 import math
 import rclpy
@@ -26,6 +25,7 @@ class NavigationServer(Node):
 
         #--------------- PARAMETERS ---------------#
 
+<<<<<<< HEAD
         self.map_grid = None
         self.map_info = None  # Resolution of the map (m/cell)
         self.target = None
@@ -34,6 +34,8 @@ class NavigationServer(Node):
         self.failed_runs = 0
         self.completed_runs = 0
 
+=======
+>>>>>>> 3fe87afb242828813b1e6f75555d420e941b9cef
         self.global_frame_id = self.declare_parameter(
             "global_frame_id", "odom").get_parameter_value().string_value
         Kpid_x = self.declare_parameter(
@@ -46,10 +48,17 @@ class NavigationServer(Node):
             "max_vel", [4.0, 2.0, 1.0]).get_parameter_value().double_array_value
 
         #--------------- SUBSCRIBERS, PUBLISHERS, AND SERVERS ---------------#
+<<<<<<< HEAD
 
         self.map_topic = "map"  # OccupancyGrid
 
+=======
+        # goal_sub and path_sub removed
+>>>>>>> 3fe87afb242828813b1e6f75555d420e941b9cef
         self.group = MutuallyExclusiveCallbackGroup()
+
+        self.map_topic = "map"  # OccupancyGrid
+
         self.waypoint_server = ActionServer(
             self,
             Waypoint,
@@ -58,6 +67,10 @@ class NavigationServer(Node):
             cancel_callback=self.cancel_callback,
             callback_group=self.group,
         )
+        self.map_sub = self.create_subscription(
+            OccupancyGrid, "map", self.map_cb, 10, callback_group=self.group
+        )
+
         self.odom_sub = self.create_subscription(
             Odometry,
             "odometry/filtered",
@@ -66,9 +79,24 @@ class NavigationServer(Node):
             callback_group=self.group,
         )
 
+<<<<<<< HEAD
         # Subscriptions to map and waypoints
         self.map_sub = self.create_subscription(
             OccupancyGrid, self.map_topic, self.map_cb, 10)
+=======
+        self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
+        self.path_pub = self.create_publisher(Path, "a_star_path", 10)
+
+        self.map_grid = None
+        self.map_info = None  # Resolution of the map (m/cell)
+        self.target = None
+        self.cutoff = 50  # Threshold for obstacle cells
+        self.waypoints = None
+        self.failed_runs = 0
+        self.completed_runs = 0
+
+        self.get_logger().debug("Initialized A* Path Planner")
+>>>>>>> 3fe87afb242828813b1e6f75555d420e941b9cef
 
         # Publishers for path and PoseArray
         self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
@@ -92,6 +120,23 @@ class NavigationServer(Node):
         self.proc_count = 0
         self.prev_update_time = self.get_clock().now()
 
+    def publish_nav_path(self, path):
+        """Publish path as nav_msgs/Path"""
+        path_msg = Path()
+        path_msg.header.stamp = self.get_clock().now().to_msg()
+        path_msg.header.frame_id = 'map'
+
+        for point in path:
+            wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
+            pose = PoseStamped()
+            pose.header = path_msg.header
+            pose.pose.position.x = float(wx)
+            pose.pose.position.y = float(wy)
+            path_msg.poses.append(pose)
+
+        self.path_pub.publish(path_msg)
+        self.get_logger().debug("Published A* Path")
+
     def odom_callback(self, msg: Odometry):
         self.nav_x = msg.pose.pose.position.x
         self.nav_y = msg.pose.pose.position.y
@@ -103,20 +148,6 @@ class NavigationServer(Node):
                 msg.pose.pose.orientation.w,
             ]
         )
-
-    # -> path_callback removed since no longer accessing a* via subscription
-    # def path_callback(self, msg: Path):
-    #     """Receive the A* path and store it for navigation"""
-    #     self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
-    #     self.current_target_index = 0  # Reset the target index to start following the path
-    #     self.get_logger().info(f"Received path with {len(self.path)} waypoints")
-
-    # -> new path generator calling a* algo
-    def generate_path(self, start, goal):
-        """Calls A* algorithm to generate a path."""
-        self.path = self.plan_path(start, goal) #TODO: change (start, goal) to inputs of plan_path()
-        self.current_target_index = 0
-        self.get_logger().info(f"Generated path with {len(self.path)} waypoints")
 
     def start_process(self, msg=None):
         self.proc_count += 1
@@ -203,63 +234,42 @@ class NavigationServer(Node):
         control_msg.twist.angular.z = theta_output
         self.control_pub.publish(control_msg)
 
+
     def waypoint_callback(self, goal_handle):
         self.start_process("Waypoint following started!")
 
-        #TODO: verify if path is correctly inputted and accessed
-        if self.path and self.current_target_index < len(self.path):
-        # Get the next target position from the path
-            target_x, target_y = self.path[self.current_target_index]
-
-        #TODO: Compute and issue position command to move towards target_x, target_y
-        # (Use ROS2 publishers for this)
-
-        #TODO: Check if the current target has been reached w/ some threshold, then increment the target index
-        if self.reached_target(target_x, target_y):  # Define `reached_target` as needed
-            self.current_target_index += 1
-
-        # -> REMOVED bc waypoint should be following current_target_index which is updated every step
-        # # Initialize the waypoint index to 0 (start of path)
-        # waypoint_index = 0
-
-        # Thresholds for reaching a waypoint
         xy_threshold = goal_handle.request.xy_threshold
         theta_threshold = goal_handle.request.theta_threshold
+        goal_x = goal_handle.request.x
+        goal_y = goal_handle.request.y
 
-        # Check if the path is available from A* (it should be set in path_callback)
-        if not hasattr(self, 'path') or len(self.path) == 0:
-            self.end_process("No path available to follow!")
+        if goal_handle.request.ignore_theta:
+            goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
+        else:
+            goal_theta = goal_handle.request.theta
+        self.visualize_waypoint(goal_x, goal_y)
+
+        #Generate a path using A* from the current position to the goal
+
+        #TODO: call path correctly and follows each waypoint correctly
+        path = self.path_plan(self.nav_x, self.nav_y, goal_x, goal_y)
+
+        # Return a list of waypoitns the robot should follow
+        if path is not None or len(path) == 0:
+            self.end_process("Waypoint following aborted!")
             goal_handle.abort()
             return Waypoint.Result()
 
-        self.get_logger().info(f"Starting to follow path with {len(self.path)} waypoints.")
+        self.reset_pid()
 
-        # Loop through the waypoints in the path
-        while waypoint_index < len(self.path):
+        for waypoint in path:
+            waypoint_x, waypoint_y = waypoint
+            self.set_pid_setpoints(waypoint_x, waypoint_y, goal_theta)
 
-            # Get the current target waypoint from the path
-            goal_x, goal_y = self.path[waypoint_index]
-            self.get_logger().info(f"Following waypoint {waypoint_index + 1}/{len(self.path)}: ({goal_x}, {goal_y})")
-
-            # Visualize the waypoint
-            self.visualize_waypoint(goal_x, goal_y)
-
-            # Set the target orientation (goal_theta), either towards next point or given in request
-            if goal_handle.request.ignore_theta:
-                goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
-            else:
-                goal_theta = goal_handle.request.theta
-
-            # Reset the PID controllers and set new waypoints
-            self.reset_pid()
-            self.set_pid_setpoints(goal_x, goal_y, goal_theta)
-
-            # Control loop: move towards the current waypoint
             while (not self.x_pid.is_done(self.nav_x, xy_threshold) or
-                   not self.y_pid.is_done(self.nav_y, xy_threshold) or
-                   not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))):
+               not self.y_pid.is_done(self.nav_y, xy_threshold) or
+               not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))):
 
-                # Abort if another process or cancellation request
                 if self.proc_count >= 2:
                     self.end_process("Waypoint following aborted!")
                     goal_handle.abort()
@@ -270,16 +280,10 @@ class NavigationServer(Node):
                     goal_handle.canceled()
                     return Waypoint.Result()
 
-                # Execute the control loop to move towards the waypoint
-                self.control_loop()
+            self.control_loop()
+            time.sleep(TIMER_PERIOD)
 
-                time.sleep(TIMER_PERIOD)
-
-            # Move to the next waypoint once the current one is reached
-            waypoint_index += 1
-
-        # All waypoints have been followed successfully
-        self.end_process("All waypoints followed successfully!")
+        self.end_process("Waypoint following completed!")
         goal_handle.succeed()
         return Waypoint.Result(is_finished=True)
 

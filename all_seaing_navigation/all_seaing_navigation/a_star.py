@@ -29,13 +29,13 @@ def map_cb(self, msg):
     self.map_grid = msg.data
     self.get_logger().debug("Initialized Map" if self.map_info is None else "Updated Map")
 
-def waypoints_cb(self, msg):
-    self.waypoints = msg
-    self.get_logger().debug("New Waypoints Added, Running A*")
-    if self.map_info is None:
-        self.get_logger().debug("No occupancy grid in memory")
-        return
-    self.full_path()
+# def waypoints_cb(self, msg):
+#     self.waypoints = msg
+#     self.get_logger().debug("New Waypoints Added, Running A*")
+#     if self.map_info is None:
+#         self.get_logger().debug("No occupancy grid in memory")
+#         return
+#     self.full_path()
 
 def heuristic(self, node):
     """Euclidean distance as heuristic"""
