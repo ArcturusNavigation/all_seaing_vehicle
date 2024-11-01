@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from scipy.spatial import ConvexHull
+# from utils import GeometryPrimitives
 
 from nav_msgs.msg import OccupancyGrid
 from all_seaing_interfaces.msg import ObstacleMap
@@ -16,7 +18,7 @@ class PathPlan(Node):
 
         # Subscriber to labeled_map
         self.labeled_map_sub = self.create_subscription(
-            ObstacleMap, self.labeled_map_topic, self.map_cb, 10)
+            ObstacleMap, self.labeled_map_topic, self.hulls_update_cb, 10)
 
         # Publishers for path and PoseArray
         self.grid_pub = self.create_publisher(OccupancyGrid, "occupancy_grid", 10)
@@ -39,7 +41,12 @@ class PathPlan(Node):
 
         # Active cells in row major order            
         self.active_cells = [[False] * self.grid.info.width * self.grid.info.height]
-        self.get_logger().debug("Initialized Mapping Server")
+        self.get_logger().info("Initialized Mapping Server")
+
+    def ccw(self,A,B,C):
+        return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
+    def intersect(self,A,B,C,D):
+        return self.ccw(A,C,D) != self.ccw(B,C,D) and self.ccw(A,B,C) != self.ccw(A,B,D)
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -58,13 +65,60 @@ class PathPlan(Node):
         return x, y
 
     def find_active_cells(self):
-        """Find the current active cells that the sensors can see, and mark them as active"""
-        
-        pass
+        if len(self.labeled_map.obstacles) == 0:
+            for x in range(0, self.grid.width):
+                for y in range(0, self.grid.height):
+                    self.active_cells[x+y*self.grid.width] = True
+                    return
+        """
+        Find the current active cells that the sensors can see, and mark them as active
+        Mark cells inactive if behind obstacles
+        """
+
+        ob = self.labeled_map.obstacles[0]
+        self.ship_pos = (ob.local_point.point.x-ob.global_point.point.x,
+                    ob.local_point.point.y-ob.global_point.point.y)
+        all_modified_hulls = []
+        all_hulls = []
+        for obstacle in self.labeled_map.obstacles:
+            gchull = obstacle.global_chull.polygon.points
+            polygon = [(point.x, point.y) for point in gchull]
+            all_hulls.append(ConvexHull(polygon))
+            polygon.append(self.ship_pos)
+            modified_hull = ConvexHull(polygon)
+            all_modified_hulls.append(modified_hull)
+
+        #test if cells are active
+        #O(W * H * |hulls|) (very slow)
+        for x in range(0, self.grid.width):
+            for y in range(0, self.grid.height):
+                worldx, worldy = self.grid_to_world(x), self.grid_to_world(y)
+                self.active_cells[x + y * self.grid.width] = True
+                for hull,mhull in zip(all_hulls,all_modified_hulls):
+                    continue_flag = False
+                    for line_indices in hull.simplices:
+                        if self.intersect(line_indices[0], line_indices[1],
+                                         worldx-self.ship_pos[0], worldy-self.ship_pos[1]):
+                            continue_flag = True
+                            break
+                    if continue_flag: 
+                        continue
+
+                    # Check if cell is behind convex hull
+                    ctr = 0
+                    for line_indices in mhull.simplices: #indices of points that form a line
+                        ctr += (self.intersect(line_indices[0], line_indices[1],
+                                                (worldx,worldy), (self.grid.info.width+0.00007,self.grid.info.height)))
+                    if ctr%2 == 0:
+                        self.active_cells[x + y * self.grid.width] = False
+                        break
 
     def modify_probability(self):
         """Decay or increase probability of obstacle in active cells based on sensor observations"""
-        pass
+        for x in range(0, self.grid.width):
+            for y in range(0, self.grid.height):
+                self.grid[x+y*self.grid.width] = 100 if self.active_cells[x+y*self.grid.width] else 0
+
     
     def hulls_update_cb(self, msg):
         self.labeled_map = msg
