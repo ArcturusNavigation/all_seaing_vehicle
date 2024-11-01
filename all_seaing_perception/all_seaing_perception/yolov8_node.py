@@ -70,8 +70,10 @@ class Yolov8Node(Node):
             self.yolo = YOLO(model_path)
             #print("YOLO BEFORE EXPORT", self.yolo)
             if use_tensorRT:
+                print('In tensorRT if loop :)')
                 self.yolo.export(format="engine", dynamic=True)
                 self.tensorrtmodel = YOLO(model_name[:-3]+'.engine')
+                print("Attached model to exported tensorRT ones")
                 #print("YOLO AFTER EXPORT", self.yolo)
                 #self.yolo.export(
                     #format="engine",
@@ -85,6 +87,7 @@ class Yolov8Node(Node):
                 #to_new_model_name = model_name[:dot_loc]
                 #self.yolo = YOLO(to_new_model_name+'.engine', task='detect')
             self.yolo.fuse()
+            print("Fused :)")
 
         # Setup QoS profile
         image_qos_profile = QoSProfile(
@@ -128,7 +131,9 @@ class Yolov8Node(Node):
             #     conf=self.threshold,
             #     device=self.device
             # )
+            print("Line before running results")
             results = self.tensorrtmodel(cv_image)
+            print('Executed tensorRT and ran on images :)')
             results: Results = results[0].cpu()
 
             # Create labeled_bounding_box msgs
