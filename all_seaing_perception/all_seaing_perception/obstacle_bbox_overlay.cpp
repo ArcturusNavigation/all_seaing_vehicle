@@ -15,21 +15,18 @@ int ObstacleBboxOverlay::get_matching_obstacle_iou(
     const std::unordered_set<int> &chosen_indices,
     const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg) {
 
-    // geometry_msgs::msg::Point bbox_min, bbox_max;
-    // bbox_min.x = obstacle.bbox_min.x;
-    // bbox_min.y = obstacle.bbox_min.y;
-    // bbox_min.z = obstacle.bbox_min.z;
-    // bbox_max.x = obstacle.bbox_max.x;
-    // bbox_max.y = obstacle.bbox_max.y;
-    // bbox_max.z = obstacle.bbox_max.z;
     geometry_msgs::msg::Point bbox_min_cam, bbox_max_cam;
     tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_min, bbox_min_cam, m_pc_cam_tf);
     tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_max, bbox_max_cam, m_pc_cam_tf);
     
-    cv::Point2d bbox_min_2d = m_cam_model.project3dToPixel(
+    cv::Point2d bbox1_xy = m_cam_model.project3dToPixel(
         cv::Point3d(bbox_min_cam.y, bbox_min_cam.z, -bbox_min_cam.x));
-    cv::Point2d bbox_max_2d = m_cam_model.project3dToPixel(
+    cv::Point2d bbox2_xy = m_cam_model.project3dToPixel(
         cv::Point3d(bbox_max_cam.y, bbox_max_cam.z, -bbox_max_cam.x));
+
+    // mins / max become strange due to coordinate system. need to recalculate
+    cv::Point bbox_min_2d(std::min(bbox1_xy.x, bbox2_xy.x), std::min(bbox1_xy.y, bbox2_xy.y));
+    cv::Point bbox_max_2d(std::max(bbox1_xy.x, bbox2_xy.x), std::max(bbox1_xy.y, bbox2_xy.y));
 
     // Match clusters if within bounds and in front of the boat
     if (in_bounds(bbox_min_2d, m_cam_model.cameraInfo()) 
@@ -52,27 +49,20 @@ int ObstacleBboxOverlay::get_matching_obstacle_iou(
             // Calculate intersection over union
             // TODO: add checks for if this is a line or a point and fallback to centroid matching if so.
 
-            // x is swapped (min and max)
-            cv::Rect2d bbox1(bbox_max_2d.x, bbox_min_2d.y, bbox_min_2d.x - bbox_max_2d.x,
+            cv::Rect2d bbox1(bbox_min_2d.x, bbox_min_2d.y, bbox_max_2d.x - bbox_min_2d.x,
                  bbox_max_2d.y - bbox_min_2d.y);
             cv::Rect2d bbox2(camera_bbox_min.x, camera_bbox_min.y, camera_bbox_max.x - camera_bbox_min.x,
                  camera_bbox_max.y - camera_bbox_min.y);
 
-            // cv::Rect2d bbox1(bbox_max_2d.x, bbox_max_2d.y, bbox_min_2d.x - bbox_max_2d.x,
-            //      bbox_min_2d.y - bbox_max_2d.y);
-            // cv::Rect2d bbox2(camera_bbox_max.x, camera_bbox_max.y, camera_bbox_min.x - camera_bbox_max.x,
-            //      camera_bbox_min.y - camera_bbox_max.y);
+            // RCLCPP_INFO(this->get_logger(), "bbox1 minxy,maxxy: %d, %d, %d, %d\n", bbox_min_2d.x, bbox_min_2d.y, bbox_max_2d.x, bbox_max_2d.y);
+            // RCLCPP_INFO(this->get_logger(), "bbox2 minxy,maxxy: %d, %d, %d, %d\n", camera_bbox_min.x, camera_bbox_min.y, camera_bbox_max.x, camera_bbox_max.y);
 
-            RCLCPP_INFO(this->get_logger(), "bbox1 minxy,maxxy: %f, %f, %f, %f\n", bbox_min_2d.x, bbox_min_2d.y, bbox_max_2d.x, bbox_max_2d.y);
-            RCLCPP_INFO(this->get_logger(), "bbox2 minxy,maxxy: %d, %d, %d, %d\n", camera_bbox_min.x, camera_bbox_min.y, camera_bbox_max.x, camera_bbox_max.y);
-
-            RCLCPP_INFO(this->get_logger(), "bbox1: %f, %f, %f, %f\n", bbox1.x, bbox1.y, bbox1.width, bbox1.height);
-            RCLCPP_INFO(this->get_logger(), "bbox2: %f, %f, %f, %f\n", bbox2.x, bbox2.y, bbox2.width, bbox2.height);
+            // RCLCPP_INFO(this->get_logger(), "bbox1: %f, %f, %f, %f\n", bbox1.x, bbox1.y, bbox1.width, bbox1.height);
+            // RCLCPP_INFO(this->get_logger(), "bbox2: %f, %f, %f, %f\n", bbox2.x, bbox2.y, bbox2.width, bbox2.height);
 
             cv::Rect2d intersection = bbox1 & bbox2;
             cv::Rect2d union_rect = bbox1 | bbox2;
             double iou = intersection.area() / union_rect.area();
-            RCLCPP_INFO(this->get_logger(), "iou: %f\n", iou);
 
             if (iou > best_iou) {
                 best_match = i;
@@ -150,11 +140,15 @@ void ObstacleBboxOverlay::obstacle_bbox_fusion_cb(
     new_map.is_labeled = true;
     std::unordered_set<int> chosen_indices;
     for (const all_seaing_interfaces::msg::Obstacle &obstacle : in_map_msg->obstacles) {
-        int best_match = get_matching_obstacle_centroid(obstacle, chosen_indices, in_bbox_msg);
-        int best_match2 = get_matching_obstacle_iou(obstacle, chosen_indices, in_bbox_msg);
-        RCLCPP_INFO(this->get_logger(), "Centroid %d, IoU %d\n", best_match, best_match2);
+        int best_match_centroid = get_matching_obstacle_centroid(obstacle, chosen_indices, in_bbox_msg);
+        int best_match_iou = get_matching_obstacle_iou(obstacle, chosen_indices, in_bbox_msg);
 
-        // If best_match was never assigned, then skip
+        // prioritize iou match over centroid match
+        int best_match = best_match_iou;
+        if (best_match == -1)
+            best_match = best_match_centroid;
+
+        // If best_match was never assigned, then skip (both centroid and iou gave -1)
         if (best_match == -1)
             continue;
 
