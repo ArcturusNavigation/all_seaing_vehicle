@@ -89,7 +89,6 @@ navsat_transform_node:
     magnetic_declination_radians: 0.0
     yaw_offset: 0.0
     zero_altitude: true
-    broadcast_cartesian_transform: true
     publish_filtered_gps: true
     use_odometry_yaw: false
     wait_for_datum: true
