@@ -85,10 +85,10 @@ def launch_setup(context, *args, **kwargs):
         executable="controller_server.py",
         parameters=[
             {"global_frame_id": "odom"},
-            {"Kpid_x": [1.0, 0.0, 0.0]},
-            {"Kpid_y": [1.0, 0.0, 0.0]},
-            {"Kpid_theta": [1.0, 0.0, 0.0]},
-            {"max_vel": [2.0, 1.0, 0.8]},
+            {"Kpid_x": [0.3, 0.0, 0.0]},
+            {"Kpid_y": [0.3, 0.0, 0.0]},
+            {"Kpid_theta": [0.3, 0.0, 0.0]},
+            {"max_vel": [1.5, 1.0, 0.3]},
         ],
         output="screen",
     )
@@ -97,7 +97,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": 1.0},
+            {"xy_threshold": 0.1},
             {"theta_threshold": 5.0},
         ],
         output="screen",
@@ -126,7 +126,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
     )
 
@@ -148,9 +148,9 @@ def launch_setup(context, *args, **kwargs):
         rviz_waypoint_sender,
         rover_lora_controller,
         thrust_commander_node,
-        # lidar_ld,
+        lidar_ld,
         mavros_ld,
-        # zed_ld,
+        zed_ld,
     ]
 
 

@@ -69,7 +69,7 @@ class ThrustCommander(Node):
         )
     
     def receive_heartbeat(self, msg):
-        if self.e_stopped:
+        if self.e_stopped and not msg.e_stopped:
             self.get_logger().info("Regained heartbeat!")
 
         self.get_logger().debug("Heartbeat received!")

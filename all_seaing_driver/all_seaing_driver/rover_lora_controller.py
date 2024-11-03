@@ -15,7 +15,7 @@ class RoverLoraController(Node):
         super().__init__("rover_lora_controller")
 
         # Setup serial connection
-        self.serial_port = serial.Serial("/dev/ttyUSB1", 57600, timeout=1)
+        self.serial_port = serial.Serial("/dev/ttyUSB0", 57600, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
 
         self.data_size = struct.calcsize("BdddBBB")
@@ -58,7 +58,8 @@ class RoverLoraController(Node):
             control_msg.twist.linear.x = x
             control_msg.twist.linear.y = y
             control_msg.twist.angular.z = angular
-            self.control_publisher.publish(control_msg)
+            if bool(in_teleop) and not bool(e_stopped):
+                self.control_publisher.publish(control_msg)
 
             heartbeat_message = Heartbeat()
             heartbeat_message.in_teleop = bool(in_teleop)
