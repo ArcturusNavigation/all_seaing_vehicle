@@ -48,7 +48,7 @@ class Yolov8Node(Node):
         self.declare_parameter("device", "cuda:0")
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-        self.declare_parameter("image_topic", "/zed/zed_node/rgb_raw/image_raw_color")
+        self.declare_parameter("image_topic", "/webcam_image/Image")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
         self.declare_parameter("tensorRT", True)
 
@@ -135,6 +135,7 @@ class Yolov8Node(Node):
 
             if using_tensorRT:
                 results = self.tensorrtmodel(cv_image)
+                print("Running using engine :)")
             else:
                 # Predict based on image
                 results = self.yolo.predict(
@@ -144,7 +145,9 @@ class Yolov8Node(Node):
                     conf=self.threshold,
                     device=self.device
                 )
+                print('Running using pt :|')
             results: Results = results[0].cpu()
+            print('Image results ready')
 
             # Create labeled_bounding_box msgs
             labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
