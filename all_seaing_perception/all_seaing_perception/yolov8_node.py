@@ -37,11 +37,14 @@ from std_srvs.srv import SetBool
 
 class Yolov8Node(Node):
 
+    #Declare global variable to use
+    using_tensorRT = False
+
     def __init__(self) -> None:
         super().__init__("yolov8_node")
 
         # Declare parameters
-        self.declare_parameter("model", "yolov8m_roboboat_current_model.pt")
+        self.declare_parameter("model", "yolov8m_roboboat_current_model")
         self.declare_parameter("device", "cuda:0")
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
@@ -55,26 +58,32 @@ class Yolov8Node(Node):
         self.threshold = self.get_parameter("threshold").get_parameter_value().double_value
         self.enable = self.get_parameter("enable").get_parameter_value().bool_value
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
-        use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
+        # use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
         # Get the model's path
         self.model_dir = os.path.expanduser("~/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
-        model_path = os.path.join(self.model_dir, model_name)
+        model_path1 = os.path.join(self.model_dir, model_name+'.engine')
+        model_path2 = os.path.join(self.model_dir, model_name+'.pt')
 
         # Initialize YOLO model
-        if not os.path.isfile(model_path):
-            self.get_logger().error(f"Model file does not exist at path: {model_path}")
-        else:
-            self.get_logger().info(f"Loading model from: {model_path}")
+        if os.path.isfile(model_path1):
+            self.get_logger().info(f"Loading model from tensorRT engine: {model_path1}")
             self.cv_bridge = CvBridge()
-            self.yolo = YOLO(model_path)
+            self.yolo = YOLO(model_path1)
+            using_tensorRT = True
+        elif os.path.isfile(model_path2):
+            self.get_logger().info(f"Loading model from pt model: {model_path2}")
+            self.cv_bridge = CvBridge()
+            self.yolo = YOLO(model_path2)
+        else:
+            self.get_logger().error(f"Both model paths do not exist :( TensorRT: {model_path1} and pt: {model_path2}")
             #print("YOLO BEFORE EXPORT", self.yolo)
-            if use_tensorRT:
-                print('In tensorRT if loop :)')
-                self.yolo.export(format="engine", dynamic=True)
-                print('Exported!')
-                self.tensorrtmodel = YOLO(model_name[:-3]+'.engine')
-                print("Attached model to exported tensorRT ones")
+            # if use_tensorRT:
+            #     print('In tensorRT if loop :)')
+            #     self.yolo.export(format="engine", dynamic=True)
+            #     print('Exported!')
+            #     self.tensorrtmodel = YOLO(model_name[:-3]+'.engine')
+            #     print("Attached model to exported tensorRT ones")
                 #print("YOLO AFTER EXPORT", self.yolo)
                 #self.yolo.export(
                     #format="engine",
@@ -88,7 +97,7 @@ class Yolov8Node(Node):
                 #to_new_model_name = model_name[:dot_loc]
                 #self.yolo = YOLO(to_new_model_name+'.engine', task='detect')
             self.yolo.fuse()
-            print("Fused :)")
+            # print("Fused :)")
 
         # Setup QoS profile
         image_qos_profile = QoSProfile(
@@ -102,7 +111,7 @@ class Yolov8Node(Node):
         # Publisher and Subscriber
         self._pub = self.create_publisher(LabeledBoundingBox2DArray, "bounding_boxes", 10)
         self._image_pub = self.create_publisher(Image, "annotated_image", 10)
-        self._sub = self.create_subscription(Image, image_topic, self.image_cb, image_qos_profile)
+        self._sub = self.create_subscription(Image, image_topic, self.image_cb(using_tensorRT), image_qos_profile)
 
         # Service for enabling/disabling
         self._srv = self.create_service(SetBool, "enable", self.enable_cb)
@@ -118,23 +127,23 @@ class Yolov8Node(Node):
         res.success = True
         return res
 
-    def image_cb(self, msg: Image) -> None:
+    def image_cb(using_tensorRT, self, msg: Image) -> None:
 
         if self.enable:
             # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "rgb8")
 
-            # Predict based on image
-            # results = self.yolo.predict(
-            #     source=cv_image,
-            #     verbose=False,
-            #     stream=False,
-            #     conf=self.threshold,
-            #     device=self.device
-            # )
-            print("Line before running results")
-            results = self.tensorrtmodel(cv_image)
-            print('Executed tensorRT and ran on images :)')
+            if using_tensorRT:
+                results = self.tensorrtmodel(cv_image)
+            else:
+                # Predict based on image
+                results = self.yolo.predict(
+                    source=cv_image,
+                    verbose=False,
+                    stream=False,
+                    conf=self.threshold,
+                    device=self.device
+                )
             results: Results = results[0].cpu()
 
             # Create labeled_bounding_box msgs
