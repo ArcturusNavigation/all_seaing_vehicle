@@ -111,7 +111,7 @@ class Yolov8Node(Node):
         # Publisher and Subscriber
         self._pub = self.create_publisher(LabeledBoundingBox2DArray, "bounding_boxes", 10)
         self._image_pub = self.create_publisher(Image, "annotated_image", 10)
-        self._sub = self.create_subscription(Image, image_topic, self.image_cb(using_tensorRT), image_qos_profile)
+        self._sub = self.create_subscription(Image, image_topic, self.image_cb, image_qos_profile)
 
         # Service for enabling/disabling
         self._srv = self.create_service(SetBool, "enable", self.enable_cb)
@@ -128,6 +128,7 @@ class Yolov8Node(Node):
         return res
 
     def image_cb(using_tensorRT, self, msg: Image) -> None:
+        print('In image_cb')
 
         if self.enable:
             # Convert image to cv_image
