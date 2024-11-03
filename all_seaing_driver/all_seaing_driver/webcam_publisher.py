@@ -29,7 +29,7 @@ def main(args=None):
     rclpy.init(args=args)
     webcam_publisher = WebcamPublisher()
     try:
-        rclpy.spin(webcam_publisher)  # means run continously
+        rclpy.spin(webcam_publisher)
     except KeyboardInterrupt:
         webcam_publisher.close()
         webcam_publisher.destroy_node()
