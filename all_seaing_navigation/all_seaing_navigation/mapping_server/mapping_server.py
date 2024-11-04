@@ -37,6 +37,7 @@ class PathPlan(Node):
 
         # Position of ship relative to global origin
         self.ship_pos = (0,0)
+        self.lidar_rad = 10
 
 
         # Active cells in row major order            
@@ -44,9 +45,19 @@ class PathPlan(Node):
         self.get_logger().info("Initialized Mapping Server")
 
     def ccw(self,A,B,C):
-        return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
+        v1,v2 = (B[0]-A[0], B[1]-A[1]), (C[0]-B[0], C[1]-B[1])
+        return v1[0]*v2[1] - v1[1]*v2[0]
+    def dot(self,A,B):
+        return A[0]*B[0]+A[1]*B[1]
     def intersect(self,A,B,C,D):
-        return self.ccw(A,C,D) != self.ccw(B,C,D) and self.ccw(A,B,C) != self.ccw(A,B,D)
+        if self.ccw(A,B,C) == 0 or self.ccw(A,B,D) == 0:
+            vB = (B[0]-A[0], B[1]-A[1])
+            aC = (C[0]-A[0], C[1]-A[1])
+            bC = (C[0]-B[0], C[1]-B[1])
+            aD = (D[0]-A[0], D[1]-A[1])
+            bD = (D[0]-B[0], D[1]-B[1])
+            return self.dot(aC,aC) + self.dot(bC, bC) <= self.dot(vB, vB) or self.dot(aD,aD) + self.dot(bD, bD) <= self.dot(vB, vB)
+        return self.ccw(A,C,D) * self.ccw(B,C,D) < 0 and self.ccw(A,B,C) * self.ccw(A,B,D) < 0
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -93,6 +104,10 @@ class PathPlan(Node):
         for x in range(0, self.grid.width):
             for y in range(0, self.grid.height):
                 worldx, worldy = self.grid_to_world(x), self.grid_to_world(y)
+                if (worldx-self.ship_pos[0])**2 + (worldy-self.ship_pos[1])**2 > self.lidar_rad**2:
+                    self.active_cells[x + y * self.grid.width] = False
+                    continue
+
                 self.active_cells[x + y * self.grid.width] = True
                 for hull,mhull in zip(all_hulls,all_modified_hulls):
                     continue_flag = False
