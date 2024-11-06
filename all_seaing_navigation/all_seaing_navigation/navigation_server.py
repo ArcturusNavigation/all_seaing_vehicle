@@ -25,17 +25,6 @@ class NavigationServer(Node):
 
         #--------------- PARAMETERS ---------------#
 
-<<<<<<< HEAD
-        self.map_grid = None
-        self.map_info = None  # Resolution of the map (m/cell)
-        self.target = None
-        self.cutoff = 50  # Threshold for obstacle cells
-        self.waypoints = None
-        self.failed_runs = 0
-        self.completed_runs = 0
-
-=======
->>>>>>> 3fe87afb242828813b1e6f75555d420e941b9cef
         self.global_frame_id = self.declare_parameter(
             "global_frame_id", "odom").get_parameter_value().string_value
         Kpid_x = self.declare_parameter(
@@ -48,13 +37,7 @@ class NavigationServer(Node):
             "max_vel", [4.0, 2.0, 1.0]).get_parameter_value().double_array_value
 
         #--------------- SUBSCRIBERS, PUBLISHERS, AND SERVERS ---------------#
-<<<<<<< HEAD
-
-        self.map_topic = "map"  # OccupancyGrid
-
-=======
         # goal_sub and path_sub removed
->>>>>>> 3fe87afb242828813b1e6f75555d420e941b9cef
         self.group = MutuallyExclusiveCallbackGroup()
 
         self.map_topic = "map"  # OccupancyGrid
@@ -79,11 +62,6 @@ class NavigationServer(Node):
             callback_group=self.group,
         )
 
-<<<<<<< HEAD
-        # Subscriptions to map and waypoints
-        self.map_sub = self.create_subscription(
-            OccupancyGrid, self.map_topic, self.map_cb, 10)
-=======
         self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
         self.path_pub = self.create_publisher(Path, "a_star_path", 10)
 
@@ -96,7 +74,6 @@ class NavigationServer(Node):
         self.completed_runs = 0
 
         self.get_logger().debug("Initialized A* Path Planner")
->>>>>>> 3fe87afb242828813b1e6f75555d420e941b9cef
 
         # Publishers for path and PoseArray
         self.pose_array_pub = self.create_publisher(PoseArray, "path_planning", 10)
