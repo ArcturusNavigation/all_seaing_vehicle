@@ -15,6 +15,13 @@ font = pygame.font.Font(None, 36)
 serial_port = serial.Serial("/dev/ttyUSB0", 57600, timeout=1)
 time.sleep(2)  # Allow serial port to stabilize
 
+
+
+heartbeat_msg = {
+    "in_teleop": True,
+    "e_stopped": False,
+}
+
 def calculate_checksum(data):
     return sum(data) % 256
 
@@ -23,6 +30,11 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                heartbeat_msg["e_stopped"] = not heartbeat_msg["e_stopped"]
+            elif event.key == pygame.K_RETURN:
+                heartbeat_msg["in_teleop"] = not heartbeat_msg["in_teleop"]
 
     keys = pygame.key.get_pressed()
     
@@ -52,11 +64,13 @@ while running:
 
     # Serialize to binary format
     serialized_msg = struct.pack(
-        "Bddd",
+        "BdddBB",
         control_msg["priority"],
         control_msg["x"],
         control_msg["y"],
         control_msg["angular"],
+        heartbeat_msg["in_teleop"],
+        heartbeat_msg["e_stopped"],
     )
     
     checksum = calculate_checksum(serialized_msg)
@@ -71,6 +85,10 @@ while running:
     # Render control message status
     control_text = font.render(f"Control - x: {control_msg['x']}, y: {control_msg['y']}, angular: {control_msg['angular']}", True, (255, 255, 255))
     screen.blit(control_text, (20, 20))
+
+    # Render heartbeat message status
+    heartbeat_text = font.render(f"Heartbeat - in_teleop (enter): {heartbeat_msg['in_teleop']}, e_stopped (space): {heartbeat_msg['e_stopped']}", True, (255, 255, 255))
+    screen.blit(heartbeat_text, (20, 60))
 
     # Update the display
     pygame.display.flip()
