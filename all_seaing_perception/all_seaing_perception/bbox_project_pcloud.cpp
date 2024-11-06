@@ -68,6 +68,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         pcl::PointCloud<pcl::PointXYZI>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
         labeled_pcl.label = bbox.label;
+        obj_cloud_ptr->header = in_cloud_tf_ptr->header;
         RCLCPP_INFO(this->get_logger(), "BOUNDING BOX FOR OBJECT %d: (%lf,%lf), (%lf, %lf)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y, obj);
         for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
             // Project 3D point onto the image plane using the intrinsic matrix.
