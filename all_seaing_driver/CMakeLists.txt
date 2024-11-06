@@ -15,7 +15,11 @@ install(PROGRAMS
     ${PROJECT_NAME}/webcam_publisher.py
     ${PROJECT_NAME}/zed2i_publisher.py
     ${PROJECT_NAME}/rover_lora_controller.py
+    ${PROJECT_NAME}/rover_lora_heartbeat.py
+    ${PROJECT_NAME}/rover_lora_combined.py
     ${PROJECT_NAME}/onshore_lora_controller.py
+    ${PROJECT_NAME}/onshore_lora_heartbeat.py
+    ${PROJECT_NAME}/onshore_lora_combined.py
     ${PROJECT_NAME}/gps_converter.py
     DESTINATION lib/${PROJECT_NAME}
 )
