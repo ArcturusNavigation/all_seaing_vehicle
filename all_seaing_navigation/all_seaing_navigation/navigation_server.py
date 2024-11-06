@@ -239,8 +239,10 @@ class NavigationServer(Node):
 
         path = self.path_plan(start_pose, goal_pose)
 
+        if path is not None and len(path)>0:
+            self.publish_nav_path(path)
         # Return a list of waypoitns the robot should follow
-        if path is not None or len(path) == 0:
+        if path is None or len(path) == 0:
             self.end_process("Waypoint following aborted!")
             goal_handle.abort()
             return Waypoint.Result()
@@ -273,26 +275,12 @@ class NavigationServer(Node):
         return Waypoint.Result(is_finished=True)
 
 
-    def publish_nav_path(self, path):
-        """Publish path as nav_msgs/Path"""
-        path_msg = Path()
-        path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map'
 
-        for point in path:
-            wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
-            pose = PoseStamped()
-            pose.header = path_msg.header
-            pose.pose.position.x = float(wx)
-            pose.pose.position.y = float(wy)
-            path_msg.poses.append(pose)
-
-        self.path_pub.publish(path_msg)
-        self.get_logger().debug("Published A* Path")
 
 def main(args=None):
     rclpy.init(args=args)
     node = NavigationServer()
+    node.get_logger().info("Navigation server node initialized.")
     executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
     executor.spin()
