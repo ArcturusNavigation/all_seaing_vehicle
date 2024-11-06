@@ -226,7 +226,15 @@ class NavigationServer(Node):
         #Generate a path using A* from the current position to the goal
 
         #TODO: call path correctly and follows each waypoint correctly
-        path = self.path_plan(self.nav_x, self.nav_y, goal_x, goal_y)
+        start_pose = Pose()
+        start_pose.position.x = self.nav_x
+        start_pose.position.y = self.nav_y
+
+        goal_pose = Pose()
+        goal_pose.position.x = goal_x
+        goal_pose.position.y = goal_y
+
+        path = self.path_plan(start_pose, goal_pose)
 
         # Return a list of waypoitns the robot should follow
         if path is not None or len(path) == 0:
