@@ -146,6 +146,14 @@ def generate_launch_description():
         ],
     )
 
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        parameters=[
+            {"bbox_object_margin": 0.0}
+        ]
+    )
+
     rviz_node = launch_ros.actions.Node(
         package="rviz2",
         executable="rviz2",
@@ -232,6 +240,7 @@ def generate_launch_description():
             color_segmentation_node,
             point_cloud_filter_node,
             obstacle_detector_node,
+            # bbox_project_pcloud_node,
             rviz_node,
             control_mux,
             controller_server,

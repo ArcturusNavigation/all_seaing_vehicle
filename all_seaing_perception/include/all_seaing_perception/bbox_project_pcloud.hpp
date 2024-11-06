@@ -2,6 +2,9 @@
 #define ALL_SEAING_PERCEPTION__BBOX_PROJECT_PCLOUD_HPP
 
 #include <string>
+#include <vector>
+#include <algorithm>
+#include <exception>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -36,6 +39,7 @@ class BBoxProjectPCloud : public rclcpp::Node{
 private:
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_pcl_pub;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_object_pcl_viz_pub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> m_cloud_sub;
