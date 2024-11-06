@@ -164,9 +164,9 @@ def generate_launch_description():
         executable="control_mux.py",
     )
 
-    controller_server = launch_ros.actions.Node(
-        package="all_seaing_controller",
-        executable="controller_server.py",
+    navigation_server = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server.py",
         parameters=[
             {"global_frame_id": "odom"},
             {"Kpid_x": [1.0, 0.0, 0.0]},
@@ -234,7 +234,7 @@ def generate_launch_description():
             obstacle_detector_node,
             rviz_node,
             control_mux,
-            controller_server,
+            navigation_server,
             onshore_node,
             waypoint_finder,
             rviz_waypoint_sender,
