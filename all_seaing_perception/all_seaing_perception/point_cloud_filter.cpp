@@ -21,7 +21,8 @@ public:
 
         // Subscribe to the input point cloud topic
         m_subscription = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "point_cloud", rclcpp::SensorDataQoS(),
+            // "point_cloud", rclcpp::SensorDataQoS(),
+            "velodyne_points", 10,
             std::bind(&PointCloudFilter::pc_callback, this, std::placeholders::_1));
 
         // Advertise the filtered point cloud topic

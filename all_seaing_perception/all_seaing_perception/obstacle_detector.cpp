@@ -40,7 +40,7 @@ ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
     m_unlabeled_map_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(
         "obstacle_map/unlabeled", 10);
     m_cloud_sub = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        "point_cloud", rclcpp::SensorDataQoS(),
+        "point_cloud/filtered", rclcpp::SensorDataQoS(),
         std::bind(&ObstacleDetector::pc_callback, this, std::placeholders::_1));
     m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "odometry/filtered", 10,
