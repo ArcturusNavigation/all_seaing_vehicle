@@ -37,8 +37,6 @@ from std_srvs.srv import SetBool
 
 class Yolov8Node(Node):
 
-    #Declare global variable to use
-    using_tensorRT = False
 
     def __init__(self) -> None:
         super().__init__("yolov8_node")
@@ -48,7 +46,8 @@ class Yolov8Node(Node):
         self.declare_parameter("device", "cuda:0")
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-        self.declare_parameter("image_topic", "/webcam_image/image")
+        # self.declare_parameter("image_topic", "/webcam_image/image")
+        self.declare_parameter("image_topic", "/webcam_image")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
         self.declare_parameter("tensorRT", True)
 
@@ -64,13 +63,14 @@ class Yolov8Node(Node):
         self.model_dir = os.path.expanduser("~/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
         model_path1 = os.path.join(self.model_dir, model_name+'.engine')
         model_path2 = os.path.join(self.model_dir, model_name+'.pt')
+        self.using_tensorRT = False
 
         # Initialize YOLO model
         if os.path.isfile(model_path1):
             self.get_logger().info(f"Loading model from tensorRT engine: {model_path1}")
             self.cv_bridge = CvBridge()
-            self.yolo = YOLO(model_path1)
-            using_tensorRT = True
+            self.tensorrtmodel = YOLO(model_path1)
+            self.using_tensorRT = True
         elif os.path.isfile(model_path2):
             self.get_logger().info(f"Loading model from pt model: {model_path2}")
             self.cv_bridge = CvBridge()
@@ -127,14 +127,14 @@ class Yolov8Node(Node):
         res.success = True
         return res
 
-    def image_cb(using_tensorRT, self, msg: Image) -> None:
+    def image_cb(self, msg: Image) -> None:
         print('In image_cb')
 
         if self.enable:
             # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "rgb8")
 
-            if using_tensorRT:
+            if self.using_tensorRT:
                 results = self.tensorrtmodel(cv_image)
                 print("Running using engine :)")
             else:
@@ -176,7 +176,7 @@ class Yolov8Node(Node):
                                   (0, 255, 0),  # Green color
                                   2)  # Thickness
 
-                    class_name = self.yolo.names[box_msg.label]
+                    class_name = self.tensorrtmodel.names[box_msg.label]
                     self.get_logger().info(f"Detected: {class_name}")
 
             # Publish detections
