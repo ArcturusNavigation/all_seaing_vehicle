@@ -25,6 +25,7 @@ from cv_bridge import CvBridge
 from ultralytics import YOLO
 from ultralytics.engine.results import Results
 from ultralytics.engine.results import Boxes
+from ultralytics.utils.plotting import Annotator
 
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 
@@ -169,14 +170,32 @@ class Yolov8Node(Node):
 
                     labeled_bounding_box_msgs.boxes.append(box_msg)
 
+                    annotator = Annotator(cv_image, 2, 2, "Arial.ttf", False)
                     # Draw the bounding box on the image
-                    cv2.rectangle(cv_image,
-                                  (box_msg.min_x, box_msg.min_y),
-                                  (box_msg.max_x, box_msg.max_y),
-                                  (0, 255, 0),  # Green color
-                                  2)  # Thickness
+                    # cv2.rectangle(cv_image,
+                    #               (box_msg.min_x, box_msg.min_y),
+                    #               (box_msg.max_x, box_msg.max_y),
+                    #               (0, 255, 0),  # Green color
+                    #               2)  # Thickness
 
                     class_name = self.tensorrtmodel.names[box_msg.label]
+                    class_name_list = class_name.split(' ')
+                    color_name = class_name_list[0]
+                    color = ()
+                    text_color = ()
+                    if color_name == "red":
+                        color = (0, 0, 255)
+                        text_color = (255,0,0)
+                    elif color_name == "green":
+                        color = (0,255,0)
+                        text_color = (0,255,0)
+                    elif color_name == "yellow":
+                        color = (0,230,230)
+                        text_color = (230,230,0)
+                    else:
+                        color = (255,0,0)
+                        text_color = (0,0,255)
+                    annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
                     self.get_logger().info(f"Detected: {class_name}")
 
             # Publish detections
