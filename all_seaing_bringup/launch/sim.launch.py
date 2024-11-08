@@ -229,6 +229,23 @@ def generate_launch_description():
         }.items(),
     )
 
+    yolov8_prefix = get_package_share_directory("yolov8_bringup")
+    model_share_path = get_package_share_directory("all_seaing_perception")
+
+    yolov8_ld = LaunchDescription(
+        [
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [yolov8_prefix, "/launch/yolov8.launch.py"]
+                ),
+                launch_arguments={
+                    "model": model_share_path + "/models/yolov8_roboboat_model.pt",
+                    "input_image_topic": "/wamv/sensors/cameras/front_left_camera_sensor/image_raw",
+                }.items(),
+            )
+        ]
+    )
+
     return LaunchDescription(
         [
             launch_rviz_launch_arg,
@@ -249,6 +266,7 @@ def generate_launch_description():
             rviz_waypoint_sender,
             keyboard_ld,
             sim_ld,
+            # yolov8_ld,
             perception_eval_node,
         ]
     )

@@ -59,17 +59,17 @@ void BBoxProjectPCloud::bb_pcl_project(
     for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
         // Project 3D point onto the image plane using the intrinsic matrix.
         // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-        RCLCPP_INFO(this->get_logger(), "3D POINT: (%lf, %lf, %lf)", point_tf.x, point_tf.y, point_tf.z);
+        RCLCPP_DEBUG(this->get_logger(), "3D POINT: (%lf, %lf, %lf)", point_tf.x, point_tf.y, point_tf.z);
         cv::Point2d xy_rect = m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));
         // Check if within bounds & in front of the boat
-        RCLCPP_INFO(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
+        RCLCPP_DEBUG(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
     }
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         pcl::PointCloud<pcl::PointXYZI>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
         labeled_pcl.label = bbox.label;
         obj_cloud_ptr->header = in_cloud_tf_ptr->header;
-        RCLCPP_INFO(this->get_logger(), "BOUNDING BOX FOR OBJECT %d: (%lf,%lf), (%lf, %lf)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y, obj);
+        RCLCPP_DEBUG(this->get_logger(), "BOUNDING BOX FOR OBJECT %d: (%lf,%lf), (%lf, %lf)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y, obj);
         for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
             // Project 3D point onto the image plane using the intrinsic matrix.
             // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
@@ -81,7 +81,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 // Check if point is in bbox
                 if(xy_rect.x >= bbox.min_x-bbox_margin && xy_rect.x <= bbox.max_x+bbox_margin && xy_rect.y >= bbox.min_y-bbox_margin && xy_rect.y <= bbox.max_y+bbox_margin){
                     obj_cloud_ptr->push_back(point_tf);
-                    RCLCPP_INFO(this->get_logger(), "SELECTED POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
+                    RCLCPP_DEBUG(this->get_logger(), "SELECTED POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
                 }
             }
         }
@@ -101,13 +101,15 @@ void BBoxProjectPCloud::bb_pcl_project(
     RCLCPP_INFO(this->get_logger(), "PUBLISHED PCLOUD DIMENSIONS: height: %d, width: %d", (int)all_obj_pcls_ptr->height, (int)all_obj_pcls_ptr->width);
     RCLCPP_INFO(this->get_logger(), "STORED PCLOUD DIMENSIONS: objects: %d, max_length: %d", (int)obj_cloud_vec.size(), max_len);
     try{
+        //TODO: CHECK IF THE CHANNELS CORRECTLY REPRESENT DIFFERENT OBJECTS
+        //(I.E. HEIGHT & WIDTH ARE CORRECT, OTHERWISE SWAP THEIR ORDER BOTH IN THE RESIZE() AND THE AT() METHODS)
         for(int i = 0; i<obj_cloud_vec.size(); i++){
             for(int j = 0; j<obj_cloud_vec[i].size(); j++){
-                all_obj_pcls_ptr->at(i,j) = obj_cloud_vec[i][j];
+                all_obj_pcls_ptr->at(j,i) = obj_cloud_vec[i][j];
             }
         }
     }catch(std::exception &ex){
-        RCLCPP_WARN(this->get_logger(), "%s", ex.what());
+        RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
     }
     auto obj_pcls_msg = sensor_msgs::msg::PointCloud2();
     pcl::toROSMsg(*all_obj_pcls_ptr, obj_pcls_msg);
