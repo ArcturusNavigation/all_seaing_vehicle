@@ -12,7 +12,6 @@ import subprocess
 def generate_launch_description():
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
-    driver_prefix = get_package_share_directory("all_seaing_driver")
 
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
@@ -32,33 +31,16 @@ def generate_launch_description():
         condition=IfCondition(launch_rviz),
     )
 
-    onshore_node = launch_ros.actions.Node(
-        package="all_seaing_driver",
-        executable="onshore_node.py",
-        output="screen",
-        parameters=[
-            {"joy_x_scale": 2.0},
-            {"joy_y_scale": -1.0},
-            {"joy_ang_scale": -0.8},
-        ],
-    )
-    
-    onshore_lora_node = launch_ros.actions.Node(
+    onshore_lora_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_lora_controller.py",
         output="screen",
-    )
-
-    keyboard_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
     return LaunchDescription(
         [
             launch_rviz_launch_arg,
             rviz_node,
-            onshore_lora_node
-            # onshore_node,
-            # keyboard_ld,
+            onshore_lora_controller,
         ]
     )

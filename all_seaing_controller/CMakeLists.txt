@@ -12,7 +12,6 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/control_mux.py
     ${PROJECT_NAME}/controller_server.py
-    ${PROJECT_NAME}/simple_controller.py
     ${PROJECT_NAME}/xdrive_controller.py
     DESTINATION lib/${PROJECT_NAME}
 )

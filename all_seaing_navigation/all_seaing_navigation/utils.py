@@ -15,6 +15,3 @@ class PriorityQueue:
 
     def get(self):
         return heapq.heappop(self.elements)
-
-if __name__ == "__main__":
-	main()
