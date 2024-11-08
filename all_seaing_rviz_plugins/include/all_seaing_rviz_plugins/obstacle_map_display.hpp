@@ -23,8 +23,9 @@ public:
 private:
     void processMessage(const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr msg) override;
     visualization_msgs::msg::Marker::SharedPtr
-    // get_marker(const all_seaing_interfaces::msg::Obstacle &obstacle) const; obsolete
-    get_marker(const geometry_msgs::msg::Point32 &point) const;
+    get_centroid_marker(const all_seaing_interfaces::msg::Obstacle &obstacle) const;
+    visualization_msgs::msg::Marker::SharedPtr
+    get_vertex_marker(const all_seaing_interfaces::msg::Obstacle &obstacle) const;
     visualization_msgs::msg::Marker::SharedPtr
     get_text(bool is_labeled, const all_seaing_interfaces::msg::Obstacle &obstacle) const;
     std::unique_ptr<rviz_default_plugins::displays::MarkerCommon> m_marker_common;
