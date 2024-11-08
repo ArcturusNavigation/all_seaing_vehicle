@@ -179,22 +179,24 @@ class Yolov8Node(Node):
                     #               2)  # Thickness
 
                     class_name = self.tensorrtmodel.names[box_msg.label]
+                    print(f"Class name is {class_name}")
                     class_name_list = class_name.split(' ')
+                    print(f"Class name list is {class_name_list}")
                     color_name = class_name_list[0]
                     color = ()
-                    text_color = ()
+                    text_color = (0,0,0)
                     if color_name == "red":
+                        print("Should have bounding box be red")
                         color = (0, 0, 255)
-                        text_color = (255,0,0)
                     elif color_name == "green":
                         color = (0,255,0)
-                        text_color = (0,255,0)
+                        print("Should have bounding box be green")
                     elif color_name == "yellow":
                         color = (0,230,230)
-                        text_color = (230,230,0)
+                        print("Sholud have bounding box be yellow")
                     else:
                         color = (255,0,0)
-                        text_color = (0,0,255)
+                        print("In else loop")
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
                     self.get_logger().info(f"Detected: {class_name}")
 
