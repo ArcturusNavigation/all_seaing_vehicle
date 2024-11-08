@@ -128,11 +128,11 @@ class Yolov8Node(Node):
         return res
 
     def image_cb(self, msg: Image) -> None:
-        print('In image_cb')
+        # print('In image_cb')
 
         if self.enable:
             # Convert image to cv_image
-            cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "rgb8")
+            cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
 
             if self.using_tensorRT:
                 results = self.tensorrtmodel(cv_image)
@@ -148,7 +148,7 @@ class Yolov8Node(Node):
                 )
                 print('Running using pt :|')
             results: Results = results[0].cpu()
-            print('Image results ready')
+            # print('Image results ready')
 
             # Create labeled_bounding_box msgs
             labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
@@ -183,7 +183,7 @@ class Yolov8Node(Node):
             self._pub.publish(labeled_bounding_box_msgs)
 
             # Convert annotated image back to ROS Image message
-            annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(cv_image, encoding="rgb8")
+            annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(cv_image, encoding="bgr8")
             self._image_pub.publish(annotated_image_msg)  # Publish annotated image
 
 
