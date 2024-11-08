@@ -46,6 +46,18 @@ private:
     typedef message_filters::Synchronizer<ObstacleBboxPolicy> ObstacleBboxSync;
     std::shared_ptr<ObstacleBboxSync> m_obstacle_bbox_sync;
 
+    // Get the closest obstacle
+    // Diff criteria options (centroid matching, IoU)
+    int get_matching_obstacle_centroid(
+    const all_seaing_interfaces::msg::Obstacle &obstacle,
+        const std::unordered_set<int> &chosen_indices,
+        const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg);
+
+    int get_matching_obstacle_iou(
+    const all_seaing_interfaces::msg::Obstacle &obstacle,
+        const std::unordered_set<int> &chosen_indices,
+        const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg);
+
     // Fuse image and obstacle by projecting 3D points onto 2D image.
     void obstacle_bbox_fusion_cb(
         const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg,

@@ -89,6 +89,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
                              -camera_point.x);
         cv::Point2d pixel_centroid = m_cam_model.project3dToPixel(centroid);
 
+
         if (pixel_centroid.x >= 0 && pixel_centroid.x < cv_ptr->image.cols &&
             pixel_centroid.y >= 0 && pixel_centroid.y < cv_ptr->image.rows) {
             cv::Scalar color = get_color_for_label(obstacle.label);
@@ -98,6 +99,27 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
         else { 
             RCLCPP_WARN(this->get_logger(), "Centroid outside image bounds: (%f, %f)", pixel_centroid.x, pixel_centroid.y);
         }
+
+        // display bbox -> 2d bbox. this is the 2d bbox of the lidar point. 
+        geometry_msgs::msg::Point camera_bbox_min;
+        geometry_msgs::msg::Point camera_bbox_max;
+        tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_min, camera_bbox_min, m_pc_cam_tf);
+        tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_max, camera_bbox_max, m_pc_cam_tf);
+        cv::Point3d ptmin(camera_bbox_min.y, camera_bbox_min.z, -camera_bbox_min.x);
+        cv::Point3d ptmax(camera_bbox_max.y, camera_bbox_max.z, -camera_bbox_max.x);
+        cv::Point pt1 = m_cam_model.project3dToPixel(ptmin);
+        cv::Point pt2 = m_cam_model.project3dToPixel(ptmax);
+        cv::Scalar color(0, 255, 255);
+        cv::rectangle(cv_ptr->image, pt1, pt2, color, 2);
+        
+        // Define the position for the label text, slightly above the bounding box
+        cv::Point label_position(pt1.x, pt1.y - 5);  // Adjust to position above the rectangle
+
+        // Add label text
+        std::string label_text = std::to_string(obstacle.label); // Replace with whatever string you want
+        cv::putText(cv_ptr->image, label_text, label_position, cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
+        // RCLCPP_INFO(this->get_logger(), "visualizer Bbox min: (%d, %d)", pt1.x, pt1.y);
+        // RCLCPP_INFO(this->get_logger(), "visualizer Bbox max: (%d, %d)", pt2.x, pt2.y);
     }
 
     // draw the bounding boxes
@@ -107,6 +129,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
         cv::Point pt2(bbox.max_x, bbox.max_y);
         cv::rectangle(cv_ptr->image, pt1, pt2, color, 2);
     }
+
 
     m_image_pub->publish(*cv_ptr->toImageMsg());
 }

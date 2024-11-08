@@ -6,7 +6,6 @@ from geometry_msgs.msg import PoseStamped, PoseArray, Pose
 from nav_msgs.msg import OccupancyGrid, Path
 from utils import PriorityQueue
 from math import inf, sqrt
-import numpy as np
 
 class PathPlan(Node):
     """ Inputs obstacles (OccupancyGrid) and waypoints (PoseArray) and outputs a path using A* """
