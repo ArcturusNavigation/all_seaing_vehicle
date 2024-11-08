@@ -8,6 +8,10 @@
 
 #include "sensor_msgs/msg/point_cloud2.hpp"
 
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/filters/extract_indices.h>
+
+
 class PointCloudFilter : public rclcpp::Node {
 public:
     PointCloudFilter() : Node("point_cloud_filter") {
@@ -28,6 +32,10 @@ public:
         // Advertise the filtered point cloud topic
         m_publisher = this->create_publisher<sensor_msgs::msg::PointCloud2>(
             "point_cloud/filtered", rclcpp::SensorDataQoS());
+        
+        // Advertise the water plane point cloud topic for debugging RANSAC
+        m_publisher_plane = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+            "point_cloud/water_plane", rclcpp::SensorDataQoS());
 
         // Get values from parameter server
         m_range_min_threshold = this->get_parameter("range_min_threshold").as_double();
@@ -75,13 +83,19 @@ private:
             new pcl::PointCloud<pcl::PointXYZI>);
         filter_cloud(in_cloud_ptr, filtered_cloud_ptr);
 
+        // Remove planar points (e.g., water surface)
+        pcl::PointCloud<pcl::PointXYZI>::Ptr no_plane_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+        remove_plane(filtered_cloud_ptr, no_plane_cloud_ptr, 0.06); // Adjust threshold
+
         // Downsample cloud if leaf size is not equal to 0
         pcl::PointCloud<pcl::PointXYZI>::Ptr downsampled_cloud_ptr(
             new pcl::PointCloud<pcl::PointXYZI>);
         if (m_leaf_size != 0)
-            downsample_cloud(filtered_cloud_ptr, downsampled_cloud_ptr);
+            downsample_cloud(no_plane_cloud_ptr, downsampled_cloud_ptr);
+            // downsample_cloud(filtered_cloud_ptr, downsampled_cloud_ptr);
         else
-            downsampled_cloud_ptr = filtered_cloud_ptr;
+            downsampled_cloud_ptr = no_plane_cloud_ptr;
+            // downsampled_cloud_ptr = filtered_cloud_ptr;
 
         // Convert filtered point cloud back to ROS message
         sensor_msgs::msg::PointCloud2 new_cloud_msg;
@@ -89,6 +103,48 @@ private:
         new_cloud_msg.header = in_cloud_msg.header;
         m_publisher->publish(new_cloud_msg);
     }
+
+    void remove_plane(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr,
+                  pcl::PointCloud<pcl::PointXYZI>::Ptr &out_cloud_ptr,
+                  double distance_threshold) {
+        // Create a segmentation object
+        pcl::SACSegmentation<pcl::PointXYZI> seg;
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+
+        // Configure the RANSAC segmentation object
+        seg.setOptimizeCoefficients(true);
+        seg.setModelType(pcl::SACMODEL_PLANE);
+        seg.setMethodType(pcl::SAC_RANSAC);
+        seg.setDistanceThreshold(distance_threshold);
+        seg.setInputCloud(in_cloud_ptr);
+
+        // Segment the largest planar component from the input cloud
+        seg.segment(*inliers, *coefficients);
+
+        if (inliers->indices.empty()) {
+            RCLCPP_WARN(this->get_logger(), "No planar surface found.");
+            *out_cloud_ptr = *in_cloud_ptr; // No plane found, keep the input cloud
+            return;
+        }
+
+        // Extract the non-planar points
+        pcl::ExtractIndices<pcl::PointXYZI> extract;
+        extract.setInputCloud(in_cloud_ptr);
+        extract.setIndices(inliers);
+        extract.setNegative(true);
+        extract.filter(*out_cloud_ptr);
+
+        RCLCPP_INFO(this->get_logger(), "Input cloud size: %zu", in_cloud_ptr->size());
+        RCLCPP_INFO(this->get_logger(), "Planar points removed: %zu", inliers->indices.size());
+        RCLCPP_INFO(this->get_logger(), "Remaining points: %zu", out_cloud_ptr->size());
+
+        sensor_msgs::msg::PointCloud2 water_plane_cloud_msg;
+        pcl::toROSMsg(*downsampled_cloud_ptr, water_plane_cloud_msg);
+        new_cloud_msg.header = in_cloud_msg.header;
+        m_publisher_water->publish(new_cloud_msg);
+    }
+
 
     // Subscribers, publishers, and member variables
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr m_subscription;
