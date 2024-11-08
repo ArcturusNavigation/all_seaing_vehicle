@@ -1,4 +1,6 @@
-from all_seaing_autonomy.roboboat.Task import
+from all_seaing_autonomy.roboboat.Task import Task
+from enum import Enum
+import math
 from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlOption
 
 class DockingState(Enum):
@@ -25,7 +27,7 @@ class BannerColor(Enum):
     NONE = 3
 
 # CONSTANTS: TODO: SET THESE TO THE ACTUAL VALUES / MAKE THEM EASILY CONFIGURABLE
-DOCK_POSITION = (0, 0, 0) # (x, y, z rotation)
+DOCK_POSITION = (-33.72244, 150.67449, 0) # (x, y, z rotation)
 DESIRED_BANNER = (BannerShape.CIRCLE, BannerColor.RED) # (shape, color)
 SINGLE_DOCK_LENGTH = 1
 DOCK_DEPTH = 1
@@ -33,7 +35,16 @@ ORBIT_RADIUS = 1
 
 def minus(a, b):
     # helper function to subtract two tuples
-    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+    try:
+        return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+    except TypeError:
+        try:
+            return (a.x - b[0], a.y - b[1], a.z - b[2])
+        except AttributeError:
+            try:
+                return (a[0] - b.x, a[1] - b.y, a[2] - b.z)
+            except:
+                return (a.x - b.x, a.y - b.y, a.z - b.z)
 
 # TODO: MAKE THIS ACTUALLY READ THE CAMERA
 def read_camera():
@@ -59,15 +70,15 @@ class DockingTask(Task):
         self.has_orbited = False
         self.state_changed = False
         
-    def get_name():
+    def get_name(self):
         return "Docking"
     
-    def start():
+    def start(self):
         # maybe verify that we are in a region where docking is possible?
         self.state = DockingState.APPROACHING
         self.logger.info("Starting docking task")
     
-    def update():
+    def update(self):
         control_message = ControlOption()
         
         match self.state:
@@ -82,13 +93,15 @@ class DockingTask(Task):
                     vMag = kp * deltaMag
                     vDirection = math.atan2(delta[1], delta[0])
 
+                    theta = vDirection
+
                     vx = vMag * math.cos(theta)
                     vy = vMag * math.sin(theta)
                     vtheta = kp * delta[2]
 
                     control_message.twist.linear.x = vx
                     control_message.twist.linear.y = vy
-                    control_message.twist.angular.z = vtheta
+                    #control_message.twist.angular.z = vtheta
 
                     if deltaMag < 0.1:
                         self.state = DockingState.CHECKING_CAMERA
@@ -197,11 +210,11 @@ class DockingTask(Task):
             self.logger.info(f"Docking state changed to {self.state}")
         
 
-    def check_finished():
+    def check_finished(self):
         return self.state == DockingState.DONE
     
-    def receive_odometry(msg):
+    def receive_odometry(self, msg):
         self.current_position = msg.pose.pose.position
 
-    def set_state(state):
+    def set_state(self, state):
         self.state = state

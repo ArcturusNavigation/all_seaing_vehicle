@@ -238,7 +238,7 @@ def generate_launch_description():
             onshore_node,
             waypoint_finder,
             rviz_waypoint_sender,
-            keyboard_ld,
+            # keyboard_ld,
             sim_ld,
             perception_eval_node,
         ]
