@@ -35,12 +35,15 @@ void ObstacleMapDisplay::processMessage(
         centroid_marker_ptr->ns = msg->ns;
         const auto text_marker_ptr = get_text(msg->is_labeled, msg->obstacles[i]);
         text_marker_ptr->ns = msg->ns + "_text";
-        const auto vertex_marker_ptr = get_vertex_marker(msg->obstacles[i]);
-        vertex_marker_ptr->ns = msg->ns + "_vertices";
+        const auto vertices_marker_ptr = get_vertices_marker(msg->obstacles[i]);
+        vertices_marker_ptr->ns = msg->ns + "_vertices";
+        const auto edges_marker_ptr = get_edges_marker(msg->obstacles[i]);
+        edges_marker_ptr->ns = msg->ns + "_edges";
 
         m_marker_common->addMessage(centroid_marker_ptr);
         m_marker_common->addMessage(text_marker_ptr);
-        m_marker_common->addMessage(vertex_marker_ptr);
+        m_marker_common->addMessage(vertices_marker_ptr);
+        m_marker_common->addMessage(edges_marker_ptr);
     }
 }
 
@@ -67,7 +70,7 @@ ObstacleMapDisplay::get_centroid_marker(const all_seaing_interfaces::msg::Obstac
 }
 
 visualization_msgs::msg::Marker::SharedPtr
-ObstacleMapDisplay::get_vertex_marker(const all_seaing_interfaces::msg::Obstacle &obstacle) const {
+ObstacleMapDisplay::get_vertices_marker(const all_seaing_interfaces::msg::Obstacle &obstacle) const {
     auto marker = std::make_shared<visualization_msgs::msg::Marker>();
 
     marker->type = visualization_msgs::msg::Marker::SPHERE_LIST;
@@ -78,9 +81,9 @@ ObstacleMapDisplay::get_vertex_marker(const all_seaing_interfaces::msg::Obstacle
 
     marker->color.a = 1.0;
     marker->color.g = 1.0;
-    marker->scale.x = 0.03;
-    marker->scale.y = 0.03;
-    marker->scale.z = 0.03;
+    marker->scale.x = 0.01;
+    marker->scale.y = 0.01;
+    marker->scale.z = 0.01;
 
     for (size_t i = 0; i<obstacle.global_chull.polygon.points.size(); i++){
         geometry_msgs::msg::Point p;
@@ -91,6 +94,50 @@ ObstacleMapDisplay::get_vertex_marker(const all_seaing_interfaces::msg::Obstacle
         marker->points.push_back(p);
     }
 
+    return marker;
+}
+
+visualization_msgs::msg::Marker::SharedPtr
+ObstacleMapDisplay::get_edges_marker(const all_seaing_interfaces::msg::Obstacle &obstacle) const {
+    auto marker = std::make_shared<visualization_msgs::msg::Marker>();
+
+    marker->type = visualization_msgs::msg::Marker::LINE_LIST;
+    marker->action = visualization_msgs::msg::Marker::ADD;
+
+    marker->id = obstacle.id;
+    marker->header = obstacle.global_point.header; //
+
+    marker->color.a = 1.0;
+    marker->color.g = 1.0;
+    marker->scale.x = 0.01;
+    marker->scale.y = 0.01;
+    marker->scale.z = 0.01;
+
+    for (size_t i = 0; i<obstacle.global_chull.polygon.points.size()-1; i++){
+        geometry_msgs::msg::Point p1, p2;
+        p1.x = obstacle.global_chull.polygon.points[i].x;
+        p1.y = obstacle.global_chull.polygon.points[i].y;
+        p1.z = 0;
+
+        p2.x = obstacle.global_chull.polygon.points[i+1].x;
+        p2.y = obstacle.global_chull.polygon.points[i+1].y;
+        p2.z = 0;
+
+        marker->points.push_back(p1);
+        marker->points.push_back(p2);
+    }
+    if (obstacle.global_chull.polygon.points.size() > 2){
+        geometry_msgs::msg::Point p1, p2;
+        p1.x = obstacle.global_chull.polygon.points.back().x;
+        p1.y = obstacle.global_chull.polygon.points.back().y;
+        p1.z = 0;
+
+        p2.x = obstacle.global_chull.polygon.points[0].x;
+        p2.y = obstacle.global_chull.polygon.points[0].y;
+        p2.z = 0;
+        marker->points.push_back(p1);
+        marker->points.push_back(p2);
+    }
     return marker;
 }
 
