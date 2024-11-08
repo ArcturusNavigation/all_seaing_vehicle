@@ -31,25 +31,29 @@ void ObstacleMapDisplay::processMessage(
     scene_node_->setOrientation(orientation);
 
     for (size_t i = 0; i < msg->obstacles.size(); i++) {
-        const auto marker_ptr = get_marker(msg->obstacles[i]);
-        marker_ptr->ns = msg->ns;
-        const auto text_marker_ptr = get_text(msg->is_labeled, msg->obstacles[i]);
-        text_marker_ptr->ns = msg->ns + "_text";
+        for (size_t j = 0; j< msg->obstacles[i].global_chull.polygon.size(); j++){
+            const auto marker_ptr = get_marker(msg->obstacles[i].global_chull.polygon[j]);
+            marker_ptr->ns = msg->ns;
+            marker_ptr->header = msg->obstacles[i].global_chull.header;
+            marker_ptr->id = msg->obstacles[i].id;
 
-        m_marker_common->addMessage(marker_ptr);
-        m_marker_common->addMessage(text_marker_ptr);
+            const auto text_marker_ptr = get_text(msg->is_labeled, msg->obstacles[i]);
+            text_marker_ptr->ns = msg->ns + "_text";
+
+            m_marker_common->addMessage(marker_ptr);
+            m_marker_common->addMessage(text_marker_ptr);
+
+
+        }
     }
 }
 
 visualization_msgs::msg::Marker::SharedPtr
-ObstacleMapDisplay::get_marker(const all_seaing_interfaces::msg::Obstacle &obstacle) const {
+ObstacleMapDisplay::get_marker(const geometry_msgs::msg::Point32 &point) const {
     auto marker = std::make_shared<visualization_msgs::msg::Marker>();
 
     marker->type = visualization_msgs::msg::Marker::SPHERE;
     marker->action = visualization_msgs::msg::Marker::ADD;
-
-    marker->id = obstacle.id;
-    marker->header = obstacle.global_point.header;
 
     marker->color.a = 1.0;
     marker->color.r = 1.0;
@@ -57,8 +61,8 @@ ObstacleMapDisplay::get_marker(const all_seaing_interfaces::msg::Obstacle &obsta
     marker->scale.y = 0.3;
     marker->scale.z = 0.3;
 
-    marker->pose.position.x = obstacle.global_point.point.x;
-    marker->pose.position.y = obstacle.global_point.point.y;
+    marker->pose.position.x = obstacle.point.x;
+    marker->pose.position.y = obstacle.point.y;
 
     return marker;
 }
