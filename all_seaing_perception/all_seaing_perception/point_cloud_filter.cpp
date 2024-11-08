@@ -85,7 +85,8 @@ private:
 
         // Remove planar points (e.g., water surface)
         pcl::PointCloud<pcl::PointXYZI>::Ptr no_plane_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-        remove_plane(filtered_cloud_ptr, no_plane_cloud_ptr, 0.06); // Adjust threshold
+        pcl::PointCloud<pcl::PointXYZI>::Ptr water_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+        remove_plane(filtered_cloud_ptr, no_plane_cloud_ptr, water_cloud_ptr, 0.06); // Adjust threshold
 
         // Downsample cloud if leaf size is not equal to 0
         pcl::PointCloud<pcl::PointXYZI>::Ptr downsampled_cloud_ptr(
@@ -102,10 +103,16 @@ private:
         pcl::toROSMsg(*downsampled_cloud_ptr, new_cloud_msg);
         new_cloud_msg.header = in_cloud_msg.header;
         m_publisher->publish(new_cloud_msg);
+
+        sensor_msgs::msg::PointCloud2 water_cloud_msg;
+        pcl::toROSMsg(*water_cloud_ptr, water_cloud_msg);
+        water_cloud_msg.header = in_cloud_msg.header;
+        m_publisher_plane->publish(water_cloud_msg);
     }
 
     void remove_plane(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr,
                   pcl::PointCloud<pcl::PointXYZI>::Ptr &out_cloud_ptr,
+                  pcl::PointCloud<pcl::PointXYZI>::Ptr &water_cloud_ptr,
                   double distance_threshold) {
         // Create a segmentation object
         pcl::SACSegmentation<pcl::PointXYZI> seg;
@@ -132,6 +139,7 @@ private:
         pcl::ExtractIndices<pcl::PointXYZI> extract;
         extract.setInputCloud(in_cloud_ptr);
         extract.setIndices(inliers);
+        extract.filter(*water_cloud_ptr);
         extract.setNegative(true);
         extract.filter(*out_cloud_ptr);
 
@@ -139,16 +147,13 @@ private:
         RCLCPP_INFO(this->get_logger(), "Planar points removed: %zu", inliers->indices.size());
         RCLCPP_INFO(this->get_logger(), "Remaining points: %zu", out_cloud_ptr->size());
 
-        sensor_msgs::msg::PointCloud2 water_plane_cloud_msg;
-        pcl::toROSMsg(*downsampled_cloud_ptr, water_plane_cloud_msg);
-        new_cloud_msg.header = in_cloud_msg.header;
-        m_publisher_water->publish(new_cloud_msg);
     }
 
 
     // Subscribers, publishers, and member variables
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr m_subscription;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_publisher;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_publisher_plane; // for the ransac plane
     double m_range_min_threshold;
     double m_range_max_threshold;
     double m_intensity_low_threshold;
