@@ -31,6 +31,7 @@ from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2D
 
 import os
 import cv2
+import yaml
 
 from sensor_msgs.msg import Image
 from std_srvs.srv import SetBool
@@ -51,6 +52,7 @@ class Yolov8Node(Node):
         self.declare_parameter("image_topic", "/webcam_image")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
         self.declare_parameter("tensorRT", True)
+        self.declare_parameter('color_label_mappings_file', '')
 
         # Get parameters
         model_name = self.get_parameter("model").get_parameter_value().string_value
@@ -59,6 +61,10 @@ class Yolov8Node(Node):
         self.enable = self.get_parameter("enable").get_parameter_value().bool_value
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
         # use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
+        color_label_mappings_file = self.get_parameter('color_label_mappings_file').value
+
+        with open(color_label_mappings_file, 'r') as f:
+            self.label_dict = yaml.safe_load(f)
 
         # Get the model's path
         self.model_dir = os.path.expanduser("~/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
@@ -151,6 +157,8 @@ class Yolov8Node(Node):
             results: Results = results[0].cpu()
             # print('Image results ready')
 
+            label_dict = self.label_dict
+
             # Create labeled_bounding_box msgs
             labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
 
@@ -180,7 +188,6 @@ class Yolov8Node(Node):
 
                     class_name = self.tensorrtmodel.names[box_msg.label] + str(box_msg.label)
                     class_name_list = class_name.split('_')
-                    print(f"Class name list is {class_name_list}")
                     color_name = class_name_list[0]
                     color = ()
                     text_color = (0,0,0)
@@ -190,10 +197,15 @@ class Yolov8Node(Node):
                         color = (0,255,0)
                     elif color_name == "yellow":
                         color = (0,230,230)
-                    else:
-                        color = (255,0,0)
+                    elif color_name == "orange":
+                        color = (0,165,255)
+                    elif color_name == "black":
+                        color = (0,0,0)
+                    elif color_name == "white":
+                        color = (255,255,255)
+                    box_msg.label = label_dict[color_name]
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
-                    # self.get_logger().info(f"Detected: {class_name}")
+                    self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
