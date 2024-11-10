@@ -137,7 +137,7 @@ class Yolov8Node(Node):
 
             if self.using_tensorRT:
                 results = self.tensorrtmodel(cv_image)
-                print("Running using engine :)")
+                #print("Running using engine :)")
             else:
                 # Predict based on image
                 results = self.yolo.predict(
@@ -147,7 +147,7 @@ class Yolov8Node(Node):
                     conf=self.threshold,
                     device=self.device
                 )
-                print('Running using pt :|')
+                #print('Running using pt :|')
             results: Results = results[0].cpu()
             # print('Image results ready')
 
@@ -178,27 +178,22 @@ class Yolov8Node(Node):
                     #               (0, 255, 0),  # Green color
                     #               2)  # Thickness
 
-                    class_name = self.tensorrtmodel.names[box_msg.label]
-                    print(f"Class name is {class_name}")
-                    class_name_list = class_name.split(' ')
+                    class_name = self.tensorrtmodel.names[box_msg.label] + str(box_msg.label)
+                    class_name_list = class_name.split('_')
                     print(f"Class name list is {class_name_list}")
                     color_name = class_name_list[0]
                     color = ()
                     text_color = (0,0,0)
                     if color_name == "red":
-                        print("Should have bounding box be red")
                         color = (0, 0, 255)
                     elif color_name == "green":
                         color = (0,255,0)
-                        print("Should have bounding box be green")
                     elif color_name == "yellow":
                         color = (0,230,230)
-                        print("Sholud have bounding box be yellow")
                     else:
                         color = (255,0,0)
-                        print("In else loop")
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
-                    self.get_logger().info(f"Detected: {class_name}")
+                    # self.get_logger().info(f"Detected: {class_name}")
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
