@@ -27,7 +27,7 @@ class BannerColor(Enum):
     NONE = 3
 
 # CONSTANTS: TODO: SET THESE TO THE ACTUAL VALUES / MAKE THEM EASILY CONFIGURABLE
-DOCK_POSITION = (-33.72244, 150.67449, 0) # (x, y, z rotation)
+DOCK_POSITION = (45.697, 32.452, 0) # (x, y, z rotation)
 DESIRED_BANNER = (BannerShape.CIRCLE, BannerColor.RED) # (shape, color)
 SINGLE_DOCK_LENGTH = 1
 DOCK_DEPTH = 1
@@ -93,15 +93,16 @@ class DockingTask(Task):
                     vMag = kp * deltaMag
                     vDirection = math.atan2(delta[1], delta[0])
 
-                    theta = vDirection
+                    _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
+                    theta = vDirection - robot_rotation
 
                     vx = vMag * math.cos(theta)
                     vy = vMag * math.sin(theta)
-                    vtheta = kp * delta[2]
+                    vtheta = kp * 30 * theta
 
                     control_message.twist.linear.x = vx
                     control_message.twist.linear.y = vy
-                    #control_message.twist.angular.z = vtheta
+                    control_message.twist.angular.z = vtheta
 
                     if deltaMag < 0.1:
                         self.state = DockingState.CHECKING_CAMERA
@@ -111,9 +112,9 @@ class DockingTask(Task):
                 # check the camera for the dock
 
                 # stop the boat while we do this
-                control_message.twist.linear.x = 0
-                control_message.twist.linear.y = 0
-                control_message.twist.angular.z = 0
+                control_message.twist.linear.x = 0.0
+                control_message.twist.linear.y = 0.0
+                control_message.twist.angular.z = 0.0
 
                 if self.state_changed:
                     self.logger.info("Checking camera for dock")
@@ -215,6 +216,31 @@ class DockingTask(Task):
     
     def receive_odometry(self, msg):
         self.current_position = msg.pose.pose.position
+        self.current_rotation = msg.pose.pose.orientation
 
     def set_state(self, state):
         self.state = state
+
+    def euler_from_quaternion(self, quaternion):
+        """
+        Converts quaternion (w in last place) to euler roll, pitch, yaw
+        quaternion = [x, y, z, w]
+        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
+        """
+        x = quaternion.x
+        y = quaternion.y
+        z = quaternion.z
+        w = quaternion.w
+
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+
+        sinp = 2 * (w * y - z * x)
+        pitch = math.asin(sinp)
+
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
+
+        return roll, pitch, yaw
