@@ -52,7 +52,7 @@ class Yolov8Node(Node):
         self.declare_parameter("image_topic", "/webcam_image")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
         self.declare_parameter("tensorRT", True)
-        self.declare_parameter('color_label_mappings_file', '')
+       
 
         # Get parameters
         model_name = self.get_parameter("model").get_parameter_value().string_value
@@ -61,9 +61,9 @@ class Yolov8Node(Node):
         self.enable = self.get_parameter("enable").get_parameter_value().bool_value
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
         # use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
-        color_label_mappings_file = self.get_parameter('color_label_mappings_file').value
 
-        with open(color_label_mappings_file, 'r') as f:
+        yaml_file_path = os.path.join('home', 'arcturus', 'dev_ws','src','all_seaing_vehicle','all_seaing_bringup','config','perception','color_label_mappings.yaml')
+        with open(yaml_file_path,'r') as f:
             self.label_dict = yaml.safe_load(f)
 
         # Get the model's path
