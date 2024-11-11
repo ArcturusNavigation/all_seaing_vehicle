@@ -208,6 +208,8 @@ void BBoxProjectPCloud::bb_pcl_project(
         cv::inRange(hsv_img, cv::Scalar(h_min, s_min, v_min), cv::Scalar(h_max, s_max, v_max), mask);
         cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 5));
         cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 7));
+        //TODO: now do the rest for color segmentation, starting from the contours (see color_segmentation.py)
+
         //go through the obstacle clusters and take the most matching one
         for (auto it = obstacles_indices.begin(); it != obstacles_indices.end(); it++) {
             
