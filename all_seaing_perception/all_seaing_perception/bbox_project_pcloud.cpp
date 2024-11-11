@@ -5,15 +5,39 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 
+    //essential ones
     this->declare_parameter("bbox_object_margin", 0.0);
+    this->declare_parameter("lidar_topic", "/wamv/sensors/lidars/lidar_wamv_sensor/points");
     this->declare_parameter("camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw");
     this->declare_parameter("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info");
+
+    // for cluster extraction
+    this->declare_parameter<int>("obstacle_size_min", 20);
+    this->declare_parameter<int>("obstacle_size_max", 100000);
+    this->declare_parameter<double>("clustering_distance", 0.75);
+    this->declare_parameter<double>("obstacle_seg_thresh", 1.0);
+    this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
+    this->declare_parameter<double>("polygon_area_thresh", 100000.0);
+    
+    m_obstacle_size_min = this->get_parameter("obstacle_size_min").as_int();
+    m_obstacle_size_max = this->get_parameter("obstacle_size_max").as_int();
+    m_clustering_distance = this->get_parameter("clustering_distance").as_double();
+    m_obstacle_seg_thresh = this->get_parameter("obstacle_seg_thresh").as_double();
+    m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
+    m_polygon_area_thresh = this->get_parameter("polygon_area_thresh").as_double();
+
+    // for color segmentation
+    this->declare_parameter('color_ranges_file', '');
+    this->declare_parameter('color_label_mappings_file', '')
+
+    color_ranges_file = this->get_parameter('color_ranges_file').as_string()
+    color_label_mappings_file = this->get_parameter('color_label_mappings_file').as_string()
 
     // Subscriptions
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
         this->get_parameter("camera_info_topic").as_string(), 10, std::bind(&BBoxProjectPCloud::intrinsics_cb, this, std::placeholders::_1));
     m_image_sub.subscribe(this, this->get_parameter("camera_topic").as_string(), rmw_qos_profile_sensor_data);
-    m_cloud_sub.subscribe(this, "point_cloud/filtered", rmw_qos_profile_sensor_data);
+    m_cloud_sub.subscribe(this, this->get_parameter("lidar_topic").as_string(), rmw_qos_profile_sensor_data);
     m_bbox_sub.subscribe(this, "bounding_boxes", rmw_qos_profile_sensor_data);
     
     // Send pc msg and img msg to bb_pcl_project
@@ -25,6 +49,34 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     // Publishers
     m_object_pcl_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>("labeled_object_point_clouds", 5);
     m_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("object_point_clouds_viz", 5);
+
+    // get color label mappings from yaml
+    std::ifstream label_yaml(color_label_mappings_file);
+    if (label_yaml.is_open()) {
+        label_config_yaml = YAML::Load(label_yaml);  
+        for (YAML::const_iterator it = label_config_yaml.begin(); it != label_config_yaml.end(); ++it) {
+            // RCLCPP_INFO(this->get_logger(), "label %d and color %s", it->second.as<int>(), it->second.as<std::string>().c_str());
+            label_color_map[it->second.as<int>()] = it->first.as<std::string>();
+        }
+    } 
+    else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", color_label_mappings_file.c_str());
+    }
+    label_yaml.close();
+
+    // get color ranges from yaml
+    std::ifstream ranges_yaml(color_ranges_file);
+    if (ranges_yaml.is_open()) {
+        ranges_config_yaml = YAML::Load(ranges_yaml);  
+        for (YAML::const_iterator it = ranges_config_yaml.begin(); it != ranges_config_yaml.end(); ++it) {
+            // RCLCPP_INFO(this->get_logger(), "label %d and color %s", it->second.as<int>(), it->second.as<std::string>().c_str());
+            color_range_map[it->first.as<std::string>()] = it->second.as<int[6]>();
+        }
+    } 
+    else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", color_ranges_file.c_str());
+    }
+    ranges_yaml.close();
 }
 
 void BBoxProjectPCloud::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
@@ -39,7 +91,6 @@ void BBoxProjectPCloud::bb_pcl_project(
     RCLCPP_INFO(this->get_logger(), "GOT DATA");
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
     if (!m_pc_cam_tf_ok)
-        // TODO: get the camera frame another way and don't subscribe to the image topic, we only need the bounding boxes which are another topic
         m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id);
 
     // Transform in_cloud_msg to the camera frame and convert PointCloud2 to PCL PointCloud
@@ -64,6 +115,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         // Check if within bounds & in front of the boat
         RCLCPP_DEBUG(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
     }
+    std::vector<std::pair<all_seaing_interfaces::msg::LabeledBoundingBox2D, pcl::PointCloud<pcl::PointXYZI>>::Ptr> bbox_pcloud_objects;
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         pcl::PointCloud<pcl::PointXYZI>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
@@ -88,6 +140,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         pcl::toROSMsg(*obj_cloud_ptr, labeled_pcl.cloud);
         object_pcls.objects.push_back(labeled_pcl);
         obj_cloud_vec.push_back(*obj_cloud_ptr);
+        bbox_pcloud_objects.push_back(std::make_pair(bbox, obj_cloud_ptr));
         obj++;
         RCLCPP_INFO(this->get_logger(), "%d POINTS IN OBJECT %d", obj_cloud_ptr->size(), obj);
         max_len = std::max(max_len, (int)obj_cloud_ptr->size());
@@ -114,6 +167,52 @@ void BBoxProjectPCloud::bb_pcl_project(
     auto obj_pcls_msg = sensor_msgs::msg::PointCloud2();
     pcl::toROSMsg(*all_obj_pcls_ptr, obj_pcls_msg);
     m_object_pcl_viz_pub->publish(obj_pcls_msg);
+
+    // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
+    cv_bridge::CvImagePtr cv_ptr;
+    try {
+        cv_ptr = cv_bridge::toCvCopy(in_img_msg, sensor_msgs::image_encodings::BGR8);
+    } catch (cv_bridge::Exception &e) {
+        RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+        return;
+    }
+
+    cv_bridge::CvImagePtr cv_hsv_ptr = cv_bridge::cvtColor(cv_ptr.toCvShare(), cv::COLOR_RGB2HSV);
+
+    // REFINE OBJECT POINT CLOUDS
+    for(auto bbox_pcloud_pair : bbox_pcloud_objects){
+        all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = bbox_pcloud_pair.first;
+        pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
+
+        //extract clusters
+        pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>());
+        if (!pcloud_ptr->points.empty())
+            tree->setInputCloud(pcloud_ptr);
+        std::vector<pcl::PointIndices> obstacles_indices;
+        pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
+        ec.setClusterTolerance(m_clustering_distance);
+        ec.setMinClusterSize(m_obstacle_size_min);
+        ec.setMaxClusterSize(m_obstacle_size_max);
+        ec.setSearchMethod(tree);
+        ec.setInputCloud(pcloud_ptr);
+        ec.extract(obstacles_indices);
+
+        //color segmentation using the color label
+        cv::Mat hsv_img(cv_hsv_ptr->image, cv::Range(bbox.min_x, bbox.max_x), cv::Range(bbox.min_y, bbox.max_y));
+        cv::Size img_sz;
+        cv::Point bbox_offset;
+        hsv_img.locateROI(img_sz, bbox_offset);
+        int lims[6] = label_color_map[bbox.label]=="red"?color_range_map["red2"]:color_range_map[label_color_map[bbox.label]];
+        int h_min=lims[0], h_max=lims[1], s_min=lims[2], s_max=lims[3], v_min=lims[4], v_max=lims[5];
+        cv::Mat mask;
+        cv::inRange(hsv_img, cv::Scalar(h_min, s_min, v_min), cv::Scalar(h_max, s_max, v_max), mask);
+        cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 5));
+        cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 7));
+        //go through the obstacle clusters and take the most matching one
+        for (auto it = obstacles_indices.begin(); it != obstacles_indices.end(); it++) {
+            
+        }
+    }
 }
 
 geometry_msgs::msg::TransformStamped BBoxProjectPCloud::get_tf(const std::string &in_target_frame,

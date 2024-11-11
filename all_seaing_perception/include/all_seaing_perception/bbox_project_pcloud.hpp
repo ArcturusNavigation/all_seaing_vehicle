@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <exception>
+#include <pair>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -34,6 +35,10 @@
 #include "all_seaing_interfaces/msg/labeled_bounding_box2_d.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud_array.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud.hpp"
+
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
+#include "yaml-cpp/yaml.h" 
 
 class BBoxProjectPCloud : public rclcpp::Node{
 private:
@@ -77,6 +82,23 @@ private:
         const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
         const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg,
         const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg);
+
+    int m_obstacle_id;
+
+    // for cluster extraction
+    int m_obstacle_size_min;
+    int m_obstacle_size_max;
+    double m_clustering_distance;
+    double m_obstacle_seg_thresh;
+    double m_obstacle_drop_thresh;
+    double m_polygon_area_thresh;
+
+    // for color segmentation
+    std::string color_ranges_file;
+    std::string color_label_mappings_file;
+    YAML::Node label_config_yaml, ranges_config_yaml;
+    std::map<int, std::string> label_color_map;
+    std::map<std::string, int[6]> color_range_map;
 public:
     BBoxProjectPCloud();
     virtual ~BBoxProjectPCloud();

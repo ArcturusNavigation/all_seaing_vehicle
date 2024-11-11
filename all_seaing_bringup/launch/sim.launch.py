@@ -153,7 +153,18 @@ def generate_launch_description():
         package="all_seaing_perception",
         executable="bbox_project_pcloud",
         parameters=[
-            {"bbox_object_margin": 0.0}
+            {"bbox_object_margin": 0.0},
+            {"camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"},
+            {"camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"},
+            {"lidar_topic", "point_cloud/filtered"},
+            {"color_label_mappings_file": color_label_mappings},
+            {"color_ranges_file": color_ranges},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"polygon_area_thresh": 100000.0}
         ]
     )
 
@@ -259,7 +270,7 @@ def generate_launch_description():
             color_segmentation_node,
             point_cloud_filter_node,
             obstacle_detector_node,
-            # bbox_project_pcloud_node,
+            bbox_project_pcloud_node,
             rviz_node,
             control_mux,
             controller_server,
