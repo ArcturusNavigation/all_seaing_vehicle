@@ -237,7 +237,8 @@ class NavigationServer(Node):
         goal_pose.position.x = goal_x
         goal_pose.position.y = goal_y
 
-        path = self.path_plan(start_pose, goal_pose)
+        path = self.sath_plan(start_pose, goal_pose)
+        self.get_logger().info("Before publishing nav_path")
 
         if path is not None and len(path)>0:
             self.publish_nav_path(path)
@@ -269,7 +270,7 @@ class NavigationServer(Node):
 
             self.control_loop()
             time.sleep(TIMER_PERIOD)
-
+  
         self.end_process("Waypoint following completed!")
         goal_handle.succeed()
         return Waypoint.Result(is_finished=True)
