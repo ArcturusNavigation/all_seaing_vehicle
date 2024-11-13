@@ -10,7 +10,7 @@ import math
 class GPSRawConverter(Node):
     def __init__(self):
         super().__init__('gpsraw_converter')
-        self.subscription = self.create_subscription(GPSRAW, "test_topic", self.gpsraw_callback, 10)
+        self.subscription = self.create_subscription(GPSRAW, "/mavros/gpsstatus/gps2/raw", self.gpsraw_callback, 10)
         self.publisher_navsatfix = self.create_publisher(NavSatFix, 'gps_navsatfix', 10)
         self.publisher_imu = self.create_publisher(Imu, 'gps_imu', 10)
 
@@ -37,8 +37,8 @@ class GPSRawConverter(Node):
         imu_msg.angular_velocity.x = 0.0
         imu_msg.angular_velocity.y = 0.0
         imu_msg.angular_velocity.z = 0.0
-        imu_msg.orientation.z = math.sin(math.radians(gpsraw_msg.yaw)/2)
-        imu_msg.orientation.w = math.cos(math.radians(gpsraw_msg.yaw)/2)
+        imu_msg.orientation.z = math.sin(math.radians(gpsraw_msg.yaw / 100)/2)
+        imu_msg.orientation.w = math.cos(math.radians(gpsraw_msg.yaw / 100)/2)
         imu_msg.orientation_covariance[0] = -1  # Indicate no orientation data
         return imu_msg
 
@@ -46,7 +46,8 @@ class GPSRawConverter(Node):
         navsatfix_msg = self.gpsraw_to_navsatfix(gpsraw_msg)
         self.publisher_navsatfix.publish(navsatfix_msg)
         imu_msg = self.gpsraw_to_imu(gpsraw_msg)
-        self.publisher_imu.publish(imu_msg)
+        if gpsraw_msg.yaw != 65535:
+            self.publisher_imu.publish(imu_msg)
 
 
 def main(args=None):
