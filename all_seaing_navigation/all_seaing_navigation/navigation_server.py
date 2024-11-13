@@ -101,7 +101,7 @@ class NavigationServer(Node):
         """Publish path as nav_msgs/Path"""
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map'
+        path_msg.header.frame_id = 'odom'
 
         for point in path:
             wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
@@ -151,7 +151,7 @@ class NavigationServer(Node):
 
     def visualize_waypoint(self, x, y):
         marker_msg = Marker()
-        marker_msg.header.frame_id = self.global_frame_idc
+        marker_msg.header.frame_id = self.global_frame_id
         marker_msg.header.stamp = self.get_clock().now().to_msg()
         marker_msg.ns = MARKER_NS
         marker_msg.type = Marker.CYLINDER
@@ -238,12 +238,7 @@ class NavigationServer(Node):
         goal_pose.position.x = goal_x
         goal_pose.position.y = goal_y
 
-<<<<<<< HEAD
-        path = self.sath_plan(start_pose, goal_pose)
-        self.get_logger().info("Before publishing nav_path")
-=======
-        path = plan_path(start_pose, goal_pose)
->>>>>>> 7378dd9c4633b455af52be0730c5dd45501ed5f8
+        path = plan_path(self, start_pose, goal_pose)
 
         self.get_logger().info("Before publishing nav_path")
 
