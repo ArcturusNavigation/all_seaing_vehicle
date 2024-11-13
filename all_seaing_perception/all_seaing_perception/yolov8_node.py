@@ -19,16 +19,20 @@ from rclpy.qos import QoSHistoryPolicy
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSReliabilityPolicy
 
+from ament_index_python.packages import get_package_share_directory
+
 from cv_bridge import CvBridge
 
 from ultralytics import YOLO
 from ultralytics.engine.results import Results
 from ultralytics.engine.results import Boxes
+from ultralytics.utils.plotting import Annotator
 
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 
 import os
 import cv2
+import yaml
 
 from sensor_msgs.msg import Image
 from std_srvs.srv import SetBool
@@ -36,8 +40,6 @@ from std_srvs.srv import SetBool
 
 class Yolov8Node(Node):
 
-    #Declare global variable to use
-    using_tensorRT = False
 
     def __init__(self) -> None:
         super().__init__("yolov8_node")
@@ -47,9 +49,11 @@ class Yolov8Node(Node):
         self.declare_parameter("device", "cuda:0")
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-        self.declare_parameter("image_topic", "/webcam_image/image")
+        # self.declare_parameter("image_topic", "/webcam_image/image")
+        self.declare_parameter("image_topic", "/image_raw")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
         self.declare_parameter("tensorRT", True)
+       
 
         # Get parameters
         model_name = self.get_parameter("model").get_parameter_value().string_value
@@ -58,17 +62,23 @@ class Yolov8Node(Node):
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
         # use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
+        path_directory = get_package_share_directory("all_seaing_bringup")
+        yaml_file_path = os.path.join(path_directory, 'config','perception','color_label_mappings.yaml')
+        with open(yaml_file_path,'r') as f:
+            self.label_dict = yaml.safe_load(f)
+
         # Get the model's path
         self.model_dir = os.path.expanduser("~/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
         model_path1 = os.path.join(self.model_dir, model_name+'.engine')
         model_path2 = os.path.join(self.model_dir, model_name+'.pt')
+        self.using_tensorRT = False
 
         # Initialize YOLO model
         if os.path.isfile(model_path1):
             self.get_logger().info(f"Loading model from tensorRT engine: {model_path1}")
             self.cv_bridge = CvBridge()
-            self.yolo = YOLO(model_path1)
-            using_tensorRT = True
+            self.tensorrtmodel = YOLO(model_path1)
+            self.using_tensorRT = True
         elif os.path.isfile(model_path2):
             self.get_logger().info(f"Loading model from pt model: {model_path2}")
             self.cv_bridge = CvBridge()
@@ -122,16 +132,16 @@ class Yolov8Node(Node):
         res.success = True
         return res
 
-    def image_cb(using_tensorRT, self, msg: Image) -> None:
-        print('In image_cb')
+    def image_cb(self, msg: Image) -> None:
+        # print('In image_cb')
 
         if self.enable:
             # Convert image to cv_image
-            cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "rgb8")
+            cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
 
-            if using_tensorRT:
+            if self.using_tensorRT:
                 results = self.tensorrtmodel(cv_image)
-                print("Running using engine :)")
+                #print("Running using engine :)")
             else:
                 # Predict based on image
                 results = self.yolo.predict(
@@ -141,9 +151,11 @@ class Yolov8Node(Node):
                     conf=self.threshold,
                     device=self.device
                 )
-                print('Running using pt :|')
+                #print('Running using pt :|')
             results: Results = results[0].cpu()
-            print('Image results ready')
+            # print('Image results ready')
+
+            label_dict = self.label_dict
 
             # Create labeled_bounding_box msgs
             labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
@@ -154,7 +166,7 @@ class Yolov8Node(Node):
 
                 if results.boxes:
 
-                    box_msg.label = int(box_data.cls)
+                    # box_msg.label = int(box_data.cls)
                     box_msg.probability = float(box_data.conf)
                     center_x, center_y, width, height = box_data.xywh[0]
                     box_msg.min_x = int(center_x - width / 2)
@@ -164,21 +176,40 @@ class Yolov8Node(Node):
 
                     labeled_bounding_box_msgs.boxes.append(box_msg)
 
+                    annotator = Annotator(cv_image, 2, 2, "Arial.ttf", False)
                     # Draw the bounding box on the image
-                    cv2.rectangle(cv_image,
-                                  (box_msg.min_x, box_msg.min_y),
-                                  (box_msg.max_x, box_msg.max_y),
-                                  (0, 255, 0),  # Green color
-                                  2)  # Thickness
+                    # cv2.rectangle(cv_image,
+                    #               (box_msg.min_x, box_msg.min_y),
+                    #               (box_msg.max_x, box_msg.max_y),
+                    #               (0, 255, 0),  # Green color
+                    #               2)  # Thickness
 
-                    class_name = self.yolo.names[box_msg.label]
-                    self.get_logger().debug(f"Detected: {class_name}")
+                    class_name = self.tensorrtmodel.names[int(box_data.cls)] + str(int(box_data.cls))
+                    class_name_list = class_name.split('_')
+                    color_name = class_name_list[0]
+                    color = ()
+                    text_color = (0,0,0)
+                    if color_name == "red":
+                        color = (0, 0, 255)
+                    elif color_name == "green":
+                        color = (0,255,0)
+                    elif color_name == "yellow":
+                        color = (0,230,230)
+                    elif color_name == "orange":
+                        color = (0,165,255)
+                    elif color_name == "black":
+                        color = (0,0,0)
+                    elif color_name == "white":
+                        color = (255,255,255)
+                    box_msg.label = label_dict[color_name]
+                    annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
+                    self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
 
             # Convert annotated image back to ROS Image message
-            annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(cv_image, encoding="rgb8")
+            annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(cv_image, encoding="bgr8")
             self._image_pub.publish(annotated_image_msg)  # Publish annotated image
 
 
