@@ -111,7 +111,8 @@ class NavigationServer(Node):
             pose.pose.position.y = float(wy)
             path_msg.poses.append(pose)
 
-        self.path_pub.publish(path_msg)
+        self.path_pub.publish
+
         self.get_logger().debug("Published A* Path")
 
     def odom_callback(self, msg: Odometry):
@@ -240,8 +241,11 @@ class NavigationServer(Node):
         path = self.sath_plan(start_pose, goal_pose)
         self.get_logger().info("Before publishing nav_path")
 
+        self.get_logger().info("Before publishing nav_path")
+
         if path is not None and len(path)>0:
             self.publish_nav_path(path)
+
         # Return a list of waypoitns the robot should follow
         if path is None or len(path) == 0:
             self.end_process("Waypoint following aborted!")
