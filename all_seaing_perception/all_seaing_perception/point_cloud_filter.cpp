@@ -18,8 +18,8 @@ public:
     PointCloudFilter() : Node("point_cloud_filter") {
         // Initialize parameters
         this->declare_parameter<double>("range_min_threshold", 0.0);
-        this->declare_parameter<double>("range_max_threshold", 100000.0);
-        this->declare_parameter<double>("intensity_low_threshold", 0.0);
+        this->declare_parameter<double>("range_max_threshold", 10.0);
+        this->declare_parameter<double>("intensity_low_threshold", 10.0);
         this->declare_parameter<double>("intensity_high_threshold", 100000.0);
         this->declare_parameter<double>("leaf_size", 0.0);
         this->declare_parameter<double>("hfov", 0.0);
