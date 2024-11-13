@@ -198,6 +198,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         ec.extract(obstacles_indices);
 
         //color segmentation using the color label
+        //TODO: in the end, after finishing the processing, put the results back into the original image (using bbox_offset) to be able to use it with the LiDAR
         cv::Mat hsv_img(cv_hsv_ptr->image, cv::Range(bbox.min_x, bbox.max_x), cv::Range(bbox.min_y, bbox.max_y));
         cv::Size img_sz;
         cv::Point bbox_offset;
@@ -209,6 +210,11 @@ void BBoxProjectPCloud::bb_pcl_project(
         cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 5));
         cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 7));
         //TODO: now do the rest for color segmentation, starting from the contours (see color_segmentation.py)
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(mask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+        for(auto contour : contours){
+
+        }
 
         //go through the obstacle clusters and take the most matching one
         for (auto it = obstacles_indices.begin(); it != obstacles_indices.end(); it++) {
