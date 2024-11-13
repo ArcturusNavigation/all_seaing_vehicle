@@ -1,4 +1,5 @@
 #include "pcl/common/point_tests.h"
+#include <fstream>
 #include "pcl/filters/voxel_grid.h"
 #include "pcl/point_cloud.h"
 #include "pcl/point_types.h"
@@ -47,6 +48,22 @@ public:
     }
 
 private:
+    void save_xy_intensity_to_file(const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud, const std::string &file_name) {
+        std::ofstream file(file_name);
+        if (!file.is_open()) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", file_name.c_str());
+            return;
+        }
+
+        // Save the header
+        file << "x,y,intensity\n";
+        for (const auto &point : cloud->points) {
+            file << point.x << "," << point.y << "," << point.intensity << "\n";
+        }
+        file.close();
+        RCLCPP_INFO(this->get_logger(), "Point (x, y, intensity) data saved to %s", file_name.c_str());
+    }
+
     void downsample_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr,
                           pcl::PointCloud<pcl::PointXYZI>::Ptr &out_cloud_ptr) {
         pcl::VoxelGrid<pcl::PointXYZI> vg;
@@ -93,10 +110,14 @@ private:
             new pcl::PointCloud<pcl::PointXYZI>);
         if (m_leaf_size != 0)
             downsample_cloud(no_plane_cloud_ptr, downsampled_cloud_ptr);
-            // downsample_cloud(filtered_cloud_ptr, downsampled_cloud_ptr);
+            // downsample_cloud(filtered_cloud_ptr, downsampled_cloud_ptrintensities);
         else
             downsampled_cloud_ptr = no_plane_cloud_ptr;
             // downsampled_cloud_ptr = filtered_cloud_ptr;
+
+        // Save the downsampled cloud to a file
+        // save_xy_intensity_to_file(downsampled_cloud_ptr, "xy_intensity.csv");
+        // RCLCPP_INFO(this->get_logger(), "created file");
 
         // Convert filtered point cloud back to ROS message
         sensor_msgs::msg::PointCloud2 new_cloud_msg;
