@@ -2,13 +2,13 @@
 
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import ControlOption
+from all_seaing_interfaces.msg import Heartbeat
 
 import serial
 import struct
 import time
 
-class RoverLoraController(Node):
+class RoverLoraHeartbeat(Node):
     def __init__(self):
         super().__init__('rover_lora_controller')
 
@@ -16,13 +16,12 @@ class RoverLoraController(Node):
         self.serial_port = serial.Serial('/dev/ttyUSB1', 57600, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
         
-        self.data_size = struct.calcsize('BdddB')
-
-        # Create ROS 2 publisher for ControlOption
-        self.control_publisher = self.create_publisher(ControlOption, 'control_options', 10)
+        self.data_size = struct.calcsize('BBB')
 
         # Start a ROS 2 timer to check for serial data
         self.timer = self.create_timer(0.01, self.check_serial_data)
+                
+        self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
         
         
     def calculate_checksum(self, data):
@@ -36,7 +35,7 @@ class RoverLoraController(Node):
             if len(serialized_data) != self.data_size:
                 return
         
-            priority, x, y, angular, received_checksum = struct.unpack('BdddB', serialized_data)
+            in_teleop, e_stopped, received_checksum = struct.unpack('BBB', serialized_data)
             
             # Verify checksum
             data_without_checksum = serialized_data[:-1]
@@ -46,18 +45,16 @@ class RoverLoraController(Node):
                 print("Checksum mismatch, discarding data")
                 return
                         
-            control_msg = ControlOption()
-            control_msg.priority = priority
-            control_msg.twist.linear.x = x
-            control_msg.twist.linear.y = y
-            control_msg.twist.angular.z = angular
-            self.control_publisher.publish(control_msg)
+            heartbeat_message = Heartbeat()
+            heartbeat_message.in_teleop = bool(in_teleop)
+            heartbeat_message.e_stopped = bool(e_stopped)
+            self.heartbeat_publisher.publish(heartbeat_message)
             
 
 
 def main(args=None):
     rclpy.init(args=args)
-    serial_control_subscriber = RoverLoraController()
+    serial_control_subscriber = RoverLoraHeartbeat()
 
     try:
         rclpy.spin(serial_control_subscriber)

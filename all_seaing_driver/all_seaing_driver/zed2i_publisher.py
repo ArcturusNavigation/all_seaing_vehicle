@@ -15,8 +15,7 @@ class ZEDPublisher(Node):
         self.bridge = CvBridge()
         self.init_camera()
         self.runtime_parameters = sl.RuntimeParameters()
-        self.timer = self.create_timer(1.0/30.0, self.publish_zed_image)
-             
+        self.timer = self.create_timer(1.0 / 30.0, self.publish_zed_image)
 
     def init_camera(self):
         init_params = sl.InitParameters()
@@ -48,6 +47,7 @@ class ZEDPublisher(Node):
         else:
             self.get_logger().warning("Failed to grab image from ZED camera")
 
+
 def main(args=None):
     rclpy.init(args=args)
     zed_publisher = ZEDPublisher()
@@ -58,7 +58,7 @@ def main(args=None):
     finally:
         zed_publisher.zed.close()
         zed_publisher.destroy_node()
-        rclpy.shutdown() #haha i make big change
+        rclpy.shutdown()  # haha i make big change
 
 
 if __name__ == "__main__":

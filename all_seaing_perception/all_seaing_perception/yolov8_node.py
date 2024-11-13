@@ -9,7 +9,6 @@ ros2 run all_seaing_perception yolov8_node.py --ros-args \
   -p model:=model_name.pt \
   -p device:=cuda:0 \
   -p threshold:=0.5 \
-  -p enable:=true \
   -p image_topic:=your_custom_image_topic
 """
 
@@ -56,7 +55,6 @@ class Yolov8Node(Node):
         model_name = self.get_parameter("model").get_parameter_value().string_value
         self.device = self.get_parameter("device").get_parameter_value().string_value
         self.threshold = self.get_parameter("threshold").get_parameter_value().double_value
-        self.enable = self.get_parameter("enable").get_parameter_value().bool_value
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
         # use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
@@ -114,15 +112,12 @@ class Yolov8Node(Node):
         self._sub = self.create_subscription(Image, image_topic, self.image_cb, image_qos_profile)
 
         # Service for enabling/disabling
+        self.enable = True
         self._srv = self.create_service(SetBool, "enable", self.enable_cb)
 
         self.get_logger().info(f"Yolov8Node initialized")
 
-    def enable_cb(
-        self,
-        req: SetBool.Request,
-        res: SetBool.Response
-    ) -> SetBool.Response:
+    def enable_cb(self, req: SetBool.Request, res: SetBool.Response) -> SetBool.Response:
         self.enable = req.data
         res.success = True
         return res
@@ -177,7 +172,7 @@ class Yolov8Node(Node):
                                   2)  # Thickness
 
                     class_name = self.yolo.names[box_msg.label]
-                    self.get_logger().info(f"Detected: {class_name}")
+                    self.get_logger().debug(f"Detected: {class_name}")
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
@@ -187,14 +182,12 @@ class Yolov8Node(Node):
             self._image_pub.publish(annotated_image_msg)  # Publish annotated image
 
 
-
 def main():
     rclpy.init()
     node = Yolov8Node()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()
