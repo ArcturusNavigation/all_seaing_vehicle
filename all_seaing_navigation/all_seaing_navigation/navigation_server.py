@@ -51,7 +51,7 @@ class NavigationServer(Node):
             callback_group=self.group,
         )
         self.map_sub = self.create_subscription(
-            OccupancyGrid, "map", self.map_cb, 10, callback_group=self.group
+            OccupancyGrid, "map", map_cb, 10, callback_group=self.group
         )
 
         self.odom_sub = self.create_subscription(
@@ -238,7 +238,7 @@ class NavigationServer(Node):
         goal_pose.position.x = goal_x
         goal_pose.position.y = goal_y
 
-        path = self.path_plan(start_pose, goal_pose)
+        path = plan_path(start_pose, goal_pose)
 
         self.get_logger().info("Before publishing nav_path")
 
@@ -277,9 +277,6 @@ class NavigationServer(Node):
         self.end_process("Waypoint following completed!")
         goal_handle.succeed()
         return Waypoint.Result(is_finished=True)
-
-
-
 
 def main(args=None):
     rclpy.init(args=args)
