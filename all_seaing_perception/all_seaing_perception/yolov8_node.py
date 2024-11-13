@@ -20,6 +20,8 @@ from rclpy.qos import QoSHistoryPolicy
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSReliabilityPolicy
 
+from ament_index_python.packages import get_package_share_directory
+
 from cv_bridge import CvBridge
 
 from ultralytics import YOLO
@@ -62,7 +64,8 @@ class Yolov8Node(Node):
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
         # use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
-        yaml_file_path = os.path.join('home', 'arcturus', 'dev_ws','src','all_seaing_vehicle','all_seaing_bringup','config','perception','color_label_mappings.yaml')
+        path_directory = get_package_share_directory("all_seaing_bringup")
+        yaml_file_path = os.path.join(path_directory, 'config','perception','color_label_mappings.yaml')
         with open(yaml_file_path,'r') as f:
             self.label_dict = yaml.safe_load(f)
 
@@ -168,7 +171,7 @@ class Yolov8Node(Node):
 
                 if results.boxes:
 
-                    box_msg.label = int(box_data.cls)
+                    # box_msg.label = int(box_data.cls)
                     box_msg.probability = float(box_data.conf)
                     center_x, center_y, width, height = box_data.xywh[0]
                     box_msg.min_x = int(center_x - width / 2)
@@ -186,7 +189,7 @@ class Yolov8Node(Node):
                     #               (0, 255, 0),  # Green color
                     #               2)  # Thickness
 
-                    class_name = self.tensorrtmodel.names[box_msg.label] + str(box_msg.label)
+                    class_name = self.tensorrtmodel.names[int(box_data.cls)] + str(int(box_data.cls))
                     class_name_list = class_name.split('_')
                     color_name = class_name_list[0]
                     color = ()
