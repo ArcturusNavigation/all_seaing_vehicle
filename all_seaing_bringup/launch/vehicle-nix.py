@@ -126,6 +126,18 @@ def launch_setup(context, *args, **kwargs):
             "port": "/dev/ttyACM0",
         }.items(),
     )
+    
+    ublox_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                driver_prefix,
+                "/launch/ublox_gps.launch.py",
+            ]
+        ),
+        launch_arguments={
+            "port": "/dev/ttyACM1",
+        }.items(),
+    )
 
     return [
         ekf_node,
@@ -138,6 +150,7 @@ def launch_setup(context, *args, **kwargs):
         thrust_commander_node,
         lidar_ld,
         mavros_ld,
+        ublox_ld
     ]
 
 
