@@ -5,6 +5,7 @@ from rclpy.action import ActionServer, CancelResponse
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.time import Time
 import time
 
 from all_seaing_controller.pid_controller import CircularPID, PIDController
@@ -70,7 +71,7 @@ class ControllerServer(Node):
         self.heading = 0.0
         self.proc_count = 0
         self.prev_update_time = self.get_clock().now()
-    
+
     def odom_callback(self, msg: Odometry):
         self.nav_x = msg.pose.pose.position.x
         self.nav_y = msg.pose.pose.position.y
@@ -132,19 +133,19 @@ class ControllerServer(Node):
         self.x_pid.reset()
         self.y_pid.reset()
         self.theta_pid.reset()
-    
+
     def set_pid_setpoints(self, x, y, theta):
         self.x_pid.set_setpoint(x)
         self.y_pid.set_setpoint(y)
         self.theta_pid.set_setpoint(theta)
-    
+
     def update_pid(self):
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.x_pid.update(self.nav_x, dt)
         self.y_pid.update(self.nav_y, dt)
         self.theta_pid.update(self.heading, dt)
         self.prev_update_time = self.get_clock().now()
-    
+
     def scale_thrust(self, x_vel, y_vel):
         if abs(x_vel) <= self.max_vel[0] and abs(y_vel) <= self.max_vel[1]:
             return x_vel, y_vel
@@ -175,6 +176,7 @@ class ControllerServer(Node):
         theta_threshold = goal_handle.request.theta_threshold
         goal_x = goal_handle.request.x
         goal_y = goal_handle.request.y
+        goal_time = goal_handle.request.time
         if goal_handle.request.ignore_theta:
             goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
         else:
@@ -183,9 +185,12 @@ class ControllerServer(Node):
 
         self.reset_pid()
         self.set_pid_setpoints(goal_x, goal_y, goal_theta)
+        now = (self.get_clock().now()).nanoseconds / 1e9
+        future_time = now + goal_time
         while (not self.x_pid.is_done(self.nav_x, xy_threshold) or
                not self.y_pid.is_done(self.nav_y, xy_threshold) or
-               not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))):
+               not self.theta_pid.is_done(self.heading, math.radians(theta_threshold)) or
+               (self.get_clock().now()).nanoseconds / 1e9 < future_time):
 
             if self.proc_count >= 2:
                 self.end_process("Waypoint following aborted!")
@@ -201,6 +206,7 @@ class ControllerServer(Node):
             time.sleep(TIMER_PERIOD)
 
         self.end_process("Waypoint following completed!")
+
         goal_handle.succeed()
         return Waypoint.Result(is_finished=True)
 
