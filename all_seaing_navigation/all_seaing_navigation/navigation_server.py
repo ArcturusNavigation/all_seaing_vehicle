@@ -151,7 +151,7 @@ class NavigationServer(Node):
 
     def visualize_waypoint(self, x, y):
         marker_msg = Marker()
-        marker_msg.header.frame_id = self.global_frame_idc
+        marker_msg.header.frame_id = self.global_frame_id
         marker_msg.header.stamp = self.get_clock().now().to_msg()
         marker_msg.ns = MARKER_NS
         marker_msg.type = Marker.CYLINDER
@@ -238,7 +238,7 @@ class NavigationServer(Node):
         goal_pose.position.x = goal_x
         goal_pose.position.y = goal_y
 
-        path = plan_path(start_pose, goal_pose)
+        path = plan_path(self, start_pose, goal_pose)
 
         self.get_logger().info("Before publishing nav_path")
 
