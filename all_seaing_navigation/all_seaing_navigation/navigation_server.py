@@ -101,7 +101,7 @@ class NavigationServer(Node):
         """Publish path as nav_msgs/Path"""
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map'
+        path_msg.header.frame_id = 'odom'
 
         for point in path:
             wx, wy = self.grid_to_world(point[0], point[1])  # Convert grid to world coordinates
@@ -273,7 +273,7 @@ class NavigationServer(Node):
 
             self.control_loop()
             time.sleep(TIMER_PERIOD)
-
+  
         self.end_process("Waypoint following completed!")
         goal_handle.succeed()
         return Waypoint.Result(is_finished=True)
