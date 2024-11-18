@@ -99,6 +99,19 @@ private:
     YAML::Node label_config_yaml, ranges_config_yaml;
     std::map<int, std::string> label_color_map;
     std::map<std::string, int[6]> color_range_map;
+
+    // for cluster-contour matching/selection
+    std::string matching_weights_file;
+
+    YAML::Node matching_weights_yaml;
+
+    double m_clustering_distance_weight;
+    std::vector<double> m_clustering_color_weights;
+    double m_cluster_contour_distance_weight;
+    std::vector<double> m_cluster_contour_color_weights;
+    std::vector<double> m_contour_detection_color_weights;
+    double m_cluster_contour_size_weight;
+
 public:
     BBoxProjectPCloud();
     virtual ~BBoxProjectPCloud();

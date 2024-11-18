@@ -25,7 +25,9 @@ def generate_launch_description():
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
-
+    matching_weights = os.path.join(
+        bringup_prefix, "config", "perception", "filtering_weights.yaml"
+    )
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
     launch_rviz = LaunchConfiguration("launch_rviz")
@@ -164,7 +166,8 @@ def generate_launch_description():
             {"clustering_distance": 1.0},
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
-            {"polygon_area_thresh": 100000.0}
+            {"polygon_area_thresh": 100000.0},
+            {"matching_weights_file": matching_weights}
         ]
     )
 

@@ -28,10 +28,14 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
 
     // for color segmentation
     this->declare_parameter('color_ranges_file', '');
-    this->declare_parameter('color_label_mappings_file', '')
+    this->declare_parameter('color_label_mappings_file', '');
 
-    color_ranges_file = this->get_parameter('color_ranges_file').as_string()
-    color_label_mappings_file = this->get_parameter('color_label_mappings_file').as_string()
+    color_ranges_file = this->get_parameter('color_ranges_file').as_string();
+    color_label_mappings_file = this->get_parameter('color_label_mappings_file').as_string();
+
+    // for cluster-contour matching & selection
+    this->declare_parameter('matching_weights_file', '');
+    matching_weights_file = this->get_parameter('matching_weights_file').as_string();
 
     // Subscriptions
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
@@ -76,7 +80,24 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     else {
         RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", color_ranges_file.c_str());
     }
+    
     ranges_yaml.close();
+
+    // get cluster-contour matching & selection parameters from yaml
+    std::ifstream matching_yaml(matching_weights_file);
+    if (matching_yaml.is_open()) {
+        matching_weights_yaml = YAML::Load(matching_yaml);
+
+        m_clustering_distance_weight = matching_weights_yaml["clustering_distance_weight"];
+        m_clustering_color_weights = matching_weights_yaml["clustering_color_weights"];
+        m_cluster_contour_distance_weight = matching_weights_yaml["cluster_contour_distance_weight"];
+        m_cluster_contour_color_weights = matching_weights_yaml["cluster_contour_color_weights"];
+        m_contour_detection_color_weights = matching_weights_yaml["contour_detection_color_weights"];
+        m_cluster_contour_size_weight = matching_weights_yaml["cluster_contour_size_weight"];
+    } 
+    else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", matching_weights_file.c_str());
+    }
 }
 
 void BBoxProjectPCloud::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
@@ -115,10 +136,19 @@ void BBoxProjectPCloud::bb_pcl_project(
         // Check if within bounds & in front of the boat
         RCLCPP_DEBUG(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
     }
-    std::vector<std::pair<all_seaing_interfaces::msg::LabeledBoundingBox2D, pcl::PointCloud<pcl::PointXYZI>>::Ptr> bbox_pcloud_objects;
+    // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
+    cv_bridge::CvImagePtr cv_ptr;
+    try {
+        cv_ptr = cv_bridge::toCvCopy(in_img_msg, sensor_msgs::image_encodings::BGR8);
+    } catch (cv_bridge::Exception &e) {
+        RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+        return;
+    }
+    cv_bridge::CvImagePtr cv_hsv_ptr = cv_bridge::cvtColor(cv_ptr.toCvShare(), cv::COLOR_RGB2HSV);
+    std::vector<std::pair<all_seaing_interfaces::msg::LabeledBoundingBox2D, pcl::PointCloud<pcl::PointXYZHSV>>::Ptr> bbox_pcloud_objects;
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
-        pcl::PointCloud<pcl::PointXYZI>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         labeled_pcl.label = bbox.label;
         obj_cloud_ptr->header = in_cloud_tf_ptr->header;
         RCLCPP_DEBUG(this->get_logger(), "BOUNDING BOX FOR OBJECT %d: (%lf,%lf), (%lf, %lf)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y, obj);
@@ -132,8 +162,9 @@ void BBoxProjectPCloud::bb_pcl_project(
                 double bbox_margin = this->get_parameter("bbox_object_margin").as_double();
                 // Check if point is in bbox
                 if(xy_rect.x >= bbox.min_x-bbox_margin && xy_rect.x <= bbox.max_x+bbox_margin && xy_rect.y >= bbox.min_y-bbox_margin && xy_rect.y <= bbox.max_y+bbox_margin){
-                    obj_cloud_ptr->push_back(point_tf);
-                    RCLCPP_DEBUG(this->get_logger(), "SELECTED POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
+                    cv::Vec3b hsv = cv_hsv_ptr->image.at<cv::Vec3b>(xy_rect);
+                    obj_cloud_ptr->push_back(pcl::PointXYZHSV(point_tf.x, point_tf.y, point_tf.z, hsv[0], hsv[1], hsv[2]));
+                    RCLCPP_DEBUG(this->get_logger(), "SELECTED POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%lf, %lf, %lf)", xy_rect.x, xy_rect.y, hsv[0], hsv[1], hsv[2]);
                 }
             }
         }
@@ -147,7 +178,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     }
     RCLCPP_INFO(this->get_logger(), "WILL NOW SEND OBJECT POINT CLOUDS");
     m_object_pcl_pub->publish(object_pcls);
-    pcl::PointCloud<pcl::PointXYZI>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
     all_obj_pcls_ptr->header = in_cloud_tf_ptr->header;
     //convert vector of PointCloud to a single PointCloud with channels
     all_obj_pcls_ptr->resize((pcl::uindex_t)max_len, (pcl::uindex_t)in_bbox_msg->boxes.size());
@@ -168,28 +199,21 @@ void BBoxProjectPCloud::bb_pcl_project(
     pcl::toROSMsg(*all_obj_pcls_ptr, obj_pcls_msg);
     m_object_pcl_viz_pub->publish(obj_pcls_msg);
 
-    // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
-    cv_bridge::CvImagePtr cv_ptr;
-    try {
-        cv_ptr = cv_bridge::toCvCopy(in_img_msg, sensor_msgs::image_encodings::BGR8);
-    } catch (cv_bridge::Exception &e) {
-        RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
-        return;
-    }
-
-    cv_bridge::CvImagePtr cv_hsv_ptr = cv_bridge::cvtColor(cv_ptr.toCvShare(), cv::COLOR_RGB2HSV);
-
     // REFINE OBJECT POINT CLOUDS
     for(auto bbox_pcloud_pair : bbox_pcloud_objects){
         all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = bbox_pcloud_pair.first;
-        pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
 
         //extract clusters
-        pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>());
+        //TODO: MAKE THE CLUSTER EXTRACTION ALGORITHM USE MY OWN DISTANCE METRIC THAT INCORPORATES HSV VALUES WITH DIFFERENT WEIGHTS
+        //WE CAN WORK OUR WAY AROUND THAT BY USING A DIFFERENT PCL POINT TYPE (ONE WITH MORE CHANNELS, MAYBE INHERIT FROM THE POINTT TYPE AND MAKE MY OWN) OR NORMAL TYPE
+        //AND EITHER MAKE THE VALUES IN THE CHANNELS MULTIPLIED BY THE SQRT OF THE WEIGHTS (SO THAT IT'S THE SAME FUNCTION) OR CHANGE THE DISTANCE FUNCTION (IF I MAKE MY OWN TYPE)
+        //OR FIND A GENERIC CLUSTERING ALGORITHM FOR N-DIMENSIONAL DATA AND DO THE ABOVE
+        pcl::search::KdTree<pcl::PointXYZHSV>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZHSV>());
         if (!pcloud_ptr->points.empty())
             tree->setInputCloud(pcloud_ptr);
         std::vector<pcl::PointIndices> obstacles_indices;
-        pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
+        pcl::EuclideanClusterExtraction<pcl::PointXYZHSV> ec;
         ec.setClusterTolerance(m_clustering_distance);
         ec.setMinClusterSize(m_obstacle_size_min);
         ec.setMaxClusterSize(m_obstacle_size_max);
@@ -198,7 +222,6 @@ void BBoxProjectPCloud::bb_pcl_project(
         ec.extract(obstacles_indices);
 
         //color segmentation using the color label
-        //TODO: in the end, after finishing the processing, put the results back into the original image (using bbox_offset) to be able to use it with the LiDAR
         cv::Mat hsv_img(cv_hsv_ptr->image, cv::Range(bbox.min_x, bbox.max_x), cv::Range(bbox.min_y, bbox.max_y));
         cv::Size img_sz;
         cv::Point bbox_offset;
@@ -209,16 +232,15 @@ void BBoxProjectPCloud::bb_pcl_project(
         cv::inRange(hsv_img, cv::Scalar(h_min, s_min, v_min), cv::Scalar(h_max, s_max, v_max), mask);
         cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 5));
         cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 7));
-        //TODO: now do the rest for color segmentation, starting from the contours (see color_segmentation.py)
         std::vector<std::vector<cv::Point>> contours;
         cv::findContours(mask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-        for(auto contour : contours){
+        //TODO: Now convert the contour points to fit the original image (using bbox_offset) to be able to use it with the LiDAR (projected) points
 
-        }
+        //TODO: GO THROUGH ALL THE CLUSTER/CONTOUR PAIRS AND FIND THE BEST ONE BASED ON THE OPTIMALITY METRIC WITH THE WEIGHTS
+        for (std::vector<cv::Point> contour : contours){
+            for (pcl::PointIndices obstacle : obstacles_indices) {
 
-        //go through the obstacle clusters and take the most matching one
-        for (auto it = obstacles_indices.begin(); it != obstacles_indices.end(); it++) {
-            
+            }
         }
     }
 }
