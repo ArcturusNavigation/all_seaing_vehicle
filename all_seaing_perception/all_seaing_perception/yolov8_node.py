@@ -55,7 +55,8 @@ class Yolov8Node(Node):
         self.declare_parameter("device", "cuda:0") # change to cpu if running on laptop w/o cuda
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-        self.declare_parameter("image_topic", "/webcam_image")
+#        self.declare_parameter("image_topic", "/webcam_image")
+        self.declare_parameter("image_topic", "/zed/zed_node/rgb/image_rect_color")
         # self.declare_parameter("image_topic", "/image_raw")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
 
@@ -82,7 +83,7 @@ class Yolov8Node(Node):
             self.cv_bridge = CvBridge()
             self.model = YOLO(engine_path)
             self.using_tensorRT = True
-        if os.path.isfile(pt_path):
+        elif os.path.isfile(pt_path):
             self.get_logger().info(f"Loading model from pt model: {pt_path}")
             self.cv_bridge = CvBridge()
             self.model = YOLO(pt_path)
