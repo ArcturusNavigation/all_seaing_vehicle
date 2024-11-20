@@ -1,6 +1,10 @@
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 import launch_ros
@@ -28,14 +32,13 @@ def launch_setup(context, *args, **kwargs):
         parameters=[robot_localization_params],
     )
 
-    with open(locations_file, 'r') as f:
+    with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
-        remappings=[("gps/fix", "/mavros/global_position/raw/fix")],
         parameters=[
             robot_localization_params,
             {"datum": [lat, lon, 0.0]},
@@ -47,12 +50,12 @@ def launch_setup(context, *args, **kwargs):
         executable="xdrive_controller.py",
         parameters=[
             {
-                "front_right_xy": [0.5, -0.5],
-                "back_left_xy": [-0.5, 0.5],
-                "front_left_xy": [0.5, 0.5],
-                "back_right_xy": [-0.5, -0.5],
-                "thruster_angle": 45.0,
-                "drag_constants": [5.0, 5.0, 40.0],
+                "front_right_xy": [0.27, -0.27],
+                "back_left_xy": [-0.27, 0.27],
+                "front_left_xy": [0.27, 0.27],
+                "back_right_xy": [-0.27, -0.27],
+                "thruster_angle": 67.5,
+                "drag_constants": [50.0, 50.0, 200.0],
                 "output_range": [1100.0, 1900.0],
                 "smoothing_factor": 0.8,
             }
@@ -82,10 +85,10 @@ def launch_setup(context, *args, **kwargs):
         executable="controller_server.py",
         parameters=[
             {"global_frame_id": "odom"},
-            {"Kpid_x": [1.0, 0.0, 0.0]},
-            {"Kpid_y": [1.0, 0.0, 0.0]},
-            {"Kpid_theta": [1.0, 0.0, 0.0]},
-            {"max_vel": [2.0, 1.0, 0.8]},
+            {"Kpid_x": [0.3, 0.0, 0.0]},
+            {"Kpid_y": [0.3, 0.0, 0.0]},
+            {"Kpid_theta": [0.3, 0.0, 0.0]},
+            {"max_vel": [1.5, 1.0, 0.3]},
         ],
         output="screen",
     )
@@ -94,7 +97,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": 1.0},
+            {"xy_threshold": 0.1},
             {"theta_threshold": 5.0},
         ],
         output="screen",
@@ -123,18 +126,6 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
-        }.items(),
-    )
-
-    ublox_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                driver_prefix,
-                "/launch/ublox_gps.launch.py",
-            ]
-        ),
-        launch_arguments={
             "port": "/dev/ttyACM1",
         }.items(),
     )
@@ -159,7 +150,6 @@ def launch_setup(context, *args, **kwargs):
         thrust_commander_node,
         lidar_ld,
         mavros_ld,
-        ublox_ld,
         zed_ld,
     ]
 
