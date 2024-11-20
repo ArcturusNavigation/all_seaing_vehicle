@@ -44,13 +44,20 @@ class Yolov8Node(Node):
     def __init__(self) -> None:
         super().__init__("yolov8_node")
 
+        perception_prefix = get_package_share_directory("all_seaing_perception")
+        bringup_prefix = get_package_share_directory("all_seaing_bringup")
+
+        self.get_logger().info(perception_prefix)
+        self.get_logger().info(bringup_prefix)
+
         # Declare parameters
         self.declare_parameter("model", "yolov8m_roboboat_current_model")
-        self.declare_parameter("device", "cuda:0")
+        # self.declare_parameter("device", "cuda:0")
+        self.declare_parameter("device", "cpu")
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-        # self.declare_parameter("image_topic", "/webcam_image/image")
-        self.declare_parameter("image_topic", "/image_raw")
+        self.declare_parameter("image_topic", "/webcam_image")
+        # self.declare_parameter("image_topic", "/image_raw")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
         self.declare_parameter("tensorRT", True)
        
@@ -62,29 +69,31 @@ class Yolov8Node(Node):
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
         # use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
-        path_directory = get_package_share_directory("all_seaing_bringup")
-        yaml_file_path = os.path.join(path_directory, 'config','perception','color_label_mappings.yaml')
+        yaml_file_path = os.path.join(bringup_prefix, 'config','perception','color_label_mappings.yaml')
+        
         with open(yaml_file_path,'r') as f:
             self.label_dict = yaml.safe_load(f)
+        # self.get_logger().info(str(self.label_dict))
+        # self.get_logger().info(yaml_file_path)
 
         # Get the model's path
-        self.model_dir = os.path.expanduser("~/dev_ws/src/all_seaing_vehicle/all_seaing_perception/models")
-        model_path1 = os.path.join(self.model_dir, model_name+'.engine')
-        model_path2 = os.path.join(self.model_dir, model_name+'.pt')
+        engine_path = os.path.join(perception_prefix, 'models', model_name + '.engine')
+        pt_path = os.path.join(perception_prefix, 'models', model_name + '.pt')
         self.using_tensorRT = False
 
         # Initialize YOLO model
-        if os.path.isfile(model_path1):
-            self.get_logger().info(f"Loading model from tensorRT engine: {model_path1}")
+        # check if we are using the jetson and if the engine path exists.
+        if os.path.exists('/etc/nv_tegra_release') and os.path.isfile(engine_path):
+            self.get_logger().info(f"Loading model from tensorRT engine: {engine_path}")
             self.cv_bridge = CvBridge()
-            self.tensorrtmodel = YOLO(model_path1)
+            self.model = YOLO(engine_path)
             self.using_tensorRT = True
-        elif os.path.isfile(model_path2):
-            self.get_logger().info(f"Loading model from pt model: {model_path2}")
+        if os.path.isfile(pt_path):
+            self.get_logger().info(f"Loading model from pt model: {pt_path}")
             self.cv_bridge = CvBridge()
-            self.yolo = YOLO(model_path2)
+            self.model = YOLO(pt_path)
         else:
-            self.get_logger().error(f"Both model paths do not exist :( TensorRT: {model_path1} and pt: {model_path2}")
+            self.get_logger().error(f"Both model paths do not exist :( TensorRT: {engine_path} and pt: {pt_path}")
             #print("YOLO BEFORE EXPORT", self.yolo)
             # if use_tensorRT:
             #     print('In tensorRT if loop :)')
@@ -104,7 +113,7 @@ class Yolov8Node(Node):
                 #dot_loc = model_name.index('.')
                 #to_new_model_name = model_name[:dot_loc]
                 #self.yolo = YOLO(to_new_model_name+'.engine', task='detect')
-            self.yolo.fuse()
+            # self.yolo.fuse()
             # print("Fused :)")
 
         # Setup QoS profile
@@ -125,8 +134,6 @@ class Yolov8Node(Node):
         self.enable = True
         self._srv = self.create_service(SetBool, "enable", self.enable_cb)
 
-        self.get_logger().info(f"Yolov8Node initialized")
-
     def enable_cb(self, req: SetBool.Request, res: SetBool.Response) -> SetBool.Response:
         self.enable = req.data
         res.success = True
@@ -140,11 +147,10 @@ class Yolov8Node(Node):
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
 
             if self.using_tensorRT:
-                results = self.tensorrtmodel(cv_image)
-                #print("Running using engine :)")
+                results = self.model(cv_image)
             else:
                 # Predict based on image
-                results = self.yolo.predict(
+                results = self.model.predict(
                     source=cv_image,
                     verbose=False,
                     stream=False,
@@ -177,14 +183,8 @@ class Yolov8Node(Node):
                     labeled_bounding_box_msgs.boxes.append(box_msg)
 
                     annotator = Annotator(cv_image, 2, 2, "Arial.ttf", False)
-                    # Draw the bounding box on the image
-                    # cv2.rectangle(cv_image,
-                    #               (box_msg.min_x, box_msg.min_y),
-                    #               (box_msg.max_x, box_msg.max_y),
-                    #               (0, 255, 0),  # Green color
-                    #               2)  # Thickness
 
-                    class_name = self.tensorrtmodel.names[int(box_data.cls)] + str(int(box_data.cls))
+                    class_name = self.model.names[int(box_data.cls)] + str(int(box_data.cls))
                     class_name_list = class_name.split('_')
                     color_name = class_name_list[0]
                     color = ()
