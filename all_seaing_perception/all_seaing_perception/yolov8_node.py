@@ -52,29 +52,23 @@ class Yolov8Node(Node):
 
         # Declare parameters
         self.declare_parameter("model", "yolov8m_roboboat_current_model")
-        # self.declare_parameter("device", "cuda:0")
-        self.declare_parameter("device", "cpu")
+        self.declare_parameter("device", "cuda:0") # change to cpu if running on laptop w/o cuda
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
         self.declare_parameter("image_topic", "/webcam_image")
         # self.declare_parameter("image_topic", "/image_raw")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
-        self.declare_parameter("tensorRT", True)
-       
 
         # Get parameters
         model_name = self.get_parameter("model").get_parameter_value().string_value
         self.device = self.get_parameter("device").get_parameter_value().string_value
         self.threshold = self.get_parameter("threshold").get_parameter_value().double_value
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
-        # use_tensorRT = self.get_parameter("tensorRT").get_parameter_value().bool_value
 
         yaml_file_path = os.path.join(bringup_prefix, 'config','perception','color_label_mappings.yaml')
         
         with open(yaml_file_path,'r') as f:
             self.label_dict = yaml.safe_load(f)
-        # self.get_logger().info(str(self.label_dict))
-        # self.get_logger().info(yaml_file_path)
 
         # Get the model's path
         engine_path = os.path.join(perception_prefix, 'models', model_name + '.engine')
@@ -94,27 +88,7 @@ class Yolov8Node(Node):
             self.model = YOLO(pt_path)
         else:
             self.get_logger().error(f"Both model paths do not exist :( TensorRT: {engine_path} and pt: {pt_path}")
-            #print("YOLO BEFORE EXPORT", self.yolo)
-            # if use_tensorRT:
-            #     print('In tensorRT if loop :)')
-            #     self.yolo.export(format="engine", dynamic=True)
-            #     print('Exported!')
-            #     self.tensorrtmodel = YOLO(model_name[:-3]+'.engine')
-            #     print("Attached model to exported tensorRT ones")
-                #print("YOLO AFTER EXPORT", self.yolo)
-                #self.yolo.export(
-                    #format="engine",
-                    #dynamic=True,
-                    #batch=8,
-                    #workspace=4,
-                    #int8=True,
-                    #data="args.yaml",
-                #)
-                #dot_loc = model_name.index('.')
-                #to_new_model_name = model_name[:dot_loc]
-                #self.yolo = YOLO(to_new_model_name+'.engine', task='detect')
-            # self.yolo.fuse()
-            # print("Fused :)")
+            
 
         # Setup QoS profile
         image_qos_profile = QoSProfile(
@@ -146,20 +120,18 @@ class Yolov8Node(Node):
             # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
 
-            if self.using_tensorRT:
-                results = self.model(cv_image)
-            else:
-                # Predict based on image
-                results = self.model.predict(
-                    source=cv_image,
-                    verbose=False,
-                    stream=False,
-                    conf=self.threshold,
-                    device=self.device
-                )
-                #print('Running using pt :|')
-            results: Results = results[0].cpu()
-            # print('Image results ready')
+            # if self.using_tensorRT:
+            #     results = self.model(cv_image)
+            # else:
+            # # Predict based on image
+            pred_results = self.model.predict(
+                source=cv_image,
+                verbose=False,
+                stream=False,
+                conf=self.threshold,
+                device=self.device
+            )
+            results: Results = pred_results[0].cpu()
 
             label_dict = self.label_dict
 
