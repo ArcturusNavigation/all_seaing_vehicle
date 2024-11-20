@@ -55,9 +55,7 @@ class Yolov8Node(Node):
         self.declare_parameter("device", "cuda:0") # change to cpu if running on laptop w/o cuda
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-#        self.declare_parameter("image_topic", "/webcam_image")
-        self.declare_parameter("image_topic", "/zed/zed_node/rgb/image_rect_color")
-        # self.declare_parameter("image_topic", "/image_raw")
+        self.declare_parameter("image_topic", "/image_raw")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
 
         # Get parameters
@@ -121,10 +119,6 @@ class Yolov8Node(Node):
             # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
 
-            # if self.using_tensorRT:
-            #     results = self.model(cv_image)
-            # else:
-            # # Predict based on image
             pred_results = self.model.predict(
                 source=cv_image,
                 verbose=False,
