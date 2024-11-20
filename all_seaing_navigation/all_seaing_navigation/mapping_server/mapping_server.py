@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+
 from scipy.spatial import ConvexHull
-# from utils import GeometryPrimitives
+
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import OccupancyGrid, MapMetaData
 from all_seaing_interfaces.msg import ObstacleMap
 
 
-class PathPlan(Node):
+class MappingServer(Node):
     """ Inputs obstacle convex hulls(labeled_map) and outputs global map (Occupancy_grid) """
 
     def __init__(self):
@@ -17,11 +20,16 @@ class PathPlan(Node):
         self.labeled_map_topic = "labeled_map"
 
         # Subscriber to labeled_map
+        self.group1 = MutuallyExclusiveCallbackGroup()
+        self.group2 = MutuallyExclusiveCallbackGroup()
         self.labeled_map_sub = self.create_subscription(
-            ObstacleMap, self.labeled_map_topic, self.hulls_update_cb, 10)
+            ObstacleMap, self.labeled_map_topic, self.hulls_update_cb, 10,callback_group=self.group1)
 
         # Publishers for path and PoseArray
-        self.grid_pub = self.create_publisher(OccupancyGrid, "occupancy_grid", 20)
+        self.grid_pub = self.create_publisher(OccupancyGrid, "occupancy_grid", 20, callback_group=self.group2)
+        self.timer_period = 1.0
+        self.timer = self.create_timer(self.timer_period, self.timer_callback, callback_group=self.group2)
+        self.iterations = 0
 
         # Local variables
         self.labeled_map = ObstacleMap()
@@ -41,14 +49,12 @@ class PathPlan(Node):
         self.grid.info.origin.position.y = 0.0
         self.grid.info.origin.position.z = 0.0
 
-
         self.grid.data = [-1] * self.grid.info.width * self.grid.info.height
 
         # Position of ship relative to global origin
         # TO DO: receive and set the position of the ship somewhere
         self.ship_pos = (10,42)
         self.lidar_rad = 10
-
 
         # Active cells in row major order            
         self.active_cells = [False] * self.grid.info.width * self.grid.info.height
@@ -95,7 +101,7 @@ class PathPlan(Node):
         for obstacle in self.labeled_map.obstacles:
             gchull = obstacle.global_chull.polygon.points
             m_polygon = [(point.x, point.y) for point in gchull]
-            m_polygon.append(self.ship_pos)
+            # m_polygon.append(self.ship_pos)
             all_mpolys.append(m_polygon)
             all_modified_hulls.append(ConvexHull(m_polygon))
 
@@ -117,7 +123,7 @@ class PathPlan(Node):
                     ctr = 0
                     for line_indices in mhull.simplices: #indices of points that form a line
                         ctr += (self.intersect(mpoly[line_indices[0]], mpoly[line_indices[1]],
-                                                (int(worldx),int(worldy)), (self.ship_pos[0], self.ship_pos[1])))
+                                                ((worldx),(worldy)), (self.ship_pos[0], self.ship_pos[1])))
                     if ctr == 2:
                         continue
                     if ctr > 2:
@@ -132,10 +138,14 @@ class PathPlan(Node):
         for x in range(0, self.grid.info.width):
             for y in range(0, self.grid.info.height):
                 if self.active_cells[x + y*self.grid.info.width]:
-                    self.grid.data[x+y*self.grid.info.width] = 100
-                else:
                     self.grid.data[x+y*self.grid.info.width] = 0
+                else:
+                    self.grid.data[x+y*self.grid.info.width] = 100
+    
+    def timer_callback(self):
+        self.iterations += 1
         self.publish_grid()
+
 
     
     def hulls_update_cb(self, msg):
@@ -151,9 +161,11 @@ class PathPlan(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    planner = PathPlan()
-    rclpy.spin(planner)
-    planner.destroy_node()
+    node = MappingServer()
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
+    executor.spin()
+    node.destroy_node()
     rclpy.shutdown()
 
 if __name__ == "__main__":
