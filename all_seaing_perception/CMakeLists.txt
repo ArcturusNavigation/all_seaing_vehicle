@@ -53,6 +53,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/yolov8_node.py
     ${PROJECT_NAME}/image_splitter.py
     ${PROJECT_NAME}/perception_eval.py
+    ${PROJECT_NAME}/triangle1.png
     DESTINATION lib/${PROJECT_NAME}
 )
 

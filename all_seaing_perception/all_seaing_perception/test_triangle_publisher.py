@@ -19,7 +19,7 @@ class TrianglePublisher(Node):
         # Publish the image at 1Hz
         self.timer = self.create_timer(1.0, self.publish_image)
         print(f"Started publishing image: {image_path}")
-        
+
     def publish_image(self):
         try:
             ros_image = self.bridge.cv2_to_imgmsg(self.image, "bgr8")
@@ -31,10 +31,10 @@ class TrianglePublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
     # Specify the image filename
-    image_filename = "triangle1.png"  # Replace with your image filename
-    image_path = os.path.join(os.path.dirname(__file__), image_filename)
+    image_path = "/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception/all_seaing_perception/square.png"
     triangle_publisher = TrianglePublisher(image_path)
     rclpy.spin(triangle_publisher)
     rclpy.shutdown()
+
 if __name__ == "__main__":
     main()

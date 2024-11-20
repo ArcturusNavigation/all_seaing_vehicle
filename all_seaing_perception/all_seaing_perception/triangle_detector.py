@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -14,6 +15,7 @@ class TriangleDetector(Node):
         self.annotated_publisher = self.create_publisher(Image, "triangle_detected_image", 10)
         self.bridge = CvBridge()
         print('started triangle detector node')
+        self.get_logger().info("This is an info message")
         
     def detect_triangle(self, img_msg):
         try:
@@ -35,9 +37,12 @@ class TriangleDetector(Node):
                 if len(approx) == 3:
                     # Draw the triangle on the image
                     cv2.drawContours(cv2_image, [approx], -1, (0, 255, 0), 2)
+                    self.get_logger().info("this is a triangle!")
+
             # Convert the annotated image back to ROS format
             annotated_image = self.bridge.cv2_to_imgmsg(cv2_image, "bgr8")
             self.annotated_publisher.publish(annotated_image)
+
         except Exception as e:
             self.get_logger().error(f"Failed to detect triangle: {e}")
 
@@ -46,15 +51,6 @@ def main(args=None):
     triangle_detector_node = TriangleDetector()
     rclpy.spin(triangle_detector_node)
     rclpy.shutdown()
-    # ros2 run your_package_name triangle_detector.py --ros-args --remap /image_to_detect:=/your_camera/image_topic
-    if __name__ == "__main__":
-        main()
 
-
-
-
-
-
-
-
-
+if __name__ == "__main__":
+    main()
