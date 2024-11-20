@@ -135,7 +135,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
         }.items(),
     )
 
