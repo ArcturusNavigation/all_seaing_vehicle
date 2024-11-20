@@ -109,6 +109,15 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
+        ]
+    )
+
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
