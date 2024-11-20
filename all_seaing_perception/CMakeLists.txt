@@ -46,6 +46,8 @@ install(TARGETS
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/color_segmentation.py
+    ${PROJECT_NAME}/triangle_detector.py
+    ${PROJECT_NAME}/test_triangle_publisher.py
     ${PROJECT_NAME}/yolov5_detector.py
     ${PROJECT_NAME}/yolov5_image.py
     ${PROJECT_NAME}/yolov8_node.py
