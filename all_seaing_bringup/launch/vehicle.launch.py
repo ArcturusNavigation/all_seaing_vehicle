@@ -15,6 +15,7 @@ import yaml
 def launch_setup(context, *args, **kwargs):
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
+    description_prefix = get_package_share_directory("all_seaing_description")
     driver_prefix = get_package_share_directory("all_seaing_driver")
 
     robot_localization_params = os.path.join(
@@ -148,6 +149,15 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
+    static_transforms = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                description_prefix,
+                "/launch/static_transforms.launch.py",
+            ]
+        )
+    )
+
     return [
         ekf_node,
         navsat_node,
@@ -160,6 +170,7 @@ def launch_setup(context, *args, **kwargs):
         lidar_ld,
         mavros_ld,
         zed_ld,
+        static_transforms,
     ]
 
 
