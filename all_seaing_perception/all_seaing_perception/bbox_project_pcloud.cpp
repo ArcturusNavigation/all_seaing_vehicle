@@ -248,7 +248,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         cec.setConditionFunction(&hsv_diff_condition);
         cec.segment(obstacles_indices);
 
-        //color segmentation using the color label
+        // color segmentation using the color label
         cv::Mat hsv_img(cv_hsv_ptr->image, cv::Range(bbox.min_x, bbox.max_x), cv::Range(bbox.min_y, bbox.max_y));
         cv::Size img_sz;
         cv::Point bbox_offset;
@@ -261,8 +261,12 @@ void BBoxProjectPCloud::bb_pcl_project(
         cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, 7));
         std::vector<std::vector<cv::Point>> contours;
         cv::findContours(mask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-        //TODO: Now convert the contour points to fit the original image (using bbox_offset) to be able to use it with the LiDAR (projected) points
-
+        // Convert the contour points to fit the original image (using image_sz and bbox_offset -> just bbox_offset+pt_coords) to be able to use it with the LiDAR (projected) points
+        for(int ctr = 0; ctr < contours.size(); ctr++){
+            for(int pt=0; pt < contours[ctr].size(); pt++){
+                contours[ctr][pt]+=bbox_offset;
+            }
+        }
         //TODO: GO THROUGH ALL THE CLUSTER/CONTOUR PAIRS AND FIND THE BEST ONE BASED ON THE OPTIMALITY METRIC WITH THE WEIGHTS
         for (std::vector<cv::Point> contour : contours){
             for (pcl::PointIndices obstacle : obstacles_indices) {
