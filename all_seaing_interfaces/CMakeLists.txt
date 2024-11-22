@@ -10,7 +10,8 @@ ament_auto_find_build_dependencies()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     "action/Waypoint.action"
-    "action/TaskOne.action"
+    "action/Task.action"
+    "action/ShootBoat.action"
     "msg/ObstacleMap.msg"
     "msg/Obstacle.msg"
     "msg/ControlOption.msg"
@@ -18,6 +19,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/LabeledBoundingBox2D.msg"
     "msg/Heartbeat.msg"
     "msg/ASV2State.msg"
+    "msg/BoatInfo.msg"
     "msg/BuoyPair.msg"
     "msg/BuoyPairArray.msg"
     "msg/Waypoint.msg"

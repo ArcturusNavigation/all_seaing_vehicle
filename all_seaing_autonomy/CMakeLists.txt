@@ -14,6 +14,10 @@ install(PROGRAMS
     ${PROJECT_NAME}/roboboat/waypoint_finder.py
     ${PROJECT_NAME}/roboboat/task_manager.py
     ${PROJECT_NAME}/roboboat/Task.py
+    ${PROJECT_NAME}/roboboat/run_tasks.py
+    ${PROJECT_NAME}/roboboat/task_1.py
+    ${PROJECT_NAME}/roboboat/task_2.py
+    ${PROJECT_NAME}/roboboat/task_5.py
     ${PROJECT_NAME}/vrx/acoustic_tracking/vrx_acoustic_tracking_sub.py
     DESTINATION lib/${PROJECT_NAME}
 )
