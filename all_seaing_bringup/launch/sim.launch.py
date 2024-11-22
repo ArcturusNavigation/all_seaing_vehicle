@@ -210,8 +210,13 @@ def generate_launch_description():
         output="screen",
     )
 
-    keyboard_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
+    keyboard_ld = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="boat_controller.py",
+        parameters=[
+            {"is_real": False}
+        ],
+        output="screen",
     )
 
     sim_ld = IncludeLaunchDescription(
