@@ -83,6 +83,9 @@ private:
         const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg,
         const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg);
 
+    // The HSV-similarity condition for Conditional Euclidean Clustering
+    bool hsv_diff_condition(const pcl::PointXYZHSV& p1, const pcl::PointXYZHSV& p2, float sq_dist);
+
     int m_obstacle_id;
 
     // for cluster extraction
@@ -107,6 +110,7 @@ private:
 
     double m_clustering_distance_weight;
     std::vector<double> m_clustering_color_weights;
+    double m_clustering_hue_thres;
     double m_cluster_contour_distance_weight;
     std::vector<double> m_cluster_contour_color_weights;
     std::vector<double> m_contour_detection_color_weights;

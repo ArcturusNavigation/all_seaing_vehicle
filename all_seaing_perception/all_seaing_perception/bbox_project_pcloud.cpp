@@ -90,6 +90,7 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
 
         m_clustering_distance_weight = matching_weights_yaml["clustering_distance_weight"];
         m_clustering_color_weights = matching_weights_yaml["clustering_color_weights"];
+        m_clustering_color_thres = matching_weights_yaml["clustering_color_thres"];
         m_cluster_contour_distance_weight = matching_weights_yaml["cluster_contour_distance_weight"];
         m_cluster_contour_color_weights = matching_weights_yaml["cluster_contour_color_weights"];
         m_contour_detection_color_weights = matching_weights_yaml["contour_detection_color_weights"];
@@ -103,6 +104,10 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
 void BBoxProjectPCloud::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
     RCLCPP_INFO(this->get_logger(), "GOT CAMERA INFO");
     m_cam_model.fromCameraInfo(info_msg);
+}
+
+bool hsv_diff_condition(const pcl::PointXYZHSV& p1, const pcl::PointXYZHSV& p2, float sq_dist){
+    return m_clustering_color_weights[0]*p1.h^2+m_clustering_color_weights[1]*p1.s^2+m_clustering_color_weights[2]*p1.v^2<m_clustering_color_thres^2;
 }
 
 void BBoxProjectPCloud::bb_pcl_project(
@@ -163,8 +168,11 @@ void BBoxProjectPCloud::bb_pcl_project(
                 // Check if point is in bbox
                 if(xy_rect.x >= bbox.min_x-bbox_margin && xy_rect.x <= bbox.max_x+bbox_margin && xy_rect.y >= bbox.min_y-bbox_margin && xy_rect.y <= bbox.max_y+bbox_margin){
                     cv::Vec3b hsv = cv_hsv_ptr->image.at<cv::Vec3b>(xy_rect);
+                    // cv::Vec3b rgb = cv_ptr->image.at<cv::Vec3b>(xy_rect);
                     obj_cloud_ptr->push_back(pcl::PointXYZHSV(point_tf.x, point_tf.y, point_tf.z, hsv[0], hsv[1], hsv[2]));
-                    RCLCPP_DEBUG(this->get_logger(), "SELECTED POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%lf, %lf, %lf)", xy_rect.x, xy_rect.y, hsv[0], hsv[1], hsv[2]);
+                    // obj_cloud_ptr->push_back(pcl::PointXYZRGB(point_tf.x, point_tf.y, point_tf.z, rgb[0], rgb[1], rgb[2]));
+                    RCLCPP_DEBUG(this->get_logger(), "SELECTED HSV POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%lf, %lf, %lf)", xy_rect.x, xy_rect.y, hsv[0], hsv[1], hsv[2]);
+                    // RCLCPP_DEBUG(this->get_logger(), "SELECTED RGB POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%lf, %lf, %lf)", xy_rect.x, xy_rect.y, rgb[0], rgb[1], rgb[2]);
                 }
             }
         }
@@ -179,6 +187,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     RCLCPP_INFO(this->get_logger(), "WILL NOW SEND OBJECT POINT CLOUDS");
     m_object_pcl_pub->publish(object_pcls);
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
     all_obj_pcls_ptr->header = in_cloud_tf_ptr->header;
     //convert vector of PointCloud to a single PointCloud with channels
     all_obj_pcls_ptr->resize((pcl::uindex_t)max_len, (pcl::uindex_t)in_bbox_msg->boxes.size());
@@ -203,23 +212,41 @@ void BBoxProjectPCloud::bb_pcl_project(
     for(auto bbox_pcloud_pair : bbox_pcloud_objects){
         all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = bbox_pcloud_pair.first;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
+        // pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
+        // pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr_hsv(new pcl::PointCloud<pcl::PointXYZHSV>);
+        // // CONVERT RGB POINTS TO HSV
+        // for(auto pt : pcloud_ptr->points){
+        //     pcl::PointXYZHSV pt_hsv;
+        //     pcl::PointXYZRGBtoXYZHSV(*pt, pt_hsv);
+        //     pcloud_ptr_hsv->push_back(pt_hsv);
+        // }
 
         //extract clusters
-        //TODO: MAKE THE CLUSTER EXTRACTION ALGORITHM USE MY OWN DISTANCE METRIC THAT INCORPORATES HSV VALUES WITH DIFFERENT WEIGHTS
-        //WE CAN WORK OUR WAY AROUND THAT BY USING A DIFFERENT PCL POINT TYPE (ONE WITH MORE CHANNELS, MAYBE INHERIT FROM THE POINTT TYPE AND MAKE MY OWN) OR NORMAL TYPE
-        //AND EITHER MAKE THE VALUES IN THE CHANNELS MULTIPLIED BY THE SQRT OF THE WEIGHTS (SO THAT IT'S THE SAME FUNCTION) OR CHANGE THE DISTANCE FUNCTION (IF I MAKE MY OWN TYPE)
-        //OR FIND A GENERIC CLUSTERING ALGORITHM FOR N-DIMENSIONAL DATA AND DO THE ABOVE
         pcl::search::KdTree<pcl::PointXYZHSV>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZHSV>());
+        // pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>());
         if (!pcloud_ptr->points.empty())
             tree->setInputCloud(pcloud_ptr);
         std::vector<pcl::PointIndices> obstacles_indices;
-        pcl::EuclideanClusterExtraction<pcl::PointXYZHSV> ec;
-        ec.setClusterTolerance(m_clustering_distance);
-        ec.setMinClusterSize(m_obstacle_size_min);
-        ec.setMaxClusterSize(m_obstacle_size_max);
-        ec.setSearchMethod(tree);
-        ec.setInputCloud(pcloud_ptr);
-        ec.extract(obstacles_indices);
+
+        // EUCLIDEAN CLUSTERING (DEPRECATED)
+        // // pcl::EuclideanClusterExtraction<pcl::PointXYZHSV> ec;
+        // pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
+        // ec.setClusterTolerance(m_clustering_distance);
+        // ec.setMinClusterSize(m_obstacle_size_min);
+        // ec.setMaxClusterSize(m_obstacle_size_max);
+        // ec.setSearchMethod(tree);
+        // ec.setInputCloud(pcloud_ptr);
+        // ec.extract(obstacles_indices);
+
+        // CONDITIONAL (WITH HSV-BASED CONDITION) EUCLIDEAN CLUSTERING
+        pcl::ConditionalEuclideanClustering<pcl::PointHSV> cec;
+        cec.setClusterTolerance(m_clustering_distance);
+        cec.setMinClusterSize(m_obstacle_size_min);
+        cec.setMaxClusterSize(m_obstacle_size_max);
+        cec.setSearchMethod(tree);
+        cec.setInputCloud(pcloud_ptr);
+        cec.setConditionFunction(&hsv_diff_condition);
+        cec.segment(obstacles_indices);
 
         //color segmentation using the color label
         cv::Mat hsv_img(cv_hsv_ptr->image, cv::Range(bbox.min_x, bbox.max_x), cv::Range(bbox.min_y, bbox.max_y));
