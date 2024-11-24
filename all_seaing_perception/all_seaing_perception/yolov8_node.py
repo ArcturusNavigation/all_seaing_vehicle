@@ -34,6 +34,7 @@ import os
 import cv2
 import yaml
 import time
+import csv
 
 from sensor_msgs.msg import Image
 from std_srvs.srv import SetBool
@@ -211,8 +212,15 @@ class Yolov8Node(Node):
                     self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
                     fps = 1/(end_time-start_time)
                     with open("tensorrt_3ft.csv", 'a') as file:
-                        if len(file) <= 100:
-                            file.write(str(fps)+'\n')
+                        file.write(str(fps) +'\n')
+                        file.close()
+                        # reader = csv.reader(file)
+                        # row_count = sum(1 for row in reader)
+                        # if row_count < 100:
+                        #     file.write(str(fps)+'\n')
+                        # else: 
+                        #     print("All Done :)")
+                        #     file.close()
                     # print(len(time_capture))
                     # if len(time_capture) == 100:
                     #     average = 0
