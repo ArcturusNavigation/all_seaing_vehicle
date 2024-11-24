@@ -120,22 +120,33 @@ class Yolov8Node(Node):
             # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
 
-            if using_tensorRT == False:
-                start_time = time.time()
-                pred_results = self.model.predict(
-                    source=cv_image,
-                    verbose=False,
-                    stream=False,
-                    conf=self.threshold,
-                    device=self.device
-                )
-                results: Results = pred_results[0].cpu()
-                end_time = time.time()
-            else:
-                start_time = time.time()
-                results = self.tensorrtmodel(cv_image)
-                results: Results = results[0].cpu()
-                end_time = time.time()
+            start_time = time.time()
+            pred_results = self.model.predict(
+                source=cv_image,
+                verbose=False,
+                stream=False,
+                conf=self.threshold,
+                device=self.device
+            )
+            results: Results = pred_results[0].cpu()
+            end_time = time.time()
+
+            # if using_tensorRT == False:
+            #     start_time = time.time()
+            #     pred_results = self.model.predict(
+            #         source=cv_image,
+            #         verbose=False,
+            #         stream=False,
+            #         conf=self.threshold,
+            #         device=self.device
+            #     )
+            #     results: Results = pred_results[0].cpu()
+            #     end_time = time.time()
+            # else:
+            #     start_time = time.time()
+            #     results = self.tensorrtmodel(cv_image)
+            #     results: Results = results[0].cpu()
+            #     end_time = time.time()
 
             time_capture = []
             if len(time_capture) < 100:
