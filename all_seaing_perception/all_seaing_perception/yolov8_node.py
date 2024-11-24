@@ -33,6 +33,7 @@ from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2D
 import os
 import cv2
 import yaml
+import time
 
 from sensor_msgs.msg import Image
 from std_srvs.srv import SetBool
@@ -65,7 +66,7 @@ class Yolov8Node(Node):
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
 
         yaml_file_path = os.path.join(bringup_prefix, 'config','perception','color_label_mappings.yaml')
-        
+
         with open(yaml_file_path,'r') as f:
             self.label_dict = yaml.safe_load(f)
 
@@ -87,7 +88,7 @@ class Yolov8Node(Node):
             self.model = YOLO(pt_path)
         else:
             self.get_logger().error(f"Both model paths do not exist :( TensorRT: {engine_path} and pt: {pt_path}")
-            
+
 
         # Setup QoS profile
         image_qos_profile = QoSProfile(
@@ -119,14 +120,26 @@ class Yolov8Node(Node):
             # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
 
-            pred_results = self.model.predict(
-                source=cv_image,
-                verbose=False,
-                stream=False,
-                conf=self.threshold,
-                device=self.device
-            )
-            results: Results = pred_results[0].cpu()
+            if using_tensorRT == False:
+                start_time = time.time()
+                pred_results = self.model.predict(
+                    source=cv_image,
+                    verbose=False,
+                    stream=False,
+                    conf=self.threshold,
+                    device=self.device
+                )
+                results: Results = pred_results[0].cpu()
+                end_time = time.time()
+            else:
+                start_time = time.time()
+                results = self.tensorrtmodel(cv_image)
+                results: Results = results[0].cpu()
+                end_time = time.time()
+
+            time_capture = []
+            if len(time_capture) < 100:
+                time_capture.append(1/(end_time-start_time))
 
             label_dict = self.label_dict
 
@@ -171,6 +184,13 @@ class Yolov8Node(Node):
                     box_msg.label = label_dict[color_name]
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
                     self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
+                    if len(time_capture) == 100:
+                        average = 0
+                        sum = 0
+                        for num in time_capture:
+                            sum += num
+                        average = sum/len(time_capture)
+                        self.get_logger.info(f'using_tensorRT is {using_tensorRT} and the FPS is {average} frames per second')
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
