@@ -31,7 +31,7 @@ DOCK_POSITION = (45.697, 32.452, 15) # (x, y, z rotation)
 DESIRED_BANNER = (BannerShape.CIRCLE, BannerColor.RED) # (shape, color)
 SINGLE_DOCK_LENGTH = 5
 DOCK_DEPTH = 2
-ORBIT_RADIUS = 1.5
+ORBIT_RADIUS = 10
 
 CURR_BANNER = 0
 
@@ -109,7 +109,7 @@ class DockingTask(Task):
 
                     _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
                     theta = vDirection - robot_rotation
-                    if theta > 180: theta = 360-theta
+                    if theta > math.pi: theta = -(2*math.pi-theta)
 
                     vx = 10 * math.cos(theta)
                     vy = 10 * math.sin(theta)
@@ -132,7 +132,7 @@ class DockingTask(Task):
                 
                 _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
                 theta = robot_rotation - DOCK_POSITION[2] * 2*math.pi/180.0
-                if theta > 180: theta = 360-theta
+                if theta > math.pi: theta = -(2*math.pi-theta)
                 control_message.twist.angular.z = -theta * 5.0
 
                 if self.state_changed:
@@ -152,7 +152,9 @@ class DockingTask(Task):
 
             case DockingState.SHIFTING:
                 # shift to the correct position
-                direction = 1 if self.has_orbited else -1
+                #direction = 1 if self.has_orbited else -1
+                direction = -1
+                orientation_offset = math.pi if self.has_orbited else 0 
 
                 if self.state_changed:
                     self.start_shifting_position = self.current_position
@@ -161,8 +163,8 @@ class DockingTask(Task):
                 control_message.twist.linear.y = -10.0 * direction
 
                 _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
-                theta = robot_rotation - DOCK_POSITION[2] * 2*math.pi/180.0
-                if theta > 180: theta = 360-theta
+                theta = robot_rotation - DOCK_POSITION[2] * 2*math.pi/180.0 - orientation_offset
+                if theta > math.pi: theta = -(2*math.pi-theta)
                 control_message.twist.angular.z = -theta * 5.0
 
                 # check if we have shifted by a full dock length
@@ -192,8 +194,9 @@ class DockingTask(Task):
                 if self.state_changed:
                     self.orbit_center = add_2d(self.current_position, (ORBIT_RADIUS, 0))
                     self.start_orbit_position = self.current_position
-                    self.orbit_target = (self.current_position.x + 2*ORBIT_RADIUS, self.current_position.y)
+                    self.orbit_target = (self.current_position.x + 2*ORBIT_RADIUS, self.current_position.y, 0)
                 
+                '''
                 # calculate the robot-relative velocity to orbit the center
                 radial_vector = minus(tuple(list(self.orbit_center) + [0]), self.current_position)
                 
@@ -211,10 +214,37 @@ class DockingTask(Task):
                 control_message.twist.linear.x = vMag * math.cos(vDirection)
                 control_message.twist.linear.y = vMag * math.sin(vDirection)
                 control_message.twist.angular.z = angle_kP * angle_diff
-                
+                '''
+
+                delta = minus(self.orbit_target, self.current_position)
+                deltaMag = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
+                kp = 0.1
+
+                vMag = kp * deltaMag
+                vDirection = math.atan2(delta[1], delta[0])
+
+                _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
+                theta = vDirection - robot_rotation
+                if theta > math.pi: theta = -(2*math.pi-theta)
+
+                vx = 10 * math.cos(theta)
+                vy = 10 * math.sin(theta)
+                vtheta = kp * 30 * theta
+
+                control_message.twist.linear.x = vx
+                control_message.twist.linear.y = vy
+                control_message.twist.angular.z = vtheta
+
                 if point_diff_2d(self.orbit_target, self.current_position) < 1:
-                    self.state = DockingState.CHECKING_CAMERA
-                    self.logger.info("Orbited")
+                    control_message.twist.linear.x = 0.0
+                    control_message.twist.linear.y = 0.0
+                    theta = robot_rotation - DOCK_POSITION[2] * 2*math.pi/180.0 + math.pi
+                    if theta > math.pi: theta = -(2*math.pi-theta)
+                    control_message.twist.angular.z = -theta * 5.0
+
+                    if theta < 0.2*math.pi:
+                        self.state = DockingState.CHECKING_CAMERA
+                        self.logger.info("Orbited")
                 
             case DockingState.DONE:
                 # done
