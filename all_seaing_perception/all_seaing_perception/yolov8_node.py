@@ -56,7 +56,7 @@ class Yolov8Node(Node):
         self.declare_parameter("device", "cuda:0") # change to cpu if running on laptop w/o cuda
         self.declare_parameter("threshold", 0.5)
         self.declare_parameter("enable", True)
-        self.declare_parameter("image_topic", "/image_raw")
+        self.declare_parameter("image_topic", "/webcam_image")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
 
         # Get parameters
@@ -114,22 +114,36 @@ class Yolov8Node(Node):
         return res
 
     def image_cb(self, msg: Image) -> None:
-        # print('In image_cb')
+        #print('In image_cb')
 
         if self.enable:
             # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
+            if self.using_tensorRT: 
+                start_time = time.time()
+                results = self.model(cv_image)
+                end_time = time.time()
+            else:
+                start_time = time.time()
+                results = self.yolo.predict(
+                    source=cv_image,
+                    verbose = False,
+                    stream = False,
+                    conf = self.threshold, 
+                    device = self.device
+                )
+                end_time = time.time()
 
-            start_time = time.time()
-            pred_results = self.model.predict(
-                source=cv_image,
-                verbose=False,
-                stream=False,
-                conf=self.threshold,
-                device=self.device
-            )
-            results: Results = pred_results[0].cpu()
-            end_time = time.time()
+            # start_time = time.time()
+            # pred_results = self.model.predict(
+            #     source=cv_image,
+            #     verbose=False,
+            #     stream=False,
+            #     conf=self.threshold,
+            #     device=self.device
+            # )
+            results: Results = results[0].cpu()
+            # end_time = time.time()
 
             # if using_tensorRT == False:
             #     start_time = time.time()
@@ -148,9 +162,9 @@ class Yolov8Node(Node):
             #     results: Results = results[0].cpu()
             #     end_time = time.time()
 
-            time_capture = []
-            if len(time_capture) < 100:
-                time_capture.append(1/(end_time-start_time))
+            # time_capture = []
+            # if len(time_capture) < 100:
+            #     time_capture.append(1/(end_time-start_time))
 
             label_dict = self.label_dict
 
@@ -195,13 +209,13 @@ class Yolov8Node(Node):
                     box_msg.label = label_dict[color_name]
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
                     self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
-                    if len(time_capture) == 100:
-                        average = 0
-                        sum = 0
-                        for num in time_capture:
-                            sum += num
-                        average = sum/len(time_capture)
-                        self.get_logger.info(f'using_tensorRT is {using_tensorRT} and the FPS is {average} frames per second')
+                    # print(len(time_capture))
+                    # if len(time_capture) == 100:
+                    #     average = 0
+                    #     sum = 0
+                    #     for num in time_capture:
+                    #         sum += num
+                    #     average = sum/len(time_capture)
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
