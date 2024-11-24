@@ -119,7 +119,7 @@ class Yolov8Node(Node):
         if self.enable:
             # Convert image to cv_image
             cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
-            if self.using_tensorRT: 
+            if self.using_tensorRT:
                 start_time = time.time()
                 results = self.model(cv_image)
                 end_time = time.time()
@@ -129,7 +129,7 @@ class Yolov8Node(Node):
                     source=cv_image,
                     verbose = False,
                     stream = False,
-                    conf = self.threshold, 
+                    conf = self.threshold,
                     device = self.device
                 )
                 end_time = time.time()
@@ -209,6 +209,10 @@ class Yolov8Node(Node):
                     box_msg.label = label_dict[color_name]
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
                     self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
+                    fps = 1/(end_time-start_time)
+                    with open("tensorrt_3ft.csv", 'a') as file:
+                        if len(file) <= 100:
+                            file.write(str(fps)+'\n')
                     # print(len(time_capture))
                     # if len(time_capture) == 100:
                     #     average = 0
