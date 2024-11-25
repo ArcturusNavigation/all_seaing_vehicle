@@ -5,7 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <exception>
-#include <pair>
+#include <cmath>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -86,6 +86,9 @@ private:
     // The HSV-similarity condition for Conditional Euclidean Clustering
     bool hsv_diff_condition(const pcl::PointXYZHSV& p1, const pcl::PointXYZHSV& p2, float sq_dist);
 
+    // The penalty function that compares an HSV color value to an HSV color range
+    double color_range_penalty(vector<double> weights, int[6] color_range, cv::Vec3b pt_color);
+
     int m_obstacle_id;
 
     // for cluster extraction
@@ -105,6 +108,7 @@ private:
 
     // for cluster-contour matching/selection
     std::string matching_weights_file;
+    std::string contour_matching_color_ranges_file;
 
     YAML::Node matching_weights_yaml;
 
@@ -115,6 +119,7 @@ private:
     std::vector<double> m_cluster_contour_color_weights;
     std::vector<double> m_contour_detection_color_weights;
     double m_cluster_contour_size_weight;
+    std::map<std::string, int[6]> contour_matching_color_range_map;
 
 public:
     BBoxProjectPCloud();
