@@ -53,27 +53,12 @@ class MappingServer(Node):
 
         # Position of ship relative to global origin
         # TO DO: receive and set the position of the ship somewhere
-        self.ship_pos = (10,42)
-        self.lidar_rad = 10
+        self.ship_pos = (330,55)
+        self.lidar_rad = 20
 
         # Active cells in row major order            
         self.active_cells = [False] * self.grid.info.width * self.grid.info.height
         self.get_logger().info("Initialized Mapping Server")
-
-    def ccw(self,A,B,C):
-        v1,v2 = (B[0]-A[0], B[1]-A[1]), (C[0]-B[0], C[1]-B[1])
-        return v1[0]*v2[1] - v1[1]*v2[0]
-    def dot(self,A,B):
-        return A[0]*B[0]+A[1]*B[1]
-    def intersect(self,A,B,C,D):
-        if self.ccw(A,B,C) == 0 or self.ccw(A,B,D) == 0:
-            vB = (B[0]-A[0], B[1]-A[1])
-            aC = (C[0]-A[0], C[1]-A[1])
-            bC = (C[0]-B[0], C[1]-B[1])
-            aD = (D[0]-A[0], D[1]-A[1])
-            bD = (D[0]-B[0], D[1]-B[1])
-            return self.dot(aC,aC) + self.dot(bC, bC) <= self.dot(vB, vB) or self.dot(aD,aD) + self.dot(bD, bD) <= self.dot(vB, vB)
-        return self.ccw(A,C,D) * self.ccw(B,C,D) < 0 and self.ccw(A,B,C) * self.ccw(A,B,D) < 0
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -93,60 +78,49 @@ class MappingServer(Node):
 
     def find_active_cells(self):
         """
-        Find the current active cells that the sensors can see, and mark them as active
-        Mark cells inactive if behind obstacles
+        Mark cells inside bbox of each obstacle as active,
+        Then modifies probability of each cell based on active/not
         """
-        all_modified_hulls = []
-        all_mpolys = []
         for obstacle in self.labeled_map.obstacles:
-            gchull = obstacle.global_chull.polygon.points
-            m_polygon = [(point.x, point.y) for point in gchull]
-            # m_polygon.append(self.ship_pos)
-            all_mpolys.append(m_polygon)
-            all_modified_hulls.append(ConvexHull(m_polygon))
+            minx, miny = self.world_to_grid(obstacle.bbox_min.x, obstacle.bbox_min.y)
+            maxx, maxy = self.world_to_grid(obstacle.bbox_max.x, obstacle.bbox_max.y)
 
-        #test if cells are active
-        #O(W * H * |hulls|) (very slow)
-        self.get_logger().info("Started finding active cells")
-        for x in range(0, self.grid.info.width):
-            for y in range(0, self.grid.info.height):
-                worldx, worldy = self.grid_to_world(x,y)
-                rad = (worldx-self.ship_pos[0])**2 + (worldy-self.ship_pos[1])**2
-                if (worldx-self.ship_pos[0])**2 + (worldy-self.ship_pos[1])**2 > self.lidar_rad**2:
-                    self.active_cells[x + y * self.grid.info.width] = False
-                    continue
-                self.active_cells[x + y * self.grid.info.width] = True
-                if len(self.labeled_map.obstacles) == 0:
-                    continue
-                for mhull, mpoly in zip(all_modified_hulls, all_mpolys):
-                    # Check if cell is behind convex hull
-                    ctr = 0
-                    for line_indices in mhull.simplices: #indices of points that form a line
-                        ctr += (self.intersect(mpoly[line_indices[0]], mpoly[line_indices[1]],
-                                                ((worldx),(worldy)), (self.ship_pos[0], self.ship_pos[1])))
-                    if ctr == 2:
-                        continue
-                    if ctr > 2:
-                        self.active_cells[x + y * self.grid.info.width] = False
-                        break
+            for x in range(max(0,minx), min(self.grid.info.width,maxx)+1):
+                for y in range(max(0,miny), min(self.grid.info.height,maxy)+1):
+                    self.active_cells[x + y * self.grid.info.width] = True
+                    self.grid.data[x + y * self.grid.info.width] = 100
 
         self.get_logger().info("Found active cells")
         self.modify_probability()
 
+        for obstacle in self.labeled_map.obstacles:
+            minx, miny = self.world_to_grid(obstacle.bbox_min.x, obstacle.bbox_min.y)
+            maxx, maxy = self.world_to_grid(obstacle.bbox_max.x, obstacle.bbox_max.y)
+            for x in range(max(0,minx), min(self.grid.info.width,maxx)+1):
+                for y in range(max(0,miny), min(self.grid.info.height,maxy)+1):
+                    self.active_cells[x + y * self.grid.info.width] = False
+
     def modify_probability(self):
         """Decay or increase probability of obstacle in active cells based on sensor observations"""
-        for x in range(0, self.grid.info.width):
-            for y in range(0, self.grid.info.height):
+        for x in range(max(0, self.ship_pos[0]-self.lidar_rad), min(self.grid.info.width, self.ship_pos[0]+self.lidar_rad+1)):
+            for y in range(max(0, self.ship_pos[1]-self.lidar_rad), min(self.grid.info.height, self.ship_pos[1]+self.lidar_rad+1)):
+                if (x-self.ship_pos[0])**2 + (y-self.ship_pos[1])**2 > self.lidar_rad**2:
+                    continue
+                self.get_logger().info(f"{x}, {y}")
+                curVal = self.grid.data[x+y*self.grid.info.width]
+                if curVal == -1:
+                    curVal = 0
                 if self.active_cells[x + y*self.grid.info.width]:
-                    self.grid.data[x+y*self.grid.info.width] = 0
+                    curVal += 1
+                    curVal *= 5
+                    curVal = min(100, curVal)
                 else:
-                    self.grid.data[x+y*self.grid.info.width] = 100
+                    curVal //= 2
+                self.grid.data[x+y*self.grid.info.width] = curVal
     
     def timer_callback(self):
         self.iterations += 1
         self.publish_grid()
-
-
     
     def hulls_update_cb(self, msg):
         self.labeled_map = msg
