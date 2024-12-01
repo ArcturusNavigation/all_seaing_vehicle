@@ -106,7 +106,6 @@ class MappingServer(Node):
             for y in range(max(0, self.ship_pos[1]-self.lidar_rad), min(self.grid.info.height, self.ship_pos[1]+self.lidar_rad+1)):
                 if (x-self.ship_pos[0])**2 + (y-self.ship_pos[1])**2 > self.lidar_rad**2:
                     continue
-                self.get_logger().info(f"{x}, {y}")
                 curVal = self.grid.data[x+y*self.grid.info.width]
                 if curVal == -1:
                     curVal = 0
