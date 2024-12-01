@@ -216,12 +216,12 @@ class Yolov8Node(Node):
                     self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
                     fps = 1/(end_time-start_time)
                     if self.iterations < 100:
-                        self.sum += fps
+                        self.sum_fps += fps
                         print(f'Iteration is {self.iterations} and adding to sum')
                         self.iterations += 1 
                     else:
                         print(f'Iterations is {self.iterations}')
-                        print(f'Average fps vaule over 100 readings is {self.sum/100}')
+                        print(f'Average fps vaule over 100 readings is {self.sum_fps/100}')
                     # with open("tensorrt_3ft.csv", 'a') as file:
                     #     file.write(str(fps) +'\n')
                     #     file.close()
