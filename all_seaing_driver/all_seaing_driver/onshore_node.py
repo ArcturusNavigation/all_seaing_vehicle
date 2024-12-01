@@ -46,7 +46,7 @@ class OnshoreNode(Node):
 
     def send_controls(self, x, y, angular):
         control_option = ControlOption()
-        control_option.priority = 0   # TeleOp has the highest priority value
+        control_option.priority = 0  # TeleOp has the highest priority value
         control_option.twist.linear.x = x
         control_option.twist.linear.y = y
         control_option.twist.angular.z = angular

@@ -90,7 +90,10 @@ def generate_launch_description():
         package="all_seaing_perception",
         executable="obstacle_bbox_visualizer",
         remappings=[
-            ("camera_info", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
+            ),
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ],
         parameters=[
@@ -188,19 +191,18 @@ def generate_launch_description():
         ],
     )
 
-
     waypoint_finder = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="waypoint_finder.py",
         parameters=[
             {"color_label_mappings_file": color_label_mappings},
-            {"safe_margin": 0.2}
-        ]
+            {"safe_margin": 0.2},
+        ],
     )
 
-    waypoint_sender = launch_ros.actions.Node(
+    rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
-        executable="waypoint_sender.py",
+        executable="rviz_waypoint_sender.py",
         parameters=[
             {"xy_threshold": 1.0},
             {"theta_threshold": 5.0},
@@ -237,7 +239,7 @@ def generate_launch_description():
             controller_server,
             onshore_node,
             waypoint_finder,
-            waypoint_sender,
+            rviz_waypoint_sender,
             keyboard_ld,
             sim_ld,
             perception_eval_node,
