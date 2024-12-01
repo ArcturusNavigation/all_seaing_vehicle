@@ -59,12 +59,16 @@ class Yolov8Node(Node):
         self.declare_parameter("enable", True)
         self.declare_parameter("image_topic", "/webcam_image")
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
+        self.declare_parameter("iterations", 0)
+        self.declare_parameter("sum_fps", 0.0)
 
         # Get parameters
         model_name = self.get_parameter("model").get_parameter_value().string_value
         self.device = self.get_parameter("device").get_parameter_value().string_value
         self.threshold = self.get_parameter("threshold").get_parameter_value().double_value
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
+        self.iterations = self.get_parameter("iterations").get_parameter_value().integer_value
+        self.sum_fps = self.get_parameter("sum_fps").get_parameter_value().double_value
 
         yaml_file_path = os.path.join(bringup_prefix, 'config','perception','color_label_mappings.yaml')
 
@@ -211,14 +215,21 @@ class Yolov8Node(Node):
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
                     self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
                     fps = 1/(end_time-start_time)
-                    with open("tensorrt_3ft.csv", 'a') as file:
-                        file.write(str(fps) +'\n')
-                        file.close()
+                    if self.iterations < 100:
+                        self.sum += fps
+                        print(f'Iteration is {self.iterations} and adding to sum')
+                        self.iterations += 1 
+                    else:
+                        print(f'Iterations is {self.iterations}')
+                        print(f'Average fps vaule over 100 readings is {self.sum/100}')
+                    # with open("tensorrt_3ft.csv", 'a') as file:
+                    #     file.write(str(fps) +'\n')
+                    #     file.close()
                         # reader = csv.reader(file)
                         # row_count = sum(1 for row in reader)
                         # if row_count < 100:
                         #     file.write(str(fps)+'\n')
-                        # else: 
+                        # else:
                         #     print("All Done :)")
                         #     file.close()
                     # print(len(time_capture))
