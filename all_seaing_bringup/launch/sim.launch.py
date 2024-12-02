@@ -26,7 +26,7 @@ def generate_launch_description():
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
     matching_weights = os.path.join(
-        bringup_prefix, "config", "perception", "filtering_weights.yaml"
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
     contour_matching_color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
@@ -249,6 +249,15 @@ def generate_launch_description():
         }.items(),
     )
 
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
+        ]
+    )
+
     return LaunchDescription(
         [
             launch_rviz_launch_arg,
@@ -258,6 +267,7 @@ def generate_launch_description():
             obstacle_bbox_overlay_node,
             obstacle_bbox_visualizer_node,
             color_segmentation_node,
+            # yolov8_node,
             point_cloud_filter_node,
             obstacle_detector_node,
             # bbox_project_pcloud_node,

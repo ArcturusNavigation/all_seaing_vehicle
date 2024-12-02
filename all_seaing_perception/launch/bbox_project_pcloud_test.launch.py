@@ -14,7 +14,7 @@ def generate_launch_description():
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
     matching_weights = os.path.join(
-        bringup_prefix, "config", "perception", "filtering_weights.yaml"
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
     contour_matching_color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
