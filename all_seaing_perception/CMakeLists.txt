@@ -37,6 +37,7 @@ ament_auto_add_executable(
 )
 
 target_link_libraries(obstacle_bbox_visualizer yaml-cpp)
+target_link_libraries(bbox_project_pcloud yaml-cpp)
 
 install(TARGETS
     obstacle_detector

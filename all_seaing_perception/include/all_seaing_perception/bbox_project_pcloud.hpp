@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <exception>
 #include <cmath>
-#include <uchar>
+
+#include <iostream>
+#include <fstream>
+#include "yaml-cpp/yaml.h" 
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -23,8 +26,10 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 
-#include "pcl/point_cloud.h"
-#include "pcl/point_types.h"
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/search/kdtree.h>
+#include <pcl/segmentation/conditional_euclidean_clustering.h>
 #include "pcl_conversions/pcl_conversions.h"
 
 #include "cv_bridge/cv_bridge.h"
@@ -39,7 +44,6 @@
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
-#include "yaml-cpp/yaml.h" 
 
 class BBoxProjectPCloud : public rclcpp::Node{
 private:
@@ -88,10 +92,10 @@ private:
         const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg);
 
     // The HSV-similarity condition for Conditional Euclidean Clustering
-    bool hsv_diff_condition(const pcl::PointXYZHSV& p1, const pcl::PointXYZHSV& p2, float sq_dist);
+    // bool hsv_diff_condition(std::vector<double> weights, double thres, const pcl::PointXYZHSV& p1, const pcl::PointXYZHSV& p2, float sq_dist);
 
     // The penalty function that compares an HSV color value to an HSV color range
-    double color_range_penalty(vector<double> weights, int[6] color_range, cv::Vec3b pt_color);
+    // double color_range_penalty(std::vector<double> weights, std::vector<int> color_range, cv::Vec3b pt_color);
 
     int m_obstacle_id;
 
@@ -108,22 +112,22 @@ private:
     std::string color_label_mappings_file;
     YAML::Node label_config_yaml, ranges_config_yaml;
     std::map<int, std::string> label_color_map;
-    std::map<std::string, int[6]> color_range_map;
+    std::map<std::string, std::vector<int>> color_range_map;
 
     // for cluster-contour matching/selection
     std::string matching_weights_file;
     std::string contour_matching_color_ranges_file;
 
-    YAML::Node matching_weights_yaml;
+    YAML::Node matching_weights_config_yaml, contour_matching_ranges_config_yaml;
 
     double m_clustering_distance_weight;
     std::vector<double> m_clustering_color_weights;
-    double m_clustering_hue_thres;
+    double m_clustering_color_thres;
     double m_cluster_contour_distance_weight;
     std::vector<double> m_cluster_contour_color_weights;
     std::vector<double> m_contour_detection_color_weights;
     double m_cluster_contour_size_weight;
-    std::map<std::string, int[6]> contour_matching_color_range_map;
+    std::map<std::string, std::vector<int>> contour_matching_color_range_map;
 
 public:
     BBoxProjectPCloud();

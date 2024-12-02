@@ -16,6 +16,9 @@ def generate_launch_description():
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "filtering_weights.yaml"
     )
+    contour_matching_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
     bbox_project_pcloud_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="bbox_project_pcloud",
@@ -33,7 +36,8 @@ def generate_launch_description():
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
             {"polygon_area_thresh": 100000.0},
-            {"matching_weights_file": matching_weights}
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges}
         ]
     )
     return LaunchDescription([
