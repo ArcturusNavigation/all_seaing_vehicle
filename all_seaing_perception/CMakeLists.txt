@@ -47,13 +47,16 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/color_segmentation.py
     ${PROJECT_NAME}/triangle_detector.py
+    ${PROJECT_NAME}/cross_detector.py
     ${PROJECT_NAME}/test_triangle_publisher.py
+    ${PROJECT_NAME}/test_cross_publisher.py
     ${PROJECT_NAME}/yolov5_detector.py
     ${PROJECT_NAME}/yolov5_image.py
     ${PROJECT_NAME}/yolov8_node.py
     ${PROJECT_NAME}/image_splitter.py
     ${PROJECT_NAME}/perception_eval.py
     ${PROJECT_NAME}/triangle1.png
+    ${PROJECT_NAME}/jesus.jpg
     DESTINATION lib/${PROJECT_NAME}
 )
 
