@@ -33,6 +33,10 @@ geometry_msgs::msg::Point Obstacle::get_global_bbox_min() { return m_global_bbox
 
 geometry_msgs::msg::Point Obstacle::get_global_bbox_max() { return m_global_bbox_max; }
 
+geometry_msgs::msg::Pose Obstacle::get_pose() { return m_pose; }
+
+void Obstacle::set_pose(geometry_msgs::msg::Pose pose) { m_pose = pose; }
+
 float Obstacle::get_polygon_area() { return m_area; }
 
 // TODO: do this using tf and not manually
@@ -77,6 +81,8 @@ void Obstacle::to_ros_msg(std_msgs::msg::Header local_header, std_msgs::msg::Hea
     out_obstacle_msg.global_bbox_min = this->get_global_bbox_min();
     out_obstacle_msg.global_bbox_max = this->get_global_bbox_max();
 
+    out_obstacle_msg.pose = this->get_pose();
+
 }
 
 Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
@@ -86,6 +92,8 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
     // Set id and header
     m_id = in_id;
     m_last_seen = in_last_seen;
+
+    // this->set_pose(pose);
 
     // Fill cluster point by point
     pcl::PointCloud<pcl::PointXYZI>::Ptr current_cluster(new pcl::PointCloud<pcl::PointXYZI>);
@@ -165,7 +173,7 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
         p_glob_msg.y = p_glob.y;
         m_global_chull.polygon.points.push_back(p_glob_msg);
     }
-
+ 
     // Speicfy that all points are finite
     current_cluster->is_dense = true;
 

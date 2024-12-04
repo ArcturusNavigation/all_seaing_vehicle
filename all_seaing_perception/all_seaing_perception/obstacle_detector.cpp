@@ -76,6 +76,7 @@ ObstacleDetector::cluster_cloud(builtin_interfaces::msg::Time current_time,
         std::shared_ptr<all_seaing_perception::Obstacle> obstacle(
             new all_seaing_perception::Obstacle(in_cloud_ptr, it->indices, m_obstacle_id++,
                                                 current_time, m_nav_x, m_nav_y, m_nav_heading));
+        obstacle->set_pose(m_nav_pose);
         obstacles.push_back(obstacle);
     }
 
@@ -202,6 +203,9 @@ void ObstacleDetector::odom_callback(const nav_msgs::msg::Odometry &msg) {
     double r, p, y;
     m.getRPY(r, p, y);
     m_nav_heading = y;
+
+    m_nav_pose = msg.pose.pose;
+    
 }
 
 int main(int argc, char **argv) {

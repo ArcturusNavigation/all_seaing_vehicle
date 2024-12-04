@@ -41,6 +41,9 @@ public:
     geometry_msgs::msg::Point get_global_bbox_min();
     geometry_msgs::msg::Point get_global_bbox_max();
 
+    geometry_msgs::msg::Pose get_pose();
+    void set_pose(geometry_msgs::msg::Pose pose);
+
     template <typename T>
     T convert_to_global(double nav_x, double nav_y, double nav_heading, T point);
 
@@ -56,6 +59,7 @@ private:
     geometry_msgs::msg::Point m_bbox_max;
     geometry_msgs::msg::Point m_global_bbox_min;
     geometry_msgs::msg::Point m_global_bbox_max;
+    geometry_msgs::msg::Pose m_pose;
     float m_area;
 };
 

@@ -13,7 +13,7 @@ class PathPlan(Node):
     def __init__(self):
         super().__init__("astar_path_planner")
 
-        self.map_topic = "map"  # OccupancyGrid
+        self.map_topic = "odom"  # OccupancyGrid
         self.waypoints_topic = "waypoints"
 
         # Subscriptions to map and waypoints
