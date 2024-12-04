@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <exception>
 #include <cmath>
+#include <chrono>
+#include <exception>
+#include <thread>
 
 #include <iostream>
 #include <fstream>
@@ -31,6 +34,9 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
 #include "pcl_conversions/pcl_conversions.h"
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/visualization/cloud_viewer.h>
 
 #include "cv_bridge/cv_bridge.h"
 
@@ -90,12 +96,6 @@ private:
         const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
         const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg,
         const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg);
-
-    // The HSV-similarity condition for Conditional Euclidean Clustering
-    // bool hsv_diff_condition(std::vector<double> weights, double thres, const pcl::PointXYZHSV& p1, const pcl::PointXYZHSV& p2, float sq_dist);
-
-    // The penalty function that compares an HSV color value to an HSV color range
-    // double color_range_penalty(std::vector<double> weights, std::vector<int> color_range, cv::Vec3b pt_color);
 
     int m_obstacle_id;
 
