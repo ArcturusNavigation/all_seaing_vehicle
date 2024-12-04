@@ -162,7 +162,9 @@ def generate_launch_description():
         package="all_seaing_perception",
         executable="bbox_project_pcloud",
         parameters=[
-            {"bbox_object_margin": 0.0}
+            {"bbox_object_margin": 0.0},
+            {"camera_topic": "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"},
+            {"camera_info_topic": "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"},
         ]
     )
 

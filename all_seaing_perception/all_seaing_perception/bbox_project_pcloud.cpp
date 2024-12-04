@@ -28,7 +28,6 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
 }
 
 void BBoxProjectPCloud::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
-    RCLCPP_INFO(this->get_logger(), "GOT CAMERA INFO");
     m_cam_model.fromCameraInfo(info_msg);
 }
 
@@ -36,7 +35,6 @@ void BBoxProjectPCloud::bb_pcl_project(
     const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg,
     const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg) {
-    RCLCPP_INFO(this->get_logger(), "GOT DATA");
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
     if (!m_pc_cam_tf_ok)
         // TODO: get the camera frame another way and don't subscribe to the image topic, we only need the bounding boxes which are another topic
@@ -49,7 +47,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
 
     RCLCPP_INFO(this->get_logger(), "%d POINTS, %d OBJECTS", in_cloud_tf_ptr->points.size(), in_bbox_msg->boxes.size());
-    RCLCPP_INFO(this->get_logger(), "FRAME_ID BEFORE SELECTION, AFTER TRANSFORM TO CAMERA FRAME: %s", in_cloud_tf_ptr->header.frame_id);
+    RCLCPP_INFO(this->get_logger(), "FRAME_ID BEFORE SELECTION, AFTER TRANSFORM TO CAMERA FRAME: %d", in_cloud_tf_ptr->header.frame_id);
 
     auto object_pcls = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
     std::vector<pcl::PointCloud<pcl::PointXYZI>> obj_cloud_vec;
@@ -92,7 +90,6 @@ void BBoxProjectPCloud::bb_pcl_project(
         RCLCPP_INFO(this->get_logger(), "%d POINTS IN OBJECT %d", obj_cloud_ptr->size(), obj);
         max_len = std::max(max_len, (int)obj_cloud_ptr->size());
     }
-    RCLCPP_INFO(this->get_logger(), "WILL NOW SEND OBJECT POINT CLOUDS");
     m_object_pcl_pub->publish(object_pcls);
     pcl::PointCloud<pcl::PointXYZI>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZI>);
     all_obj_pcls_ptr->header = in_cloud_tf_ptr->header;
