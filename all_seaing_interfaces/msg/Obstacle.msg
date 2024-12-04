@@ -11,3 +11,6 @@ float32 polygon_area
 
 geometry_msgs/Point bbox_min
 geometry_msgs/Point bbox_max
+
+geometry_msgs/Point global_bbox_min
+geometry_msgs/Point global_bbox_max
