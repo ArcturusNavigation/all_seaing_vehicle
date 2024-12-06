@@ -164,7 +164,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg,
     const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg) {
-    RCLCPP_INFO(this->get_logger(), "GOT DATA");
+    RCLPP_DEBUG(this->get_logger(), "GOT DATA");
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
     if (!m_pc_cam_tf_ok)
         m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id);
@@ -238,14 +238,14 @@ void BBoxProjectPCloud::bb_pcl_project(
         RCLCPP_DEBUG(this->get_logger(), "%d POINTS IN OBJECT %d", obj_cloud_ptr->size(), obj);
         max_len = std::max(max_len, (int)obj_cloud_ptr->size());
     }
-    RCLCPP_INFO(this->get_logger(), "WILL NOW SEND OBJECT POINT CLOUDS");
+    RCLPP_DEBUG(this->get_logger(), "WILL NOW SEND OBJECT POINT CLOUDS");
     m_object_pcl_pub->publish(object_pcls);
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
     // pcl::PointCloud<pcl::PointXYZRGB>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
     all_obj_pcls_ptr->header = in_cloud_tf_ptr->header;
     //convert vector of PointCloud to a single PointCloud with channels
     all_obj_pcls_ptr->resize((pcl::uindex_t)max_len, (pcl::uindex_t)in_bbox_msg->boxes.size());
-    RCLCPP_INFO(this->get_logger(), "PUBLISHED PCLOUD DIMENSIONS: height: %d, width: %d", (int)all_obj_pcls_ptr->height, (int)all_obj_pcls_ptr->width);
+    RCLPP_DEBUG(this->get_logger(), "PUBLISHED PCLOUD DIMENSIONS: height: %d, width: %d", (int)all_obj_pcls_ptr->height, (int)all_obj_pcls_ptr->width);
     // RCLCPP_DEBUG(this->get_logger(), "STORED PCLOUD DIMENSIONS: objects: %d, max_length: %d", (int)obj_cloud_vec.size(), max_len);
     try{
         //TODO: CHECK IF THE CHANNELS CORRECTLY REPRESENT DIFFERENT OBJECTS (ALTHOUGH THAT'S ONLY FOR RVIZ SO WE DON'T CARE)
@@ -281,21 +281,21 @@ void BBoxProjectPCloud::bb_pcl_project(
         // }
 
         //image & bbox relation & adjustment (make sure in-bounds)
-        RCLCPP_INFO(this->get_logger(), "BBOX COORDS: (%d, %d), (%d, %d) in img of sz %d x %d", bbox.min_x, bbox.min_y, bbox.max_x+1, bbox.max_y+1, cv_hsv.cols, cv_hsv.rows);
+        RCLCPP_DEBUG(this->get_logger(), "BBOX COORDS: (%d, %d), (%d, %d) in img of sz %d x %d", bbox.min_x, bbox.min_y, bbox.max_x+1, bbox.max_y+1, cv_hsv.cols, cv_hsv.rows);
         if(bbox.min_x > bbox.max_x || bbox.min_y > bbox.max_y) continue;
         //make sure bbox coords are inside image
         int adj_min_x = std::max((int)bbox.min_x,0);
         int adj_max_x = std::min((int)bbox.max_x+1, cv_hsv.cols);
         int adj_min_y = std::max((int)bbox.min_y,0);
         int adj_max_y = std::min((int)bbox.max_y+1, cv_hsv.rows);
-        RCLCPP_INFO(this->get_logger(), "ADJUSTED BBOX COORDS: (%d, %d), (%d, %d) in img of sz %d x %d", adj_min_x, adj_min_y, adj_max_x, adj_max_y, cv_hsv.cols, cv_hsv.rows);
+        RCLCPP_DEBUG(this->get_logger(), "ADJUSTED BBOX COORDS: (%d, %d), (%d, %d) in img of sz %d x %d", adj_min_x, adj_min_y, adj_max_x, adj_max_y, cv_hsv.cols, cv_hsv.rows);
         cv::Mat cv_hsv_copy = cv_hsv.clone();
         cv::Mat hsv_img(cv_hsv, cv::Range(adj_min_y, adj_max_y), cv::Range(adj_min_x, adj_max_x));
         cv::Size img_sz;
         cv::Point bbox_offset;
         hsv_img.locateROI(img_sz, bbox_offset);
-        RCLCPP_INFO(this->get_logger(), "IMAGE SIZE: (%d, %d)", img_sz.height, img_sz.width);
-        RCLCPP_INFO(this->get_logger(), "BBOX OFFSET: (%d, %d)", bbox_offset.x, bbox_offset.y);
+        RCLCPP_DEBUG(this->get_logger(), "IMAGE SIZE: (%d, %d)", img_sz.height, img_sz.width);
+        RCLCPP_DEBUG(this->get_logger(), "BBOX OFFSET: (%d, %d)", bbox_offset.x, bbox_offset.y);
 
         //to display points inside contours, and the clusters projected (debugging)
         cv::Mat cv_img_copy = cv_ptr->image.clone();
@@ -351,9 +351,9 @@ void BBoxProjectPCloud::bb_pcl_project(
         // color segmentation using the color label
         std::vector<int> lims = label_color_map[bbox.label]=="red"?contour_matching_color_range_map["red2"]:contour_matching_color_range_map[label_color_map[bbox.label]];
         int h_min=lims[0], h_max=lims[1], s_min=lims[2], s_max=lims[3], v_min=lims[4], v_max=lims[5];
-        RCLCPP_INFO(this->get_logger(), "COLOR: %s, & SEGMENTATION COLOR LIMITS-> H: %d - %d, S: %d - %d, V: %d - %d", label_color_map[bbox.label].c_str(), h_min, h_max, s_min, s_max, v_min, v_max);
+        RCLCPP_DEBUG(this->get_logger(), "COLOR: %s, & SEGMENTATION COLOR LIMITS-> H: %d - %d, S: %d - %d, V: %d - %d", label_color_map[bbox.label].c_str(), h_min, h_max, s_min, s_max, v_min, v_max);
         cv::Scalar bbox_mean_hsv = cv::mean(hsv_img);
-        RCLCPP_INFO(this->get_logger(), "MEAN BBOX IMAGE COLOR: (%lf, %lf, %lf)", bbox_mean_hsv[0], bbox_mean_hsv[1], bbox_mean_hsv[2]);
+        RCLCPP_DEBUG(this->get_logger(), "MEAN BBOX IMAGE COLOR: (%lf, %lf, %lf)", bbox_mean_hsv[0], bbox_mean_hsv[1], bbox_mean_hsv[2]);
         cv::Mat mask;
         cv::inRange(hsv_img, cv::Scalar(h_min, s_min, v_min), cv::Scalar(h_max, s_max, v_max), mask);
         //show mask
@@ -489,7 +489,7 @@ void BBoxProjectPCloud::bb_pcl_project(
 
         auto refined_pcl_contours = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         refined_pcl_contours.label = bbox.label;
-        pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>());
         refined_cloud_ptr->header = pcloud_ptr->header;
         cv::Mat refined_obj_contour_mat = cv::Mat::zeros(img_sz, CV_8UC3);
         for (cv::Point image_pt : in_contours[opt_contour_id]){
@@ -503,7 +503,7 @@ void BBoxProjectPCloud::bb_pcl_project(
             mat_opt_cluster.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(opt_cluster_id, clusters_indices.size());
         }
         pcl::toROSMsg(*refined_cloud_ptr, refined_pcl_contours.cloud);
-        cv_bridge::CvImagePtr refined_obj_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC1, refined_obj_contour_mat));
+        cv_bridge::CvImagePtr refined_obj_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, refined_obj_contour_mat));
         refined_pcl_contours.contour = *refined_obj_contour_ptr->toImageMsg();
         refined_objects_pub.objects.push_back(refined_pcl_contours);
         refined_cloud_contour_vec.push_back(std::make_pair(*refined_cloud_ptr,refined_obj_contour_mat));
@@ -524,28 +524,35 @@ void BBoxProjectPCloud::bb_pcl_project(
         cv::imshow("Clusters & contours & matching", upscaled);
         cv::waitKey();
     }
-    RCLCPP_INFO(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS");
+    RCLPP_DEBUG(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS & CONTOURS");
     m_refined_object_pcl_contour_pub->publish(refined_objects_pub);
-    pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
+    RCLPP_DEBUG(this->get_logger(), "PUBLISHED REFINED OBJECT POINT CLOUDS & CONTOURS");
+    pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>());
     all_obj_refined_pcls_ptr->header = in_cloud_tf_ptr->header;
     //convert vector of PointCloud to a single PointCloud with channels
-    all_obj_refined_pcls_ptr->resize((pcl::uindex_t)max_refined_len, (pcl::uindex_t)in_bbox_msg->boxes.size());
+    all_obj_refined_pcls_ptr->resize((pcl::uindex_t)max_refined_len, (pcl::uindex_t)refined_cloud_contour_vec.size());
     cv::Mat all_obj_refined_contours = cv::Mat::zeros(cv_ptr->image.size(), CV_8UC3);
     try{
         for(int i = 0; i<refined_cloud_contour_vec.size(); i++){
+            RCLPP_DEBUG(this->get_logger(), "BBOX %d/%d", i, refined_cloud_contour_vec.size());
             for(int j = 0; j<refined_cloud_contour_vec[i].first.size(); j++){
-                all_obj_refined_pcls_ptr->at(j,i) = obj_cloud_vec[i][j];
+                all_obj_refined_pcls_ptr->at(j,i) = refined_cloud_contour_vec[i].first[j];
+                RCLPP_DEBUG(this->get_logger(), "CLUSTER %d/%d", j, refined_cloud_contour_vec[i].first.size());
             }
+            RCLPP_DEBUG(this->get_logger(), "BEFORE CONTOUR ADDITION");
             all_obj_refined_contours += refined_cloud_contour_vec[i].second;
+            RCLPP_DEBUG(this->get_logger(), "AFTER CONTOUR ADDITION");
         }
     }catch(std::exception &ex){
         RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
     }
+    RCLPP_DEBUG(this->get_logger(), "STORED CONTOURS TO BE PUBLISHED");
     auto obj_refined_pcls_msg = sensor_msgs::msg::PointCloud2();
     pcl::toROSMsg(*all_obj_refined_pcls_ptr, obj_refined_pcls_msg);
     m_refined_object_pcl_viz_pub->publish(obj_refined_pcls_msg);
     cv_bridge::CvImagePtr all_obj_refined_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC1, all_obj_refined_contours));
     m_refined_object_contour_viz_pub->publish(*all_obj_refined_contour_ptr->toImageMsg());
+    RCLPP_DEBUG(this->get_logger(), "SENT OBJECT POINT CLOUDS FOR VISUALIZATION");
 }
 
 geometry_msgs::msg::TransformStamped BBoxProjectPCloud::get_tf(const std::string &in_target_frame,
