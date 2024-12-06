@@ -65,7 +65,7 @@ void Obstacle::to_ros_msg(std_msgs::msg::Header local_header, std_msgs::msg::Hea
     out_obstacle_msg.local_chull.header = local_header;
 
     out_obstacle_msg.global_chull = this->get_global_chull();
-    out_obstacle_msg.global_chull.header = local_header;
+    out_obstacle_msg.global_chull.header = global_header;
 
     out_obstacle_msg.polygon_area = this->get_polygon_area();
 
