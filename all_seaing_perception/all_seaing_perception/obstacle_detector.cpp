@@ -76,7 +76,6 @@ ObstacleDetector::cluster_cloud(builtin_interfaces::msg::Time current_time,
         std::shared_ptr<all_seaing_perception::Obstacle> obstacle(
             new all_seaing_perception::Obstacle(in_cloud_ptr, it->indices, m_obstacle_id++,
                                                 current_time, m_nav_x, m_nav_y, m_nav_heading));
-        obstacle->set_pose(m_nav_pose);
         obstacles.push_back(obstacle);
     }
 
@@ -168,6 +167,7 @@ void ObstacleDetector::publish_map(
         map[i]->to_ros_msg(local_header, global_header, raw_obstacle);
         map_msg.obstacles.push_back(raw_obstacle);
     }
+    map_msg.pose = m_nav_pose;
     pub->publish(map_msg);
 }
 
