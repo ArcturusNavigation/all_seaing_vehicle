@@ -12,8 +12,7 @@ from all_seaing_interfaces.msg import ObstacleMap
 
 
 # TO DO:
-# blow up obstacles so ship maintains safe distance from them
-# use ship position from message
+# blow up obstacles so ship maintains safe distance from them / use hybrid a*?
 # figure out where odom frame starts
 
 
@@ -130,6 +129,7 @@ class MappingServer(Node):
     
     def hulls_update_cb(self, msg):
         self.labeled_map = msg
+        self.ship_pos = self.world_to_grid(msg.pose.position.x, msg.pose.position.y)
         self.get_logger().info("Mapping server: Intialized obstacles" if self.labeled_map is None else "Mapping server: Updated obstacles")
         self.find_active_cells()
 
