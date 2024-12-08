@@ -11,6 +11,12 @@ from nav_msgs.msg import OccupancyGrid, MapMetaData
 from all_seaing_interfaces.msg import ObstacleMap
 
 
+# TO DO:
+# blow up obstacles so ship maintains safe distance from them
+# use ship position from message
+# figure out where odom frame starts
+
+
 class MappingServer(Node):
     """ Inputs obstacle convex hulls(labeled_map) and outputs global map (Occupancy_grid) """
 
@@ -37,7 +43,7 @@ class MappingServer(Node):
         # Actual location of competition (Nathan Benderson Park) has an 
         #     interior square area of around 117m * 117m. We use a 200m * 200m square.
         self.grid = OccupancyGrid()
-        self.grid.header.frame_id = 'map'
+        self.grid.header.frame_id = 'odom'
 
         self.grid.info = MapMetaData()
         self.grid.info.width = 2000
@@ -53,8 +59,8 @@ class MappingServer(Node):
 
         # Position of ship relative to global origin
         # TO DO: receive and set the position of the ship somewhere
-        self.ship_pos = (330,55)
-        self.lidar_rad = 20
+        self.ship_pos = (100,410)
+        self.lidar_rad = 200
 
         # Active cells in row major order            
         self.active_cells = [False] * self.grid.info.width * self.grid.info.height
@@ -82,11 +88,12 @@ class MappingServer(Node):
         Then modifies probability of each cell based on active/not
         """
         for obstacle in self.labeled_map.obstacles:
-            minx, miny = self.world_to_grid(obstacle.bbox_min.x, obstacle.bbox_min.y)
-            maxx, maxy = self.world_to_grid(obstacle.bbox_max.x, obstacle.bbox_max.y)
+            minx, miny = self.world_to_grid(obstacle.global_bbox_min.x, obstacle.global_bbox_min.y)
+            maxx, maxy = self.world_to_grid(obstacle.global_bbox_max.x, obstacle.global_bbox_max.y)
 
-            for x in range(max(0,minx), min(self.grid.info.width,maxx)+1):
-                for y in range(max(0,miny), min(self.grid.info.height,maxy)+1):
+            for x in range(max(0,minx-1), min(self.grid.info.width,maxx+1)+1):
+                for y in range(max(0,miny-1), min(self.grid.info.height,maxy+1)+1):
+                    self.get_logger().info(f"{x}, {y}")
                     self.active_cells[x + y * self.grid.info.width] = True
                     self.grid.data[x + y * self.grid.info.width] = 100
 
@@ -94,10 +101,10 @@ class MappingServer(Node):
         self.modify_probability()
 
         for obstacle in self.labeled_map.obstacles:
-            minx, miny = self.world_to_grid(obstacle.bbox_min.x, obstacle.bbox_min.y)
-            maxx, maxy = self.world_to_grid(obstacle.bbox_max.x, obstacle.bbox_max.y)
-            for x in range(max(0,minx), min(self.grid.info.width,maxx)+1):
-                for y in range(max(0,miny), min(self.grid.info.height,maxy)+1):
+            minx, miny = self.world_to_grid(obstacle.global_bbox_min.x, obstacle.global_bbox_min.y)
+            maxx, maxy = self.world_to_grid(obstacle.global_bbox_max.x, obstacle.global_bbox_max.y)
+            for x in range(max(0,minx-1), min(self.grid.info.width,maxx+1)+1):
+                for y in range(max(0,miny-1), min(self.grid.info.height,maxy+1)+1):
                     self.active_cells[x + y * self.grid.info.width] = False
 
     def modify_probability(self):
