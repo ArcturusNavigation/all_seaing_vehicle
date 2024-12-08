@@ -117,6 +117,15 @@ def generate_launch_description():
         ],
     )
 
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ]
+    )
+
     point_cloud_filter_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -147,6 +156,16 @@ def generate_launch_description():
             {"obstacle_drop_thresh": 1.0},
             {"polygon_area_thresh": 100000.0},
         ],
+    )
+
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        parameters=[
+            {"bbox_object_margin": 0.0},
+            {"camera_topic": "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"},
+            {"camera_info_topic": "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"},
+        ]
     )
 
     rviz_node = launch_ros.actions.Node(
@@ -232,8 +251,10 @@ def generate_launch_description():
             obstacle_bbox_overlay_node,
             obstacle_bbox_visualizer_node,
             color_segmentation_node,
+            # yolov8_node,
             point_cloud_filter_node,
             obstacle_detector_node,
+            bbox_project_pcloud_node,
             rviz_node,
             control_mux,
             controller_server,
