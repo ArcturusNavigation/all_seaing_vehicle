@@ -238,7 +238,7 @@ class NavigationServer(Node):
         goal_pose.position.x = goal_x
         goal_pose.position.y = goal_y
 
-        path = plan_path(self, start_pose, goal_pose)
+        path = full_path(self)
 
         self.get_logger().info("Before publishing nav_path")
 
