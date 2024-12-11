@@ -315,18 +315,9 @@ void BBoxProjectPCloud::bb_pcl_project(
             tree->setInputCloud(pcloud_ptr);
         std::vector<pcl::PointIndices> clusters_indices;
 
-        // EUCLIDEAN CLUSTERING (DEPRECATED)
-        // // pcl::EuclideanClusterExtraction<pcl::PointXYZHSV> ec;
-        // pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
-        // ec.setClusterTolerance(m_clustering_distance);
-        // ec.setMinClusterSize(m_obstacle_size_min);
-        // ec.setMaxClusterSize(m_obstacle_size_max);
-        // ec.setSearchMethod(tree);
-        // ec.setInputCloud(pcloud_ptr);
-        // ec.extract(clusters_indices);
-
         // CONDITIONAL (WITH HSV-BASED CONDITION) EUCLIDEAN CLUSTERING
         // TODO: USE AN ALGORITHM THAT MAKES SURE THE CONTOUR IS CONTINUOUS (WITHOUT NON-SELECTED POINTS INSIDE IT, AS IT'S PROBABLY THE CASE NOW)
+        //(though seems to work pretty well as it is now)
         pcl::ConditionalEuclideanClustering<pcl::PointXYZHSV> cec;
         cec.setClusterTolerance(m_clustering_distance);
         cec.setMinClusterSize(m_obstacle_size_min);
@@ -476,22 +467,6 @@ void BBoxProjectPCloud::bb_pcl_project(
                                         - 2*contour_qts.first.first.y*cluster_qts.first.first.y;
                 long long contour_cluster_dist_ms = fast_contour_cluster_sq_dist_sum/(cluster_size*contour_size);
 
-                // RCLCPP_DEBUG(this->get_logger(), "FAST SQUARED DIST SUM: cluster_size (%lf)*sum(x_i^2) (%lf) +contour_size (%lf)*sum(x_j^2) (%lf) -2*sum(x_i) (%lf)*sum(x_j) (%lf) +cluster_size (%lf)*sum(y_i^2) (%lf)+contour_size (%lf)*sum(y_j^2) (%lf) -2*sum(y_i) (%lf)* sum(y_j) (%lf) = %lf", cluster_size, contour_qts.second.first.x, contour_size, cluster_qts.second.first.x, contour_qts.first.first.x, cluster_qts.first.first.x, cluster_size, contour_qts.second.first.y, contour_size, cluster_qts.second.first.y, contour_qts.first.first.y, cluster_qts.first.first.y, fast_contour_cluster_sq_dist_sum);
-
-                // //debugging, brute force
-                // long long sq_dist_sum = 0;
-                // for(cv::Point image_pt : in_contours[contour]){
-                //     for(pcl::index_t ind : clusters_indices[cluster].indices){
-                //         cv::Point2d image_pt_xy = cv::Point2d(image_pt.x, image_pt.y);
-
-                //         cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x));
-                    
-                //         sq_dist_sum += pow(cv::norm(cloud_pt_xy - image_pt_xy),2);
-                //     }
-                // }
-
-                // RCLCPP_DEBUG(this->get_logger(), "BRUTE FORCE SQUARED DIST SUM: %lf", sq_dist_sum);
-
                 std::vector<long long> avg_contour_col = {contour_qts.first.second[0]/contour_size, contour_qts.first.second[1]/contour_size, contour_qts.first.second[2]/contour_size};
   
                 long long fast_cluster_sq_dh_sum = cluster_qts.second.second[0]-2*cluster_qts.first.second[0]*avg_contour_col[0]+cluster_size*avg_contour_col[0]*avg_contour_col[0];//sum((h_i-m_h)^2=h_i^2-2*h_i*m_h+cluster_size*m_h^2)
@@ -501,29 +476,6 @@ void BBoxProjectPCloud::bb_pcl_project(
                 long long cluster_dh_ms = fast_cluster_sq_dh_sum/cluster_size;
                 long long cluster_ds_ms = fast_cluster_sq_ds_sum/cluster_size;
                 long long cluster_dv_ms = fast_cluster_sq_dv_sum/cluster_size;
-                
-                // RCLCPP_DEBUG(this->get_logger(), "FAST SQUARED DH SUM: sum(h_i^2) (%lld)-2*sum(h_i) (%lld)*m_h (%lld)+cluster_size(%lld)*m_h^2 (%lld)) = %lld", cluster_qts.second.second[0], cluster_qts.first.second[0], avg_contour_col[0], cluster_size, avg_contour_col[0]*avg_contour_col[0], fast_cluster_sq_dh_sum);
-
-                //debugging, brute force
-                // long long sq_dh_sum = 0;
-                // long long sum_contour_h = 0;
-                // for(cv::Point image_pt : in_contours[contour]){
-                //     cv::Vec3b image_pt_hsv_vec3b = cv_hsv.at<cv::Vec3b>(image_pt);
-                //     std::vector<long long> image_pt_hsv = {(long long)image_pt_hsv_vec3b[0], (long long)image_pt_hsv_vec3b[1], (long long)image_pt_hsv_vec3b[2]};
-
-                //     sum_contour_h += image_pt_hsv[0];
-                // }
-                // long long avg_contour_h = sum_contour_h/contour_size;
-                // for(pcl::index_t ind : clusters_indices[cluster].indices){
-                //     std::vector<long long> cloud_pt_hsv = {pcloud_ptr->points[ind].h, pcloud_ptr->points[ind].s, pcloud_ptr->points[ind].v};
-                //     //transform to OpenCV HSV
-                //     cloud_pt_hsv[0]/=2;
-                //     cloud_pt_hsv[1]*=255;
-                //     cloud_pt_hsv[2]*=255;
-                //     sq_dh_sum += pow(cloud_pt_hsv[0] - avg_contour_h,2);
-                // }
-
-                // RCLCPP_DEBUG(this->get_logger(), "BRUTE FORCE SQUARE DH SUM: %lld, AVERAGE CONTOUR H: %lld", sq_dh_sum, avg_contour_h);
                 
                 long long pair_cost = m_cluster_contour_distance_weight*contour_cluster_dist_ms\
                                     + m_cluster_contour_color_weights[0]*cluster_dh_ms\
