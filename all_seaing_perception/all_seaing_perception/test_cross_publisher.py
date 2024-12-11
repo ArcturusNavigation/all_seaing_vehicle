@@ -31,7 +31,7 @@ class CrossPublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
     # Specify the image filename
-    image_path = "/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception/all_seaing_perception/cross.png"
+    image_path = "/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception/all_seaing_perception/bright_cross.png"
     cross_publisher = CrossPublisher(image_path)
     rclpy.spin(cross_publisher)
     rclpy.shutdown()
