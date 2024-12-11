@@ -148,7 +148,7 @@ double line_range_penalty(int a, int b, int x){
 }
 
 // The penalty function that compares an HSV color value to an HSV color range
-double color_range_penalty(std::vector<double> weights, std::vector<int> color_range, cv::Vec3b pt_color){
+double color_range_penalty(std::vector<double> weights, std::vector<int> color_range, std::vector<long long> pt_color){
     double h_min=color_range[0], h_max=color_range[1], s_min=color_range[2], s_max=color_range[3], v_min=color_range[4], v_max=color_range[5];
     return weights[0]*line_range_penalty(h_min, h_max, pt_color[0]) + weights[1]*line_range_penalty(s_min, s_max, pt_color[1]) + weights[2]*line_range_penalty(v_min, v_max, pt_color[2]);
 }
@@ -203,10 +203,10 @@ void BBoxProjectPCloud::bb_pcl_project(
     // cv::imshow("Received Image", cv_ptr->image);
     // cv::waitKey();
     cv::Mat cv_hsv;
-    cv::waitKey();
     cv::cvtColor(cv_ptr->image, cv_hsv, cv::COLOR_BGR2HSV);
     //show hsv (false color) image
     // cv::imshow("HSV Image", cv_hsv);
+    // cv::waitKey();
     std::vector<std::pair<all_seaing_interfaces::msg::LabeledBoundingBox2D, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>> bbox_pcloud_objects;
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
@@ -224,11 +224,12 @@ void BBoxProjectPCloud::bb_pcl_project(
                 double bbox_margin = this->get_parameter("bbox_object_margin").as_double();
                 // Check if point is in bbox
                 if(xy_rect.x >= bbox.min_x-bbox_margin && xy_rect.x <= bbox.max_x+bbox_margin && xy_rect.y >= bbox.min_y-bbox_margin && xy_rect.y <= bbox.max_y+bbox_margin){
-                    cv::Vec3b hsv = cv_hsv.at<cv::Vec3b>(xy_rect);
+                    cv::Vec3b hsv_vec3b = cv_hsv.at<cv::Vec3b>(xy_rect);
+                    std::vector<long long> hsv = {(long long)hsv_vec3b[0], (long long)hsv_vec3b[1], (long long)hsv_vec3b[2]};
                     // cv::Vec3b bgr = cv_ptr->image.at<cv::Vec3b>(xy_rect);
                     obj_cloud_ptr->push_back(pcl::PointXYZHSV(point_tf.x, point_tf.y, point_tf.z, ((float)hsv[0])*2, ((float)hsv[1])/((float)255.0), ((float)hsv[2])/((float)255.0)));
                     // obj_cloud_ptr->push_back(pcl::PointXYZRGB(point_tf.x, point_tf.y, point_tf.z, bgr[2], bgr[1], bgr[0]));
-                    RCLCPP_INFO(this->get_logger(), "SELECTED HSV POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%d, %d, %d)", xy_rect.x, xy_rect.y, hsv[0], hsv[1], hsv[2]);
+                    RCLCPP_DEBUG(this->get_logger(), "SELECTED HSV POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%d, %d, %d)", xy_rect.x, xy_rect.y, hsv[0], hsv[1], hsv[2]);
                     // RCLCPP_DEBUG(this->get_logger(), "SELECTED RGB POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%d, %d, %d)", xy_rect.x, xy_rect.y, bgr[2], bgr[1], bgr[0]);
                 }
             }
@@ -270,7 +271,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     std::vector<std::pair<pcl::PointCloud<pcl::PointXYZHSV>, cv::Mat>> refined_cloud_contour_vec;
     int max_refined_len = 0;
 
-    RCLCPP_INFO(this->get_logger(), "# OF FOUND BBOXES: %d", bbox_pcloud_objects.size());
+    RCLCPP_DEBUG(this->get_logger(), "# OF FOUND BBOXES: %d", bbox_pcloud_objects.size());
     for(auto bbox_pcloud_pair : bbox_pcloud_objects){
         all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = bbox_pcloud_pair.first;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
@@ -335,10 +336,10 @@ void BBoxProjectPCloud::bb_pcl_project(
         std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func = std::bind(&hsv_diff_condition, m_clustering_color_weights, m_clustering_color_thres, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
         cec.setConditionFunction(cond_func);
         cec.segment(clusters_indices);
-        RCLCPP_INFO(this->get_logger(), "# OF EXTRACTED CLUSTERS: %d", clusters_indices.size());
+        RCLCPP_DEBUG(this->get_logger(), "# OF EXTRACTED CLUSTERS: %d", clusters_indices.size());
         int clust_id = 0;
         for(auto ind_set : clusters_indices){
-            RCLCPP_INFO(this->get_logger(), "SIZE OF CLUSTER %d: %d", clust_id, ind_set.indices.size());
+            RCLCPP_DEBUG(this->get_logger(), "SIZE OF CLUSTER %d: %d", clust_id, ind_set.indices.size());
             for(pcl::index_t ind : ind_set.indices){
                 cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x));
                 mat_clusters.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(clust_id, clusters_indices.size());
@@ -382,10 +383,10 @@ void BBoxProjectPCloud::bb_pcl_project(
             }
             in_contours.push_back(in_contour);
         }
-        RCLCPP_INFO(this->get_logger(), "# OF FOUND CONTOURS: %d", in_contours.size());
+        RCLCPP_DEBUG(this->get_logger(), "# OF FOUND CONTOURS: %d", in_contours.size());
         // Convert the contour points to fit the original image (using image_sz and bbox_offset -> just bbox_offset+pt_coords) to be able to use it with the LiDAR (projected) points
         for(int ctr = 0; ctr < in_contours.size(); ctr++){
-            RCLCPP_INFO(this->get_logger(), "SIZE OF CONTOUR %d: %d", ctr, in_contours[ctr].size());
+            RCLCPP_DEBUG(this->get_logger(), "SIZE OF CONTOUR %d: %d", ctr, in_contours[ctr].size());
             for(int pt=0; pt < in_contours[ctr].size(); pt++){
                 in_contours[ctr][pt]+=bbox_offset;
                 mat_contours.at<cv::Vec3b>(in_contours[ctr][pt]-bbox_offset) = int_to_bgr(ctr, in_contours.size());
@@ -393,16 +394,19 @@ void BBoxProjectPCloud::bb_pcl_project(
         }
         if(in_contours.empty() || clusters_indices.empty()) continue;
         // Convert both the pcloud and the contours to a vector of pair<Point2d, Vec3b> and compute sum and sum of squares (can be used to compute all the needed metrics)
-        std::vector<std::vector<std::pair<cv::Point2d, cv::Vec3b>>> contours_pts;
-        std::vector<std::pair<std::pair<cv::Point2d, cv::Vec3b>, std::pair<cv::Point2d, cv::Vec3b>>> contours_qts;
+        std::vector<std::vector<std::pair<cv::Point2d, std::vector<long long>>>> contours_pts;
+        std::vector<std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>>> contours_qts;
         for (std::vector<cv::Point> in_contour : in_contours){// point.x, point.y the coords
-            std::vector<std::pair<cv::Point2d, cv::Vec3b>> contour_pts;
-            std::pair<std::pair<cv::Point2d, cv::Vec3b>, std::pair<cv::Point2d, cv::Vec3b>> contour_qts;
+            std::vector<std::pair<cv::Point2d, std::vector<long long>>> contour_pts;
+            std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> contour_qts;
+            contour_qts.first.second = contour_qts.second.second = {0,0,0};
             for(cv::Point image_pt : in_contour){
-                cv::Vec3b image_pt_hsv = cv_hsv.at<cv::Vec3b>(image_pt);
-                RCLCPP_INFO(this->get_logger(), "IMAGE POINT COLOR AT POINT (%d, %d) (size: %d, %d): (%lf, %lf, %lf)", image_pt.x, image_pt.y, cv_hsv.cols, cv_hsv.rows, image_pt_hsv[0], image_pt_hsv[1], image_pt_hsv[2]);
+                cv::Vec3b image_pt_hsv_vec3b = cv_hsv.at<cv::Vec3b>(image_pt);
+                std::vector<long long> image_pt_hsv = {(long long)image_pt_hsv_vec3b[0], (long long)image_pt_hsv_vec3b[1], (long long)image_pt_hsv_vec3b[2]};
+                RCLCPP_DEBUG(this->get_logger(), "IMAGE POINT COLOR AT POINT (%d, %d) (size: %d, %d): (%d, %d, %d)", image_pt.x, image_pt.y, cv_hsv.cols, cv_hsv.rows, image_pt_hsv[0], image_pt_hsv[1], image_pt_hsv[2]);
                 cv::Point2d image_pt_xy = cv::Point2d(image_pt.x, image_pt.y);
                 contour_pts.push_back(std::make_pair(image_pt_xy, image_pt_hsv));
+                RCLCPP_DEBUG(this->get_logger(), "IMAGE H SUM/SQUARED BEFORE POINT UPDATE: %lld/%lld", contour_qts.first.second[0], contour_qts.second.second[0]);
                 //store sums
                 contour_qts.first.first.x+=image_pt_xy.x;
                 contour_qts.first.first.y+=image_pt_xy.y;
@@ -415,20 +419,22 @@ void BBoxProjectPCloud::bb_pcl_project(
                 contour_qts.second.second[0]+=image_pt_hsv[0]*image_pt_hsv[0];
                 contour_qts.second.second[1]+=image_pt_hsv[1]*image_pt_hsv[1];
                 contour_qts.second.second[2]+=image_pt_hsv[2]*image_pt_hsv[2];
+                RCLCPP_DEBUG(this->get_logger(), "IMAGE H SUM/SQUARED AFTER POINT UPDATE: %lld/%lld", contour_qts.first.second[0], contour_qts.second.second[0]);
             }
             contours_pts.push_back(contour_pts);
             contours_qts.push_back(contour_qts);
         }
-        std::vector<std::vector<std::pair<cv::Point2d, cv::Vec3b>>> clusters_pts;
-        std::vector<std::pair<std::pair<cv::Point2d, cv::Vec3b>, std::pair<cv::Point2d, cv::Vec3b>>> clusters_qts;
+        std::vector<std::vector<std::pair<cv::Point2d, std::vector<long long>>>> clusters_pts;
+        std::vector<std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>>> clusters_qts;
         for (pcl::PointIndices cluster : clusters_indices){// vector<index_t> is cluster.indices
-            std::vector<std::pair<cv::Point2d, cv::Vec3b>> cluster_pts;
-            std::pair<std::pair<cv::Point2d, cv::Vec3b>, std::pair<cv::Point2d, cv::Vec3b>> cluster_qts;
+            std::vector<std::pair<cv::Point2d, std::vector<long long>>> cluster_pts;
+            std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> cluster_qts;
+            cluster_qts.first.second = cluster_qts.second.second = {0,0,0};
             for(pcl::index_t ind : cluster.indices){
-                RCLCPP_INFO(this->get_logger(), "INITIAL CLUSTER POINT COLOR: (%lf, %lf, %lf)", pcloud_ptr->points[ind].h, pcloud_ptr->points[ind].s, pcloud_ptr->points[ind].v);
+                RCLCPP_DEBUG(this->get_logger(), "INITIAL CLUSTER POINT COLOR: (%lf, %lf, %lf)", pcloud_ptr->points[ind].h, pcloud_ptr->points[ind].s, pcloud_ptr->points[ind].v);
                 //transform to OpenCV HSV
-                cv::Vec3b cloud_pt_hsv = cv::Vec3b(pcloud_ptr->points[ind].h/2, pcloud_ptr->points[ind].s*((float)255.0), pcloud_ptr->points[ind].v*((float)255.0));
-                RCLCPP_INFO(this->get_logger(), "CONVERTED CLUSTER POINT COLOR: (%lf, %lf, %lf)", cloud_pt_hsv[0], cloud_pt_hsv[1], cloud_pt_hsv[2]);
+                std::vector<long long> cloud_pt_hsv = {pcloud_ptr->points[ind].h/2, pcloud_ptr->points[ind].s*((float)255.0), pcloud_ptr->points[ind].v*((float)255.0)};
+                RCLCPP_DEBUG(this->get_logger(), "CONVERTED CLUSTER POINT COLOR: (%d, %d, %d)", cloud_pt_hsv[0], cloud_pt_hsv[1], cloud_pt_hsv[2]);
                 cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x));
                 cluster_pts.push_back(std::make_pair(cloud_pt_xy, cloud_pt_hsv));
                 //store sums
@@ -449,82 +455,80 @@ void BBoxProjectPCloud::bb_pcl_project(
         }
 
         // GO THROUGH ALL THE CLUSTER/CONTOUR PAIRS AND FIND THE BEST ONE BASED ON THE OPTIMALITY METRIC WITH THE WEIGHTS
-        double min_pair_cost = -1;
+        long long min_pair_cost = -1;
         int opt_contour_id = -1, opt_cluster_id = -1;
         for (int contour = 0; contour < contours_pts.size(); contour++){
-            double contour_size = contours_pts[contour].size();
-            std::pair<std::pair<cv::Point2d, cv::Vec3b>, std::pair<cv::Point2d, cv::Vec3b>> contour_qts = contours_qts[contour];
+            long long contour_size = contours_pts[contour].size();
+            std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> contour_qts = contours_qts[contour];
             
-            double contour_cost = 0;
-            for (std::pair<cv::Point2d, cv::Vec3b> contour_pt : contours_pts[contour]){
-                contour_cost += color_range_penalty(m_contour_detection_color_weights, label_color_map[bbox.label]=="red"?contour_matching_color_range_map["red2"]:contour_matching_color_range_map[label_color_map[bbox.label]], contour_pt.second)/contour_size;
+            long long contour_cost = 0;
+            for (std::pair<cv::Point2d, std::vector<long long>> contour_pt : contours_pts[contour]){
+                contour_cost += (long long)color_range_penalty(m_contour_detection_color_weights, label_color_map[bbox.label]=="red"?contour_matching_color_range_map["red2"]:contour_matching_color_range_map[label_color_map[bbox.label]], contour_pt.second)/contour_size;
             }
             for (int cluster = 0; cluster < clusters_pts.size(); cluster++){
-                double cluster_size = clusters_pts[cluster].size();
-                std::pair<std::pair<cv::Point2d, cv::Vec3b>, std::pair<cv::Point2d, cv::Vec3b>> cluster_qts = clusters_qts[cluster];
+                long long cluster_size = clusters_pts[cluster].size();
+                std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> cluster_qts = clusters_qts[cluster];
                 
                 //sum(cluster_size*x_i^2+contour_size*x_j^2) -2*sum(x_i*x_j) +sum(cluster_size*y_i^2+contour_size*y_j^2) -2*sum(y_i*y_j))
-                double fast_contour_cluster_sq_dist_sum = cluster_size*contour_qts.second.first.x+contour_size*cluster_qts.second.first.x\
+                long long fast_contour_cluster_sq_dist_sum = cluster_size*contour_qts.second.first.x+contour_size*cluster_qts.second.first.x\
                                         - 2*contour_qts.first.first.x*cluster_qts.first.first.x\
                                         + cluster_size*contour_qts.second.first.y+contour_size*cluster_qts.second.first.y\
                                         - 2*contour_qts.first.first.y*cluster_qts.first.first.y;
-                double contour_cluster_dist_rms = sqrt(fast_contour_cluster_sq_dist_sum/(cluster_size*contour_size));
+                long long contour_cluster_dist_ms = fast_contour_cluster_sq_dist_sum/(cluster_size*contour_size);
 
-                // RCLCPP_INFO(this->get_logger(), "FAST SQUARED DIST SUM: cluster_size (%lf)*sum(x_i^2) (%lf) +contour_size (%lf)*sum(x_j^2) (%lf) -2*sum(x_i) (%lf)*sum(x_j) (%lf) +cluster_size (%lf)*sum(y_i^2) (%lf)+contour_size (%lf)*sum(y_j^2) (%lf) -2*sum(y_i) (%lf)* sum(y_j) (%lf) = %lf", cluster_size, contour_qts.second.first.x, contour_size, cluster_qts.second.first.x, contour_qts.first.first.x, cluster_qts.first.first.x, cluster_size, contour_qts.second.first.y, contour_size, cluster_qts.second.first.y, contour_qts.first.first.y, cluster_qts.first.first.y, fast_contour_cluster_sq_dist_sum);
+                // RCLCPP_DEBUG(this->get_logger(), "FAST SQUARED DIST SUM: cluster_size (%lf)*sum(x_i^2) (%lf) +contour_size (%lf)*sum(x_j^2) (%lf) -2*sum(x_i) (%lf)*sum(x_j) (%lf) +cluster_size (%lf)*sum(y_i^2) (%lf)+contour_size (%lf)*sum(y_j^2) (%lf) -2*sum(y_i) (%lf)* sum(y_j) (%lf) = %lf", cluster_size, contour_qts.second.first.x, contour_size, cluster_qts.second.first.x, contour_qts.first.first.x, cluster_qts.first.first.x, cluster_size, contour_qts.second.first.y, contour_size, cluster_qts.second.first.y, contour_qts.first.first.y, cluster_qts.first.first.y, fast_contour_cluster_sq_dist_sum);
 
                 // //debugging, brute force
-                // double sq_dist_sum = 0;
+                // long long sq_dist_sum = 0;
                 // for(cv::Point image_pt : in_contours[contour]){
                 //     for(pcl::index_t ind : clusters_indices[cluster].indices){
-                //         cv::Vec3b image_pt_hsv = cv_hsv.at<cv::Vec3b>(image_pt);
                 //         cv::Point2d image_pt_xy = cv::Point2d(image_pt.x, image_pt.y);
 
-                //         cv::Vec3b cloud_pt_hsv = cv::Vec3b(pcloud_ptr->points[ind].h, pcloud_ptr->points[ind].s, pcloud_ptr->points[ind].v);
                 //         cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x));
                     
                 //         sq_dist_sum += pow(cv::norm(cloud_pt_xy - image_pt_xy),2);
                 //     }
                 // }
 
-                // RCLCPP_INFO(this->get_logger(), "BRUTE FORCE SQUARED DIST SUM: %lf", sq_dist_sum);
+                // RCLCPP_DEBUG(this->get_logger(), "BRUTE FORCE SQUARED DIST SUM: %lf", sq_dist_sum);
 
-                cv::Vec3b avg_contour_col = (1/contour_size)*contour_qts.first.second;
+                std::vector<long long> avg_contour_col = {contour_qts.first.second[0]/contour_size, contour_qts.first.second[1]/contour_size, contour_qts.first.second[2]/contour_size};
   
-                double fast_cluster_sq_dh_sum = cluster_qts.second.second[0]-2*cluster_qts.first.second[0]*avg_contour_col[0]+avg_contour_col[0]*avg_contour_col[0];//sum((h_i-m_h)^2=h_i^2-2*h_i*m_h+m_h^2)
-                double fast_cluster_sq_ds_sum = cluster_qts.second.second[1]-2*cluster_qts.first.second[1]*avg_contour_col[1]+avg_contour_col[1]*avg_contour_col[1];//same for s
-                double fast_cluster_sq_dv_sum = cluster_qts.second.second[2]-2*cluster_qts.first.second[2]*avg_contour_col[2]+avg_contour_col[2]*avg_contour_col[2];//same for v
+                long long fast_cluster_sq_dh_sum = cluster_qts.second.second[0]-2*cluster_qts.first.second[0]*avg_contour_col[0]+cluster_size*avg_contour_col[0]*avg_contour_col[0];//sum((h_i-m_h)^2=h_i^2-2*h_i*m_h+cluster_size*m_h^2)
+                long long fast_cluster_sq_ds_sum = cluster_qts.second.second[1]-2*cluster_qts.first.second[1]*avg_contour_col[1]+cluster_size*avg_contour_col[1]*avg_contour_col[1];//same for s
+                long long fast_cluster_sq_dv_sum = cluster_qts.second.second[2]-2*cluster_qts.first.second[2]*avg_contour_col[2]+cluster_size*avg_contour_col[2]*avg_contour_col[2];//same for v
 
-                double cluster_dh_rms = sqrt(fast_cluster_sq_dh_sum/cluster_size);
-                double cluster_ds_rms = sqrt(fast_cluster_sq_ds_sum/cluster_size);
-                double cluster_dv_rms = sqrt(fast_cluster_sq_dv_sum/cluster_size);
+                long long cluster_dh_ms = fast_cluster_sq_dh_sum/cluster_size;
+                long long cluster_ds_ms = fast_cluster_sq_ds_sum/cluster_size;
+                long long cluster_dv_ms = fast_cluster_sq_dv_sum/cluster_size;
                 
-                RCLCPP_INFO(this->get_logger(), "FAST SQUARED DH SUM: sum(h_i^2) (%lf)-2*sum(h_i) (%lf)*m_h (%lf)+m_h^2 (%lf)) = %lf", cluster_qts.second.second[0], cluster_qts.first.second[0], avg_contour_col[0], avg_contour_col[0]*avg_contour_col[0], fast_cluster_sq_dh_sum);
+                // RCLCPP_DEBUG(this->get_logger(), "FAST SQUARED DH SUM: sum(h_i^2) (%lld)-2*sum(h_i) (%lld)*m_h (%lld)+cluster_size(%lld)*m_h^2 (%lld)) = %lld", cluster_qts.second.second[0], cluster_qts.first.second[0], avg_contour_col[0], cluster_size, avg_contour_col[0]*avg_contour_col[0], fast_cluster_sq_dh_sum);
 
                 //debugging, brute force
-                double sq_dh_sum = 0;
-                double avg_contour_h = 0;
-                for(cv::Point image_pt : in_contours[contour]){
-                    cv::Vec3b image_pt_hsv = cv_hsv.at<cv::Vec3b>(image_pt);
-                    cv::Point2d image_pt_xy = cv::Point2d(image_pt.x, image_pt.y);
-                    
-                    avg_contour_h += image_pt_hsv[0]/contour_size;
-                }
-                for(pcl::index_t ind : clusters_indices[cluster].indices){
-                    cv::Vec3b cloud_pt_hsv = cv::Vec3b(pcloud_ptr->points[ind].h, pcloud_ptr->points[ind].s, pcloud_ptr->points[ind].v);
-                    cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x));
-                    //transform to OpenCV HSV
-                    cloud_pt_hsv[0]/=2;
-                    cloud_pt_hsv[1]*=255;
-                    cloud_pt_hsv[2]*=255;
-                    sq_dh_sum += pow(cloud_pt_hsv[0] - avg_contour_h,2);
-                }
+                // long long sq_dh_sum = 0;
+                // long long sum_contour_h = 0;
+                // for(cv::Point image_pt : in_contours[contour]){
+                //     cv::Vec3b image_pt_hsv_vec3b = cv_hsv.at<cv::Vec3b>(image_pt);
+                //     std::vector<long long> image_pt_hsv = {(long long)image_pt_hsv_vec3b[0], (long long)image_pt_hsv_vec3b[1], (long long)image_pt_hsv_vec3b[2]};
 
-                RCLCPP_INFO(this->get_logger(), "BRUTE FORCE SQUARE DH SUM: %lf, AVERAGE CONTOUR H: %lf", sq_dh_sum, avg_contour_h);
+                //     sum_contour_h += image_pt_hsv[0];
+                // }
+                // long long avg_contour_h = sum_contour_h/contour_size;
+                // for(pcl::index_t ind : clusters_indices[cluster].indices){
+                //     std::vector<long long> cloud_pt_hsv = {pcloud_ptr->points[ind].h, pcloud_ptr->points[ind].s, pcloud_ptr->points[ind].v};
+                //     //transform to OpenCV HSV
+                //     cloud_pt_hsv[0]/=2;
+                //     cloud_pt_hsv[1]*=255;
+                //     cloud_pt_hsv[2]*=255;
+                //     sq_dh_sum += pow(cloud_pt_hsv[0] - avg_contour_h,2);
+                // }
+
+                // RCLCPP_DEBUG(this->get_logger(), "BRUTE FORCE SQUARE DH SUM: %lld, AVERAGE CONTOUR H: %lld", sq_dh_sum, avg_contour_h);
                 
-                double pair_cost = m_cluster_contour_distance_weight*contour_cluster_dist_rms*contour_cluster_dist_rms\
-                                    + m_cluster_contour_color_weights[0]*cluster_dh_rms*cluster_dh_rms\
-                                    + m_cluster_contour_color_weights[1]*cluster_ds_rms*cluster_ds_rms\
-                                    + m_cluster_contour_color_weights[2]*cluster_dv_rms*cluster_dv_rms\
+                long long pair_cost = m_cluster_contour_distance_weight*contour_cluster_dist_ms\
+                                    + m_cluster_contour_color_weights[0]*cluster_dh_ms\
+                                    + m_cluster_contour_color_weights[1]*cluster_ds_ms\
+                                    + m_cluster_contour_color_weights[2]*cluster_dv_ms\
                                     - m_cluster_contour_size_weight*cluster_size*contour_size\
                                     + contour_cost;
                 if (min_pair_cost == -1 || pair_cost < min_pair_cost){
@@ -558,19 +562,19 @@ void BBoxProjectPCloud::bb_pcl_project(
         max_refined_len = std::max(max_refined_len, (int)refined_cloud_ptr->size());
 
         //show clusters & contours & respective matching (split image)
-        cv::Mat clust_cont_arr[] = {mat_clusters, mat_contours};
-        cv::Mat opt_clust_cont_arr[] = {mat_opt_cluster, mat_opt_contour};
-        cv::Mat clust_cont;
-        cv::Mat opt_clust_cont;
-        cv::hconcat(clust_cont_arr, 2, clust_cont);
-        cv::hconcat(opt_clust_cont_arr, 2, opt_clust_cont);
-        cv::Mat clust_cont_all_arr[] = {clust_cont, opt_clust_cont};
-        cv::Mat clust_cont_all;
-        cv::vconcat(clust_cont_all_arr, 2, clust_cont_all);
-        cv::Mat upscaled;
-        cv::resize(clust_cont_all, upscaled, cv::Size(), 5, 5, cv::INTER_CUBIC);
-        cv::imshow("Clusters & contours & matching", upscaled);
-        cv::waitKey();
+        // cv::Mat clust_cont_arr[] = {mat_clusters, mat_contours};
+        // cv::Mat opt_clust_cont_arr[] = {mat_opt_cluster, mat_opt_contour};
+        // cv::Mat clust_cont;
+        // cv::Mat opt_clust_cont;
+        // cv::hconcat(clust_cont_arr, 2, clust_cont);
+        // cv::hconcat(opt_clust_cont_arr, 2, opt_clust_cont);
+        // cv::Mat clust_cont_all_arr[] = {clust_cont, opt_clust_cont};
+        // cv::Mat clust_cont_all;
+        // cv::vconcat(clust_cont_all_arr, 2, clust_cont_all);
+        // cv::Mat upscaled;
+        // cv::resize(clust_cont_all, upscaled, cv::Size(), 5, 5, cv::INTER_CUBIC);
+        // cv::imshow("Clusters & contours & matching", upscaled);
+        // cv::waitKey();
     }
     RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS & CONTOURS");
     m_refined_object_pcl_contour_pub->publish(refined_objects_pub);
