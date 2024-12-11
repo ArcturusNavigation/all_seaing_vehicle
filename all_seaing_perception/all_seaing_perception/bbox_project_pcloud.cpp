@@ -268,7 +268,7 @@ void BBoxProjectPCloud::bb_pcl_project(
 
     // REFINE OBJECT POINT CLOUDS
     auto refined_objects_pub = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
-    std::vector<std::pair<pcl::PointCloud<pcl::PointXYZHSV>, cv::Mat>> refined_cloud_contour_vec;
+    std::vector<std::pair<pcl::PointCloud<pcl::PointXYZHSV>, std::vector<cv::Point>>> refined_cloud_contour_vec;
     int max_refined_len = 0;
 
     RCLCPP_DEBUG(this->get_logger(), "# OF FOUND BBOXES: %d", bbox_pcloud_objects.size());
@@ -556,9 +556,11 @@ void BBoxProjectPCloud::bb_pcl_project(
         }
         pcl::toROSMsg(*refined_cloud_ptr, refined_pcl_contours.cloud);
         cv_bridge::CvImagePtr refined_obj_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, refined_obj_contour_mat));
+        // cv::imshow("Object contour image to be published:", refined_obj_contour_mat);
+        // cv::waitKey();
         refined_pcl_contours.contour = *refined_obj_contour_ptr->toImageMsg();
         refined_objects_pub.objects.push_back(refined_pcl_contours);
-        refined_cloud_contour_vec.push_back(std::make_pair(*refined_cloud_ptr,refined_obj_contour_mat));
+        refined_cloud_contour_vec.push_back(std::make_pair(*refined_cloud_ptr,in_contours[opt_contour_id]));
         max_refined_len = std::max(max_refined_len, (int)refined_cloud_ptr->size());
 
         //show clusters & contours & respective matching (split image)
@@ -589,11 +591,10 @@ void BBoxProjectPCloud::bb_pcl_project(
             RCLCPP_DEBUG(this->get_logger(), "BBOX %d/%d", i, refined_cloud_contour_vec.size());
             for(int j = 0; j<refined_cloud_contour_vec[i].first.size(); j++){
                 all_obj_refined_pcls_ptr->at(j,i) = refined_cloud_contour_vec[i].first[j];
-                RCLCPP_DEBUG(this->get_logger(), "CLUSTER %d/%d", j, refined_cloud_contour_vec[i].first.size());
             }
-            RCLCPP_DEBUG(this->get_logger(), "BEFORE CONTOUR ADDITION");
-            all_obj_refined_contours += refined_cloud_contour_vec[i].second;
-            RCLCPP_DEBUG(this->get_logger(), "AFTER CONTOUR ADDITION");
+            for(cv::Point pt : refined_cloud_contour_vec[i].second){
+                all_obj_refined_contours.at<cv::Vec3b>(pt)=cv::Vec3b(255, 255, 255);
+            }
         }
     }catch(std::exception &ex){
         RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
@@ -602,7 +603,9 @@ void BBoxProjectPCloud::bb_pcl_project(
     auto obj_refined_pcls_msg = sensor_msgs::msg::PointCloud2();
     pcl::toROSMsg(*all_obj_refined_pcls_ptr, obj_refined_pcls_msg);
     m_refined_object_pcl_viz_pub->publish(obj_refined_pcls_msg);
-    cv_bridge::CvImagePtr all_obj_refined_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC1, all_obj_refined_contours));
+    cv_bridge::CvImagePtr all_obj_refined_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, all_obj_refined_contours));
+    // cv::imshow("Object contour image to be published:", all_obj_refined_contours);
+    // cv::waitKey();
     m_refined_object_contour_viz_pub->publish(*all_obj_refined_contour_ptr->toImageMsg());
     RCLCPP_DEBUG(this->get_logger(), "SENT OBJECT POINT CLOUDS FOR VISUALIZATION");
 }
