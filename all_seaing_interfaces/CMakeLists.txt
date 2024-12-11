@@ -23,8 +23,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/WaypointArray.msg"
     "msg/ObstacleCounter.msg"
     "msg/ObstacleCounterArray.msg"
+    "msg/LabeledObjectPointCloud.msg"
+    "msg/LabeledObjectPointCloudArray.msg"
     DEPENDENCIES
     geometry_msgs
+    sensor_msgs
 )
 
 ament_auto_package()

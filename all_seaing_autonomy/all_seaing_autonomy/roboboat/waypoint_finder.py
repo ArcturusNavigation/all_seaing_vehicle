@@ -12,7 +12,6 @@ import math
 import os
 from ament_index_python.packages import get_package_share_directory
 
-
 class WaypointFinder(Node):
     def __init__(self):
         super().__init__("waypoint_finder")

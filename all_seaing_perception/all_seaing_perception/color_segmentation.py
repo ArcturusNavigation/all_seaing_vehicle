@@ -46,10 +46,10 @@ class ColorSegmentation(Node):
         bboxes.header = img.header
 
         try:
-            img = self.bridge.imgmsg_to_cv2(img, "rgb8")
+            img = self.bridge.imgmsg_to_cv2(img, "bgr8")
         except cv_bridge.CvBridgeError as e:
             self.get_logger().info(str(e))
-        hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
         colors = self.colors
         label_dict = self.label_dict
@@ -104,7 +104,7 @@ class ColorSegmentation(Node):
                     4,
                 )
 
-            self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
+            self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "bgr8"))
         self.bbox_pub.publish(bboxes)
 
 
