@@ -16,7 +16,7 @@ ament_auto_add_executable(
     ${PROJECT_NAME}/obstacle.cpp
 )
 ament_auto_add_executable(
-    obstacle_bbox_overlay 
+    obstacle_bbox_overlay
     ${PROJECT_NAME}/obstacle_bbox_overlay.cpp
 )
 ament_auto_add_executable(
@@ -39,7 +39,7 @@ install(TARGETS
     obstacle_bbox_overlay
     point_cloud_filter
     point_cloud_image_overlay
-    obstacle_bbox_visualizer  
+    obstacle_bbox_visualizer
     DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -55,8 +55,9 @@ install(PROGRAMS
     ${PROJECT_NAME}/yolov8_node.py
     ${PROJECT_NAME}/image_splitter.py
     ${PROJECT_NAME}/perception_eval.py
-    ${PROJECT_NAME}/triangle1.png
-    ${PROJECT_NAME}/jesus.jpg
+    ${PROJECT_NAME}/test_square_publisher.py
+    ${PROJECT_NAME}/square_detector.py
+
     DESTINATION lib/${PROJECT_NAME}
 )
 
