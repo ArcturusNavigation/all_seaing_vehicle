@@ -33,9 +33,6 @@ def generate_launch_description():
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
-            {"obstacle_seg_thresh": 10.0},
-            {"obstacle_drop_thresh": 1.0},
-            {"polygon_area_thresh": 100000.0},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges}
         ]

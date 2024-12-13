@@ -103,16 +103,11 @@ private:
     int m_obstacle_size_min;
     int m_obstacle_size_max;
     double m_clustering_distance;
-    double m_obstacle_seg_thresh;
-    double m_obstacle_drop_thresh;
-    double m_polygon_area_thresh;
 
     // for color segmentation
-    std::string color_ranges_file;
     std::string color_label_mappings_file;
-    YAML::Node label_config_yaml, ranges_config_yaml;
+    YAML::Node label_config_yaml;
     std::map<int, std::string> label_color_map;
-    std::map<std::string, std::vector<int>> color_range_map;
 
     // for cluster-contour matching/selection
     std::string matching_weights_file;

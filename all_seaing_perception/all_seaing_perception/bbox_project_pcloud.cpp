@@ -15,22 +15,14 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     this->declare_parameter<int>("obstacle_size_min", 20);
     this->declare_parameter<int>("obstacle_size_max", 100000);
     this->declare_parameter<double>("clustering_distance", 0.75);
-    this->declare_parameter<double>("obstacle_seg_thresh", 1.0);
-    this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
-    this->declare_parameter<double>("polygon_area_thresh", 100000.0);
     
     m_obstacle_size_min = this->get_parameter("obstacle_size_min").as_int();
     m_obstacle_size_max = this->get_parameter("obstacle_size_max").as_int();
     m_clustering_distance = this->get_parameter("clustering_distance").as_double();
-    m_obstacle_seg_thresh = this->get_parameter("obstacle_seg_thresh").as_double();
-    m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
-    m_polygon_area_thresh = this->get_parameter("polygon_area_thresh").as_double();
 
     // for color segmentation
-    this->declare_parameter("color_ranges_file", "");
     this->declare_parameter("color_label_mappings_file", "");
 
-    color_ranges_file = this->get_parameter("color_ranges_file").as_string();
     color_label_mappings_file = this->get_parameter("color_label_mappings_file").as_string();
 
     // for cluster-contour matching & selection
@@ -74,21 +66,6 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
         RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", color_label_mappings_file.c_str());
     }
     label_yaml.close();
-
-    // get color ranges from yaml
-    RCLCPP_DEBUG(this->get_logger(), "READING COLOR RANGES");
-    std::ifstream ranges_yaml(color_ranges_file);
-    if (ranges_yaml.is_open()) {
-        ranges_config_yaml = YAML::Load(ranges_yaml);  
-        for (YAML::const_iterator it = ranges_config_yaml.begin(); it != ranges_config_yaml.end(); ++it) {
-            color_range_map[it->first.as<std::string>()] = it->second.as<std::vector<int>>();
-            RCLCPP_DEBUG(this->get_logger(), "%s -> [%d, %d, %d, %d, %d, %d]", it->first.as<std::string>().c_str(), it->second.as<std::vector<int>>()[0], it->second.as<std::vector<int>>()[1], it->second.as<std::vector<int>>()[2], it->second.as<std::vector<int>>()[3], it->second.as<std::vector<int>>()[4], it->second.as<std::vector<int>>()[5]);
-        }
-    } 
-    else {
-        RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", color_ranges_file.c_str());
-    }
-    ranges_yaml.close();
 
     // get cluster-contour matching & selection parameters from yaml
     RCLCPP_DEBUG(this->get_logger(), "READING MATCHING PARAMETERS");
