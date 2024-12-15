@@ -1,10 +1,8 @@
 from all_seaing_autonomy.roboboat.Task import Task
+from all_seaing_interfaces.action import Waypoint
+from rclpy.action import ActionClient
 from enum import Enum
 import math
-from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlOption
-from all_seaing_interfaces.action import Waypoint
-
-
 
 class DockingState(Enum):
     IDLE = 0
@@ -30,8 +28,8 @@ class BannerColor(Enum):
     NONE = 3
 
 # CONSTANTS: TODO: SET THESE TO THE ACTUAL VALUES / MAKE THEM EASILY CONFIGURABLE
-DOCK_POSITION = (45.697, 32.452, 15) # (x, y, z rotation)
-DESIRED_BANNER = (BannerShape.CIRCLE, BannerColor.RED) # (shape, color)
+DOCK_POSITION = (45.697, 32.452, 15)  # (x, y, z rotation)
+DESIRED_BANNER = (BannerShape.CIRCLE, BannerColor.RED)  # (shape, color)
 SINGLE_DOCK_LENGTH = 5
 DOCK_DEPTH = 2
 ORBIT_RADIUS = 10
@@ -39,25 +37,11 @@ ORBIT_RADIUS = 10
 CURR_BANNER = 0
 
 def minus(a, b):
-    # helper function to subtract two tuples
     if type(a) != tuple:
         a = (a.x, a.y, a.z)
     if type(b) != tuple:
         b = (b.x, b.y, b.z)
     return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
-
-# TODO: MAKE THIS ACTUALLY READ THE CAMERA
-def read_camera():
-    # read the camera and return the shape and color of the banner
-    # fake sequence
-    global CURR_BANNER
-    return [
-        (BannerShape.SQUARE, BannerColor.GREEN),
-        (BannerShape.SQUARE, BannerColor.RED),
-        (BannerShape.SQUARE, BannerColor.GREEN),
-        (BannerShape.NONE, BannerColor.NONE),
-        (BannerShape.CIRCLE, BannerColor.RED)
-    ][CURR_BANNER]
 
 def point_diff_2d(a, b):
     if type(a) != tuple:
@@ -66,114 +50,107 @@ def point_diff_2d(a, b):
         b = (b.x, b.y)
     return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
 
-def add_2d(a, b):
-    if type(a) != tuple:
-        a = (a.x, a.y)
-    if type(b) != tuple:
-        b = (b.x, b.y)
-    return (a[0] + b[0], a[1] + b[1])
-
 class DockingTask(Task):
-    def __init__(self, waypoint_action_client, clock, logger):
-        self.waypoint_action_client = waypoint_action_client
+    def __init__(self, node, clock, logger):
+        super().__init__()
+        self.node = node  # Parent node for access to action client
         self.clock = clock
         self.logger = logger
         
+        self.waypoint_client = ActionClient(self.node, Waypoint, "waypoint")
         self.state = DockingState.IDLE
         self.last_state = DockingState.IDLE
         self.current_position = None
-
-        self.has_orbited = False
         self.state_changed = False
-        
+
     def get_name(self):
         return "Docking"
-    
+
     def start(self):
         self.state = DockingState.APPROACHING
         self.logger.info("Starting docking task")
-    
-    def send_waypoint_goal(self, x, y, theta=None, ignore_theta=True):
+
+    def send_waypoint(self, x, y, ignore_theta=True, theta=0.0):
         """
-        Sends a waypoint goal to the controller server.
+        Send a single waypoint to the controller and wait for it to complete.
         """
         goal_msg = Waypoint.Goal()
         goal_msg.x = x
         goal_msg.y = y
         goal_msg.ignore_theta = ignore_theta
-        if theta is not None:
-            goal_msg.theta = theta
-        goal_msg.xy_threshold = 1.0  # Adjust threshold as needed
-        goal_msg.theta_threshold = 5.0  # Adjust threshold as needed
+        goal_msg.theta = theta
+        goal_msg.xy_threshold = 1.0  # Adjust as needed
+        goal_msg.theta_threshold = 5.0  # Degrees, adjust as needed
 
-        self.logger.info(f"Sending waypoint goal: x={x}, y={y}, theta={theta}")
-        self.waypoint_action_client.wait_for_server()
-        return self.waypoint_action_client.send_goal_async(goal_msg)
-    
+        # Wait for action server to be ready
+        self.waypoint_client.wait_for_server()
+
+        # Send the goal
+        self.logger.info(f"Sending waypoint: x={x}, y={y}, ignore_theta={ignore_theta}")
+        self.future = self.waypoint_client.send_goal_async(goal_msg)
+        self.future.add_done_callback(self.waypoint_response_callback)
+
+    def waypoint_response_callback(self, future):
+        """
+        Callback for when the waypoint action server responds.
+        """
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.logger.warn("Waypoint request was rejected.")
+            return
+
+        self.logger.info("Waypoint accepted, waiting for result...")
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.waypoint_result_callback)
+
+    def waypoint_result_callback(self, future):
+        """
+        Callback for when the waypoint action server sends a result.
+        """
+        result = future.result().result
+        if result.is_finished:
+            self.logger.info("Waypoint successfully completed!")
+        else:
+            self.logger.warn("Waypoint failed or was canceled.")
+
     def update(self):
-        global CURR_BANNER
-        
         match self.state:
             case DockingState.APPROACHING:
-                # Approach the dock
                 if self.current_position is not None:
-                    x, y, _ = DOCK_POSITION
-                    delta = minus(DOCK_POSITION, self.current_position)
-                    deltaMag = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
-
-                    if deltaMag < 2:  # Close enough to dock
+                    # Send waypoint only once when transitioning into APPROACHING
+                    if self.state_changed:
+                        self.send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], ignore_theta=True)
+                    
+                    # Simulate waypoint completion
+                    if point_diff_2d(self.current_position, DOCK_POSITION) < 1.0:  # Threshold
                         self.state = DockingState.CHECKING_CAMERA
                         self.logger.info("Approached dock")
-                    else:
-                        # Send waypoint goal
-                        self.send_waypoint_goal(x, y)
-                    
+            
             case DockingState.CHECKING_CAMERA:
-                # Stop and check the camera
+                # Perform camera-based checks
                 if self.state_changed:
-                    self.logger.info("Checking camera for dock")
-                    self.start_checking_camera_time = self.clock.now()
-
-                elif (self.clock.now() - self.start_checking_camera_time).nanoseconds > 2e9:  # Wait 2 seconds
-                    banner = read_camera()
+                    self.logger.info("Checking camera for dock...")
+                    banner = self.read_camera()
                     if banner == DESIRED_BANNER:
                         self.state = DockingState.DOCKING
                     else:
                         self.state = DockingState.SHIFTING if banner[0] != BannerShape.NONE else DockingState.ORBITING
-                    CURR_BANNER += 1  # Simulate camera reading progress
-                
+
             case DockingState.SHIFTING:
-                # Shift position laterally
-                direction = -1
-                x, y, _ = DOCK_POSITION
-                offset_x = SINGLE_DOCK_LENGTH * direction
-                new_x = x + offset_x
-
+                # Shift the dock position
                 if self.state_changed:
-                    self.start_shifting_position = self.current_position
-                    self.logger.info("Shifting to new dock position")
+                    self.logger.info("Shifting position...")
+                    new_x = DOCK_POSITION[0] + SINGLE_DOCK_LENGTH
+                    new_y = DOCK_POSITION[1]
+                    self.send_waypoint(new_x, new_y, ignore_theta=True)
 
-                # Send waypoint goal
-                self.send_waypoint_goal(new_x, y)
-                if point_diff_2d(self.start_shifting_position, self.current_position) > SINGLE_DOCK_LENGTH:
-                    self.state = DockingState.CHECKING_CAMERA
-                    self.logger.info("Shifted position")
-                
             case DockingState.DOCKING:
-                # Docking sequence
                 if self.state_changed:
-                    self.start_docking_position = self.current_position
-                    self.logger.info("Docking in progress")
+                    self.logger.info("Docking at target position...")
+                    self.send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], ignore_theta=False, theta=DOCK_POSITION[2])
 
-                # Send waypoint goal for docking
-                x, y, _ = DOCK_POSITION
-                self.send_waypoint_goal(x, y, ignore_theta=False)
-                if point_diff_2d(self.start_docking_position, self.current_position) < DOCK_DEPTH:
-                    self.state = DockingState.DONE
-                    self.logger.info("Docked successfully")
-                
             case DockingState.DONE:
-                self.logger.info("Docking task completed")
+                self.logger.info("Docking completed successfully.")
 
     def check_finished(self):
         return self.state == DockingState.DONE
