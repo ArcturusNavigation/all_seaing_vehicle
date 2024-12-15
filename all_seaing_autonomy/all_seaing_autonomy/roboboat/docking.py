@@ -10,9 +10,10 @@ class DockingState(Enum):
     CHECKING_CAMERA = 2
     SHIFTING = 3
     DOCKING = 4
-    ORBITING = 5
-    DONE = 6
-    STOPPED = 7
+    ORBITING_1 = 5
+    ORBITING_2 = 6
+    DONE = 7
+    STOPPED = 8
 
 class BannerShape(Enum):
     CIRCLE = 0
@@ -63,6 +64,7 @@ class DockingTask(Task):
         self.state_changed = False 
         self.reached_waypoint = False
         self.dock_times = 1
+        self.shift_direction = 1
 
     def get_name(self):
         return "Docking"
@@ -122,7 +124,7 @@ class DockingTask(Task):
             case DockingState.APPROACHING:
                 # Send waypoint only once when transitioning into APPROACHING
                 if self.state_changed:
-                    self.send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], ignore_theta=False)
+                    self.send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], ignore_theta=False, theta=DOCK_POSITION[2])
                     
                 if self.reached_waypoint:
                     self.state = DockingState.CHECKING_CAMERA
@@ -132,14 +134,23 @@ class DockingTask(Task):
                 # Perform camera-based checks
                 if self.state_changed:
                     self.logger.info("Checking camera for dock...")
+                    self.dock_times += 1
                     # banner = self.read_camera()
                     banner = (BannerShape.CIRCLE, BannerColor.BLUE)  # Placeholder for WRONG
                     if banner == DESIRED_BANNER:
                         self.state = DockingState.DOCKING
                         self.logger.info("Correct banner detected, docking...")
                     else:
-                        self.state = DockingState.SHIFTING if self.dock_times < 3 else DockingState.ORBITING
-                        self.logger.info("Incorrect banner detected, shifting position...")
+                        if self.dock_times != 3:
+                            self.state = DockingState.SHIFTING
+                            self.shift_direction = 1 if self.dock_times < 3 else -1
+                            self.logger.info("Incorrect banner detected, shifting position...")
+                        else 
+                            self.state = DockingState.ORBITING_1
+                            self.logger.info("Incorrect banner detected, orbiting...")
+
+                        # self.state = DockingState.SHIFTING if self.dock_times 3 else DockingState.ORBITING_1
+                        # self.logger.info("Incorrect banner detected, shifting position...")
 
             case DockingState.SHIFTING:
                 # Shift the dock position
@@ -147,12 +158,33 @@ class DockingTask(Task):
                     self.logger.info("Shifting position...")
                     new_x = DOCK_POSITION[0]
                     new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times)
-                    self.send_waypoint(new_x, new_y, ignore_theta=False)
-                    self.dock_times += 1
+                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + (180 if self.shift_direction == -1 else 0))
                 
                 if self.reached_waypoint:
                     self.state = DockingState.CHECKING_CAMERA
                     self.logger.info("Shifted position")
+            
+            case DockingState.ORBITING_1:
+                if self.state_changed:
+                    self.logger.info("Orbiting dock first half...")
+                    new_x = DOCK_POSITION[0] + ORBIT_RADIUS
+                    new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times) + ORBIT_RADIUS
+                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 90)
+
+                if self.reached_waypoint:
+                    self.state = DockingState.ORBITING_2
+                    self.logger.info("first half of orbit completed")
+            
+            case DockingState.ORBITING_2:
+                if self.state_changed:
+                    self.logger.info("Orbiting dock second half...")
+                    new_x = DOCK_POSITION[0] + (ORBIT_RADIUS * 2)
+                    new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times)
+                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 180)
+                
+                if self.reached_waypoint:
+                    self.state = DockingState.CHECKING_CAMERA
+                    self.logger.info("Shifted position (via complete orbit)")
 
             case DockingState.DOCKING:
                 if self.state_changed:
