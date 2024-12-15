@@ -2,6 +2,9 @@ from all_seaing_autonomy.roboboat.Task import Task
 from enum import Enum
 import math
 from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlOption
+from all_seaing_interfaces.action import Waypoint
+
+
 
 class DockingState(Enum):
     IDLE = 0

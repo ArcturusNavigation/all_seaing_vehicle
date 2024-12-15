@@ -7,6 +7,8 @@ from all_seaing_autonomy.roboboat.Task import Task
 from all_seaing_autonomy.roboboat.FollowThePath import FollowThePath
 from all_seaing_autonomy.roboboat.docking import DockingTask
 from all_seaing_interfaces.msg import ObstacleMap
+from rclpy.action import ActionClient
+from all_seaing_interfaces.action import Waypoint
 
 
 def point_diff_2d(a, b):
