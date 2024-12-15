@@ -88,10 +88,12 @@ class TaskManager(Node):
             ControlOption, "control_options", 10
         )
 
+        self.waypoint_action_client = ActionClient(self, Waypoint, "waypoint")
+
         self.TASK_LIST = [
             # FollowThePath(self.get_logger()),
             # NavigationChannel(self.control_message_publisher, self.get_logger()),
-            DockingTask(self.control_message_publisher, self.get_clock(), self.get_logger()),
+            DockingTask(self.waypoint_action_client, self.get_clock(), self.get_logger()),
             Idling(),
         ]
 

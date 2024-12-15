@@ -2,8 +2,6 @@ from all_seaing_autonomy.roboboat.Task import Task
 from enum import Enum
 import math
 from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlOption
-from rclpy.action import ActionClient
-from all_seaing_interfaces.action import Waypoint
 
 class DockingState(Enum):
     IDLE = 0
@@ -73,10 +71,8 @@ def add_2d(a, b):
     return (a[0] + b[0], a[1] + b[1])
 
 class DockingTask(Task):
-    def __init__(self, control_message_pub, clock, logger):
-        self.control_message_pub = control_message_pub
-        self.waypoint_action_client = ActionClient(self, Waypoint, "waypoint")
-
+    def __init__(self, waypoint_action_client, clock, logger):
+        self.waypoint_action_client = waypoint_action_client
         self.clock = clock
         self.logger = logger
         
@@ -86,207 +82,95 @@ class DockingTask(Task):
 
         self.has_orbited = False
         self.state_changed = False
-
-        self.xy_threshold = 1.0
-        self.theta_threshold = 5.0
-
-    def send_waypoint(self, x, y, z_rotation):
-        goal_msg = Waypoint.Goal()
-        goal_msg.xy_threshold = self.xy_threshold
-        goal_msg.theta_threshold = self.theta_threshold
-        goal_msg.x = x
-        goal_msg.y = y
-        goal_msg.ignore_theta = True
-
-        self.action_client.wait_for_server()
-        self.send_goal_future = self.action_client.send_goal_async(goal_msg)
         
     def get_name(self):
         return "Docking"
     
     def start(self):
-        # maybe verify that we are in a region where docking is possible?
         self.state = DockingState.APPROACHING
         self.logger.info("Starting docking task")
     
+    def send_waypoint_goal(self, x, y, theta=None, ignore_theta=True):
+        """
+        Sends a waypoint goal to the controller server.
+        """
+        goal_msg = Waypoint.Goal()
+        goal_msg.x = x
+        goal_msg.y = y
+        goal_msg.ignore_theta = ignore_theta
+        if theta is not None:
+            goal_msg.theta = theta
+        goal_msg.xy_threshold = 1.0  # Adjust threshold as needed
+        goal_msg.theta_threshold = 5.0  # Adjust threshold as needed
+
+        self.logger.info(f"Sending waypoint goal: x={x}, y={y}, theta={theta}")
+        self.waypoint_action_client.wait_for_server()
+        return self.waypoint_action_client.send_goal_async(goal_msg)
+    
     def update(self):
         global CURR_BANNER
-        control_message = ControlOption()
         
-        send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], DOCK_POSITION[2])
-        
-        
-        # match self.state:
-        #     case DockingState.APPROACHING:
-        #         # move towards the dock
-        #         # TODO: maybe do something more robust than a plan proportional controller
-        #         if self.current_position is not None:
-        #             delta = minus(DOCK_POSITION, self.current_position)
-        #             deltaMag = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
-        #             kp = 0.1
+        match self.state:
+            case DockingState.APPROACHING:
+                # Approach the dock
+                if self.current_position is not None:
+                    x, y, _ = DOCK_POSITION
+                    delta = minus(DOCK_POSITION, self.current_position)
+                    deltaMag = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
 
-        #             vMag = kp * deltaMag
-        #             vDirection = math.atan2(delta[1], delta[0])
-
-        #             _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
-        #             theta = vDirection - robot_rotation
-        #             if theta > math.pi: theta = -(2*math.pi-theta)
-
-        #             vx = 10 * math.cos(theta)
-        #             vy = 10 * math.sin(theta)
-        #             vtheta = kp * 30 * theta
-
-        #             control_message.twist.linear.x = vx
-        #             control_message.twist.linear.y = vy
-        #             control_message.twist.angular.z = vtheta
-
-        #             if deltaMag < 2:
-        #                 self.state = DockingState.CHECKING_CAMERA
-        #                 self.logger.info("Approached dock")
+                    if deltaMag < 2:  # Close enough to dock
+                        self.state = DockingState.CHECKING_CAMERA
+                        self.logger.info("Approached dock")
+                    else:
+                        # Send waypoint goal
+                        self.send_waypoint_goal(x, y)
                     
-        #     case DockingState.CHECKING_CAMERA:
-        #         # check the camera for the dock
+            case DockingState.CHECKING_CAMERA:
+                # Stop and check the camera
+                if self.state_changed:
+                    self.logger.info("Checking camera for dock")
+                    self.start_checking_camera_time = self.clock.now()
 
-        #         # stop the boat while we do this
-        #         control_message.twist.linear.x = 0.0
-        #         control_message.twist.linear.y = 0.0
+                elif (self.clock.now() - self.start_checking_camera_time).nanoseconds > 2e9:  # Wait 2 seconds
+                    banner = read_camera()
+                    if banner == DESIRED_BANNER:
+                        self.state = DockingState.DOCKING
+                    else:
+                        self.state = DockingState.SHIFTING if banner[0] != BannerShape.NONE else DockingState.ORBITING
+                    CURR_BANNER += 1  # Simulate camera reading progress
                 
-        #         _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
-        #         theta = robot_rotation - DOCK_POSITION[2] * 2*math.pi/180.0
-        #         if theta > math.pi: theta = -(2*math.pi-theta)
-        #         control_message.twist.angular.z = -theta * 5.0
+            case DockingState.SHIFTING:
+                # Shift position laterally
+                direction = -1
+                x, y, _ = DOCK_POSITION
+                offset_x = SINGLE_DOCK_LENGTH * direction
+                new_x = x + offset_x
 
-        #         if self.state_changed:
-        #             self.logger.info("Checking camera for dock")
-        #             self.start_checking_camera_time = self.clock.now()
-        #         elif (self.clock.now() - self.start_checking_camera_time).nanoseconds > 2e9: # wait 2 sec for boat to stop
-        #             # check camera
-        #             banner = read_camera()
+                if self.state_changed:
+                    self.start_shifting_position = self.current_position
+                    self.logger.info("Shifting to new dock position")
 
-        #             if banner == DESIRED_BANNER:
-        #                 self.state = DockingState.DOCKING
-        #             else:
-        #                 self.state = DockingState.SHIFTING if banner[0] != BannerShape.NONE else DockingState.ORBITING
-            
-        #             # TODO REMOVE
-        #             CURR_BANNER += 1
-
-        #     case DockingState.SHIFTING:
-        #         # shift to the correct position
-        #         #direction = 1 if self.has_orbited else -1
-        #         direction = -1
-        #         orientation_offset = math.pi if self.has_orbited else 0 
-
-        #         if self.state_changed:
-        #             self.start_shifting_position = self.current_position
-
-        #         control_message.twist.linear.x = 0.0
-        #         control_message.twist.linear.y = -10.0 * direction
-
-        #         _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
-        #         theta = robot_rotation - DOCK_POSITION[2] * 2*math.pi/180.0 - orientation_offset
-        #         if theta > math.pi: theta = -(2*math.pi-theta)
-        #         control_message.twist.angular.z = -theta * 5.0
-
-        #         # check if we have shifted by a full dock length
-        #         if point_diff_2d(self.start_shifting_position, self.current_position) > SINGLE_DOCK_LENGTH:
-        #             self.state = DockingState.CHECKING_CAMERA
-        #             self.logger.info("Shifted position")
+                # Send waypoint goal
+                self.send_waypoint_goal(new_x, y)
+                if point_diff_2d(self.start_shifting_position, self.current_position) > SINGLE_DOCK_LENGTH:
+                    self.state = DockingState.CHECKING_CAMERA
+                    self.logger.info("Shifted position")
                 
-        #     case DockingState.DOCKING:
-        #         # dock the boat
-        #         direction = 1 if self.has_orbited else -1
+            case DockingState.DOCKING:
+                # Docking sequence
+                if self.state_changed:
+                    self.start_docking_position = self.current_position
+                    self.logger.info("Docking in progress")
 
-        #         if self.state_changed:
-        #             self.start_docking_position = self.current_position
-
-        #         control_message.twist.linear.x = 10.0
-        #         control_message.twist.linear.y = 0.0
-        #         control_message.twist.angular.z = 0.0
-
-        #         # check if we have docked
-        #         if point_diff_2d(self.start_docking_position, self.current_position) > DOCK_DEPTH:
-        #             self.state = DockingState.DONE
-        #             self.logger.info("Docked")
+                # Send waypoint goal for docking
+                x, y, _ = DOCK_POSITION
+                self.send_waypoint_goal(x, y, ignore_theta=False)
+                if point_diff_2d(self.start_docking_position, self.current_position) < DOCK_DEPTH:
+                    self.state = DockingState.DONE
+                    self.logger.info("Docked successfully")
                 
-        #     case DockingState.ORBITING:
-        #         self.has_orbited = True
-
-        #         if self.state_changed:
-        #             self.orbit_center = add_2d(self.current_position, (ORBIT_RADIUS, 0))
-        #             self.start_orbit_position = self.current_position
-        #             self.orbit_target = (self.current_position.x + 2*ORBIT_RADIUS, self.current_position.y, 0)
-                
-        #         '''
-        #         # calculate the robot-relative velocity to orbit the center
-        #         radial_vector = minus(tuple(list(self.orbit_center) + [0]), self.current_position)
-                
-        #         velocity_vector = (radial_vector[1], -radial_vector[0])
-        #         vMag = 10.0
-        #         vDirection = math.atan2(velocity_vector[1], velocity_vector[0])
-
-        #         angle_to_center = math.atan2(radial_vector[1], radial_vector[0])
-        #         angle_diff = angle_to_center - self.current_position.z
-        #         if angle_diff > math.pi:
-        #             angle_diff -= 2 * math.pi
-                
-        #         angle_kP = -1.0
-
-        #         control_message.twist.linear.x = vMag * math.cos(vDirection)
-        #         control_message.twist.linear.y = vMag * math.sin(vDirection)
-        #         control_message.twist.angular.z = angle_kP * angle_diff
-        #         '''
-
-        #         delta = minus(self.orbit_target, self.current_position)
-        #         deltaMag = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
-        #         kp = 0.1
-
-        #         vMag = kp * deltaMag
-        #         vDirection = math.atan2(delta[1], delta[0])
-
-        #         _, _, robot_rotation = self.euler_from_quaternion(self.current_rotation)
-        #         theta = vDirection - robot_rotation
-        #         if theta > math.pi: theta = -(2*math.pi-theta)
-
-        #         vx = 10 * math.cos(theta)
-        #         vy = 10 * math.sin(theta)
-        #         vtheta = kp * 30 * theta
-
-        #         control_message.twist.linear.x = vx
-        #         control_message.twist.linear.y = vy
-        #         control_message.twist.angular.z = vtheta
-
-        #         if point_diff_2d(self.orbit_target, self.current_position) < 0.25:
-        #             control_message.twist.linear.x = 0.0
-        #             control_message.twist.linear.y = 0.0
-        #             theta = robot_rotation - DOCK_POSITION[2] * 2*math.pi/180.0 + math.pi
-        #             if theta > math.pi: theta = -(2*math.pi-theta)
-        #             control_message.twist.angular.z = -theta * 5.0
-
-        #             if theta < 0.2*math.pi:
-        #                 self.state = DockingState.CHECKING_CAMERA
-        #                 self.logger.info("Orbited")
-                
-        #     case DockingState.DONE:
-        #         # done
-        #         # TODO: leave the dock ?
-        #         control_message.twist.linear.x = 0.0
-        #         control_message.twist.linear.y = 0.0
-        #         control_message.twist.angular.z = 0.0
-
-        #     case DockingState.STOPPED:
-        #         # stopped
-        #         control_message.twist.linear.x = 0.0
-        #         control_message.twist.linear.y = 0.0
-        #         control_message.twist.angular.z = 0.0
-            
-        # self.control_message_pub.publish(control_message)
-        self.state_changed = self.state != self.last_state
-        self.last_state = self.state
-
-        if self.state_changed:
-            self.logger.info(f"Docking state changed to {self.state}")
-        
+            case DockingState.DONE:
+                self.logger.info("Docking task completed")
 
     def check_finished(self):
         return self.state == DockingState.DONE
