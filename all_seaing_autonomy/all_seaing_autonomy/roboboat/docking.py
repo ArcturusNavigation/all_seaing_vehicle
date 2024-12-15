@@ -145,7 +145,7 @@ class DockingTask(Task):
                             self.state = DockingState.SHIFTING
                             self.shift_direction = 1 if self.dock_times < 3 else -1
                             self.logger.info("Incorrect banner detected, shifting position...")
-                        else 
+                        else:
                             self.state = DockingState.ORBITING_1
                             self.logger.info("Incorrect banner detected, orbiting...")
 
