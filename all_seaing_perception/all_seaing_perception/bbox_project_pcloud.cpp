@@ -45,9 +45,9 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     // Publishers
     m_object_pcl_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>("labeled_object_point_clouds", 5);
     m_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("object_point_clouds_viz", 5);
-    m_refined_object_pcl_contour_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>("refined_object_point_clouds_contours", 5);
+    m_refined_object_pcl_segment_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>("refined_object_point_clouds_segments", 5);
     m_refined_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("refined_object_point_clouds_viz", 5);
-    m_refined_object_contour_viz_pub = this->create_publisher<sensor_msgs::msg::Image>("refined_object_contours_viz", 5);
+    m_refined_object_segment_viz_pub = this->create_publisher<sensor_msgs::msg::Image>("refined_object_segments_viz", 5);
 
     // get color label mappings from yaml
     RCLCPP_DEBUG(this->get_logger(), "READING COLOR LABEL MAPPINGS");
@@ -464,8 +464,8 @@ void BBoxProjectPCloud::bb_pcl_project(
             }
         }
 
-        auto refined_pcl_contours = all_seaing_interfaces::msg::LabeledObjectPointCloud();
-        refined_pcl_contours.label = bbox.label;
+        auto refined_pcl_segments = all_seaing_interfaces::msg::LabeledObjectPointCloud();
+        refined_pcl_segments.label = bbox.label;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>());
         refined_cloud_ptr->header = pcloud_ptr->header;
         cv::Mat refined_obj_contour_mat = cv::Mat::zeros(img_sz, CV_8UC3);
@@ -479,12 +479,12 @@ void BBoxProjectPCloud::bb_pcl_project(
             cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pt.y, pt.z, -pt.x));
             mat_opt_cluster.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(opt_cluster_id, clusters_indices.size());
         }
-        pcl::toROSMsg(*refined_cloud_ptr, refined_pcl_contours.cloud);
+        pcl::toROSMsg(*refined_cloud_ptr, refined_pcl_segments.cloud);
         cv_bridge::CvImagePtr refined_obj_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, refined_obj_contour_mat));
         // cv::imshow("Object contour image to be published:", refined_obj_contour_mat);
         // cv::waitKey();
-        refined_pcl_contours.contour = *refined_obj_contour_ptr->toImageMsg();
-        refined_objects_pub.objects.push_back(refined_pcl_contours);
+        refined_pcl_segments.segment = *refined_obj_contour_ptr->toImageMsg();
+        refined_objects_pub.objects.push_back(refined_pcl_segments);
         refined_cloud_contour_vec.push_back(std::make_pair(*refined_cloud_ptr,in_contours[opt_contour_id]));
         // max_refined_len = std::max(max_refined_len, (int)refined_cloud_ptr->size());
 
@@ -504,7 +504,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         // cv::waitKey();
     }
     RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS & CONTOURS");
-    m_refined_object_pcl_contour_pub->publish(refined_objects_pub);
+    m_refined_object_pcl_segment_pub->publish(refined_objects_pub);
     RCLCPP_DEBUG(this->get_logger(), "PUBLISHED REFINED OBJECT POINT CLOUDS & CONTOURS");
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>());
     all_obj_refined_pcls_ptr->header = in_cloud_tf_ptr->header;
@@ -532,7 +532,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     cv_bridge::CvImagePtr all_obj_refined_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, all_obj_refined_contours));
     // cv::imshow("Object contour image to be published:", all_obj_refined_contours);
     // cv::waitKey();
-    m_refined_object_contour_viz_pub->publish(*all_obj_refined_contour_ptr->toImageMsg());
+    m_refined_object_segment_viz_pub->publish(*all_obj_refined_contour_ptr->toImageMsg());
     RCLCPP_DEBUG(this->get_logger(), "SENT OBJECT POINT CLOUDS FOR VISUALIZATION");
 }
 
