@@ -60,8 +60,9 @@ class DockingTask(Task):
         self.state = DockingState.IDLE
         self.last_state = DockingState.IDLE
         self.current_position = None
-        self.state_changed = False
+        self.state_changed = False 
         self.reached_waypoint = False
+        self.dock_times = 1
 
     def get_name(self):
         return "Docking"
@@ -81,6 +82,7 @@ class DockingTask(Task):
         goal_msg.theta = theta
         goal_msg.xy_threshold = 1.0  # Adjust as needed
         goal_msg.theta_threshold = 5.0  # Degrees, adjust as needed
+        self.reached_waypoint = False
 
         # Wait for action server to be ready
         self.waypoint_client.wait_for_server()
@@ -109,6 +111,7 @@ class DockingTask(Task):
         """
         result = future.result().result
         if result.is_finished:
+            self.reached_waypoint = True
             self.logger.info("Waypoint successfully completed!")
         else:
             self.logger.warn("Waypoint failed or was canceled.")
@@ -117,20 +120,14 @@ class DockingTask(Task):
     def update(self):
         match self.state:
             case DockingState.APPROACHING:
-                if self.current_position is not None:
-                    # Send waypoint only once when transitioning into APPROACHING
-                    if self.state_changed:
-                        self.send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], ignore_theta=True)
+                # Send waypoint only once when transitioning into APPROACHING
+                if self.state_changed:
+                    self.send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], ignore_theta=False)
                     
-                    if self.reached_waypoint:
-                        self.state = DockingState.CHECKING_CAMERA
-                        self.logger.info("Approached dock")
-                    
-                    # # Simulate waypoint completion
-                    # if point_diff_2d(self.current_position, DOCK_POSITION) < 1.0:  # Threshold
-                    #     self.state = DockingState.CHECKING_CAMERA
-                    #     self.logger.info("Approached dock")
-            
+                if self.reached_waypoint:
+                    self.state = DockingState.CHECKING_CAMERA
+                    self.logger.info("Approached dock")
+           
             case DockingState.CHECKING_CAMERA:
                 # Perform camera-based checks
                 if self.state_changed:
@@ -141,19 +138,20 @@ class DockingTask(Task):
                         self.state = DockingState.DOCKING
                         self.logger.info("Correct banner detected, docking...")
                     else:
-                        self.state = DockingState.SHIFTING if banner[0] != BannerShape.NONE else DockingState.ORBITING
+                        self.state = DockingState.SHIFTING if self.dock_times < 3 else DockingState.ORBITING
                         self.logger.info("Incorrect banner detected, shifting position...")
 
             case DockingState.SHIFTING:
                 # Shift the dock position
                 if self.state_changed:
                     self.logger.info("Shifting position...")
-                    new_x = DOCK_POSITION[0] + SINGLE_DOCK_LENGTH
-                    new_y = DOCK_POSITION[1]
-                    self.send_waypoint(new_x, new_y, ignore_theta=True)
+                    new_x = DOCK_POSITION[0]
+                    new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times)
+                    self.send_waypoint(new_x, new_y, ignore_theta=False)
+                    self.dock_times += 1
                 
                 if self.reached_waypoint:
-                    self.state = DockingState.APPROACHING
+                    self.state = DockingState.CHECKING_CAMERA
                     self.logger.info("Shifted position")
 
             case DockingState.DOCKING:
@@ -169,9 +167,11 @@ class DockingTask(Task):
                 self.logger.info("Docking completed successfully.")
         
         self.state_changed = self.state != self.last_state
-        self.last_state = self.state
 
-        self.logger.info(f"Current state: {self.state}, last state: {self.last_state}")
+        if (self.state_changed):
+            self.logger.info(f"State changed to {self.state}, last state: {self.last_state}")
+
+        self.last_state = self.state
 
     def check_finished(self):
         return self.state == DockingState.DONE
