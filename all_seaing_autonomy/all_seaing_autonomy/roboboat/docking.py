@@ -51,17 +51,17 @@ def point_diff_2d(a, b):
     return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
 
 class DockingTask(Task):
-    def __init__(self, node, clock, logger):
+    def __init__(self, waypoint_client, clock, logger):
         super().__init__()
-        self.node = node  # Parent node for access to action client
         self.clock = clock
         self.logger = logger
         
-        self.waypoint_client = ActionClient(self.node, Waypoint, "waypoint")
+        self.waypoint_client = waypoint_client
         self.state = DockingState.IDLE
         self.last_state = DockingState.IDLE
         self.current_position = None
         self.state_changed = False
+        self.reached_waypoint = False
 
     def get_name(self):
         return "Docking"
@@ -112,6 +112,7 @@ class DockingTask(Task):
             self.logger.info("Waypoint successfully completed!")
         else:
             self.logger.warn("Waypoint failed or was canceled.")
+            self.state = DockingState.STOPPED
 
     def update(self):
         match self.state:
@@ -121,20 +122,27 @@ class DockingTask(Task):
                     if self.state_changed:
                         self.send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], ignore_theta=True)
                     
-                    # Simulate waypoint completion
-                    if point_diff_2d(self.current_position, DOCK_POSITION) < 1.0:  # Threshold
+                    if self.reached_waypoint:
                         self.state = DockingState.CHECKING_CAMERA
                         self.logger.info("Approached dock")
+                    
+                    # # Simulate waypoint completion
+                    # if point_diff_2d(self.current_position, DOCK_POSITION) < 1.0:  # Threshold
+                    #     self.state = DockingState.CHECKING_CAMERA
+                    #     self.logger.info("Approached dock")
             
             case DockingState.CHECKING_CAMERA:
                 # Perform camera-based checks
                 if self.state_changed:
                     self.logger.info("Checking camera for dock...")
-                    banner = self.read_camera()
+                    # banner = self.read_camera()
+                    banner = (BannerShape.CIRCLE, BannerColor.BLUE)  # Placeholder for WRONG
                     if banner == DESIRED_BANNER:
                         self.state = DockingState.DOCKING
+                        self.logger.info("Correct banner detected, docking...")
                     else:
                         self.state = DockingState.SHIFTING if banner[0] != BannerShape.NONE else DockingState.ORBITING
+                        self.logger.info("Incorrect banner detected, shifting position...")
 
             case DockingState.SHIFTING:
                 # Shift the dock position
@@ -143,14 +151,27 @@ class DockingTask(Task):
                     new_x = DOCK_POSITION[0] + SINGLE_DOCK_LENGTH
                     new_y = DOCK_POSITION[1]
                     self.send_waypoint(new_x, new_y, ignore_theta=True)
+                
+                if self.reached_waypoint:
+                    self.state = DockingState.APPROACHING
+                    self.logger.info("Shifted position")
 
             case DockingState.DOCKING:
                 if self.state_changed:
                     self.logger.info("Docking at target position...")
                     self.send_waypoint(DOCK_POSITION[0], DOCK_POSITION[1], ignore_theta=False, theta=DOCK_POSITION[2])
+                
+                if self.reached_waypoint:
+                    self.state = DockingState.ORBITING
+                    self.logger.info("Docked")
 
             case DockingState.DONE:
                 self.logger.info("Docking completed successfully.")
+        
+        self.state_changed = self.state != self.last_state
+        self.last_state = self.state
+
+        self.logger.info(f"Current state: {self.state}, last state: {self.last_state}")
 
     def check_finished(self):
         return self.state == DockingState.DONE
