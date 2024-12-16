@@ -42,19 +42,14 @@ void PclImageOverlay::pc_image_fusion_cb(
 
         // Project 3D point onto the image plane using the intrinsic matrix.
         // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-//        cv::Point2d xy_rect =
-//            m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));
-        cv::Point2d xy_rect =
+        cv::Point2d xy_rect = m_is_sim ?
+            m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) :
             m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
 
         // Plot projected point onto image if within bounds and in front of the boat
-//        if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-//            (xy_rect.y < m_cam_model.cameraInfo().height) && (point_tf.x >= 0)) {
-//            cv::circle(cv_ptr->image, cv::Point(xy_rect.x, xy_rect.y), 2, cv::Scalar(255, 0, 0), 4);
-//        }
-        // Plot projected point onto image if within bounds and in front of the boat
         if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) &&
-            (xy_rect.y >= 0) && (xy_rect.y < m_cam_model.cameraInfo().height) && (point_tf.z >= 0)) {
+            (xy_rect.y >= 0) && (xy_rect.y < m_cam_model.cameraInfo().height) &&
+            (m_is_sim ? point_tf.x >= 0 : point_tf.z >= 0)) {
             cv::circle(cv_ptr->image, cv::Point(xy_rect.x, xy_rect.y), 2, cv::Scalar(255, 0, 0), 4);
         }
         
@@ -86,6 +81,10 @@ void PclImageOverlay::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg
 }
 
 PclImageOverlay::PclImageOverlay() : Node("point_cloud_image_overlay") {
+    // Initialize parameters
+    this->declare_parameter<bool>("is_sim", false);
+    m_is_sim = this->get_parameter("is_sim").as_bool();
+
     // Initialize tf_listener pointer
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
