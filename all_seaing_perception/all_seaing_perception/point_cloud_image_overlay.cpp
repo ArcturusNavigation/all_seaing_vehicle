@@ -13,8 +13,11 @@ void PclImageOverlay::pc_image_fusion_cb(
     const sensor_msgs::msg::Image::ConstSharedPtr &in_img_msg,
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg) {
 
+    // Only continue if intrinsics has been initialized
+    if (!m_cam_model.initialized()) return;
+
     // Get transform the first iteration
-    if (!m_pc_cam_tf_ok)
+    if (!m_pc_cam_tf.has_value())
         m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id);
 
     // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
@@ -28,22 +31,38 @@ void PclImageOverlay::pc_image_fusion_cb(
 
     // Transform in_cloud_msg and convert PointCloud2 to PCL PointCloud
     sensor_msgs::msg::PointCloud2 in_cloud_tf;
-    tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, m_pc_cam_tf);
+    tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, m_pc_cam_tf.value());
     pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
 
     for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
 
+        // Ignore points which are NaN
+        if (isnan(point_tf.x) || isnan(point_tf.y) || isnan(point_tf.z)) continue;
+
         // Project 3D point onto the image plane using the intrinsic matrix.
         // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
+//        cv::Point2d xy_rect =
+//            m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));
         cv::Point2d xy_rect =
-            m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));
+            m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
 
         // Plot projected point onto image if within bounds and in front of the boat
-        if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-            (xy_rect.y < m_cam_model.cameraInfo().height) && (point_tf.x >= 0)) {
+//        if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
+//            (xy_rect.y < m_cam_model.cameraInfo().height) && (point_tf.x >= 0)) {
+//            cv::circle(cv_ptr->image, cv::Point(xy_rect.x, xy_rect.y), 2, cv::Scalar(255, 0, 0), 4);
+//        }
+        // Plot projected point onto image if within bounds and in front of the boat
+        if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) &&
+            (xy_rect.y >= 0) && (xy_rect.y < m_cam_model.cameraInfo().height) && (point_tf.z >= 0)) {
             cv::circle(cv_ptr->image, cv::Point(xy_rect.x, xy_rect.y), 2, cv::Scalar(255, 0, 0), 4);
         }
+        
+        // Debug statements
+        RCLCPP_DEBUG(this->get_logger(), "3D point in camera frame: (%.2f, %.2f, %.2f)",
+                point_tf.x, point_tf.y, point_tf.z);
+        RCLCPP_DEBUG(this->get_logger(), "2D point in pixel coordinates: (%.2f, %.2f)",
+                xy_rect.x, xy_rect.y);
     }
     m_image_pub->publish(*cv_ptr->toImageMsg());
 }
@@ -51,10 +70,8 @@ void PclImageOverlay::pc_image_fusion_cb(
 geometry_msgs::msg::TransformStamped PclImageOverlay::get_tf(const std::string &in_target_frame,
                                                              const std::string &in_src_frame) {
     geometry_msgs::msg::TransformStamped tf;
-    m_pc_cam_tf_ok = false;
     try {
         tf = m_tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
-        m_pc_cam_tf_ok = true;
         RCLCPP_INFO(this->get_logger(), "LiDAR to Camera Transform good");
         RCLCPP_INFO(this->get_logger(), "in_target_frame: %s, in_src_frame: %s",
                     in_target_frame.c_str(), in_src_frame.c_str());
