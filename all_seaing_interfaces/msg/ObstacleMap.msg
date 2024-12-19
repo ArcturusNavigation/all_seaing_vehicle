@@ -3,3 +3,4 @@ std_msgs/Header local_header
 string ns
 Obstacle[] obstacles
 bool is_labeled
+geometry_msgs/Pose pose

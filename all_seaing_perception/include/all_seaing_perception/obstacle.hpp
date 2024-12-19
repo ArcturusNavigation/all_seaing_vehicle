@@ -38,8 +38,11 @@ public:
     geometry_msgs::msg::Point get_bbox_min();
     geometry_msgs::msg::Point get_bbox_max();
 
-    pcl::PointXYZI convert_to_global(double nav_x, double nav_y, double nav_heading,
-                                     pcl::PointXYZI point);
+    geometry_msgs::msg::Point get_global_bbox_min();
+    geometry_msgs::msg::Point get_global_bbox_max();
+
+    template <typename T>
+    T convert_to_global(double nav_x, double nav_y, double nav_heading, T point);
 
 private:
     builtin_interfaces::msg::Time m_last_seen;
@@ -51,6 +54,8 @@ private:
     geometry_msgs::msg::PolygonStamped m_global_chull;
     geometry_msgs::msg::Point m_bbox_min;
     geometry_msgs::msg::Point m_bbox_max;
+    geometry_msgs::msg::Point m_global_bbox_min;
+    geometry_msgs::msg::Point m_global_bbox_max;
     float m_area;
 };
 
