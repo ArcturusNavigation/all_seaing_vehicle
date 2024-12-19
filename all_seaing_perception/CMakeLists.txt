@@ -37,9 +37,14 @@ ament_auto_add_executable(
     bbox_project_pcloud
     ${PROJECT_NAME}/bbox_project_pcloud.cpp
 )
+ament_auto_add_executable(
+    object_tracking_map
+    ${PROJECT_NAME}/object_tracking_map.cpp
+)
 
 target_link_libraries(obstacle_bbox_visualizer yaml-cpp)
 target_link_libraries(bbox_project_pcloud yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+target_link_libraries(object_tracking_map yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 
 install(TARGETS
     obstacle_detector
@@ -48,6 +53,7 @@ install(TARGETS
     point_cloud_image_overlay
     obstacle_bbox_visualizer
     bbox_project_pcloud
+    object_tracking_map
     DESTINATION lib/${PROJECT_NAME}
 )
 
