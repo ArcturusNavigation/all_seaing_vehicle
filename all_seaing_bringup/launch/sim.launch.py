@@ -25,7 +25,12 @@ def generate_launch_description():
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
-
+    matching_weights = os.path.join(
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
+    )
+    contour_matching_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
     launch_rviz = LaunchConfiguration("launch_rviz")
@@ -149,6 +154,27 @@ def generate_launch_description():
         ],
     )
 
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            ("camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("lidar_topic", "point_cloud/filtered")
+        ],
+        parameters=[
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": color_label_mappings},
+            {"color_ranges_file": color_ranges},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges}
+        ]
+    )
+
     rviz_node = launch_ros.actions.Node(
         package="rviz2",
         executable="rviz2",
@@ -223,6 +249,15 @@ def generate_launch_description():
         }.items(),
     )
 
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
+        ]
+    )
+
     return LaunchDescription(
         [
             launch_rviz_launch_arg,
@@ -232,8 +267,10 @@ def generate_launch_description():
             obstacle_bbox_overlay_node,
             obstacle_bbox_visualizer_node,
             color_segmentation_node,
+            # yolov8_node,
             point_cloud_filter_node,
             obstacle_detector_node,
+            bbox_project_pcloud_node,
             rviz_node,
             control_mux,
             controller_server,
