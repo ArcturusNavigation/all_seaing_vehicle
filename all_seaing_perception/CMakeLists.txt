@@ -46,12 +46,11 @@ install(TARGETS
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/color_segmentation.py
-    ${PROJECT_NAME}/yolov5_detector.py
-    ${PROJECT_NAME}/yolov5_image.py
+    ${PROJECT_NAME}/yolov5_node.py
     ${PROJECT_NAME}/yolov8_node.py
     ${PROJECT_NAME}/image_splitter.py
     ${PROJECT_NAME}/perception_eval.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
-ament_auto_package(INSTALL_TO_SHARE launch)
+ament_auto_package(INSTALL_TO_SHARE launch models)
