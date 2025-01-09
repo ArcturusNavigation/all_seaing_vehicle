@@ -9,8 +9,8 @@ find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+    "action/FollowPath.action"
     "action/Waypoint.action"
-    "action/Navigation.action"
     "msg/ObstacleMap.msg"
     "msg/Obstacle.msg"
     "msg/ControlOption.msg"
