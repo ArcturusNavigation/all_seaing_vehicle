@@ -1,8 +1,7 @@
 # Request
-uint8 ASTAR=0
-uint8 RRT=1
+string planner 
+# Options: "astar," "rrt"
 
-uint8 planner
 float64 x
 float64 y
 float64 xy_threshold

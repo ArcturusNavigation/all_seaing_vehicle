@@ -11,10 +11,10 @@ import heapq
 class AStar(PathPlanner):
 
     def heuristic(self, gp: Point) -> float:
-        return math.hypot(gp.x - self.goal.x, gp.y - self.goal.y)
+        return math.hypot(gp.x - self.grid_goal.x, gp.y - self.grid_goal.y)
 
     def get_path(self, end: Point, parent: List[Point]) -> PoseArray:
-        ans = PoseArray(header=self.map_grid.header)
+        ans = PoseArray(header=self.map.header)
         curr = Pose(position=end)
         while curr != self.grid_start:
             ans.poses.append(curr)
@@ -45,12 +45,12 @@ class AStar(PathPlanner):
         ]
 
         # Matrix of scores and parent pointers for each cell
-        gscore = [math.inf] * (self.map_info.height * self.map_info.width)
-        parent = [Point(x=0.0, y=0.0)] * (self.map_info.height * self.map_info.width)
+        gscore = [math.inf] * (self.map.info.height * self.map.info.width)
+        parent = [Point(x=0.0, y=0.0)] * (self.map.info.height * self.map.info.width)
 
         # Check if the starting position and/or the ending position is occupied
         if (self.is_grid_occupied(self.grid_start) or self.is_grid_occupied(self.grid_goal)):
-            return PoseArray(header=self.map_grid.header)
+            return PoseArray(header=self.map.header)
 
         gscore[self.get_grid_index(self.grid_start)] = 0
         parent[self.get_grid_index(self.grid_start)] = self.grid_start
@@ -76,4 +76,4 @@ class AStar(PathPlanner):
                     parent[self.get_grid_index(nxt)] = curr_pos
                     heapq.heappush(pq, (gscore[self.get_grid_index(nxt)] + self.heuristic(nxt), nxt))
 
-        return PoseArray(header=self.map_grid.header)
+        return PoseArray(header=self.map.header)

@@ -10,6 +10,8 @@ import time
 from all_seaing_controller.pid_controller import CircularPID, PIDController
 from all_seaing_interfaces.action import Waypoint
 from all_seaing_interfaces.msg import ControlOption
+
+from std_msgs.msg import ColorRGBA
 from nav_msgs.msg import Odometry
 from tf_transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
@@ -53,7 +55,7 @@ class ControllerServer(Node):
             callback_group=self.group,
         )
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
-        self.marker_pub = self.create_publisher(Marker, "control_marker", 10)
+        self.marker_pub = self.create_publisher(Marker, "action_marker", 10)
 
         #--------------- PID CONTROLLERS ---------------#
 
@@ -112,16 +114,14 @@ class ControllerServer(Node):
         marker_msg.ns = MARKER_NS
         marker_msg.type = Marker.CYLINDER
         marker_msg.action = Marker.ADD
-        marker_msg.pose.position.x = x
-        marker_msg.pose.position.y = y
-        marker_msg.pose.position.z = 2.0
         marker_msg.scale.x = 0.4
         marker_msg.scale.y = 0.4
         marker_msg.scale.z = 8.0
-        marker_msg.color.a = 1.0
-        marker_msg.color.r = 1.0
-        marker_msg.color.g = 1.0
-        marker_msg.color.b = 1.0
+        marker_msg.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
+
+        marker_msg.pose.position.x = x
+        marker_msg.pose.position.y = y
+        marker_msg.pose.position.z = 2.0
         self.marker_pub.publish(marker_msg)
 
     def cancel_callback(self, cancel_request):
