@@ -57,7 +57,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/perception_eval.py
     ${PROJECT_NAME}/test_square_publisher.py
     ${PROJECT_NAME}/square_detector.py
-
+    ${PROJECT_NAME}/test_circle_publisher.py
+    ${PROJECT_NAME}/circle_detector.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
