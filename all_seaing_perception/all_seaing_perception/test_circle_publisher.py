@@ -31,7 +31,7 @@ class CirclePublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
     # Specify the image filename
-    image_path = "/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception/all_seaing_perception/circle.jpg"
+    image_path = "/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_perception/all_seaing_perception/arcturus.png"
     circle_publisher = CirclePublisher(image_path)
     rclpy.spin(circle_publisher)
     rclpy.shutdown()

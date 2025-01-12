@@ -14,9 +14,9 @@ class CircleDetector(Node):
         self.create_subscription(Image, image_topic, self.detect_circle, 10)
         self.annotated_publisher = self.create_publisher(Image, "circle_detected_image", 10)
         self.bridge = CvBridge()
-        print('started circle detector node')
-        self.get_logger().info("Circle detector node initialized")
-
+        print('started circle detector node yayay')
+        self.get_logger().info("This is an info message")
+        
     def detect_circle(self, img_msg):
         try:
             # Convert ROS image message to OpenCV image
@@ -24,24 +24,19 @@ class CircleDetector(Node):
             # Convert to grayscale
             gray = cv2.cvtColor(cv2_image, cv2.COLOR_BGR2GRAY)
             # Apply Gaussian Blur
-            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-            # Detect edges using Canny
-            edges = cv2.Canny(blurred, 50, 150)
-            # Find contours
-            contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            
-            for contour in contours:
-                # Calculate area and perimeter
-                area = cv2.contourArea(contour)
-                perimeter = cv2.arcLength(contour, True)
-                
-                # For a circle, area/perimeter ratio should be close to r/2
-                # And circularity = 4*pi*area/perimeter^2 should be close to 1
-                if area > 0 and perimeter > 0:
-                    circularity = 4 * np.pi * area / (perimeter * perimeter)
-                    if 0.8 < circularity < 1.2:  # Allow some tolerance
-                        cv2.drawContours(cv2_image, [contour], -1, (0, 255, 0), 2)
-                        self.get_logger().info("Circle detected!")
+            blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+            # Detect circles using Hough Circle Transform
+            circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, dp=1.2, minDist=20, 
+                                       param1=50, param2=30, minRadius=10, maxRadius=100)
+
+            if circles is not None:
+                circles = np.uint16(np.around(circles))
+                for circle in circles[0, :]:
+                    # Draw the circle
+                    cv2.circle(cv2_image, (circle[0], circle[1]), circle[2], (0, 255, 0), 2)
+                    # Draw the center of the circle
+                    cv2.circle(cv2_image, (circle[0], circle[1]), 2, (0, 0, 255), 3)
+                    self.get_logger().info("Detected a circle!")
 
             # Convert the annotated image back to ROS format
             annotated_image = self.bridge.cv2_to_imgmsg(cv2_image, "bgr8")
