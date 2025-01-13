@@ -10,12 +10,14 @@ import time
 from all_seaing_controller.pid_controller import CircularPID, PIDController
 from all_seaing_interfaces.action import Waypoint
 from all_seaing_interfaces.msg import ControlOption
+
+from std_msgs.msg import ColorRGBA
 from nav_msgs.msg import Odometry
 from tf_transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
 
 TIMER_PERIOD = 1 / 60
-MARKER_NS = "control"
+MARKER_NS = "controller"
 
 class ControllerServer(Node):
     def __init__(self):
@@ -53,7 +55,7 @@ class ControllerServer(Node):
             callback_group=self.group,
         )
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
-        self.marker_pub = self.create_publisher(Marker, "control_marker", 10)
+        self.marker_pub = self.create_publisher(Marker, "action_marker", 10)
 
         #--------------- PID CONTROLLERS ---------------#
 
@@ -70,7 +72,7 @@ class ControllerServer(Node):
         self.heading = 0.0
         self.proc_count = 0
         self.prev_update_time = self.get_clock().now()
-    
+
     def odom_callback(self, msg: Odometry):
         self.nav_x = msg.pose.pose.position.x
         self.nav_y = msg.pose.pose.position.y
@@ -112,16 +114,14 @@ class ControllerServer(Node):
         marker_msg.ns = MARKER_NS
         marker_msg.type = Marker.CYLINDER
         marker_msg.action = Marker.ADD
-        marker_msg.pose.position.x = x
-        marker_msg.pose.position.y = y
-        marker_msg.pose.position.z = 2.0
         marker_msg.scale.x = 0.4
         marker_msg.scale.y = 0.4
         marker_msg.scale.z = 8.0
-        marker_msg.color.a = 1.0
-        marker_msg.color.r = 1.0
-        marker_msg.color.g = 1.0
-        marker_msg.color.b = 1.0
+        marker_msg.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
+
+        marker_msg.pose.position.x = x
+        marker_msg.pose.position.y = y
+        marker_msg.pose.position.z = 2.0
         self.marker_pub.publish(marker_msg)
 
     def cancel_callback(self, cancel_request):
@@ -132,19 +132,19 @@ class ControllerServer(Node):
         self.x_pid.reset()
         self.y_pid.reset()
         self.theta_pid.reset()
-    
+
     def set_pid_setpoints(self, x, y, theta):
         self.x_pid.set_setpoint(x)
         self.y_pid.set_setpoint(y)
         self.theta_pid.set_setpoint(theta)
-    
+
     def update_pid(self):
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.x_pid.update(self.nav_x, dt)
         self.y_pid.update(self.nav_y, dt)
         self.theta_pid.update(self.heading, dt)
         self.prev_update_time = self.get_clock().now()
-    
+
     def scale_thrust(self, x_vel, y_vel):
         if abs(x_vel) <= self.max_vel[0] and abs(y_vel) <= self.max_vel[1]:
             return x_vel, y_vel

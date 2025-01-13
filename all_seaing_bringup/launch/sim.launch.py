@@ -29,9 +29,21 @@ def generate_launch_description():
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
     launch_rviz = LaunchConfiguration("launch_rviz")
+    use_waypoint_client = LaunchConfiguration("use_waypoint_client")
+    xy_threshold = LaunchConfiguration("xy_threshold")
+    theta_threshold = LaunchConfiguration("theta_threshold")
 
     launch_rviz_launch_arg = DeclareLaunchArgument(
         "launch_rviz", default_value="true", choices=["true", "false"]
+    )
+    use_waypoint_client_launch_arg = DeclareLaunchArgument(
+        "use_waypoint_client", default_value="false", choices=["true", "false"]
+    )
+    xy_threshold_launch_arg = DeclareLaunchArgument(
+        "xy_threshold", default_value="2.0",
+    )
+    theta_threshold_launch_arg = DeclareLaunchArgument(
+        "theta_threshold", default_value="30.0",
     )
 
     ekf_node = launch_ros.actions.Node(
@@ -180,6 +192,15 @@ def generate_launch_description():
         output="screen",
     )
 
+    navigation_server = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server.py",
+        parameters=[
+            {"global_frame_id": "odom"},
+        ],
+        output="screen",
+    )
+
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_node.py",
@@ -204,8 +225,9 @@ def generate_launch_description():
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": 1.0},
-            {"theta_threshold": 5.0},
+            {"xy_threshold": xy_threshold},
+            {"theta_threshold": theta_threshold},
+            {"use_waypoint_client": use_waypoint_client},
         ],
         output="screen",
     )
@@ -226,9 +248,13 @@ def generate_launch_description():
     return LaunchDescription(
         [
             launch_rviz_launch_arg,
+            use_waypoint_client_launch_arg,
+            xy_threshold_launch_arg,
+            theta_threshold_launch_arg,
             ekf_node,
             navsat_node,
             controller_node,
+            controller_server,
             obstacle_bbox_overlay_node,
             obstacle_bbox_visualizer_node,
             color_segmentation_node,
@@ -236,7 +262,7 @@ def generate_launch_description():
             obstacle_detector_node,
             rviz_node,
             control_mux,
-            controller_server,
+            navigation_server,
             onshore_node,
             waypoint_finder,
             rviz_waypoint_sender,
