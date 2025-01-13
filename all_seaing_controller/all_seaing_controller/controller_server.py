@@ -17,7 +17,7 @@ from tf_transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
 
 TIMER_PERIOD = 1 / 60
-MARKER_NS = "control"
+MARKER_NS = "controller"
 
 class ControllerServer(Node):
     def __init__(self):
@@ -109,7 +109,7 @@ class ControllerServer(Node):
 
     def visualize_waypoint(self, x, y):
         marker_msg = Marker()
-        marker_msg.header.frame_id = self.global_frame_idc
+        marker_msg.header.frame_id = self.global_frame_id
         marker_msg.header.stamp = self.get_clock().now().to_msg()
         marker_msg.ns = MARKER_NS
         marker_msg.type = Marker.CYLINDER

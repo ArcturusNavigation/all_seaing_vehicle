@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 
-from geometry_msgs.msg import Point, Pose, PoseArray
+from geometry_msgs.msg import Point, PoseArray
 from nav_msgs.msg import OccupancyGrid
+from rclpy.logging import get_logger
 
 import math
 
@@ -11,8 +12,8 @@ class PathPlanner(ABC):
     def __init__(
         self,
         map: OccupancyGrid,
-        start: Pose,
-        goal: Pose,
+        start: Point,
+        goal: Point,
         obstacle_tol=50,
         goal_tol=0.5,
     ):
@@ -23,6 +24,7 @@ class PathPlanner(ABC):
         self.grid_goal = self.world_to_grid(goal)
         self.obstacle_tol = obstacle_tol
         self.goal_tol = goal_tol
+        self.logger = get_logger("path_planner")
 
     @abstractmethod
     def plan(self) -> PoseArray:
@@ -48,14 +50,16 @@ class PathPlanner(ABC):
         return self.get_grid_val(gp) >= self.obstacle_tol or self.get_grid_val(gp) == -1
 
     def is_rect_occupied(self, gp1: Point, gp2: Point) -> bool:
-        for tx in range(min(gp1.x, gp2.x), max(gp1.x, gp2.x) + 1):
-            for ty in range(min(gp1.y, gp2.y), max(gp1.y, gp2.y) + 1):
-                if self.is_grid_occupied(Point(x=tx, y=ty)):
+        for tx in range(int(min(gp1.x, gp2.x)), int(max(gp1.x, gp2.x) + 1)):
+            for ty in range(int(min(gp1.y, gp2.y)), int(max(gp1.y, gp2.y) + 1)):
+                if self.is_grid_occupied(Point(x=float(tx), y=float(ty))):
                     return True
         return False
 
     def is_goal_reached(self, gp: Point) -> bool:
-        return math.hypot(gp.x - self.grid_goal.x, gp.y - self.grid_goal.y) < self.goal_tol
+        return (
+            math.hypot(gp.x - self.grid_goal.x, gp.y - self.grid_goal.y) < self.goal_tol
+        )
 
     def is_in_bounds(self, gp: Point) -> bool:
         return 0 <= gp.x < self.map.info.width and 0 <= gp.y < self.map.info.height

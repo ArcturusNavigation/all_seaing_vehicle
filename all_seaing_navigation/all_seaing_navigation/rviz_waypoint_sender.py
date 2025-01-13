@@ -13,8 +13,8 @@ class WaypointSender(Node):
     def __init__(self):
         super().__init__("rviz_waypoint_sender")
 
-        self.declare_parameter("xy_threshold", 1.0)
-        self.declare_parameter("theta_threshold", 5.0)
+        self.declare_parameter("xy_threshold", 2.0)
+        self.declare_parameter("theta_threshold", 30.0)
         self.declare_parameter("goal_tol", 0.5)
         self.declare_parameter("obstacle_tol", 50)
         self.declare_parameter("choose_every", 5)
@@ -29,10 +29,10 @@ class WaypointSender(Node):
 
     def send_waypoint(self, msg: PointStamped):
         goal_msg = Waypoint.Goal()
-        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
         goal_msg.x = msg.point.x
         goal_msg.y = msg.point.y
         goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
         goal_msg.ignore_theta = True
 
         self.waypoint_client.wait_for_server()
@@ -44,6 +44,7 @@ class WaypointSender(Node):
         goal_msg.x = msg.point.x
         goal_msg.y = msg.point.y
         goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
         goal_msg.goal_tol = self.get_parameter("goal_tol").value
         goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
         goal_msg.choose_every = self.get_parameter("choose_every").value

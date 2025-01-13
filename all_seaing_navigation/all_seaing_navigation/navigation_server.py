@@ -109,12 +109,12 @@ class NavigationServer(Node):
 
     def visualize_path(self, path: PoseArray):
         marker_msg = Marker()
-        marker_msg.header.frame_id = self.global_frame_idc
+        marker_msg.header.frame_id = self.global_frame_id
         marker_msg.header.stamp = self.get_clock().now().to_msg()
         marker_msg.ns = MARKER_NS
         marker_msg.type = Marker.LINE_STRIP
         marker_msg.action = Marker.ADD
-        marker_msg.scale.x = 0.05
+        marker_msg.scale.x = 0.1
         marker_msg.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)
 
         marker_msg.points = [
@@ -145,6 +145,7 @@ class NavigationServer(Node):
     def send_waypoint(self, goal_handle, pose):
         goal_msg = Waypoint.Goal()
         goal_msg.xy_threshold = goal_handle.request.xy_threshold
+        goal_msg.theta_threshold = goal_handle.request.theta_threshold
         goal_msg.x = pose.position.x
         goal_msg.y = pose.position.y
         goal_msg.ignore_theta = True
@@ -183,12 +184,14 @@ class NavigationServer(Node):
             return FollowPath.Result()
 
         self.visualize_path(path)
+        self.get_logger().info(f"Path visualized")
 
         for pose in path.poses:
             self.send_waypoint(goal_handle, pose)
 
             # Wait until the boat finished reaching the waypoint
             while not self.result:
+                #TODO: CANCEL WAYPOINT FOLLOWING AS WELL
                 if self.proc_count >= 2:
                     self.end_process("Path following aborted!")
                     goal_handle.abort()
