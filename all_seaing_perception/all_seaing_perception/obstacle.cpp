@@ -92,11 +92,9 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
     float min_x = std::numeric_limits<float>::max();
     float min_y = std::numeric_limits<float>::max();
     float min_z = std::numeric_limits<float>::max();
-    // lowest() gives the lowest negative float. min() just gives lowest positive float.
     float max_x = std::numeric_limits<float>::lowest();
     float max_y = std::numeric_limits<float>::lowest();
     float max_z = std::numeric_limits<float>::lowest();
-    
     float average_x = 0, average_y = 0, average_z = 0;
     for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); pit++) {
         pcl::PointXYZI p;
@@ -118,6 +116,12 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
         max_z = std::max(p.z, max_z);
     }
 
+    // Speicfy that all points are finite
+    current_cluster->is_dense = true;
+
+    // Add pointcloud to member variable
+    m_cloud = current_cluster;
+
     // Calculate average local point
     if (in_cluster_indices.size() > 0) {
         average_x /= in_cluster_indices.size();
@@ -138,9 +142,11 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
 
     // Calculate global point
     m_global_point = convert_to_global(nav_x, nav_y, nav_heading, m_local_point);
-
     m_global_bbox_min = convert_to_global(nav_x, nav_y, nav_heading, m_bbox_min);
     m_global_bbox_max = convert_to_global(nav_x, nav_y, nav_heading, m_bbox_max);
+
+    // Skip chull calculation if less than 3 points
+    if (current_cluster->points.size() < 3) return;
 
     // Calculate convex hull polygon
     pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -165,12 +171,6 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
         p_glob_msg.y = p_glob.y;
         m_global_chull.polygon.points.push_back(p_glob_msg);
     }
- 
-    // Speicfy that all points are finite
-    current_cluster->is_dense = true;
-
-    // Add pointcloud to member variable
-    m_cloud = current_cluster;
 }
 
 Obstacle::~Obstacle() {}

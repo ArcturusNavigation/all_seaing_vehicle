@@ -168,9 +168,9 @@ class WaypointFinder(Node):
             "initial red buoys: {red_buoys}, green buoys: {green_buoys}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
-            # didn't find starting buoys
             self.get_logger().debug("No starting buoy pairs!")
             return False
+
         # from the red buoys that are in front of the robot, take the one that is closest to it, and do the same for the green buoys
         # this pair is the front pair of the starting box of the robot
         self.starting_buoys = (
@@ -178,7 +178,6 @@ class WaypointFinder(Node):
             self.get_closest_to((0, 0), green_buoys, local=True),
         )
         self.pair_to = self.starting_buoys
-        self.get_logger().info(f"{self.starting_buoys=}")
         return True
 
     def ccw(self, a, b, c):
