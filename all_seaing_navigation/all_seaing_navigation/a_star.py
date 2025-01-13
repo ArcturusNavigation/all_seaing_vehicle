@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from all_seaing_navigation.path_planner import PathPlanner
 
 from typing import List
