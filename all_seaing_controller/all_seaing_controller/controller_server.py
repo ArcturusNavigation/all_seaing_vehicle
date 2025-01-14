@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import math
 import rclpy
-from rclpy.action import ActionServer, CancelResponse
+from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
 import time
 
@@ -48,7 +48,7 @@ class ControllerServer(ActionServerBase):
             Waypoint,
             "waypoint",
             execute_callback=self.waypoint_callback,
-            cancel_callback=self.cancel_callback,
+            cancel_callback=self.default_cancel_callback,
             callback_group=self.group,
         )
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
@@ -78,9 +78,6 @@ class ControllerServer(ActionServerBase):
         marker_msg.pose.position.y = y
         marker_msg.pose.position.z = 2.0
         self.marker_pub.publish(marker_msg)
-
-    def cancel_callback(self, cancel_request):
-        return CancelResponse.ACCEPT
 
     def reset_pid(self):
         self.prev_update_time = self.get_clock().now()
@@ -134,6 +131,7 @@ class ControllerServer(ActionServerBase):
             goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
         else:
             goal_theta = goal_handle.request.theta
+
         self.visualize_waypoint(goal_x, goal_y)
 
         self.reset_pid()
@@ -144,7 +142,7 @@ class ControllerServer(ActionServerBase):
             or not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))
         ):
 
-            if self.proc_count >= 2:
+            if self.should_abort():
                 self.end_process("Waypoint following aborted!")
                 goal_handle.abort()
                 return Waypoint.Result()

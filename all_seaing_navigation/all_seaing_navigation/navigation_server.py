@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.action import ActionClient, ActionServer, CancelResponse
+from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
 import time
 
@@ -23,7 +23,7 @@ class NavigationServer(ActionServerBase):
             FollowPath,
             "follow_path",
             execute_callback=self.follow_path_callback,
-            cancel_callback=self.cancel_callback,
+            cancel_callback=self.default_cancel_callback,
             callback_group=self.group,
         )
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
@@ -33,9 +33,6 @@ class NavigationServer(ActionServerBase):
         )
 
         self.map = None
-
-    def cancel_callback(self, cancel_request):
-        return CancelResponse.ACCEPT
 
     def map_callback(self, msg: OccupancyGrid):
         self.map = msg
@@ -91,32 +88,25 @@ class NavigationServer(ActionServerBase):
         self.start_process("Path following started!")
 
         if self.map is None:
-            self.get_logger().warn(
-                "OccupancyGrid has not been received! Aborting path following."
-            )
-            self.end_process()
+            self.end_process("No map received. Aborting path following.")
             goal_handle.abort()
             return FollowPath.Result()
-        path = self.generate_path(goal_handle)
 
+        path = self.generate_path(goal_handle)
         if not path.poses:
-            self.get_logger().warn(
-                "Planner failed to find a valid path! Aborting path following."
-            )
-            self.end_process()
+            self.end_process("No valid path found. Aborting path following.")
             goal_handle.abort()
             return FollowPath.Result()
 
         self.visualize_path(path)
-        self.get_logger().info(f"Path visualized")
 
         for pose in path.poses:
             self.send_waypoint(goal_handle, pose)
 
             # Wait until the boat finished reaching the waypoint
             while not self.result:
-                if self.proc_count >= 2:
-                    self.end_process("Path following aborted!")
+                if self.should_abort():
+                    self.end_process("New request received. Aborting path following.")
                     goal_handle.abort()
                     return FollowPath.Result()
 
