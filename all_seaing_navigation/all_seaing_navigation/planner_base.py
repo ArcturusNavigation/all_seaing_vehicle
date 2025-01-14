@@ -7,15 +7,14 @@ from rclpy.logging import get_logger
 import math
 
 
-class PathPlanner(ABC):
-
+class PlannerBase(ABC):
     def __init__(
         self,
         map: OccupancyGrid,
         start: Point,
         goal: Point,
-        obstacle_tol=50,
-        goal_tol=0.5,
+        obstacle_tol,
+        goal_tol,
     ):
         self.map = map
         self.world_start = start

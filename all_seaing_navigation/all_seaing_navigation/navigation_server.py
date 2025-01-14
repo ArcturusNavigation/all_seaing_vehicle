@@ -1,39 +1,23 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.action import ActionClient, ActionServer, CancelResponse
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.node import Node
 import time
 
+from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_interfaces.action import Waypoint, FollowPath
-from all_seaing_navigation.a_star import AStar
+from all_seaing_navigation.planner_executor import PlannerExecutor
 
 from std_msgs.msg import ColorRGBA
-from nav_msgs.msg import Odometry, OccupancyGrid
-from tf_transformations import euler_from_quaternion
+from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point, PoseArray
 
-TIMER_PERIOD = 1 / 60
-MARKER_NS = "navigation"
 
-
-class NavigationServer(Node):
+class NavigationServer(ActionServerBase):
     def __init__(self):
-        super().__init__("navigation_server")
+        super().__init__("navigation_server", "navigation", 1 / 60)
 
-        # --------------- PARAMETERS ---------------#
-
-        self.global_frame_id = (
-            self.declare_parameter("global_frame_id", "odom")
-            .get_parameter_value()
-            .string_value
-        )
-
-        # --------------- SUBSCRIBERS AND PUBLISHERS ---------------#
-
-        self.group = MutuallyExclusiveCallbackGroup()
         self.follow_path_server = ActionServer(
             self,
             FollowPath,
@@ -44,28 +28,11 @@ class NavigationServer(Node):
         )
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
 
-        self.odom_sub = self.create_subscription(
-            Odometry,
-            "odometry/filtered",
-            self.odom_callback,
-            10,
-            callback_group=self.group,
-        )
-
         self.map_sub = self.create_subscription(
             OccupancyGrid, "map", self.map_callback, 10
         )
 
-        self.marker_pub = self.create_publisher(Marker, "action_marker", 10)
-
-        # --------------- MEMBER VARIABLES ---------------#
-
         self.map = None
-        self.nav_x = 0.0
-        self.nav_y = 0.0
-        self.heading = 0.0
-        self.proc_count = 0
-        self.prev_update_time = self.get_clock().now()
 
     def cancel_callback(self, cancel_request):
         return CancelResponse.ACCEPT
@@ -73,45 +40,11 @@ class NavigationServer(Node):
     def map_callback(self, msg: OccupancyGrid):
         self.map = msg
 
-    def odom_callback(self, msg: Odometry):
-        self.nav_x = msg.pose.pose.position.x
-        self.nav_y = msg.pose.pose.position.y
-        _, _, self.heading = euler_from_quaternion(
-            [
-                msg.pose.pose.orientation.x,
-                msg.pose.pose.orientation.y,
-                msg.pose.pose.orientation.z,
-                msg.pose.pose.orientation.w,
-            ]
-        )
-
-    def start_process(self, msg=None):
-        self.proc_count += 1
-        while self.proc_count >= 2:
-            time.sleep(TIMER_PERIOD)
-        if msg is not None:
-            time.sleep(TIMER_PERIOD)
-            self.get_logger().info(msg)
-
-    def end_process(self, msg=None):
-        self.delete_all_marker()
-        self.proc_count -= 1
-        if msg is not None:
-            self.get_logger().info(msg)
-
-    def delete_all_marker(self):
-        marker_msg = Marker()
-        marker_msg.header.frame_id = self.global_frame_id
-        marker_msg.header.stamp = self.get_clock().now().to_msg()
-        marker_msg.ns = MARKER_NS
-        marker_msg.action = Marker.DELETEALL
-        self.marker_pub.publish(marker_msg)
-
     def visualize_path(self, path: PoseArray):
         marker_msg = Marker()
         marker_msg.header.frame_id = self.global_frame_id
         marker_msg.header.stamp = self.get_clock().now().to_msg()
-        marker_msg.ns = MARKER_NS
+        marker_msg.ns = self.marker_ns
         marker_msg.type = Marker.LINE_STRIP
         marker_msg.action = Marker.ADD
         marker_msg.scale.x = 0.1
@@ -123,22 +56,13 @@ class NavigationServer(Node):
         self.marker_pub.publish(marker_msg)
 
     def generate_path(self, goal_handle):
-        goal_tol = goal_handle.request.goal_tol
-        obstacle_tol = goal_handle.request.obstacle_tol
         start = Point(x=self.nav_x, y=self.nav_y)
         goal = Point(x=goal_handle.request.x, y=goal_handle.request.y)
+        obstacle_tol = goal_handle.request.obstacle_tol
+        goal_tol = goal_handle.request.goal_tol
 
-        if goal_handle.request.planner == "astar":
-            planner = AStar(
-                self.map, start, goal, obstacle_tol, goal_tol
-            )
-        elif goal_handle.request.planner == "rrt":
-            raise NotImplementedError
-        else:
-            self.get_logger().error("Unrecognized planner name")
-            raise ValueError
-
-        path = planner.plan()
+        planner = PlannerExecutor(goal_handle.request.planner)
+        path = planner.plan(self.map, start, goal, obstacle_tol, goal_tol)
         path.poses = path.poses[:: goal_handle.request.choose_every]
         return path
 
@@ -191,7 +115,6 @@ class NavigationServer(Node):
 
             # Wait until the boat finished reaching the waypoint
             while not self.result:
-                #TODO: CANCEL WAYPOINT FOLLOWING AS WELL
                 if self.proc_count >= 2:
                     self.end_process("Path following aborted!")
                     goal_handle.abort()
@@ -202,7 +125,7 @@ class NavigationServer(Node):
                     goal_handle.canceled()
                     return FollowPath.Result()
 
-                time.sleep(TIMER_PERIOD)
+                time.sleep(self.timer_period)
 
         self.end_process("Path following completed!")
         goal_handle.succeed()

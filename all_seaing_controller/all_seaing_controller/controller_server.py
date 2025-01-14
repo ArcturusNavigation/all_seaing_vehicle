@@ -2,43 +2,47 @@
 import math
 import rclpy
 from rclpy.action import ActionServer, CancelResponse
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.node import Node
 import time
 
+from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_controller.pid_controller import CircularPID, PIDController
 from all_seaing_interfaces.action import Waypoint
 from all_seaing_interfaces.msg import ControlOption
 
 from std_msgs.msg import ColorRGBA
-from nav_msgs.msg import Odometry
-from tf_transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
 
-TIMER_PERIOD = 1 / 60
-MARKER_NS = "controller"
 
-class ControllerServer(Node):
+class ControllerServer(ActionServerBase):
     def __init__(self):
-        super().__init__("controller_server")
+        super().__init__("controller_server", "controller", 1 / 60)
 
-        #--------------- PARAMETERS ---------------#
+        # --------------- PARAMETERS ---------------#
 
-        self.global_frame_id = self.declare_parameter(
-            "global_frame_id", "odom").get_parameter_value().string_value
-        Kpid_x = self.declare_parameter(
-            "Kpid_x", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
-        Kpid_y = self.declare_parameter(
-            "Kpid_y", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
-        Kpid_theta= self.declare_parameter(
-            "Kpid_theta", [1.0, 0.0, 0.0]).get_parameter_value().double_array_value
-        self.max_vel = self.declare_parameter(
-            "max_vel", [4.0, 2.0, 1.0]).get_parameter_value().double_array_value
+        Kpid_x = (
+            self.declare_parameter("Kpid_x", [1.0, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        Kpid_y = (
+            self.declare_parameter("Kpid_y", [1.0, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        Kpid_theta = (
+            self.declare_parameter("Kpid_theta", [1.0, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        self.max_vel = (
+            self.declare_parameter("max_vel", [4.0, 2.0, 1.0])
+            .get_parameter_value()
+            .double_array_value
+        )
 
-        #--------------- SUBSCRIBERS, PUBLISHERS, AND SERVERS ---------------#
+        # --------------- SUBSCRIBERS, PUBLISHERS, AND SERVERS ---------------#
 
-        self.group = MutuallyExclusiveCallbackGroup()
         self.waypoint_server = ActionServer(
             self,
             Waypoint,
@@ -47,71 +51,22 @@ class ControllerServer(Node):
             cancel_callback=self.cancel_callback,
             callback_group=self.group,
         )
-        self.odom_sub = self.create_subscription(
-            Odometry,
-            "odometry/filtered",
-            self.odom_callback,
-            10,
-            callback_group=self.group,
-        )
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
-        self.marker_pub = self.create_publisher(Marker, "action_marker", 10)
 
-        #--------------- PID CONTROLLERS ---------------#
+        # --------------- PID CONTROLLERS ---------------#
 
         self.x_pid = PIDController(*Kpid_x)
         self.y_pid = PIDController(*Kpid_y)
         self.theta_pid = CircularPID(*Kpid_theta)
         self.theta_pid.set_effort_min(-self.max_vel[2])
         self.theta_pid.set_effort_max(self.max_vel[2])
-
-        #--------------- MEMBER VARIABLES ---------------#
-
-        self.nav_x = 0.0
-        self.nav_y = 0.0
-        self.heading = 0.0
-        self.proc_count = 0
         self.prev_update_time = self.get_clock().now()
-
-    def odom_callback(self, msg: Odometry):
-        self.nav_x = msg.pose.pose.position.x
-        self.nav_y = msg.pose.pose.position.y
-        _, _, self.heading = euler_from_quaternion(
-            [
-                msg.pose.pose.orientation.x,
-                msg.pose.pose.orientation.y,
-                msg.pose.pose.orientation.z,
-                msg.pose.pose.orientation.w,
-            ]
-        )
-
-    def start_process(self, msg=None):
-        self.proc_count += 1
-        while self.proc_count >= 2:
-            time.sleep(TIMER_PERIOD)
-        if msg is not None:
-            time.sleep(TIMER_PERIOD)
-            self.get_logger().info(msg)
-
-    def end_process(self, msg=None):
-        self.delete_all_marker()
-        self.proc_count -= 1
-        if msg is not None:
-            self.get_logger().info(msg)
-
-    def delete_all_marker(self):
-        marker_msg = Marker()
-        marker_msg.header.frame_id = self.global_frame_id
-        marker_msg.header.stamp = self.get_clock().now().to_msg()
-        marker_msg.ns = MARKER_NS
-        marker_msg.action = Marker.DELETEALL
-        self.marker_pub.publish(marker_msg)
 
     def visualize_waypoint(self, x, y):
         marker_msg = Marker()
         marker_msg.header.frame_id = self.global_frame_id
         marker_msg.header.stamp = self.get_clock().now().to_msg()
-        marker_msg.ns = MARKER_NS
+        marker_msg.ns = self.marker_ns
         marker_msg.type = Marker.CYLINDER
         marker_msg.action = Marker.ADD
         marker_msg.scale.x = 0.4
@@ -183,9 +138,11 @@ class ControllerServer(Node):
 
         self.reset_pid()
         self.set_pid_setpoints(goal_x, goal_y, goal_theta)
-        while (not self.x_pid.is_done(self.nav_x, xy_threshold) or
-               not self.y_pid.is_done(self.nav_y, xy_threshold) or
-               not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))):
+        while (
+            not self.x_pid.is_done(self.nav_x, xy_threshold)
+            or not self.y_pid.is_done(self.nav_y, xy_threshold)
+            or not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))
+        ):
 
             if self.proc_count >= 2:
                 self.end_process("Waypoint following aborted!")
@@ -198,7 +155,7 @@ class ControllerServer(Node):
                 return Waypoint.Result()
 
             self.control_loop()
-            time.sleep(TIMER_PERIOD)
+            time.sleep(self.timer_period)
 
         self.end_process("Waypoint following completed!")
         goal_handle.succeed()

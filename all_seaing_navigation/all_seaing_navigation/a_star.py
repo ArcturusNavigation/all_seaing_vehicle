@@ -1,4 +1,4 @@
-from all_seaing_navigation.path_planner import PathPlanner
+from all_seaing_navigation.planner_base import PlannerBase
 
 from typing import List
 from geometry_msgs.msg import Point, Pose, PoseArray
@@ -16,7 +16,7 @@ class PQNode:
         return self.score < other.score
 
 
-class AStar(PathPlanner):
+class AStar(PlannerBase):
 
     def heuristic(self, gp: Point) -> float:
         return math.hypot(gp.x - self.grid_goal.x, gp.y - self.grid_goal.y)
