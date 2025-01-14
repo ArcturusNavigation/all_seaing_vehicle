@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 import rclpy
 import numpy as np
-import math
 
 from functools import cmp_to_key
 from rclpy.node import Node
 from all_seaing_interfaces.msg import ObstacleMap
-from nav_msgs.msg import Odometry
 
 class BuoyPairFinder(Node):
 
