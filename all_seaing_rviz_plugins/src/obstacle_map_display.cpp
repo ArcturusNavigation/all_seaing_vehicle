@@ -20,6 +20,9 @@ void ObstacleMapDisplay::load(const rviz_common::Config &config) {
 void ObstacleMapDisplay::processMessage(
     const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr msg) {
 
+    // Prevent markers from keep adding and accumulating
+    m_marker_common->clearMarkers();
+
     Ogre::Vector3 position;
     Ogre::Quaternion orientation;
     if (!context_->getFrameManager()->getTransform(msg->header, position, orientation)) {
