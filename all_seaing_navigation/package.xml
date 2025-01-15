@@ -11,10 +11,11 @@
 
     <depend>rclpy</depend>
     <depend>rclcpp</depend>
-    <depend>tf2</depend>
-    <depend>scipy</depend>
+    <depend>tf_transformations</depend>
 
+    <depend>all_seaing_common</depend>
     <depend>all_seaing_interfaces</depend>
+
     <depend>geometry_msgs</depend>
     <depend>sensor_msgs</depend>
     <depend>nav_msgs</depend>

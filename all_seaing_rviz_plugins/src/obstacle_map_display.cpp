@@ -78,7 +78,7 @@ ObstacleMapDisplay::get_vertices_marker(const all_seaing_interfaces::msg::Obstac
     marker->action = visualization_msgs::msg::Marker::ADD;
 
     marker->id = obstacle.id;
-    marker->header = obstacle.global_point.header; //
+    marker->header = obstacle.global_point.header;
 
     marker->color.a = 1.0;
     marker->color.g = 1.0;
