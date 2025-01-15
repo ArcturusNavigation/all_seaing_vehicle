@@ -72,9 +72,11 @@ class AStar(PlannerBase):
             node = heapq.heappop(pq)
             curr_score = node.score
             curr_pos = node.point
-            # TODO: WHAT IS THIS MAGIC VALUE
-            #            if abs(curr_score - gscore[self.get_grid_index(curr_pos)] + self.heuristic(curr_pos)) > 0.005:
-            #                continue
+
+            # Checks if the current node has the best A* heuristic
+            epsilon = 0.005
+            if abs(curr_score - (gscore[self.get_grid_index(curr_pos)] + self.heuristic(curr_pos))) > epsilon:
+                continue
 
             if self.is_goal_reached(curr_pos):
                 return self.get_path(curr_pos, parent)
