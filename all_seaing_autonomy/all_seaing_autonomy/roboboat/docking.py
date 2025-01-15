@@ -12,8 +12,10 @@ class DockingState(Enum):
     DOCKING = 4
     ORBITING_1 = 5
     ORBITING_2 = 6
-    DONE = 7
-    STOPPED = 8
+    ORBITING_3 = 7
+    ORBITING_4 = 8
+    DONE = 9
+    STOPPED = 10
 
 class BannerShape(Enum):
     CIRCLE = 0
@@ -29,11 +31,11 @@ class BannerColor(Enum):
     NONE = 3
 
 # CONSTANTS: TODO: SET THESE TO THE ACTUAL VALUES / MAKE THEM EASILY CONFIGURABLE
-DOCK_POSITION = (45.697, 32.452, 15)  # (x, y, z rotation)
+DOCK_POSITION = (45.697, 32.452, 5.0) # (x, y, z rotation)
 DESIRED_BANNER = (BannerShape.CIRCLE, BannerColor.RED)  # (shape, color)
-SINGLE_DOCK_LENGTH = 5
+SINGLE_DOCK_LENGTH = 7
 DOCK_DEPTH = 2
-ORBIT_RADIUS = 10
+ORBIT_RADIUS = 15
 
 CURR_BANNER = 0
 
@@ -63,7 +65,7 @@ class DockingTask(Task):
         self.current_position = None
         self.state_changed = False 
         self.reached_waypoint = False
-        self.dock_times = 1
+        self.dock_times = 0
         self.shift_direction = 1
 
     def get_name(self):
@@ -81,7 +83,7 @@ class DockingTask(Task):
         goal_msg.x = x
         goal_msg.y = y
         goal_msg.ignore_theta = ignore_theta
-        goal_msg.theta = theta
+        goal_msg.theta = math.radians(theta)
         goal_msg.xy_threshold = 1.0  # Adjust as needed
         goal_msg.theta_threshold = 5.0  # Degrees, adjust as needed
         self.reached_waypoint = False
@@ -156,8 +158,8 @@ class DockingTask(Task):
                 # Shift the dock position
                 if self.state_changed:
                     self.logger.info("Shifting position...")
-                    new_x = DOCK_POSITION[0]
-                    new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times)
+                    new_x = DOCK_POSITION[0] - (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180) * self.shift_direction
+                    new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180) * self.shift_direction
                     self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + (180 if self.shift_direction == -1 else 0))
                 
                 if self.reached_waypoint:
@@ -166,20 +168,56 @@ class DockingTask(Task):
             
             case DockingState.ORBITING_1:
                 if self.state_changed:
-                    self.logger.info("Orbiting dock first half...")
-                    new_x = DOCK_POSITION[0] + ORBIT_RADIUS
-                    new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times) + ORBIT_RADIUS
+                    self.logger.info("Orbiting dock 1/4...")
+                    new_x = DOCK_POSITION[0] - \
+                            (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180)
+                    new_y = DOCK_POSITION[1] + \
+                            (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180) + \
+                            ORBIT_RADIUS * math.sin(DOCK_POSITION[2] * math.pi/180)
                     self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 90)
 
                 if self.reached_waypoint:
                     self.state = DockingState.ORBITING_2
-                    self.logger.info("first half of orbit completed")
-            
+                    self.logger.info("Orbit 1/4 completed")
+
             case DockingState.ORBITING_2:
                 if self.state_changed:
-                    self.logger.info("Orbiting dock second half...")
-                    new_x = DOCK_POSITION[0] + (ORBIT_RADIUS * 2)
-                    new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times)
+                    self.logger.info("Orbiting dock 2/4...")
+                    new_x = DOCK_POSITION[0] - \
+                            (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180) + \
+                            ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180)
+                    new_y = DOCK_POSITION[1] + \
+                            (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180) + \
+                            ORBIT_RADIUS * math.sin(DOCK_POSITION[2] * math.pi/180)
+                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 90)
+
+                if self.reached_waypoint:
+                    self.state = DockingState.ORBITING_3
+                    self.logger.info("Orbit 2/4 completed")
+            
+            case DockingState.ORBITING_3:
+                if self.state_changed:
+                    self.logger.info("Orbiting dock 3/4...")
+                    new_x = DOCK_POSITION[0] - \
+                            (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180) + \
+                            2 * ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180)
+                    new_y = DOCK_POSITION[1] + \
+                            (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180) + \
+                            ORBIT_RADIUS * math.sin(DOCK_POSITION[2] * math.pi/180)
+                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 180)
+                
+                if self.reached_waypoint:
+                    self.state = DockingState.ORBITING_4
+                    self.logger.info("Orbit 3/4 completed")
+
+            case DockingState.ORBITING_4:
+                if self.state_changed:
+                    self.logger.info("Orbiting dock 4/4...")
+                    new_x = DOCK_POSITION[0] - \
+                            (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180) + \
+                            2 * ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180)
+                    new_y = DOCK_POSITION[1] + \
+                            (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180)
                     self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 180)
                 
                 if self.reached_waypoint:

@@ -57,3 +57,7 @@ class CircularPID(PIDController):
         self.integral = max(min(self.integral, self.integral_max), self.integral_min)
         self.effort = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
         self.prev_error = error
+    def is_done(self, feedback, threshold):
+        self.setpoint %= (2 * math.pi)
+        feedback %= (2 * math.pi)
+        return abs(self.setpoint - feedback) <= threshold
