@@ -31,9 +31,9 @@ class BannerColor(Enum):
     NONE = 3
 
 # CONSTANTS: TODO: SET THESE TO THE ACTUAL VALUES / MAKE THEM EASILY CONFIGURABLE
-DOCK_POSITION = (45.697, 32.452, 5.0) # (x, y, z rotation)
+DOCK_POSITION = (45.697, 32.452, 10.0) # (x, y, z rotation)
 DESIRED_BANNER = (BannerShape.CIRCLE, BannerColor.RED)  # (shape, color)
-SINGLE_DOCK_LENGTH = 7
+SINGLE_DOCK_LENGTH = 8
 DOCK_DEPTH = 2
 ORBIT_RADIUS = 15
 
@@ -158,8 +158,12 @@ class DockingTask(Task):
                 # Shift the dock position
                 if self.state_changed:
                     self.logger.info("Shifting position...")
-                    new_x = DOCK_POSITION[0] - (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180) * self.shift_direction
-                    new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180) * self.shift_direction
+                    if self.shift_direction == 1:
+                        new_x = DOCK_POSITION[0] - (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180)
+                        new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180)
+                    else:
+                        new_x = DOCK_POSITION[0] + 2 * ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180) + (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180)
+                        new_y = DOCK_POSITION[1] + (SINGLE_DOCK_LENGTH * (3 - self.dock_times + 3)) * math.cos(DOCK_POSITION[2] * math.pi/180)
                     self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + (180 if self.shift_direction == -1 else 0))
                 
                 if self.reached_waypoint:
@@ -173,8 +177,8 @@ class DockingTask(Task):
                             (SINGLE_DOCK_LENGTH * self.dock_times) * math.sin(DOCK_POSITION[2] * math.pi/180)
                     new_y = DOCK_POSITION[1] + \
                             (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180) + \
-                            ORBIT_RADIUS * math.sin(DOCK_POSITION[2] * math.pi/180)
-                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 90)
+                            ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180)
+                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2])
 
                 if self.reached_waypoint:
                     self.state = DockingState.ORBITING_2
@@ -188,8 +192,8 @@ class DockingTask(Task):
                             ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180)
                     new_y = DOCK_POSITION[1] + \
                             (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180) + \
-                            ORBIT_RADIUS * math.sin(DOCK_POSITION[2] * math.pi/180)
-                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 90)
+                            ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180)
+                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] - 90)
 
                 if self.reached_waypoint:
                     self.state = DockingState.ORBITING_3
@@ -203,8 +207,8 @@ class DockingTask(Task):
                             2 * ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180)
                     new_y = DOCK_POSITION[1] + \
                             (SINGLE_DOCK_LENGTH * self.dock_times) * math.cos(DOCK_POSITION[2] * math.pi/180) + \
-                            ORBIT_RADIUS * math.sin(DOCK_POSITION[2] * math.pi/180)
-                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] + 180)
+                            ORBIT_RADIUS * math.cos(DOCK_POSITION[2] * math.pi/180)
+                    self.send_waypoint(new_x, new_y, ignore_theta=False, theta=DOCK_POSITION[2] - 90)
                 
                 if self.reached_waypoint:
                     self.state = DockingState.ORBITING_4
