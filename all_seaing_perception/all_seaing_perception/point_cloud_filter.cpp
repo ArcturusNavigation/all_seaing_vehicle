@@ -17,7 +17,6 @@ public:
         this->declare_parameter<double>("intensity_low_threshold", 0.0);
         this->declare_parameter<double>("intensity_high_threshold", 100000.0);
         this->declare_parameter<double>("leaf_size", 0.0);
-        this->declare_parameter<double>("hfov", 0.0);
 
         // Subscribe to the input point cloud topic
         m_subscription = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -34,7 +33,6 @@ public:
         m_intensity_low_threshold = this->get_parameter("intensity_low_threshold").as_double();
         m_intensity_high_threshold = this->get_parameter("intensity_high_threshold").as_double();
         m_leaf_size = this->get_parameter("leaf_size").as_double();
-        m_hfov = this->get_parameter("hfov").as_double();
     }
 
 private:
@@ -48,16 +46,13 @@ private:
 
     void filter_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr,
                       pcl::PointCloud<pcl::PointXYZI>::Ptr &out_cloud_ptr) {
-        double hfov = m_hfov * M_PI / 360.0; // Convert hfov to radians / 2
         for (const auto &point : in_cloud_ptr->points) {
-            double current_theta = std::atan2(point.y, point.x);
             double range = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
 
-            // Keep point if in range thresholds, intensity thresholds, fov, and is finite
+            // Keep point if in range thresholds, intensity threshold, and is finite
             if (m_range_min_threshold <= range && range <= m_range_max_threshold &&
                 m_intensity_low_threshold <= point.intensity &&
                 point.intensity <= m_intensity_high_threshold &&
-                (hfov == 0.0 || (current_theta > -hfov && current_theta < hfov)) &&
                 pcl::isFinite(point)) {
                 out_cloud_ptr->points.push_back(point);
             }
@@ -69,7 +64,7 @@ private:
         pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
         pcl::fromROSMsg(in_cloud_msg, *in_cloud_ptr);
 
-        // Filter out points ouside intensity/distance/fov range, and NaN values
+        // Filter out points ouside intensity/distance range, and NaN values
         pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud_ptr(
             new pcl::PointCloud<pcl::PointXYZI>);
         filter_cloud(in_cloud_ptr, filtered_cloud_ptr);
@@ -97,7 +92,6 @@ private:
     double m_intensity_low_threshold;
     double m_intensity_high_threshold;
     double m_leaf_size;
-    double m_hfov;
 };
 
 int main(int argc, char **argv) {
