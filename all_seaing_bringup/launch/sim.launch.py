@@ -1,6 +1,10 @@
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
@@ -10,7 +14,7 @@ import subprocess
 import yaml
 
 
-def generate_launch_description():
+def launch_setup(context, *args, **kwargs):
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     description_prefix = get_package_share_directory("all_seaing_description")
@@ -33,22 +37,12 @@ def generate_launch_description():
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
     launch_rviz = LaunchConfiguration("launch_rviz")
+    no_gui = bool(context.perform_substitution(LaunchConfiguration("no_gui")))
+    print("no_gui value:", no_gui)
     use_waypoint_client = LaunchConfiguration("use_waypoint_client")
     xy_threshold = LaunchConfiguration("xy_threshold")
     theta_threshold = LaunchConfiguration("theta_threshold")
 
-    launch_rviz_launch_arg = DeclareLaunchArgument(
-        "launch_rviz", default_value="true", choices=["true", "false"]
-    )
-    use_waypoint_client_launch_arg = DeclareLaunchArgument(
-        "use_waypoint_client", default_value="false", choices=["true", "false"]
-    )
-    xy_threshold_launch_arg = DeclareLaunchArgument(
-        "xy_threshold", default_value="2.0",
-    )
-    theta_threshold_launch_arg = DeclareLaunchArgument(
-        "theta_threshold", default_value="30.0",
-    )
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -217,8 +211,8 @@ def generate_launch_description():
         executable="onshore_node.py",
         output="screen",
         parameters=[
-            {"joy_x_scale": 5.0},
-            {"joy_y_scale": -3.0},
+            {"joy_x_scale": 3.0},
+            {"joy_y_scale": -2.0},
             {"joy_ang_scale": -1.5},
         ],
     )
@@ -247,38 +241,58 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
+    if no_gui:
+        extra_gz_args = "-v -s 0"
+    else:
+        extra_gz_args = "-v 0"
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
-            "extra_gz_args": "-v 0",
+            "extra_gz_args": extra_gz_args,
         }.items(),
     )
 
+    return [
+        ekf_node,
+        navsat_node,
+        controller_node,
+        controller_server,
+        obstacle_bbox_overlay_node,
+        obstacle_bbox_visualizer_node,
+        color_segmentation_node,
+        point_cloud_filter_node,
+        obstacle_detector_node,
+        rviz_node,
+        control_mux,
+        navigation_server,
+        onshore_node,
+        waypoint_finder,
+        rviz_waypoint_sender,
+        keyboard_ld,
+        sim_ld,
+        perception_eval_node,
+    ]
+
+def generate_launch_description():
     return LaunchDescription(
         [
-            launch_rviz_launch_arg,
-            use_waypoint_client_launch_arg,
-            xy_threshold_launch_arg,
-            theta_threshold_launch_arg,
-            ekf_node,
-            navsat_node,
-            controller_node,
-            controller_server,
-            obstacle_bbox_overlay_node,
-            obstacle_bbox_visualizer_node,
-            color_segmentation_node,
-            point_cloud_filter_node,
-            obstacle_detector_node,
-            rviz_node,
-            control_mux,
-            navigation_server,
-            onshore_node,
-            waypoint_finder,
-            rviz_waypoint_sender,
-            keyboard_ld,
-            sim_ld,
-            perception_eval_node,
+            DeclareLaunchArgument(
+                "launch_rviz", default_value="true", choices=["true", "false"]
+            ),
+            DeclareLaunchArgument(
+                "no_gui", default_value="false", choices=["true", "false"]
+            ),
+            DeclareLaunchArgument(
+                "use_waypoint_client", default_value="false", choices=["true", "false"]
+            ),
+            DeclareLaunchArgument(
+                "xy_threshold", default_value="2.0",
+            ),
+            DeclareLaunchArgument(
+                "theta_threshold", default_value="30.0",
+            ),
+            OpaqueFunction(function=launch_setup),
         ]
     )
