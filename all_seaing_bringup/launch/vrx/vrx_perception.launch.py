@@ -51,10 +51,10 @@ def generate_launch_description():
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
         parameters=[
-            {"range_min_threshold": 1.0},
-            {"range_max_threshold": 40.0},
-            {"intensity_low_threshold": 0.0},
-            {"intensity_high_threshold": 50.0},
+            {"range_x": [-100000.0, 100000.0]},
+            {"range_x": [-100000.0, 100000.0]},
+            {"range_radius": [1.0, 100000.0]},
+            {"range_intensity": [0.0, 50.0]},
             {"leaf_size": 0.0},
         ],
     )
