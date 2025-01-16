@@ -7,6 +7,7 @@ from launch.conditions import IfCondition
 import launch_ros
 import os
 import subprocess
+import yaml
 
 
 def generate_launch_description():
@@ -18,6 +19,9 @@ def generate_launch_description():
 
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_sim.yaml"
+    )
+    locations_file = os.path.join(
+        bringup_prefix, "config", "localization", "locations.yaml"
     )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
@@ -52,11 +56,18 @@ def generate_launch_description():
         parameters=[robot_localization_params],
     )
 
+    with open(locations_file, "r") as f:
+        locations = yaml.safe_load(f)
+    lat = locations["sydney"]["lat"]
+    lon = locations["sydney"]["lon"]
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
         remappings=[("gps/fix", "/wamv/sensors/gps/gps/fix")],
-        parameters=[robot_localization_params],
+        parameters=[
+            robot_localization_params,
+            {"datum": [lat, lon, 0.0]},
+        ],
     )
 
     controller_node = launch_ros.actions.Node(
@@ -136,10 +147,9 @@ def generate_launch_description():
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
         parameters=[
-            {"use_sim_time": True},
-            {"global_frame_id": "odom"},
-            {"range_x": [-100000.0, 100000.0]},
-            {"range_y": [-5.0, 100000.0]},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"range_x": [0.0, 100000.0]},
+            {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
             {"range_intensity": [0.0, 50.0]},
             {"leaf_size": 0.0},

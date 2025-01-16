@@ -52,7 +52,7 @@ def generate_launch_description():
         ],
         parameters=[
             {"range_x": [-100000.0, 100000.0]},
-            {"range_x": [-100000.0, 100000.0]},
+            {"range_y": [-100000.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
             {"range_intensity": [0.0, 50.0]},
             {"leaf_size": 0.0},
