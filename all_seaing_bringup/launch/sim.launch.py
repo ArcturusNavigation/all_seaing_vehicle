@@ -37,8 +37,7 @@ def launch_setup(context, *args, **kwargs):
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
     launch_rviz = LaunchConfiguration("launch_rviz")
-    no_gui = bool(context.perform_substitution(LaunchConfiguration("no_gui")))
-    print("no_gui value:", no_gui)
+    no_gui = str(context.perform_substitution(LaunchConfiguration("no_gui")))
     use_waypoint_client = LaunchConfiguration("use_waypoint_client")
     xy_threshold = LaunchConfiguration("xy_threshold")
     theta_threshold = LaunchConfiguration("theta_threshold")
@@ -241,7 +240,7 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
-    if no_gui:
+    if no_gui == "true":
         extra_gz_args = "-v -s 0"
     else:
         extra_gz_args = "-v 0"
