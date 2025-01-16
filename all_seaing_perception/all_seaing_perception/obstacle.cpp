@@ -3,6 +3,7 @@
 #include <limits>
 
 #include <pcl/common/common.h>
+#include <pcl/common/io.h>
 #include <pcl/surface/convex_hull.h>
 
 #include "geometry_msgs/msg/point32.hpp"
@@ -148,10 +149,17 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
     // Skip chull calculation if less than 3 points
     if (current_cluster->points.size() < 3) return;
 
+    // Flatten cluster point cloud to 2D
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::copyPointCloud(*current_cluster, *cloud_2d);
+    for (size_t i = 0; i < cloud_2d->points.size(); i++)
+        cloud_2d->points[i].z = min_z;
+
     // Calculate convex hull polygon
     pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+
     pcl::ConvexHull<pcl::PointXYZI> chull;
-    chull.setInputCloud(current_cluster);
+    chull.setInputCloud(cloud_2d);
     chull.reconstruct(*hull_cloud);
     m_area = pcl::calculatePolygonArea(*hull_cloud);
 
