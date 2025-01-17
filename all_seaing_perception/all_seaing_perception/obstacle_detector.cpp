@@ -190,7 +190,6 @@ void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSha
     publish_map(in_cloud->header, "unlabeled", true, m_tracked_obstacles, m_unlabeled_map_pub);
 }
 
-// TODO: this can be removed after using TF rather than calculating by ourselves
 void ObstacleDetector::odom_callback(const nav_msgs::msg::Odometry &msg) {
     m_nav_x = msg.pose.pose.position.x;
     m_nav_y = msg.pose.pose.position.y;
