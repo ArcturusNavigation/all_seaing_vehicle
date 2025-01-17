@@ -14,6 +14,8 @@ from all_seaing_interfaces.msg import ObstacleMap
 # TO DO:
 # blow up obstacles so ship maintains safe distance from them / use hybrid a*?
 # figure out where odom frame starts
+# all_seaing_bringup/config/localization/locations.yaml (gps origin (odom frame origin))
+#          read the yaml file upon initialization to determine the offset from odom frame use nbpark
 
 
 class MappingServer(Node):
