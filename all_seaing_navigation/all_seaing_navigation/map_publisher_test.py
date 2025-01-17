@@ -85,7 +85,7 @@ class MapPublisherTest(Node):
         # Populate the header
         msg.header = Header()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'map'
+        msg.header.frame_id = 'odom'
 
         # Populate the MapMetaData
         msg.info = MapMetaData()

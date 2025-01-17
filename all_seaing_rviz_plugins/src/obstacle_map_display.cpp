@@ -20,6 +20,9 @@ void ObstacleMapDisplay::load(const rviz_common::Config &config) {
 void ObstacleMapDisplay::processMessage(
     const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr msg) {
 
+    // Prevent markers from keep adding and accumulating
+    m_marker_common->clearMarkers();
+
     Ogre::Vector3 position;
     Ogre::Quaternion orientation;
     if (!context_->getFrameManager()->getTransform(msg->header, position, orientation)) {
@@ -78,7 +81,7 @@ ObstacleMapDisplay::get_vertices_marker(const all_seaing_interfaces::msg::Obstac
     marker->action = visualization_msgs::msg::Marker::ADD;
 
     marker->id = obstacle.id;
-    marker->header = obstacle.global_point.header; //
+    marker->header = obstacle.global_point.header;
 
     marker->color.a = 1.0;
     marker->color.g = 1.0;
