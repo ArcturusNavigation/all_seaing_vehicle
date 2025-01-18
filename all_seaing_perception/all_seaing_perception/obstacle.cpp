@@ -48,8 +48,6 @@ T Obstacle::convert_to_global(double nav_x, double nav_y, double nav_heading, T 
     return new_point;
 }
 
-//TODO: add the cluster and the image segments (respective frames should be correct in the header of both) to the published quantities, change the class attributes & methods to do that
-
 void Obstacle::to_ros_msg(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
                           all_seaing_interfaces::msg::Obstacle &out_obstacle_msg) {
     out_obstacle_msg.id = this->get_id();

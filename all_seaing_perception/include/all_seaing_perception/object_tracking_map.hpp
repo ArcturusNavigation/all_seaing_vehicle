@@ -10,6 +10,9 @@
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 
+#include "tf2/LinearMath/Matrix3x3.h"
+#include "tf2/LinearMath/Quaternion.h"
+
 #include "image_geometry/pinhole_camera_model.h"
 #include "message_filters/subscriber.h"
 
@@ -29,13 +32,35 @@
 
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud_array.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud.hpp"
+#include "all_seaing_interfaces/msg/obstacle_map.hpp"
+
+#include "all_seaing_perception/obstacle.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 
 class ObjectTrackingMap : public rclcpp::Node{
 private:
+    void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray &msg);
+    void odom_callback(const nav_msgs::msg::Odometry &msg);
+    void publish_map(std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
+                     const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
+                     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub);
 
+    // Member variables
+    std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> m_tracked_obstacles;
+    std::string m_global_frame_id;
+    int m_obstacle_id;
+
+    float m_nav_x, m_nav_y, m_nav_heading;
+
+    geometry_msgs::msg::Pose m_nav_pose;
+
+    // Publishers and subscribers
+    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_untracked_map_pub;
+    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
+    rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_sub;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();

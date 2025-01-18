@@ -286,6 +286,7 @@ def launch_setup(context, *args, **kwargs):
         controller_server,
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
+        bbox_project_pcloud_node,
         color_segmentation_node,
         point_cloud_filter_node,
         obstacle_detector_node,

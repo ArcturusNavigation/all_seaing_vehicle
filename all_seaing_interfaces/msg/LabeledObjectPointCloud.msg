@@ -1,3 +1,4 @@
+builtin_interfaces/Time last_seen
 int8 label
 sensor_msgs/PointCloud2 cloud
 sensor_msgs/Image segment
