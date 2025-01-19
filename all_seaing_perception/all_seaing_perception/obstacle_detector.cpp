@@ -167,6 +167,7 @@ void ObstacleDetector::publish_map(
         map[i]->to_ros_msg(local_header, global_header, raw_obstacle);
         map_msg.obstacles.push_back(raw_obstacle);
     }
+    map_msg.pose = m_nav_pose;
     pub->publish(map_msg);
 }
 
@@ -189,7 +190,6 @@ void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSha
     publish_map(in_cloud->header, "unlabeled", true, m_tracked_obstacles, m_unlabeled_map_pub);
 }
 
-// TODO: this can be removed after using TF rather than calculating by ourselves
 void ObstacleDetector::odom_callback(const nav_msgs::msg::Odometry &msg) {
     m_nav_x = msg.pose.pose.position.x;
     m_nav_y = msg.pose.pose.position.y;
@@ -202,6 +202,9 @@ void ObstacleDetector::odom_callback(const nav_msgs::msg::Odometry &msg) {
     double r, p, y;
     m.getRPY(r, p, y);
     m_nav_heading = y;
+
+    m_nav_pose = msg.pose.pose;
+    
 }
 
 int main(int argc, char **argv) {

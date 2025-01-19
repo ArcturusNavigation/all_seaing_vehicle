@@ -3,6 +3,7 @@
 #include <limits>
 
 #include <pcl/common/common.h>
+#include <pcl/common/io.h>
 #include <pcl/surface/convex_hull.h>
 
 #include "geometry_msgs/msg/point32.hpp"
@@ -29,12 +30,16 @@ geometry_msgs::msg::Point Obstacle::get_bbox_min() { return m_bbox_min; }
 
 geometry_msgs::msg::Point Obstacle::get_bbox_max() { return m_bbox_max; }
 
+geometry_msgs::msg::Point Obstacle::get_global_bbox_min() { return m_global_bbox_min; }
+
+geometry_msgs::msg::Point Obstacle::get_global_bbox_max() { return m_global_bbox_max; }
+
 float Obstacle::get_polygon_area() { return m_area; }
 
 // TODO: do this using tf and not manually
-pcl::PointXYZI Obstacle::convert_to_global(double nav_x, double nav_y, double nav_heading,
-                                           pcl::PointXYZI point) {
-    pcl::PointXYZI new_point;
+template <typename T> // this allows for both pcl::PointXYZI and geometry_msgs::msg::Point
+T Obstacle::convert_to_global(double nav_x, double nav_y, double nav_heading, T point) {
+    T new_point;
     double magnitude = std::hypot(point.x, point.y);
     double point_angle = std::atan2(point.y, point.x);
     new_point.x = nav_x + std::cos(nav_heading + point_angle) * magnitude;
@@ -61,7 +66,7 @@ void Obstacle::to_ros_msg(std_msgs::msg::Header local_header, std_msgs::msg::Hea
     out_obstacle_msg.local_chull.header = local_header;
 
     out_obstacle_msg.global_chull = this->get_global_chull();
-    out_obstacle_msg.global_chull.header = local_header;
+    out_obstacle_msg.global_chull.header = global_header;
 
     out_obstacle_msg.polygon_area = this->get_polygon_area();
 
@@ -69,6 +74,9 @@ void Obstacle::to_ros_msg(std_msgs::msg::Header local_header, std_msgs::msg::Hea
     
     out_obstacle_msg.bbox_min = this->get_bbox_min();
     out_obstacle_msg.bbox_max = this->get_bbox_max();
+
+    out_obstacle_msg.global_bbox_min = this->get_global_bbox_min();
+    out_obstacle_msg.global_bbox_max = this->get_global_bbox_max();
 
 }
 
@@ -85,11 +93,9 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
     float min_x = std::numeric_limits<float>::max();
     float min_y = std::numeric_limits<float>::max();
     float min_z = std::numeric_limits<float>::max();
-    // lowest() gives the lowest negative float. min() just gives lowest positive float.
     float max_x = std::numeric_limits<float>::lowest();
     float max_y = std::numeric_limits<float>::lowest();
     float max_z = std::numeric_limits<float>::lowest();
-    
     float average_x = 0, average_y = 0, average_z = 0;
     for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); pit++) {
         pcl::PointXYZI p;
@@ -111,6 +117,12 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
         max_z = std::max(p.z, max_z);
     }
 
+    // Speicfy that all points are finite
+    current_cluster->is_dense = true;
+
+    // Add pointcloud to member variable
+    m_cloud = current_cluster;
+
     // Calculate average local point
     if (in_cluster_indices.size() > 0) {
         average_x /= in_cluster_indices.size();
@@ -131,11 +143,23 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
 
     // Calculate global point
     m_global_point = convert_to_global(nav_x, nav_y, nav_heading, m_local_point);
+    m_global_bbox_min = convert_to_global(nav_x, nav_y, nav_heading, m_bbox_min);
+    m_global_bbox_max = convert_to_global(nav_x, nav_y, nav_heading, m_bbox_max);
+
+    // Skip chull calculation if less than 3 points
+    if (current_cluster->points.size() < 3) return;
+
+    // Flatten cluster point cloud to 2D
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::copyPointCloud(*current_cluster, *cloud_2d);
+    for (size_t i = 0; i < cloud_2d->points.size(); i++)
+        cloud_2d->points[i].z = min_z;
 
     // Calculate convex hull polygon
     pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+
     pcl::ConvexHull<pcl::PointXYZI> chull;
-    chull.setInputCloud(current_cluster);
+    chull.setInputCloud(cloud_2d);
     chull.reconstruct(*hull_cloud);
     m_area = pcl::calculatePolygonArea(*hull_cloud);
 
@@ -155,12 +179,6 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
         p_glob_msg.y = p_glob.y;
         m_global_chull.polygon.points.push_back(p_glob_msg);
     }
-
-    // Speicfy that all points are finite
-    current_cluster->is_dense = true;
-
-    // Add pointcloud to member variable
-    m_cloud = current_cluster;
 }
 
 Obstacle::~Obstacle() {}

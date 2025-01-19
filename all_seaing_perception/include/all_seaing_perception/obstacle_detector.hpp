@@ -47,6 +47,8 @@ private:
     double m_polygon_area_thresh;
     float m_nav_x, m_nav_y, m_nav_heading;
 
+    geometry_msgs::msg::Pose m_nav_pose;
+
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_raw_map_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_unlabeled_map_pub;

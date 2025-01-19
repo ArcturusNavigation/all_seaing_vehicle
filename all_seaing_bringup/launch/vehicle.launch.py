@@ -15,6 +15,7 @@ import yaml
 def launch_setup(context, *args, **kwargs):
 
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
+    description_prefix = get_package_share_directory("all_seaing_description")
     driver_prefix = get_package_share_directory("all_seaing_driver")
 
     robot_localization_params = os.path.join(
@@ -109,6 +110,15 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
+        ]
+    )
+
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -126,7 +136,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
         }.items(),
     )
 
@@ -135,6 +145,15 @@ def launch_setup(context, *args, **kwargs):
             [
                 driver_prefix,
                 "/launch/zed2i.launch.py",
+            ]
+        )
+    )
+
+    static_transforms = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                description_prefix,
+                "/launch/static_transforms.launch.py",
             ]
         )
     )
@@ -151,6 +170,7 @@ def launch_setup(context, *args, **kwargs):
         lidar_ld,
         mavros_ld,
         zed_ld,
+        static_transforms,
     ]
 
 
