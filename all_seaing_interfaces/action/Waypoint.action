@@ -9,3 +9,5 @@ bool ignore_theta
 # Result
 bool is_finished
 ---
+# After
+bool is_stationary
