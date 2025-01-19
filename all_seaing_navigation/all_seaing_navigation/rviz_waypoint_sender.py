@@ -34,7 +34,7 @@ class WaypointSender(Node):
         goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
         goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
         goal_msg.ignore_theta = True
-
+        goal_msg.is_stationary = True
         self.waypoint_client.wait_for_server()
         self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
 
