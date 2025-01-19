@@ -13,7 +13,8 @@ install(PROGRAMS
     ${PROJECT_NAME}/nav_to_tile.py
     ${PROJECT_NAME}/rosbag_to_image.py
     ${PROJECT_NAME}/rosbag_to_mp4.py
+    ${PROJECT_NAME}/velocity_stats.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
-ament_auto_package()
+ament_auto_package(INSTALL_TO_SHARE)
