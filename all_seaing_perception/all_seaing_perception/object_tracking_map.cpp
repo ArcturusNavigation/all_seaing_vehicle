@@ -54,7 +54,7 @@ T ObjectTrackingMap::convert_to_global(double nav_x, double nav_y, double nav_he
     return new_point;
 }
 
-//TODO: Implement object tracking and tracked map publishing
+//TODO: Implement object tracking and tracked obstacle map publishing
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
     if(msg->objects.size()==0) return;
     std::vector<std::shared_ptr<ObjectTrackingMap::ObjectCloud>> raw_obstacles;
