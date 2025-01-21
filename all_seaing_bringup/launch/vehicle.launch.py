@@ -169,6 +169,7 @@ def launch_setup(context, *args, **kwargs):
         thrust_commander_node,
         lidar_ld,
         mavros_ld,
+        yolov8_node,
         zed_ld,
         static_transforms,
     ]
