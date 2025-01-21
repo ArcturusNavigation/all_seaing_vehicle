@@ -185,7 +185,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
-        labeled_pcl.last_seen = in_cloud_tf_ptr->header.stamp;
+        labeled_pcl.time = in_cloud_msg->header.stamp;
         labeled_pcl.label = bbox.label;
         obj_cloud_ptr->header = in_cloud_tf_ptr->header;
         RCLCPP_DEBUG(this->get_logger(), "BOUNDING BOX FOR OBJECT %d: (%d,%d), (%d, %d)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y);
@@ -466,7 +466,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         }
 
         auto refined_pcl_segments = all_seaing_interfaces::msg::LabeledObjectPointCloud();
-        refined_pcl_segments.last_seen = in_cloud_tf_ptr->header.stamp;
+        refined_pcl_segments.time = in_cloud_msg->header.stamp;
         refined_pcl_segments.label = bbox.label;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>());
         refined_cloud_ptr->header = pcloud_ptr->header;

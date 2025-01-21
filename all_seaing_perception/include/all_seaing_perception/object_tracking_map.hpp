@@ -3,7 +3,9 @@
 
 #include <iostream>
 #include <fstream>
-#include "yaml-cpp/yaml.h" 
+#include "yaml-cpp/yaml.h"
+
+#include <vector>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -20,15 +22,23 @@
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "builtin_interfaces/msg/time.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/header.hpp"
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl/point_types_conversion.h>
 #include "pcl_conversions/pcl_conversions.h"
 
 #include "cv_bridge/cv_bridge.h"
 
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
+
+#include "tf2/exceptions.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
 
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud_array.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud.hpp"
@@ -41,14 +51,33 @@
 
 class ObjectTrackingMap : public rclcpp::Node{
 private:
-    void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray &msg);
+    void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
     void odom_callback(const nav_msgs::msg::Odometry &msg);
     void publish_map(std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
                      const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
                      rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub);
+    template <typename T>
+    T convert_to_global(double nav_x, double nav_y, double nav_heading, T point);
+
+    //custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)
+    struct ObjectCloud{
+        int id;
+        rclcpp::Time time_seen;
+        int label;
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_pcloud_ptr;
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr global_pcloud_ptr;
+
+        ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob){
+            id = -1;
+            time_seen = t;
+            label = l;
+            local_pcloud_ptr = loc;
+            global_pcloud_ptr = glob;
+        }
+    };
 
     // Member variables
-    std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> m_tracked_obstacles;
+    std::vector<std::shared_ptr<ObjectTrackingMap::ObjectCloud>> m_tracked_obstacles;
     std::string m_global_frame_id;
     int m_obstacle_id;
 

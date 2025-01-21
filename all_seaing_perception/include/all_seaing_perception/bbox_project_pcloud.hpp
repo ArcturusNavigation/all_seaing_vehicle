@@ -28,6 +28,7 @@
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "builtin_interfaces/msg/time.hpp"
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
