@@ -1,4 +1,4 @@
 scipy==1.11.3
-numpy==1.23.4
+numpy==1.23.5
 ultralytics
 pyserial

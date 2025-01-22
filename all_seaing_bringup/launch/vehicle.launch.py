@@ -167,9 +167,10 @@ def launch_setup(context, *args, **kwargs):
         rviz_waypoint_sender,
         rover_lora_controller,
         thrust_commander_node,
-        #lidar_ld,
+        lidar_ld,
         mavros_ld,
-        #zed_ld,
+        yolov8_node,
+        zed_ld,
         static_transforms,
     ]
 
