@@ -63,14 +63,14 @@ class NavigationServer(ActionServerBase):
         path.poses = path.poses[:: goal_handle.request.choose_every]
         return path
 
-    def send_waypoint(self, goal_handle, pose):
+    def send_waypoint(self, goal_handle, pose, is_stationary):
         goal_msg = Waypoint.Goal()
         goal_msg.xy_threshold = goal_handle.request.xy_threshold
         goal_msg.theta_threshold = goal_handle.request.theta_threshold
         goal_msg.x = pose.position.x
         goal_msg.y = pose.position.y
         goal_msg.ignore_theta = True
-
+        goal_msg.is_stationary = is_stationary
         self.result = False
         self.waypoint_client.wait_for_server()
         self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
@@ -100,8 +100,9 @@ class NavigationServer(ActionServerBase):
 
         self.visualize_path(path)
 
-        for pose in path.poses:
-            self.send_waypoint(goal_handle, pose)
+        for i, pose in enumerate(path.poses):
+            is_stationary = (i == len(path.poses)-1 and goal_handle.request.is_stationary)
+            self.send_waypoint(goal_handle, pose, is_stationary)
 
             # Wait until the boat finished reaching the waypoint
             while not self.result:
@@ -114,6 +115,7 @@ class NavigationServer(ActionServerBase):
                     self.end_process("Path following canceled!")
                     goal_handle.canceled()
                     return FollowPath.Result()
+
 
                 time.sleep(self.timer_period)
 

@@ -13,7 +13,7 @@ class RoverLoraController(Node):
         super().__init__('rover_lora_controller')
 
         # Setup serial connection
-        self.serial_port = serial.Serial('/dev/ttyUSB1', 57600, timeout=1)
+        self.serial_port = serial.Serial('/dev/ttyUSB0', 57600, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
         
         self.data_size = struct.calcsize('BdddB')

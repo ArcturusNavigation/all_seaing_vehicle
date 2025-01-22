@@ -113,7 +113,6 @@ class Yolov8Node(Node):
         return res
 
     def image_cb(self, msg: Image) -> None:
-        # print('In image_cb')
 
         if self.enable:
             # Convert image to cv_image
@@ -168,9 +167,11 @@ class Yolov8Node(Node):
                         color = (0,0,0)
                     elif color_name == "white":
                         color = (255,255,255)
-                    box_msg.label = label_dict[color_name]
-                    annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
-                    self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
+
+                    if color_name in label_dict:
+                        box_msg.label = label_dict[color_name]
+                        annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
+                        self.get_logger().debug(f"Detected: {class_name} Msg Label is {box_msg.label}")
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
