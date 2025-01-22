@@ -24,7 +24,7 @@ class MappingServer(Node):
     def __init__(self):
         super().__init__("mapping_server")
 
-        self.labeled_map_topic = "labeled_map"
+        self.labeled_map_topic = "obstacle_map/raw"
 
         # Subscriber to labeled_map
         self.group1 = MutuallyExclusiveCallbackGroup()
@@ -91,7 +91,7 @@ class MappingServer(Node):
         for obstacle in self.labeled_map.obstacles:
             minx, miny = self.world_to_grid(obstacle.global_bbox_min.x, obstacle.global_bbox_min.y)
             maxx, maxy = self.world_to_grid(obstacle.global_bbox_max.x, obstacle.global_bbox_max.y)
-
+            self.get_logger().info(f"minx, miny, maxx, maxy, {minx}, {miny}, {maxx}, {maxy}")
             for x in range(max(0,minx-1), min(self.grid.info.width,maxx+1)+1):
                 for y in range(max(0,miny-1), min(self.grid.info.height,maxy+1)+1):
                     self.get_logger().info(f"{x}, {y}")
