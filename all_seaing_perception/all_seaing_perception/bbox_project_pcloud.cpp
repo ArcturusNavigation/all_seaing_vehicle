@@ -210,6 +210,7 @@ void BBoxProjectPCloud::bb_pcl_project(
             }
         }
         pcl::toROSMsg(*obj_cloud_ptr, labeled_pcl.cloud);
+        labeled_pcl.cloud.header.stamp = in_cloud_msg->header.stamp;
         object_pcls.objects.push_back(labeled_pcl);
         obj_cloud_vec.push_back(*obj_cloud_ptr);
         bbox_pcloud_objects.push_back(std::make_pair(bbox, obj_cloud_ptr));
@@ -238,6 +239,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     }
     auto obj_pcls_msg = sensor_msgs::msg::PointCloud2();
     pcl::toROSMsg(*all_obj_pcls_ptr, obj_pcls_msg);
+    obj_pcls_msg.header.stamp = in_cloud_msg->header.stamp;
     m_object_pcl_viz_pub->publish(obj_pcls_msg);
 
     // REFINE OBJECT POINT CLOUDS
@@ -482,6 +484,7 @@ void BBoxProjectPCloud::bb_pcl_project(
             mat_opt_cluster.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(opt_cluster_id, clusters_indices.size());
         }
         pcl::toROSMsg(*refined_cloud_ptr, refined_pcl_segments.cloud);
+        refined_pcl_segments.cloud.header.stamp = in_cloud_msg->header.stamp;
         cv_bridge::CvImagePtr refined_obj_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, refined_obj_contour_mat));
         // cv::imshow("Object contour image to be published:", refined_obj_contour_mat);
         // cv::waitKey();
@@ -530,6 +533,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     RCLCPP_DEBUG(this->get_logger(), "STORED CONTOURS TO BE PUBLISHED");
     auto obj_refined_pcls_msg = sensor_msgs::msg::PointCloud2();
     pcl::toROSMsg(*all_obj_refined_pcls_ptr, obj_refined_pcls_msg);
+    obj_refined_pcls_msg.header.stamp = in_cloud_msg->header.stamp;
     m_refined_object_pcl_viz_pub->publish(obj_refined_pcls_msg);
     cv_bridge::CvImagePtr all_obj_refined_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, all_obj_refined_contours));
     // cv::imshow("Object contour image to be published:", all_obj_refined_contours);

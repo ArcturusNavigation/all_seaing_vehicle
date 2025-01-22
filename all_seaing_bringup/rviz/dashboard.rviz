@@ -5,11 +5,12 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
+        - /ObstacleMap1
+        - /ObstacleMap1/Topic1
         - /PointCloud21
-        - /PointCloud22
-        - /PointCloud22/Topic1
+        - /PointCloud21/Topic1
       Splitter Ratio: 0.5
-    Tree Height: 195
+    Tree Height: 280
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -70,16 +71,16 @@ Visualization Manager:
       Enabled: true
       Name: ObstacleMap
       Namespaces:
-        labeled: true
-        labeled_edges: true
-        labeled_text: true
-        labeled_vertices: true
+        untracked: true
+        untracked_edges: true
+        untracked_text: true
+        untracked_vertices: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /obstacle_map/labeled
+        Value: /obstacle_map/refined_untracked
       Value: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
@@ -292,10 +293,18 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /clicked_point
       Value: true
-    - Alpha: 0.699999988079071
-      Class: rviz_default_plugins/Map
-      Color Scheme: map
-      Draw Behind: false
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
@@ -318,42 +327,8 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: Intensity
-      Decay Time: 0
-      Enabled: false
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 0
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: PointCloud2
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.30000001192092896
-      Style: Flat Squares
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Best Effort
-        Value: /point_cloud/filtered
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
     - Class: rviz_default_plugins/Image
-      Enabled: false
+      Enabled: true
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -365,7 +340,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /refined_object_contours_viz
-      Value: false
+      Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
       Max Value: 1
@@ -440,16 +415,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 75.15950775146484
+      Distance: 46.016841888427734
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 14.586471557617188
-        Y: 16.246610641479492
-        Z: -2.225355863571167
+        X: 37.104736328125
+        Y: 15.365486145019531
+        Z: -1.0705451965332031
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -463,7 +438,7 @@ Visualization Manager:
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1137
+  Height: 934
   Hide Left Dock: false
   Hide Right Dock: true
   Image:
@@ -477,6 +452,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1886
-  X: 15
-  Y: 44
+  Width: 1920
+  X: 0
+  Y: 34

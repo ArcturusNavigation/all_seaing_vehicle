@@ -88,7 +88,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         untracked_obs.push_back(untracked_ob);
     }
     this->publish_map(msg->objects[0].cloud.header, "untracked", false, untracked_obs, m_untracked_map_pub);
-
+    //TODO: Fix stamp being published as 0 in local point and global point and chull, and polygon points (local and global chull) non-existing often
+    RCLCPP_INFO(this->get_logger(), "PUBLISHED STAMP SEC: %d", msg->objects[0].cloud.header.stamp.sec);
     //Match new obstacles with old ones
 }
 
