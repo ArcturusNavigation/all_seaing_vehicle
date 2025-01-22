@@ -48,9 +48,9 @@ while running:
     
     # Adjust control message based on arrow keys
     if keys[pygame.K_a]:
-        control_msg["y"] = 1.0  # Move left
+        control_msg["y"] = 0.8  # Move left
     elif keys[pygame.K_d]:
-        control_msg["y"] = -1.0  # Move right
+        control_msg["y"] = -0.8  # Move right
     
     if keys[pygame.K_w]:
         control_msg["x"] = 1.0  # Move forward
@@ -58,9 +58,9 @@ while running:
         control_msg["x"] = -1.0  # Move backward
         
     if keys[pygame.K_q]:
-        control_msg["angular"] = 1.0
+        control_msg["angular"] = 0.3
     elif keys[pygame.K_e]:
-        control_msg["angular"] = -1.0
+        control_msg["angular"] = -0.3
 
     # Serialize to binary format
     serialized_msg = struct.pack(
