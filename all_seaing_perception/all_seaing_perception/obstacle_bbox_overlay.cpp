@@ -191,7 +191,7 @@ ObstacleBboxOverlay::ObstacleBboxOverlay() : Node("obstacle_bbox_overlay") {
         "camera_info", 10,
         std::bind(&ObstacleBboxOverlay::intrinsics_cb, this, std::placeholders::_1));
     m_bbox_sub.subscribe(this, "bounding_boxes", rmw_qos_profile_default);
-    m_map_sub.subscribe(this, "obstacle_map/unlabeled", rmw_qos_profile_default);
+    m_map_sub.subscribe(this, "obstacle_map/raw", rmw_qos_profile_default);
 
     // Publisher
     m_map_pub =
