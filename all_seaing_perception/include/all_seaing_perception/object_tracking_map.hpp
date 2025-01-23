@@ -58,28 +58,33 @@ private:
                      rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub);
     template <typename T>
     T convert_to_global(double nav_x, double nav_y, double nav_heading, T point);
+    template <typename T>
+    T convert_to_local(double nav_x, double nav_y, double nav_heading, T point);
 
     //custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)
     struct ObjectCloud{
         int id;
-        rclcpp::Time time_seen;
         int label;
+        rclcpp::Time time_seen;
+        rclcpp::Time last_dead;
+        rclcpp::Duration time_dead;
+        bool is_dead;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_pcloud_ptr;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr global_pcloud_ptr;
+        pcl::PointXYZ local_centroid;
+        pcl::PointXYZ global_centroid;
 
-        ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob){
-            id = -1;
-            time_seen = t;
-            label = l;
-            local_pcloud_ptr = loc;
-            global_pcloud_ptr = glob;
-        }
+        ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob);
+    
+        void update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc);
     };
 
     // Member variables
     std::vector<std::shared_ptr<ObjectTrackingMap::ObjectCloud>> m_tracked_obstacles;
     std::string m_global_frame_id;
     int m_obstacle_id;
+    double m_obstacle_seg_thresh;
+    double m_obstacle_drop_thresh;
 
     float m_nav_x, m_nav_y, m_nav_heading;
 
@@ -90,6 +95,16 @@ private:
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
     rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
+    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
+
+    // Transform variables
+    std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+    geometry_msgs::msg::TransformStamped m_pc_cam_tf;
+    bool m_pc_cam_tf_ok;
+
+    // Intrinsics callback camera model variables
+    image_geometry::PinholeCameraModel m_cam_model;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();

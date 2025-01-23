@@ -15,7 +15,8 @@ def generate_launch_description():
 
         ],
         parameters=[
-            
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
         ]
     )
     return LaunchDescription([
