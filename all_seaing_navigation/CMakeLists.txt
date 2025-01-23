@@ -12,7 +12,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/buoy_pair_finder.py
     ${PROJECT_NAME}/map_publisher_test.py
-    ${PROJECT_NAME}/mapping_server/mapping_server.py
+    ${PROJECT_NAME}/mapping_server.py
     ${PROJECT_NAME}/navigation_server.py
     ${PROJECT_NAME}/rviz_waypoint_sender.py
     DESTINATION lib/${PROJECT_NAME}

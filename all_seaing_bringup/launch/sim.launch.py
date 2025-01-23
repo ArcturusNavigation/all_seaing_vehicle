@@ -207,7 +207,7 @@ def launch_setup(context, *args, **kwargs):
 
     mapping_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
-        executable="mapping_server/mapping_server.py",
+        executable="mapping_server.py",
         output="screen",
     )
 
