@@ -205,6 +205,12 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    mapping_server = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="mapping_server.py",
+        output="screen",
+    )
+
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_node.py",
@@ -266,6 +272,7 @@ def launch_setup(context, *args, **kwargs):
         rviz_node,
         control_mux,
         navigation_server,
+        mapping_server,
         onshore_node,
         waypoint_finder,
         rviz_waypoint_sender,

@@ -96,12 +96,21 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
     float max_x = std::numeric_limits<float>::lowest();
     float max_y = std::numeric_limits<float>::lowest();
     float max_z = std::numeric_limits<float>::lowest();
+
+    float global_min_x = std::numeric_limits<float>::max();
+    float global_min_y = std::numeric_limits<float>::max();
+    float global_min_z = std::numeric_limits<float>::max();
+    float global_max_x = std::numeric_limits<float>::lowest();
+    float global_max_y = std::numeric_limits<float>::lowest();
+    float global_max_z = std::numeric_limits<float>::lowest();
     float average_x = 0, average_y = 0, average_z = 0;
     for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); pit++) {
-        pcl::PointXYZI p;
+        pcl::PointXYZI p, global_p;
+
         p.x = in_origin_cloud_ptr->points[*pit].x;
         p.y = in_origin_cloud_ptr->points[*pit].y;
         p.z = in_origin_cloud_ptr->points[*pit].z;
+        global_p = convert_to_global(nav_x, nav_y, nav_heading, p);
 
         average_x += p.x;
         average_y += p.y;
@@ -115,6 +124,14 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
         max_x = std::max(p.x, max_x);
         max_y = std::max(p.y, max_y);
         max_z = std::max(p.z, max_z);
+
+        global_min_x = std::min(global_p.x, global_min_x);
+        global_min_y = std::min(global_p.y, global_min_y);
+        global_min_z = std::min(global_p.z, global_min_z);
+
+        global_max_x = std::max(global_p.x, global_max_x);
+        global_max_y = std::max(global_p.y, global_max_y);
+        global_max_z = std::max(global_p.z, global_max_z);
     }
 
     // Speicfy that all points are finite
@@ -143,8 +160,16 @@ Obstacle::Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_pt
 
     // Calculate global point
     m_global_point = convert_to_global(nav_x, nav_y, nav_heading, m_local_point);
-    m_global_bbox_min = convert_to_global(nav_x, nav_y, nav_heading, m_bbox_min);
-    m_global_bbox_max = convert_to_global(nav_x, nav_y, nav_heading, m_bbox_max);
+    m_global_bbox_min.x = global_min_x;
+    m_global_bbox_min.y = global_min_y;
+    m_global_bbox_min.z = global_min_z;
+
+    m_global_bbox_max.x = global_max_x;
+    m_global_bbox_max.y = global_max_y;
+    m_global_bbox_max.z = global_max_z;
+
+
+
 
     // Skip chull calculation if less than 3 points
     if (current_cluster->points.size() < 3) return;
