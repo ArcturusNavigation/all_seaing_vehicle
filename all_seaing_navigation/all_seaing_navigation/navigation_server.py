@@ -32,6 +32,9 @@ class NavigationServer(ActionServerBase):
             OccupancyGrid, "map/global", self.map_callback, 10
         )
 
+        self.planner = PlannerExecutor("astar")
+        self.planner_name = "astar"
+
         self.map = None
 
     def map_callback(self, msg: OccupancyGrid):
@@ -58,8 +61,9 @@ class NavigationServer(ActionServerBase):
         obstacle_tol = goal_handle.request.obstacle_tol
         goal_tol = goal_handle.request.goal_tol
 
-        planner = PlannerExecutor(goal_handle.request.planner)
-        path = planner.plan(self.map, start, goal, obstacle_tol, goal_tol)
+        if (self.planner_name != goal_handle.request.planner):
+            self.planner = PlannerExecutor(goal_handle.request.planner)
+        path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol)
         path.poses = path.poses[:: goal_handle.request.choose_every]
         return path
 

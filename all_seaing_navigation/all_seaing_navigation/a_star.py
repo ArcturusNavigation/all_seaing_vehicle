@@ -3,7 +3,7 @@ from all_seaing_navigation.planner_base import PlannerBase
 from typing import List
 from geometry_msgs.msg import Point, Pose, PoseArray
 
-import numpy as np
+# import numpy as np
 import math
 import heapq
 
@@ -54,8 +54,8 @@ class AStar(PlannerBase):
         ]
 
         # Matrix of scores and parent pointers for each cell
-        gscore = np.array([math.inf for _ in range(self.map.info.height * self.map.info.width)])
-        parent = np.array([Point() for _ in range(self.map.info.height * self.map.info.width)])
+        gscore = [math.inf for _ in range(self.map.info.height * self.map.info.width)]
+        parent = [Point() for _ in range(self.map.info.height * self.map.info.width)]
 
         # Check if the starting and end positions are invalid
         if (
