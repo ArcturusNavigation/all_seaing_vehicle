@@ -54,8 +54,6 @@ class AStar(PlannerBase):
         ]
 
         # Matrix of scores and parent pointers for each cell
-        gscore = [math.inf for _ in range(self.map.info.height * self.map.info.width)]
-        parent = [Point() for _ in range(self.map.info.height * self.map.info.width)]
         gscore = defaultdict(lambda: math.inf)
         parent = defaultdict(Point)
 
