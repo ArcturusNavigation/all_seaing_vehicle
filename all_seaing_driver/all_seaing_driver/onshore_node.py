@@ -19,10 +19,15 @@ class OnshoreNode(Node):
         self.declare_parameter("joy_x_scale", 2.0)
         self.declare_parameter("joy_y_scale", -1.0)
         self.declare_parameter("joy_ang_scale", -0.8)
+        self.declare_parameter("smoothing_factor", 0.8)
 
         self.joy_x_scale = self.get_parameter("joy_x_scale").value
         self.joy_y_scale = self.get_parameter("joy_y_scale").value
         self.joy_ang_scale = self.get_parameter("joy_ang_scale").value
+        self.smoothing = self.get_parameter("smoothing_factor").value
+
+        self.prev_output_x = 0
+        self.prev_output_y = 0
 
         self.heartbeat_message = Heartbeat()
         self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
@@ -47,8 +52,10 @@ class OnshoreNode(Node):
     def send_controls(self, x, y, angular):
         control_option = ControlOption()
         control_option.priority = 0  # TeleOp has the highest priority value
-        control_option.twist.linear.x = x
-        control_option.twist.linear.y = y
+        control_option.twist.linear.x = self.smoothing * self.prev_output_x + (1 - self.smoothing) * x
+        self.prev_output_x = control_option.twist.linear.x
+        control_option.twist.linear.y = self.smoothing * self.prev_output_y + (1 - self.smoothing) * y
+        self.prev_output_y = control_option.twist.linear.y
         control_option.twist.angular.z = angular
         self.control_option_pub.publish(control_option)
 

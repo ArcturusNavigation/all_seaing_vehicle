@@ -56,7 +56,7 @@ class XDriveController(Node):
             "smoothing_factor", 0.8).get_parameter_value().double_value
         self.curr_output = np.zeros(4)
         self.prev_output = np.zeros(4)
-        
+
         # From the T200 datasheet, approximately 40N maximum force
         THRUST_CONST = 40.0
         thrust_force_x = THRUST_CONST * math.sin(thruster_angle)
@@ -78,7 +78,7 @@ class XDriveController(Node):
         self.front_left_pub = self.create_publisher(Float64, "thrusters/front_left/thrust", 10)
         self.back_right_pub = self.create_publisher(Float64, "thrusters/back_right/thrust", 10)
         self.timer = self.create_timer(TIMER_PERIOD, self.timer_cb)
-    
+
     def calculate_control_output(self, target_vel):
         target_vel_sq = np.sign(target_vel) * np.square(target_vel)
         constraint_bounds = self.drag_constants @ target_vel_sq
@@ -93,7 +93,7 @@ class XDriveController(Node):
         if not result.success:
             self.get_logger().error("Optimization failed to converge!")
             return None
-        
+
         control_output = result.x.reshape(4)
         if np.any(np.abs(control_output) > 1):
             control_output = control_output / np.max(np.abs(control_output))
@@ -120,9 +120,9 @@ class XDriveController(Node):
         """
 
         # Smoothing via low-pass filter
-        control_output = self.smoothing * self.prev_output + (1 - self.smoothing) * self.curr_output
-        self.prev_output = control_output
-        
+        control_output = self.curr_output
+        # self.prev_output = control_output
+
         # Scale control_output from [-1,1] to output range
         scaled_control_output = control_output * (self.output_range[1] - self.output_range[0]) / 2
         thrust_cmd = scaled_control_output + np.mean(self.output_range)
