@@ -29,6 +29,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/point_types_conversion.h>
+#include <pcl/common/distances.h>
 #include "pcl_conversions/pcl_conversions.h"
 
 #include "cv_bridge/cv_bridge.h"
@@ -49,38 +50,45 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 
+//custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)
+struct ObjectCloud{
+    int id;
+    int label;
+    rclcpp::Time time_seen;
+    rclcpp::Time last_dead;
+    rclcpp::Duration time_dead = rclcpp::Duration(0,0);
+    bool is_dead;
+    pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_pcloud_ptr;
+    pcl::PointCloud<pcl::PointXYZHSV>::Ptr global_pcloud_ptr;
+    pcl::PointXYZ local_centroid;
+    pcl::PointXYZ global_centroid;
+
+    ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob);
+
+    void update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc);
+};
+
 class ObjectTrackingMap : public rclcpp::Node{
 private:
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
     void odom_callback(const nav_msgs::msg::Odometry &msg);
     void publish_map(std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
                      const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
-                     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub);
+                     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub, std::vector<int> labels);
     template <typename T>
     T convert_to_global(double nav_x, double nav_y, double nav_heading, T point);
     template <typename T>
     T convert_to_local(double nav_x, double nav_y, double nav_heading, T point);
 
-    //custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)
-    struct ObjectCloud{
-        int id;
-        int label;
-        rclcpp::Time time_seen;
-        rclcpp::Time last_dead;
-        rclcpp::Duration time_dead;
-        bool is_dead;
-        pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_pcloud_ptr;
-        pcl::PointCloud<pcl::PointXYZHSV>::Ptr global_pcloud_ptr;
-        pcl::PointXYZ local_centroid;
-        pcl::PointXYZ global_centroid;
+    // Get intrinsic camera model information needed for projection
+    void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
 
-        ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob);
+    // Get transform from source frame to target frame
+    geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
+                                                const std::string &in_src_frame);
     
-        void update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc);
-    };
-
     // Member variables
-    std::vector<std::shared_ptr<ObjectTrackingMap::ObjectCloud>> m_tracked_obstacles;
+    std::vector<std::shared_ptr<ObjectCloud>> m_tracked_obstacles;
     std::string m_global_frame_id;
     int m_obstacle_id;
     double m_obstacle_seg_thresh;

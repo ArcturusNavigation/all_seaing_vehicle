@@ -28,24 +28,26 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
         "odometry/filtered", 10,
         std::bind(&ObjectTrackingMap::odom_callback, this, std::placeholders::_1));
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        "camera_info_topic", 10, std::bind(&BBoxProjectPCloud::intrinsics_cb, this, std::placeholders::_1));
+        "camera_info_topic", 10, std::bind(&ObjectTrackingMap::intrinsics_cb, this, std::placeholders::_1));
 }
 
-ObjectTrackingMap::ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob){
+ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob){
     id = -1;
     label = l;
     time_seen = t;
+    last_dead = rclcpp::Time(0);
+    time_dead = rclcpp::Duration(0,0);
     is_dead = false;
     global_pcloud_ptr = glob;
     for(pcl::PointXYZHSV &global_pt : local_pcloud_ptr->points){
-        global_centroid.x += global_pt.x/((double)global_cloud_ptr->points.size());
-        global_centroid.y += global_pt.y/((double)global_cloud_ptr->points.size());
-        global_centroid.z += global_pt.z/((double)global_cloud_ptr->points.size());
+        global_centroid.x += global_pt.x/((double)global_pcloud_ptr->points.size());
+        global_centroid.y += global_pt.y/((double)global_pcloud_ptr->points.size());
+        global_centroid.z += global_pt.z/((double)global_pcloud_ptr->points.size());
     }
     this->update_loc_pcloud(loc);
 }
 
-void ObjectTrackingMap::ObjectCloud::update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc){
+void ObjectCloud::update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc){
     local_pcloud_ptr = loc;
     for(pcl::PointXYZHSV &local_pt : local_pcloud_ptr->points){
         local_centroid.x += local_pt.x/((double)local_pcloud_ptr->points.size());
@@ -70,12 +72,12 @@ void ObjectTrackingMap::odom_callback(const nav_msgs::msg::Odometry &msg) {
     m_nav_pose = msg.pose.pose;
 }
 
-void BBoxProjectPCloud::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
+void ObjectTrackingMap::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
     RCLCPP_DEBUG(this->get_logger(), "GOT CAMERA INFO");
     m_cam_model.fromCameraInfo(info_msg);
 }
 
-geometry_msgs::msg::TransformStamped BBoxProjectPCloud::get_tf(const std::string &in_target_frame,
+geometry_msgs::msg::TransformStamped ObjectTrackingMap::get_tf(const std::string &in_target_frame,
                                                              const std::string &in_src_frame) {
     geometry_msgs::msg::TransformStamped tf;
     m_pc_cam_tf_ok = false;
@@ -119,7 +121,7 @@ T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_hea
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
     if(msg->objects.size()==0) return;
     
-    std::vector<std::shared_ptr<ObjectTrackingMap::ObjectCloud>> detected_obstacles;
+    std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles;
     for(all_seaing_interfaces::msg::LabeledObjectPointCloud obj : msg->objects){
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_obj_pcloud(new pcl::PointCloud<pcl::PointXYZHSV>);
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr global_obj_pcloud(new pcl::PointCloud<pcl::PointXYZHSV>);
@@ -128,13 +130,14 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             pcl::PointXYZHSV global_pt = this->convert_to_global(m_nav_x, m_nav_y, m_nav_heading, pt);
             global_obj_pcloud->push_back(global_pt);
         }
-        std::shared_ptr<ObjectTrackingMap::ObjectCloud> obj_cloud (new ObjectTrackingMap::ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
+        std::shared_ptr<ObjectCloud> obj_cloud (new ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
         detected_obstacles.push_back(obj_cloud);
     }
 
     // Make and publish untracked map
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> untracked_obs;
-    for(std::shared_ptr<ObjectTrackingMap::ObjectCloud> det_obs : detected_obstacles){
+    std::vector<int> untracked_labels;
+    for(std::shared_ptr<ObjectCloud> det_obs : detected_obstacles){
         pcl::PointCloud<pcl::PointXYZI>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZI>);
         for(pcl::PointXYZHSV pt : det_obs->local_pcloud_ptr->points){
             pcl::PointXYZRGB rgb_pt;
@@ -148,9 +151,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
             new all_seaing_perception::Obstacle(raw_cloud, ind, m_obstacle_id++,
                                                 det_obs->time_seen, m_nav_x, m_nav_y, m_nav_heading));
+        untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-    this->publish_map(msg->objects[0].cloud.header, "untracked", true, untracked_obs, m_untracked_map_pub);
+    this->publish_map(msg->objects[0].cloud.header, "untracked", true, untracked_obs, m_untracked_map_pub, untracked_labels);
 
     /*
     OBJECT TRACKING:
@@ -171,11 +175,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     // Match new obstacles with old ones, update them, and add new ones
     std::unordered_set<int> chosen_indices;
-    for(std::shared_ptr<ObjectTrackingMap::ObjectCloud> det_obs : detected_obstacles){
+    for(std::shared_ptr<ObjectCloud> det_obs : detected_obstacles){
         float best_dist = m_obstacle_seg_thresh;
         int best_match = -1;
         for(int tracked_id = 0; tracked_id < m_tracked_obstacles.size(); tracked_id++){
-            if (chosen_indices.count(j) || m_tracked_obstacles[tracked_id]->label != det_obs->label)
+            if (chosen_indices.count(tracked_id) || m_tracked_obstacles[tracked_id]->label != det_obs->label)
                 continue;
             float curr_dist = pcl::euclideanDistance(m_tracked_obstacles[tracked_id]->global_centroid,
                                                      det_obs->global_centroid);
@@ -199,7 +203,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         if(chosen_indices.count(tracked_id)) continue;
         // Update local points
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(new pcl::PointCloud<pcl::PointXYZHSV>);
-        for(pcl::PointXYZHSV &global_pt : m_tracked_obstacles[tracked_id]->global_pcloud_ptr){ 
+        for(pcl::PointXYZHSV &global_pt : m_tracked_obstacles[tracked_id]->global_pcloud_ptr->points){ 
             upd_local_obj_pcloud->push_back(this->convert_to_local(m_nav_x, m_nav_y, m_nav_heading, global_pt));
         }
         m_tracked_obstacles[tracked_id]->update_loc_pcloud(upd_local_obj_pcloud);
@@ -213,11 +217,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         cv::Point2d xy_rect = m_cam_model.project3dToPixel(
             cv::Point3d(camera_point.y, camera_point.z, -camera_point.x));
         if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-            (xy_rect.y < m_cam_model.cameraInfo().height) && (obstacle.local_point.point.x >= 0)) {
+            (xy_rect.y < m_cam_model.cameraInfo().height) && (lidar_point.x >= 0)) {
             // Dead
             if(m_tracked_obstacles[tracked_id]->is_dead){
                 // Was also dead before, add time dead
-                m_tracked_obstacles[tracked_id]->time_dead += rclcpp::Duration(msg->objects[0].time.sec, msg->objects[0].time.nanosec) - rclcpp::Duration(m_tracked_obstacles[tracked_id]->last_dead.sec, m_tracked_obstacles[tracked_id]->last_dead.nanosec);
+                m_tracked_obstacles[tracked_id]->time_dead = rclcpp::Duration(msg->objects[0].time.sec, msg->objects[0].time.nanosec) - rclcpp::Duration(m_tracked_obstacles[tracked_id]->last_dead.seconds(), m_tracked_obstacles[tracked_id]->last_dead.nanoseconds()) + m_tracked_obstacles[tracked_id]->time_dead;
                 if(m_tracked_obstacles[tracked_id]->time_dead.seconds() > m_obstacle_drop_thresh){
                     m_tracked_obstacles.erase(m_tracked_obstacles.begin()+tracked_id);
                     tracked_id--;
@@ -233,7 +237,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     // Publish map with tracked obstacles
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
-    for(std::shared_ptr<ObjectTrackingMap::ObjectCloud> t_ob : m_tracked_obstacles){
+    std::vector<int> tracked_labels;
+    for(std::shared_ptr<ObjectCloud> t_ob : m_tracked_obstacles){
         pcl::PointCloud<pcl::PointXYZI>::Ptr tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
         for(pcl::PointXYZHSV pt : t_ob->local_pcloud_ptr->points){
             pcl::PointXYZRGB rgb_pt;
@@ -247,16 +252,16 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::shared_ptr<all_seaing_perception::Obstacle> tracked_ob(
             new all_seaing_perception::Obstacle(tracked_cloud, ind, t_ob->id,
                                                 t_ob->time_seen, m_nav_x, m_nav_y, m_nav_heading));
-        tracked_ob.label = t_ob->label;
+        tracked_labels.push_back(t_ob->label);
         tracked_obs.push_back(tracked_ob);
     }
-    this->publish_map(msg->objects[0].cloud.header, "tracked", true, tracked_obs, m_tracked_map_pub);
+    this->publish_map(msg->objects[0].cloud.header, "tracked", true, tracked_obs, m_tracked_map_pub, tracked_labels);
 }
 
 void ObjectTrackingMap::publish_map(
     std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
     const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
-    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub) {
+    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub, std::vector<int> labels) {
 
     // Create global header
     std_msgs::msg::Header global_header = std_msgs::msg::Header();
@@ -271,6 +276,9 @@ void ObjectTrackingMap::publish_map(
     for (unsigned int i = 0; i < map.size(); i++) {
         all_seaing_interfaces::msg::Obstacle det_obstacle;
         map[i]->to_ros_msg(local_header, global_header, det_obstacle);
+        if(is_labeled){
+            det_obstacle.label = labels[i];
+        }
         map_msg.obstacles.push_back(det_obstacle);
     }
     map_msg.pose = m_nav_pose;
