@@ -36,6 +36,7 @@ class WaypointSender(Node):
         goal_msg.ignore_theta = True
         goal_msg.is_stationary = True
         self.waypoint_client.wait_for_server()
+        print("SENT WAYPOINT")
         self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
 
     def send_path(self, msg: PointStamped):
