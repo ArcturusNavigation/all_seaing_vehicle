@@ -70,16 +70,16 @@ Visualization Manager:
       Enabled: true
       Name: ObstacleMap
       Namespaces:
-        untracked: true
-        untracked_edges: true
-        untracked_text: true
-        untracked_vertices: true
+        tracked: true
+        tracked_edges: true
+        tracked_text: true
+        tracked_vertices: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /obstacle_map/refined_untracked
+        Value: /obstacle_map/refined_tracked
       Value: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
@@ -327,7 +327,7 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Class: rviz_default_plugins/Image
-      Enabled: true
+      Enabled: false
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -339,7 +339,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /refined_object_contours_viz
-      Value: true
+      Value: false
     - Class: rviz_default_plugins/Image
       Enabled: true
       Max Value: 1
@@ -414,25 +414,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 33.20790481567383
+      Distance: 59.75430679321289
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 35.28513717651367
-        Y: 22.616809844970703
-        Z: 10.652386665344238
+        X: 34.421382904052734
+        Y: 16.84052276611328
+        Z: 1.149369478225708
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5603973269462585
+      Pitch: 0.5253973603248596
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.628566265106201
+      Yaw: 4.643567085266113
     Saved: ~
 Window Geometry:
   Displays:

@@ -11,8 +11,9 @@ def generate_launch_description():
         package="all_seaing_perception",
         executable="object_tracking_map",
         output="screen",
+        arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
         ],
         parameters=[
             {"obstacle_seg_thresh": 10.0},

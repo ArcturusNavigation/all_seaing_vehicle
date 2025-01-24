@@ -10,7 +10,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
     m_obstacle_seg_thresh = this->get_parameter("obstacle_seg_thresh").as_double();
     m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
-
+    RCLCPP_DEBUG(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf", m_obstacle_seg_thresh, m_obstacle_drop_thresh);
     // Initialize navigation variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
@@ -39,7 +39,8 @@ ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV
     time_dead = rclcpp::Duration(0,0);
     is_dead = false;
     global_pcloud_ptr = glob;
-    for(pcl::PointXYZHSV &global_pt : local_pcloud_ptr->points){
+    for(pcl::PointXYZHSV &global_pt : global_pcloud_ptr->points){
+        // RCLCPP_DEBUG(this->get_logger(), "NEW POINT IN CREATED OBJECT POINT CLOUD: %lf, %lf, %lf", global_pt.x, global_pt.y, global_pt.z);
         global_centroid.x += global_pt.x/((double)global_pcloud_ptr->points.size());
         global_centroid.y += global_pt.y/((double)global_pcloud_ptr->points.size());
         global_centroid.z += global_pt.z/((double)global_pcloud_ptr->points.size());
@@ -120,7 +121,7 @@ T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_hea
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
     if(msg->objects.size()==0) return;
-    
+    RCLCPP_DEBUG(this->get_logger(), "GOT DATA");
     std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles;
     for(all_seaing_interfaces::msg::LabeledObjectPointCloud obj : msg->objects){
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_obj_pcloud(new pcl::PointCloud<pcl::PointXYZHSV>);
@@ -130,10 +131,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             pcl::PointXYZHSV global_pt = this->convert_to_global(m_nav_x, m_nav_y, m_nav_heading, pt);
             global_obj_pcloud->push_back(global_pt);
         }
+        // RCLCPP_DEBUG(this->get_logger(), "BEFORE OBSTACLE CREATION");
         std::shared_ptr<ObjectCloud> obj_cloud (new ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
         detected_obstacles.push_back(obj_cloud);
     }
-
+    // RCLCPP_DEBUG(this->get_logger(), "BEFORE UNTRACKED MAP PUBLISHING");
     // Make and publish untracked map
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> untracked_obs;
     std::vector<int> untracked_labels;
@@ -155,7 +157,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         untracked_obs.push_back(untracked_ob);
     }
     this->publish_map(msg->objects[0].cloud.header, "untracked", true, untracked_obs, m_untracked_map_pub, untracked_labels);
-
+    // RCLCPP_DEBUG(this->get_logger(), "AFTER UNTRACKED MAP PUBLISHING");
     /*
     OBJECT TRACKING:
     --Like in obstacle_detector.cpp, for each detected obstacle, find the closest (RMS point distance? or just centroids),
@@ -168,11 +170,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     --For those objects, update the time they have been undetected in the FoV total (add time from prev appearance, time_seen, if it was in FoV and undetected then too)
     --For unmatched obstacles that have been undetected in FoV for > some time threshold, remove them
     */
-
+    // RCLCPP_DEBUG(this->get_logger(), "BEFORE LIDAR->CAMERA TF");
     // LIDAR -> Camera transform
-    if (!m_pc_cam_tf_ok)
-        m_pc_cam_tf = get_tf(msg->objects[0].segment.header.frame_id, msg->objects[0].cloud.header.frame_id);
-
+    // if (!m_pc_cam_tf_ok)
+    //     RCLCPP_DEBUG(this->get_logger(), "CAMERA FRAME ID: %s", msg->objects[0].segment.header.frame_id.c_str());
+    //     RCLCPP_DEBUG(this->get_logger(), "LIDAR FRAME ID: %s", msg->objects[0].cloud.header.frame_id.c_str());
+    //     m_pc_cam_tf = get_tf(msg->objects[0].segment.header.frame_id, msg->objects[0].cloud.header.frame_id);
+    // RCLCPP_DEBUG(this->get_logger(), "AFTER LIDAR->CAMERA TF");
     // Match new obstacles with old ones, update them, and add new ones
     std::unordered_set<int> chosen_indices;
     for(std::shared_ptr<ObjectCloud> det_obs : detected_obstacles){
@@ -197,7 +201,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             m_tracked_obstacles.push_back(det_obs);
         }
     }
-
+    RCLCPP_DEBUG(this->get_logger(), "AFTER NEW OBSTACLE MATCHING");
     // Filter old obstacles
     for (int tracked_id = 0; tracked_id < m_tracked_obstacles.size(); tracked_id++) {
         if(chosen_indices.count(tracked_id)) continue;
@@ -212,17 +216,21 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         lidar_point.x = m_tracked_obstacles[tracked_id]->local_centroid.x;
         lidar_point.y = m_tracked_obstacles[tracked_id]->local_centroid.y;
         lidar_point.z = m_tracked_obstacles[tracked_id]->local_centroid.z;
-        geometry_msgs::msg::Point camera_point;
-        tf2::doTransform<geometry_msgs::msg::Point>(lidar_point, camera_point, m_pc_cam_tf);
+        geometry_msgs::msg::Point camera_point = lidar_point;//ALREADY IN THE SAME FRAME, WAS TRANSFORMED BEFORE BEING PUBLISHED BY bbox_project_pcloud.cpp
+        // tf2::doTransform<geometry_msgs::msg::Point>(lidar_point, camera_point, m_pc_cam_tf);
         cv::Point2d xy_rect = m_cam_model.project3dToPixel(
             cv::Point3d(camera_point.y, camera_point.z, -camera_point.x));
+        RCLCPP_DEBUG(this->get_logger(), "OBSTACLE ID %d (%lf, %lf, %lf)->(%lf, %lf)", m_tracked_obstacles[tracked_id]->id, lidar_point.x, lidar_point.y, lidar_point.z, xy_rect.x, xy_rect.y);
         if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
             (xy_rect.y < m_cam_model.cameraInfo().height) && (lidar_point.x >= 0)) {
             // Dead
             if(m_tracked_obstacles[tracked_id]->is_dead){
                 // Was also dead before, add time dead
-                m_tracked_obstacles[tracked_id]->time_dead = rclcpp::Duration(msg->objects[0].time.sec, msg->objects[0].time.nanosec) - rclcpp::Duration(m_tracked_obstacles[tracked_id]->last_dead.seconds(), m_tracked_obstacles[tracked_id]->last_dead.nanoseconds()) + m_tracked_obstacles[tracked_id]->time_dead;
+                RCLCPP_DEBUG(this->get_logger(), "OBSTACLE ID %d TIME PERIOD FROM PREVIOUS DEAD: %lf - %lf", m_tracked_obstacles[tracked_id]->id, m_tracked_obstacles[tracked_id]->last_dead.seconds(), rclcpp::Time(msg->objects[0].time).seconds());
+                m_tracked_obstacles[tracked_id]->time_dead = rclcpp::Time(msg->objects[0].time) - m_tracked_obstacles[tracked_id]->last_dead + m_tracked_obstacles[tracked_id]->time_dead;
+                RCLCPP_DEBUG(this->get_logger(), "OBSTACLE ID %d DEAD FOR %lf SECONDS, OBSTACLE DROP THRESHOLD: %lf", m_tracked_obstacles[tracked_id]->id, m_tracked_obstacles[tracked_id]->time_dead.seconds(), m_obstacle_drop_thresh);
                 if(m_tracked_obstacles[tracked_id]->time_dead.seconds() > m_obstacle_drop_thresh){
+                    RCLCPP_DEBUG(this->get_logger(), "OBSTACLE ID %d DROPPED", m_tracked_obstacles[tracked_id]->id);
                     m_tracked_obstacles.erase(m_tracked_obstacles.begin()+tracked_id);
                     tracked_id--;
                     continue;
@@ -234,7 +242,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             m_tracked_obstacles[tracked_id]->is_dead = false;
         }
     }
-
+    RCLCPP_DEBUG(this->get_logger(), "AFTER OLD OBSTACLE FILTERING");
     // Publish map with tracked obstacles
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
     std::vector<int> tracked_labels;
@@ -256,6 +264,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         tracked_obs.push_back(tracked_ob);
     }
     this->publish_map(msg->objects[0].cloud.header, "tracked", true, tracked_obs, m_tracked_map_pub, tracked_labels);
+    RCLCPP_DEBUG(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
 }
 
 void ObjectTrackingMap::publish_map(
