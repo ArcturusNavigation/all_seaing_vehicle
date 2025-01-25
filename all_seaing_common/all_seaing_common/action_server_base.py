@@ -1,6 +1,5 @@
 from abc import ABC
 from rclpy.action import CancelResponse
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.node import Node
 
 from nav_msgs.msg import Odometry
@@ -30,13 +29,11 @@ class ActionServerBase(ABC, Node):
 
         # --------------- SUBSCRIBERS AND PUBLISHERS ---------------#
 
-        self.group = MutuallyExclusiveCallbackGroup()
         self.odom_sub = self.create_subscription(
             Odometry,
             "odometry/filtered",
             self.odom_callback,
             10,
-            callback_group=self.group,
         )
         self.marker_pub = self.create_publisher(Marker, "action_marker", 10)
 

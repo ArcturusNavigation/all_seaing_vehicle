@@ -46,7 +46,7 @@ class MappingServer(Node):
         # Position of ship relative to global origin
         # TO DO: receive and set the position of the ship somewhere
         self.ship_pos = (100, 410)
-        self.lidar_rad = 200
+        self.lidar_rad = 400
 
         # Active cells in row major order
         self.active_cells = [False] * self.grid.info.width * self.grid.info.height

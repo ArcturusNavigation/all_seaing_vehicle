@@ -12,5 +12,5 @@ class PlannerExecutor:
             get_logger("planner_executor").error("Unrecognized planner name")
             raise ValueError
 
-    def plan(self, map, start, goal, obstacle_tol=50, goal_tol=0.5):
-        return self.planner(map, start, goal, obstacle_tol, goal_tol).plan()
+    def plan(self, map, start, goal, obstacle_tol=50, goal_tol=0.5, should_abort=lambda: False):
+        return self.planner(map, start, goal, obstacle_tol, goal_tol, should_abort).plan()

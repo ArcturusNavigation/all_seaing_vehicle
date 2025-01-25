@@ -1,6 +1,5 @@
 from all_seaing_navigation.planner_base import PlannerBase
 
-from typing import List
 from geometry_msgs.msg import Point, Pose, PoseArray
 
 from collections import defaultdict
@@ -62,6 +61,7 @@ class AStar(PlannerBase):
             not self.is_in_bounds(self.grid_start)
             or not self.is_in_bounds(self.grid_goal)
             or self.is_grid_occupied(self.grid_start)
+            or self.is_grid_occupied(self.grid_goal)
         ):
             return PoseArray(header=self.map.header)
 
@@ -69,7 +69,7 @@ class AStar(PlannerBase):
         parent[self.get_grid_index(self.grid_start)] = self.grid_start
         pq = []
         heapq.heappush(pq, PQNode(self.heuristic(self.grid_start), self.grid_start))
-        while pq:
+        while pq and not self.should_abort():
             node = heapq.heappop(pq)
             curr_score = node.score
             curr_pos = node.point
