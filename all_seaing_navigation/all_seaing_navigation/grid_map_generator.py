@@ -2,54 +2,90 @@
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import Pose
-from nav_msgs.msg import OccupancyGrid, MapMetaData
+from nav_msgs.msg import MapMetaData, OccupancyGrid, Odometry
+from sensor_msgs.msg import LaserScan
 from all_seaing_interfaces.msg import ObstacleMap
 
 
-class MappingServer(Node):
+class GridMapGenerator(Node):
     """Inputs obstacle convex hulls(labeled_map) and outputs global map (Occupancy_grid)"""
 
     def __init__(self):
-        super().__init__("mapping_server")
+        super().__init__("grid_map_generator")
 
-        # Subscriber to labeled_map
-        self.obstalce_map_sub = self.create_subscription(
+        # --------------- PARAMETERS ---------------#
+
+        self.global_frame_id = (
+            self.declare_parameter("global_frame_id", "odom")
+            .get_parameter_value()
+            .string_value
+        )
+
+        self.timer_period = (
+            self.declare_parameter("timer_period", 1.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        default_lidar_range = (
+            self.declare_parameter("default_lidar_range", 130.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.grid_dim = (
+            self.declare_parameter("grid_dim", [2000, 2000])  # [width, height]
+            .get_parameter_value()
+            .integer_array_value
+        )
+
+        self.grid_resolution = (
+            self.declare_parameter("grid_resolution", 0.3)
+            .get_parameter_value()
+            .double_value
+        )
+
+        # --------------- SUBSCRIBERS, PUBLISHERS, AND TIMERS ---------------#
+
+        self.obstacle_map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/raw", self.hulls_update_cb, 10
         )
 
-        # Publishers for path and PoseArray
-        self.grid_pub = self.create_publisher(OccupancyGrid, "map/global", 10)
-        self.timer_period = 1.0
+        self.odom_sub = self.create_subscription(
+            Odometry,
+            "odometry/filtered",
+            self.odom_callback,
+            10,
+        )
+
+        self.scan_sub = self.create_subscription(
+            LaserScan,
+            "scan",
+            self.scan_callback,
+            10,
+        )
+
+        self.grid_pub = self.create_publisher(OccupancyGrid, "grid_map/global", 10)
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
 
-        # Local variables
-        self.obstalce_map = ObstacleMap()
+        # --------------- MEMBER VARIABLES ---------------#
 
-        # Actual location of competition (Nathan Benderson Park) has an
-        #     interior square area of around 117m * 117m. We use a 200m * 200m square.
+        self.initialize_grid()
+        self.obstacle_map = ObstacleMap()
+        self.ship_pos = (0, 0)
+        self.lidar_range = default_lidar_range
+        self.active_cells = [False] * self.grid.info.width * self.grid.info.height
+
+    def initialize_grid(self):
         self.grid = OccupancyGrid()
-        self.grid.header.frame_id = "odom"
+        self.grid.header.frame_id = self.global_frame_id
 
         self.grid.info = MapMetaData()
-        self.grid.info.width = 2000
-        self.grid.info.height = 2000
-        self.grid.info.resolution = 0.1
-
-        self.grid.info.origin = Pose()
-        self.grid.info.origin.position.x = 0.0
-        self.grid.info.origin.position.y = 0.0
-        self.grid.info.origin.position.z = 0.0
+        self.grid.info.width = self.grid_dim[0]
+        self.grid.info.height = self.grid_dim[1]
+        self.grid.info.resolution = self.grid_resolution
 
         self.grid.data = [-1] * self.grid.info.width * self.grid.info.height
-
-        # Position of ship relative to global origin
-        # TO DO: receive and set the position of the ship somewhere
-        self.ship_pos = (100, 410)
-        self.lidar_rad = 200
-
-        # Active cells in row major order
-        self.active_cells = [False] * self.grid.info.width * self.grid.info.height
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -72,7 +108,7 @@ class MappingServer(Node):
         Mark cells inside bbox of each obstacle as active,
         Then modifies probability of each cell based on active/not
         """
-        for obstacle in self.obstalce_map.obstacles:
+        for obstacle in self.obstacle_map.obstacles:
             minx, miny = self.world_to_grid(
                 obstacle.global_bbox_min.x, obstacle.global_bbox_min.y
             )
@@ -88,7 +124,7 @@ class MappingServer(Node):
 
         self.modify_probability()
 
-        for obstacle in self.obstalce_map.obstacles:
+        for obstacle in self.obstacle_map.obstacles:
             minx, miny = self.world_to_grid(
                 obstacle.global_bbox_min.x, obstacle.global_bbox_min.y
             )
@@ -103,17 +139,18 @@ class MappingServer(Node):
 
     def modify_probability(self):
         """Decay or increase probability of obstacle in active cells based on sensor observations"""
+        lidar_range_grid = int(self.lidar_range / self.grid_resolution)
         for x in range(
-            max(0, self.ship_pos[0] - self.lidar_rad),
-            min(self.grid.info.width, self.ship_pos[0] + self.lidar_rad + 1),
+            max(0, self.ship_pos[0] - lidar_range_grid),
+            min(self.grid.info.width, self.ship_pos[0] + lidar_range_grid + 1),
         ):
             for y in range(
-                max(0, self.ship_pos[1] - self.lidar_rad),
-                min(self.grid.info.height, self.ship_pos[1] + self.lidar_rad + 1),
+                max(0, self.ship_pos[1] - lidar_range_grid),
+                min(self.grid.info.height, self.ship_pos[1] + lidar_range_grid + 1),
             ):
                 if (x - self.ship_pos[0]) ** 2 + (
                     y - self.ship_pos[1]
-                ) ** 2 > self.lidar_rad**2:
+                ) ** 2 > lidar_range_grid**2:
                     continue
                 curVal = self.grid.data[x + y * self.grid.info.width]
                 if curVal == -1:
@@ -127,21 +164,25 @@ class MappingServer(Node):
                 self.grid.data[x + y * self.grid.info.width] = curVal
 
     def timer_callback(self):
-        self.publish_grid()
-
-    def hulls_update_cb(self, msg):
-        self.obstalce_map = msg
-        self.ship_pos = self.world_to_grid(msg.pose.position.x, msg.pose.position.y)
-        self.find_active_cells()
-
-    def publish_grid(self):
         self.grid.header.stamp = self.get_clock().now().to_msg()
         self.grid_pub.publish(self.grid)
+
+    def hulls_update_cb(self, msg):
+        self.obstacle_map = msg
+        self.find_active_cells()
+
+    def odom_callback(self, msg):
+        self.ship_pos = self.world_to_grid(
+            msg.pose.pose.position.x, msg.pose.pose.position.y
+        )
+
+    def scan_callback(self, msg):
+        self.lidar_range = msg.range_max
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MappingServer()
+    node = GridMapGenerator()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

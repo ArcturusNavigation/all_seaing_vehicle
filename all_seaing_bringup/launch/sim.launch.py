@@ -205,21 +205,27 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    mapping_server = launch_ros.actions.Node(
+    grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
-        executable="mapping_server.py",
-        output="screen",
+        executable="grid_map_generator.py",
+        remappings=[("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan")],
+        parameters=[
+            {"global_frame_id": "odom"},
+            {"timer_period": 1.0},
+            {"grid_dim": [800, 800]},
+            {"grid_resolution": 0.3},
+        ],
     )
 
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_node.py",
-        output="screen",
         parameters=[
             {"joy_x_scale": 3.0},
             {"joy_y_scale": -2.0},
             {"joy_ang_scale": -1.5},
         ],
+        output="screen",
     )
 
     waypoint_finder = launch_ros.actions.Node(
@@ -239,7 +245,6 @@ def launch_setup(context, *args, **kwargs):
             {"theta_threshold": theta_threshold},
             {"use_waypoint_client": use_waypoint_client},
         ],
-        output="screen",
     )
 
     keyboard_ld = IncludeLaunchDescription(
@@ -272,7 +277,7 @@ def launch_setup(context, *args, **kwargs):
         rviz_node,
         control_mux,
         navigation_server,
-        mapping_server,
+        grid_map_generator,
         onshore_node,
         waypoint_finder,
         rviz_waypoint_sender,
@@ -294,10 +299,10 @@ def generate_launch_description():
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),
             DeclareLaunchArgument(
-                "xy_threshold", default_value="2.0",
+                "xy_threshold", default_value="3.0",
             ),
             DeclareLaunchArgument(
-                "theta_threshold", default_value="30.0",
+                "theta_threshold", default_value="180.0",
             ),
             OpaqueFunction(function=launch_setup),
         ]

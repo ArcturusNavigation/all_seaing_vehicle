@@ -2,7 +2,6 @@
 import rclpy
 from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
-import time
 
 from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_interfaces.action import Waypoint, FollowPath
@@ -12,6 +11,9 @@ from std_msgs.msg import ColorRGBA
 from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point, PoseArray
+
+from threading import Semaphore, Event
+import time
 
 
 class NavigationServer(ActionServerBase):
@@ -24,18 +26,28 @@ class NavigationServer(ActionServerBase):
             "follow_path",
             execute_callback=self.follow_path_callback,
             cancel_callback=self.default_cancel_callback,
-            callback_group=self.group,
         )
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
 
         self.map_sub = self.create_subscription(
-            OccupancyGrid, "map/global", self.map_callback, 10
+            OccupancyGrid, "grid_map/global", self.map_callback, 10
         )
 
-        self.planner = PlannerExecutor("astar")
-        self.planner_name = "astar"
-
         self.map = None
+
+        self.stop_plan_semaphore = Semaphore(1)
+        self.stop_plan_evt = Event()
+
+    def start_plan(self):
+        self.stop_plan_evt.set()
+        self.stop_plan_semaphore.acquire()
+        self.stop_plan_evt.clear()
+
+    def should_abort_plan(self):
+        return self.stop_plan_evt.is_set()
+
+    def stopped_plan(self):
+        self.stop_plan_semaphore.release()
 
     def map_callback(self, msg: OccupancyGrid):
         self.map = msg
@@ -61,9 +73,8 @@ class NavigationServer(ActionServerBase):
         obstacle_tol = goal_handle.request.obstacle_tol
         goal_tol = goal_handle.request.goal_tol
 
-        if (self.planner_name != goal_handle.request.planner):
-            self.planner = PlannerExecutor(goal_handle.request.planner)
-        path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol)
+        self.planner = PlannerExecutor(goal_handle.request.planner)
+        path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
         path.poses = path.poses[:: goal_handle.request.choose_every]
         return path
 
@@ -89,18 +100,25 @@ class NavigationServer(ActionServerBase):
         self.result = future.result().result.is_finished
 
     def follow_path_callback(self, goal_handle):
-        self.start_process("Path following started!")
+        self.get_logger().info("Path following started!")
 
+         # Immediately start and end process if no map is found
         if self.map is None:
-            self.end_process("No map received. Aborting path following.")
+            self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
             return FollowPath.Result()
 
+        # Generate path using requested planner
+        self.start_plan()  # Protect the long-running generate path function with semaphores
         path = self.generate_path(goal_handle)
+        self.stopped_plan()
+
         if not path.poses:
-            self.end_process("No valid path found. Aborting path following.")
+            self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
             return FollowPath.Result()
+
+        self.start_process()
 
         self.visualize_path(path)
 
@@ -120,7 +138,6 @@ class NavigationServer(ActionServerBase):
                     goal_handle.canceled()
                     return FollowPath.Result()
 
-
                 time.sleep(self.timer_period)
 
         self.end_process("Path following completed!")
@@ -131,7 +148,7 @@ class NavigationServer(ActionServerBase):
 def main(args=None):
     rclpy.init(args=args)
     node = NavigationServer()
-    executor = MultiThreadedExecutor(num_threads=2)
+    executor = MultiThreadedExecutor(num_threads=3)
     executor.add_node(node)
     executor.spin()
     node.destroy_node()
