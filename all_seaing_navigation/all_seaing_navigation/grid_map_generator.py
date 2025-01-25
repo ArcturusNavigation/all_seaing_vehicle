@@ -77,8 +77,6 @@ class GridMapGenerator(Node):
         self.active_cells = [False] * self.grid.info.width * self.grid.info.height
 
     def initialize_grid(self):
-        # Actual location of competition (Nathan Benderson Park) has an
-        #     interior square area of around 117m * 117m. We use a 200m * 200m square.
         self.grid = OccupancyGrid()
         self.grid.header.frame_id = self.global_frame_id
 

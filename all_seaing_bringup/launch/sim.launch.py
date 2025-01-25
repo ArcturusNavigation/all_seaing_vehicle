@@ -212,7 +212,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "odom"},
             {"timer_period": 1.0},
-            {"grid_dim": [2000, 2000]},
+            {"grid_dim": [800, 800]},
             {"grid_resolution": 0.3},
         ],
     )
@@ -299,10 +299,10 @@ def generate_launch_description():
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),
             DeclareLaunchArgument(
-                "xy_threshold", default_value="2.0",
+                "xy_threshold", default_value="3.0",
             ),
             DeclareLaunchArgument(
-                "theta_threshold", default_value="30.0",
+                "theta_threshold", default_value="180.0",
             ),
             OpaqueFunction(function=launch_setup),
         ]

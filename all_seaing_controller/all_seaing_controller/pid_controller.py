@@ -48,6 +48,9 @@ class PIDController:
         self.effort = 0
 
 class CircularPID(PIDController):
+    def is_done(self, feedback, threshold):
+        return abs(self.setpoint - feedback) % math.pi <= threshold
+
     def update(self, feedback, dt):
         error = (self.setpoint - feedback) % (2 * math.pi)
         if error > math.pi:
