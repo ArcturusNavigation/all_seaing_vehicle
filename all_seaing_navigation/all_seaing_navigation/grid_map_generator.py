@@ -40,7 +40,7 @@ class GridMapGenerator(Node):
         )
 
         self.grid_resolution = (
-            self.declare_parameter("grid_resolution", 0.1)
+            self.declare_parameter("grid_resolution", 0.3)
             .get_parameter_value()
             .double_value
         )
@@ -85,7 +85,7 @@ class GridMapGenerator(Node):
         self.grid.info = MapMetaData()
         self.grid.info.width = self.grid_dim[0]
         self.grid.info.height = self.grid_dim[1]
-        self.grid.info.resolution = 0.1
+        self.grid.info.resolution = self.grid_resolution
 
         self.grid.data = [-1] * self.grid.info.width * self.grid.info.height
 

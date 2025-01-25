@@ -213,7 +213,7 @@ def launch_setup(context, *args, **kwargs):
             {"global_frame_id": "odom"},
             {"timer_period": 1.0},
             {"grid_dim": [2000, 2000]},
-            {"grid_resolution": 0.1},
+            {"grid_resolution": 0.3},
         ],
     )
 
