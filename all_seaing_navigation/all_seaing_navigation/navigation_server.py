@@ -30,7 +30,7 @@ class NavigationServer(ActionServerBase):
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
 
         self.map_sub = self.create_subscription(
-            OccupancyGrid, "map/global", self.map_callback, 10
+            OccupancyGrid, "grid_map/global", self.map_callback, 10
         )
 
         self.planner = PlannerExecutor("astar")

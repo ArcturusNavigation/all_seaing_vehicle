@@ -205,21 +205,27 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    mapping_server = launch_ros.actions.Node(
+    grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
-        executable="mapping_server.py",
-        output="screen",
+        executable="grid_map_generator.py",
+        remappings=[("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan")],
+        parameters=[
+            {"global_frame_id": "odom"},
+            {"timer_period": 1.0},
+            {"grid_dim": [2000, 2000]},
+            {"grid_resolution": 0.1},
+        ],
     )
 
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_node.py",
-        output="screen",
         parameters=[
             {"joy_x_scale": 3.0},
             {"joy_y_scale": -2.0},
             {"joy_ang_scale": -1.5},
         ],
+        output="screen",
     )
 
     waypoint_finder = launch_ros.actions.Node(
@@ -239,7 +245,6 @@ def launch_setup(context, *args, **kwargs):
             {"theta_threshold": theta_threshold},
             {"use_waypoint_client": use_waypoint_client},
         ],
-        output="screen",
     )
 
     keyboard_ld = IncludeLaunchDescription(
@@ -272,7 +277,7 @@ def launch_setup(context, *args, **kwargs):
         rviz_node,
         control_mux,
         navigation_server,
-        mapping_server,
+        grid_map_generator,
         onshore_node,
         waypoint_finder,
         rviz_waypoint_sender,
