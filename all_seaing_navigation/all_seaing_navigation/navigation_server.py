@@ -33,9 +33,6 @@ class NavigationServer(ActionServerBase):
             OccupancyGrid, "grid_map/global", self.map_callback, 10
         )
 
-        self.planner = PlannerExecutor("astar")
-        self.planner_name = "astar"
-
         self.map = None
 
         self.stop_plan_semaphore = Semaphore(1)
@@ -76,8 +73,7 @@ class NavigationServer(ActionServerBase):
         obstacle_tol = goal_handle.request.obstacle_tol
         goal_tol = goal_handle.request.goal_tol
 
-        if (self.planner_name != goal_handle.request.planner):
-            self.planner = PlannerExecutor(goal_handle.request.planner)
+        self.planner = PlannerExecutor(goal_handle.request.planner)
         path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
         path.poses = path.poses[:: goal_handle.request.choose_every]
         return path
