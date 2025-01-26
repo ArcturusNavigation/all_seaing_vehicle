@@ -5,11 +5,17 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     this->declare_parameter<std::string>("global_frame_id", "odom");
     this->declare_parameter<double>("obstacle_seg_thresh", 1.0);
     this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
+    this->declare_parameter<double>("range_uncertainty", 1.0);
+    this->declare_parameter<double>("bearing_uncertainty", 1.0);
+    this->declare_parameter<double>("new_object_slam_threshold", 1.0);
 
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
     m_obstacle_seg_thresh = this->get_parameter("obstacle_seg_thresh").as_double();
     m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
+    m_range_std = this->get_parameter("range_uncertainty").as_double();
+    m_bearing_std = this->get_parameter("bearing_uncertainty").as_double();
+    m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
     RCLCPP_DEBUG(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf", m_obstacle_seg_thresh, m_obstacle_drop_thresh);
     // Initialize navigation variables to 0
     m_nav_x = 0;
@@ -40,7 +46,6 @@ ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV
     is_dead = false;
     global_pcloud_ptr = glob;
     for(pcl::PointXYZHSV &global_pt : global_pcloud_ptr->points){
-        // RCLCPP_DEBUG(this->get_logger(), "NEW POINT IN CREATED OBJECT POINT CLOUD: %lf, %lf, %lf", global_pt.x, global_pt.y, global_pt.z);
         global_centroid.x += global_pt.x/((double)global_pcloud_ptr->points.size());
         global_centroid.y += global_pt.y/((double)global_pcloud_ptr->points.size());
         global_centroid.z += global_pt.z/((double)global_pcloud_ptr->points.size());
@@ -96,27 +101,32 @@ geometry_msgs::msg::TransformStamped ObjectTrackingMap::get_tf(const std::string
 
 template <typename T>
 T ObjectTrackingMap::convert_to_global(double nav_x, double nav_y, double nav_heading, T point) {
-    T new_point = point;//to keep color-related data
+    T new_point = point;//to keep color-related data and z coordinate
     double magnitude = std::hypot(point.x, point.y);
     double point_angle = std::atan2(point.y, point.x);
     new_point.x = nav_x + std::cos(nav_heading + point_angle) * magnitude;
     new_point.y = nav_y + std::sin(nav_heading + point_angle) * magnitude;
-    new_point.z = 0;
     return new_point;
 }
 
 //TODO: Check it actually works, individually from the other parts
 template <typename T>
 T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_heading, T point) {
-    T new_point = point;//to keep color-related data
+    T new_point = point;//to keep color-related data and z coordinate
     double diff_x = point.x - nav_x;
     double diff_y = point.y - nav_y;
     double magnitude = std::hypot(diff_x, diff_y);
     double point_angle = std::atan2(diff_y, diff_x);
     new_point.x = std::cos(point_angle - nav_heading) * magnitude;
     new_point.y = std::sin(point_angle - nav_heading) * magnitude;
-    new_point.z = 0;
     return new_point;
+}
+
+//TODO: Check it works, especially combined with the above
+//(range, bearing, signature)
+template <typename T>
+det_rbs local_to_range_bearing_signature(T point, int label){
+    return det_rbs(std::hypot(point.x, point.y), std::atan2(point.y, point.x), label);
 }
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
@@ -131,11 +141,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             pcl::PointXYZHSV global_pt = this->convert_to_global(m_nav_x, m_nav_y, m_nav_heading, pt);
             global_obj_pcloud->push_back(global_pt);
         }
-        // RCLCPP_DEBUG(this->get_logger(), "BEFORE OBSTACLE CREATION");
         std::shared_ptr<ObjectCloud> obj_cloud (new ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
         detected_obstacles.push_back(obj_cloud);
     }
-    // RCLCPP_DEBUG(this->get_logger(), "BEFORE UNTRACKED MAP PUBLISHING");
     // Make and publish untracked map
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> untracked_obs;
     std::vector<int> untracked_labels;
@@ -157,60 +165,130 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         untracked_obs.push_back(untracked_ob);
     }
     this->publish_map(msg->objects[0].cloud.header, "untracked", true, untracked_obs, m_untracked_map_pub, untracked_labels);
-    // RCLCPP_DEBUG(this->get_logger(), "AFTER UNTRACKED MAP PUBLISHING");
-    /*
-    OBJECT TRACKING:
-    --Like in obstacle_detector.cpp, for each detected obstacle, find the closest (RMS point distance? or just centroids),
-    same-color, yet unmatched, detected obstacle, and assign it to it --> if above distance threshold for all mark it as new
-    --Update matched obstacles and add new ones (and assign them id)
-    --From each tracked & unmatched obstacle, check if it's in the robot's FoV --> those are the only ones that may be detected at that point
-    (subscribe to the camera_info topic and get the transform from LiDAR 3D to camera 2D plane and min/max image x,y,
-    project the local centroid (from its global centroid and get_local()-->also update it in the tracked obstacles)
-    of the obstacle onto the camera image plane and check if it's within the bounds, with some margin)
-    --For those objects, update the time they have been undetected in the FoV total (add time from prev appearance, time_seen, if it was in FoV and undetected then too)
-    --For unmatched obstacles that have been undetected in FoV for > some time threshold, remove them
-    */
-    // RCLCPP_DEBUG(this->get_logger(), "BEFORE LIDAR->CAMERA TF");
+
     // LIDAR -> Camera transform
     // if (!m_pc_cam_tf_ok)
     //     RCLCPP_DEBUG(this->get_logger(), "CAMERA FRAME ID: %s", msg->objects[0].segment.header.frame_id.c_str());
     //     RCLCPP_DEBUG(this->get_logger(), "LIDAR FRAME ID: %s", msg->objects[0].cloud.header.frame_id.c_str());
     //     m_pc_cam_tf = get_tf(msg->objects[0].segment.header.frame_id, msg->objects[0].cloud.header.frame_id);
-    // RCLCPP_DEBUG(this->get_logger(), "AFTER LIDAR->CAMERA TF");
-    // Match new obstacles with old ones, update them, and add new ones
-    std::unordered_set<int> chosen_indices;
+
+    //TODO: Maybe use some better metric except from only the centroid of the objects
+
+    //EKF SLAM ("Probabilistic Robotics", Seb. Thrun, implementation, removed robot pose from the state and the respective motion updates, changed assignment algorithm)
+    Eigen::Matrix<float, 3, 3> Q{
+        {m_range_std, 0, 0},
+        {0, m_bearing_std, 0},
+        {0, 0, 0.001}//theoretically should be 0 since we only want to match obstacles of same label, could be larger if we used average color or smth continuous
+    };
+    std::vector<std::vector<float>> p;
     for(std::shared_ptr<ObjectCloud> det_obs : detected_obstacles){
-        float best_dist = m_obstacle_seg_thresh;
-        int best_match = -1;
-        for(int tracked_id = 0; tracked_id < m_tracked_obstacles.size(); tracked_id++){
-            if (chosen_indices.count(tracked_id) || m_tracked_obstacles[tracked_id]->label != det_obs->label)
-                continue;
-            float curr_dist = pcl::euclideanDistance(m_tracked_obstacles[tracked_id]->global_centroid,
-                                                     det_obs->global_centroid);
-            if (curr_dist < best_dist) {
-                best_match = tracked_id;
-                best_dist = curr_dist;
-            }
-        }
-        if(best_match >= 0){
-            det_obs->id = m_tracked_obstacles[best_match]->id;
-            m_tracked_obstacles[best_match] = det_obs;
-            chosen_indices.insert(best_match);
-        }else{
-            det_obs->id = m_obstacle_id++;
-            m_tracked_obstacles.push_back(det_obs);
+        float range, bearing;
+        int signature;
+        std::tie(range, bearing, signature) = local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
+        m_map.tail(3) = Eigen::Vector3f(m_nav_x, m_nav_y, signature) + range*Eigen::Vector3f(std::cos(bearing + m_nav_heading), std::sin(bearing + m_nav_heading), 0);
+        for(int tracked_id = 0; tracked_id < m_num_obj; tracked_id++){
+            float d_x = m_map(3*tracked_id) - m_nav_x;
+            float d_y = m_map(3*tracked_id+1) - m_nav_y;
+            float q = d_x*d_x + d_y*d_y;
+            Eigen::Vector3f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading, m_map(3*tracked_id+2));
+            Eigen::MatrixXf F(3, 3*m_num_obj+3);
+            F(0, 3*tracked_id) = F(1, 3*tracked_id+1) = F(2, 3*tracked_id+2) = 1;
+            Eigen::Matrix<float, 3, 3> h{
+                { std::sqrt(q)*d_x, std::sqrt(q)*d_y, 0},
+                { -d_y, d_x, 0},
+                { 0, 0, 1},
+            };
+            //Do not store vectors, since they don't compute covariance with other obstacles in the same detection batch
+            std::vector<Eigen::MatrixXf> H = h*F/q;
+            std::vector<Eigen::MatrixXf> Psi = H*m_cov*H.transpose()+Q;
+            Eigen::Vector3f z_actual(range, bearing, signature);
+            p.back().push_back((z_actual-z_pred).transpose()*Psi.inverse()*(z_actual-z_pred));
         }
     }
-    RCLCPP_DEBUG(this->get_logger(), "AFTER NEW OBSTACLE MATCHING");
+
+    //Assign each detection to a tracked or new object using the computed probabilities (actually -logs?)
+    std::vector<int> match(detected_obstacles.size(), -1);
+    float min_p = 0;
+    std::unordered_set<int> chosen_detected, chosen_tracked;
+    while(min_p < m_new_obj_slam_thres){
+        min_p = m_new_obj_slam_thres;
+        std::pair<int,int> best_match = std::make_pair(-1,-1);
+        for(int i=0; i < detected_obstacles.size(); i++){
+            for(int tracked_id = 0; tracked_id < m_num_obj; tracked_id++){
+                if(chosen_indices.count(tracked_id) || m_tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label) continue;
+                if (p[i][tracked_id] < min_p) {
+                    best_match = std::make_pair(i, tracked_id);
+                    min_p = p[i][tracked_id];
+                }
+            }
+        }
+        if(min_p < m_new_obj_slam_thres){
+            match[best_match.first] = best_match.second;
+            chosen_indices.insert(best_match.second);
+        }
+    }
+
+    //Update vectors, now with known correspondence
+    for(int i=0; i < detected_obstacles.size(); i++){
+        float range, bearing;
+        int signature;
+        std::tie(range, bearing, signature) = local_to_range_bearing_signature(detected_obstacles[i]->local_centroid, detected_obstacles[i]->label);
+        if(match[i] == -1){
+            //increase object count and expand & initialize matrices
+            m_num_obj++;
+            m_map.conservativeResize(3*m_num_obj);
+            m_map.tail(3) = Eigen::Vector3f(m_nav_x, m_nav_y, signature) + range*Eigen::Vector3f(std::cos(bearing + m_nav_heading), std::sin(bearing + m_nav_heading), 0);
+            m_cov.conservativeResize(3*m_num_obj, 3*m_num_obj);
+            m_cov(3*m_num_obj, 3*m_num_obj) = m_cov(3*m_num_obj+1, 3*m_num_obj+1) = m_cov(3*m_num_obj+2, 3*m_num_obj+2) = std::numeric_limits<double>::infinity();
+            //add object to tracked obstacles vector
+            detected_obstacles[i]->id = m_obstacle_id++;
+            m_tracked_obstacles.push_back(detected_obstacles[i]);
+        }
+        int tracked_id = match[i]>0?match[i]:m_num_obj;
+        float d_x = m_map(3*tracked_id) - m_nav_x;
+        float d_y = m_map(3*tracked_id+1) - m_nav_y;
+        float q = d_x*d_x + d_y*d_y;
+        Eigen::Vector3f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading, m_map(3*tracked_id+2));
+        Eigen::MatrixXf F(3, 3*m_num_obj);
+        F(0, 3*tracked_id) = F(1, 3*tracked_id+1) = F(2, 3*tracked_id+2) = 1;
+        Eigen::Matrix<float, 3, 3> h{
+            { std::sqrt(q)*d_x, std::sqrt(q)*d_y, 0},
+            { -d_y, d_x, 0},
+            { 0, 0, 1},
+        };
+        std::vector<Eigen::MatrixXf> H = h*F/q;
+        std::vector<Eigen::MatrixXf> K = m_cov*H.transpose()*(H*m_cov*H.transpose()+Q).inverse();
+        Eigen::Vector3f z_actual(range, bearing, signature);
+        m_map += K*(z_actual-z_pred);
+        m_cov = (Eigen::MatrixXf(3*m_num_obj, 3*m_num_obj)-K*H)*m_cov;
+
+        //update data for matched obstacles (we'll update position after we update SLAM with all points)
+        det_obs->id = m_tracked_obstacles[tracked_id]->id;
+        m_tracked_obstacles[tracked_id] = det_obs;
+    }
+
+    // Update all (new and old, since they also have correlation with each other) objects global positions (including the cloud, and then the local points respectively)
+    for(int i=0; i<m_tracked_obstacles.size(); i++){
+        pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
+        upd_glob_centr.x = m_map[3*i]
+        upd_glob_centr.y = m_map[3*i+1];//to not lose the z coordinate, it's useful for checking if the objects should be in the camera frame
+        pcl::PointXYZ upd_loc_centr;
+        upd_loc_centr = this->convert_to_local(m_nav_x, m_nav_y, m_nav_heading, upd_glob_centr);
+        //move everything based on the difference between that and the previous assumed global (then local) centroid
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(new pcl::PointCloud<pcl::PointXYZHSV>);
+        for(pcl::PointXYZHSV& global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points){
+            global_pt.x+=upd_glob_centr.x-m_tracked_obstacles[i]->global_centroid.x;
+            global_pt.y+=upd_glob_centr.y-m_tracked_obstacles[i]->global_centroid.y;
+            upd_local_obj_pcloud->push_back(this->convert_to_local(m_nav_x, m_nav_y, m_nav_heading, global_pt));
+        }
+        m_tracked_obstacles[i]->local_pcloud_ptr = upd_local_obj_pcloud;
+        m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
+        m_tracked_obstacles[i]->local_centroid = upd_loc_centr;
+    }
+
     // Filter old obstacles
     for (int tracked_id = 0; tracked_id < m_tracked_obstacles.size(); tracked_id++) {
         if(chosen_indices.count(tracked_id)) continue;
-        // Update local points
-        pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(new pcl::PointCloud<pcl::PointXYZHSV>);
-        for(pcl::PointXYZHSV &global_pt : m_tracked_obstacles[tracked_id]->global_pcloud_ptr->points){ 
-            upd_local_obj_pcloud->push_back(this->convert_to_local(m_nav_x, m_nav_y, m_nav_heading, global_pt));
-        }
-        m_tracked_obstacles[tracked_id]->update_loc_pcloud(upd_local_obj_pcloud);
         // Check if in FoV (which'll mean it's dead, at least temporarily)
         geometry_msgs::msg::Point lidar_point;
         lidar_point.x = m_tracked_obstacles[tracked_id]->local_centroid.x;
@@ -232,6 +310,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 if(m_tracked_obstacles[tracked_id]->time_dead.seconds() > m_obstacle_drop_thresh){
                     RCLCPP_DEBUG(this->get_logger(), "OBSTACLE ID %d DROPPED", m_tracked_obstacles[tracked_id]->id);
                     m_tracked_obstacles.erase(m_tracked_obstacles.begin()+tracked_id);
+                    //need to be careful with deleting the object from the SLAM map mean & covariance matrices
+                    m_map = m_map({Eigen::seq(0, 3*tracked_id-1), Eigen::seq(3*tracked_id+4, Eigen::placeholders::last)});
+                    m_cov = m_cov({Eigen::seq(0, 3*tracked_id-1), Eigen::seq(3*tracked_id+4, Eigen::placeholders::last)},
+                                {Eigen::seq(0, 3*tracked_id-1), Eigen::seq(3*tracked_id+4, Eigen::placeholders::last)});
+                    m_num_obj--;
                     tracked_id--;
                     continue;
                 }
@@ -242,7 +325,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             m_tracked_obstacles[tracked_id]->is_dead = false;
         }
     }
-    RCLCPP_DEBUG(this->get_logger(), "AFTER OLD OBSTACLE FILTERING");
+
     // Publish map with tracked obstacles
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
     std::vector<int> tracked_labels;

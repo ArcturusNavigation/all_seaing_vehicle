@@ -14,6 +14,8 @@ find_package(yaml-cpp REQUIRED)
 
 find_package(PCL 1.12 REQUIRED COMPONENTS common visualization io)
 
+find_package(Eigen3 3.4 REQUIRED)
+
 ament_auto_add_executable(
     obstacle_detector
     ${PROJECT_NAME}/obstacle_detector.cpp
@@ -47,7 +49,7 @@ ament_auto_add_executable(
 
 target_link_libraries(obstacle_bbox_visualizer yaml-cpp)
 target_link_libraries(bbox_project_pcloud yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
-target_link_libraries(object_tracking_map yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+target_link_libraries(object_tracking_map yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 
 install(TARGETS
     obstacle_detector

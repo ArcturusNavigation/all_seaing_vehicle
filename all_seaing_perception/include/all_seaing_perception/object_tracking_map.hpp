@@ -6,6 +6,7 @@
 #include "yaml-cpp/yaml.h"
 
 #include <vector>
+#include <tuple>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -50,6 +51,8 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include <Eigen/Dense>
+
 //custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)
 struct ObjectCloud{
     int id;
@@ -79,6 +82,10 @@ private:
     T convert_to_global(double nav_x, double nav_y, double nav_heading, T point);
     template <typename T>
     T convert_to_local(double nav_x, double nav_y, double nav_heading, T point);
+
+    typedef std::tuple<float, float, int> det_rbs;
+    template <typename T>
+    det_rbs local_to_range_bearing_signature(T point);
 
     // Get intrinsic camera model information needed for projection
     void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
@@ -113,6 +120,12 @@ private:
 
     // Intrinsics callback camera model variables
     image_geometry::PinholeCameraModel m_cam_model;
+
+    //SLAM matrices & variables
+    float m_range_std, m_bearing_std, m_new_obj_slam_thres;
+    int m_num_obj;
+    Eigen::VectorXf m_map;//obstacle map
+    Eigen::MatrixXf m_cov;//covariance matrix
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();
