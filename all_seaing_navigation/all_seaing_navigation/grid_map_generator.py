@@ -74,7 +74,6 @@ class GridMapGenerator(Node):
         self.obstacle_map = ObstacleMap()
         self.ship_pos = (0, 0)
         self.lidar_range = default_lidar_range
-        self.active_cells = [False] * self.grid.info.width * self.grid.info.height
 
     def initialize_grid(self):
         self.grid = OccupancyGrid()
@@ -86,6 +85,7 @@ class GridMapGenerator(Node):
         self.grid.info.resolution = self.grid_resolution
 
         self.grid.data = [-1] * self.grid.info.width * self.grid.info.height
+        self.active_cells = [False] * self.grid.info.width * self.grid.info.height
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -115,10 +115,8 @@ class GridMapGenerator(Node):
             maxx, maxy = self.world_to_grid(
                 obstacle.global_bbox_max.x, obstacle.global_bbox_max.y
             )
-            for x in range(max(0, minx - 1), min(self.grid.info.width, maxx + 1) + 1):
-                for y in range(
-                    max(0, miny - 1), min(self.grid.info.height, maxy + 1) + 1
-                ):
+            for x in range(max(0, minx - 1), min(self.grid.info.width, maxx + 1)):
+                for y in range(max(0, miny - 1), min(self.grid.info.height, maxy + 1)):
                     self.active_cells[x + y * self.grid.info.width] = True
                     self.grid.data[x + y * self.grid.info.width] = 100
 
@@ -131,10 +129,8 @@ class GridMapGenerator(Node):
             maxx, maxy = self.world_to_grid(
                 obstacle.global_bbox_max.x, obstacle.global_bbox_max.y
             )
-            for x in range(max(0, minx - 1), min(self.grid.info.width, maxx + 1) + 1):
-                for y in range(
-                    max(0, miny - 1), min(self.grid.info.height, maxy + 1) + 1
-                ):
+            for x in range(max(0, minx - 1), min(self.grid.info.width, maxx + 1)):
+                for y in range(max(0, miny - 1), min(self.grid.info.height, maxy + 1)):
                     self.active_cells[x + y * self.grid.info.width] = False
 
     def modify_probability(self):

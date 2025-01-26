@@ -13,6 +13,7 @@ from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point, PoseArray
 
 from threading import Semaphore, Event
+import math
 import time
 
 
@@ -68,6 +69,8 @@ class NavigationServer(ActionServerBase):
         self.marker_pub.publish(marker_msg)
 
     def generate_path(self, goal_handle):
+        self.start_plan()  # Protect the long-running generate path function with semaphores
+
         start = Point(x=self.nav_x, y=self.nav_y)
         goal = Point(x=goal_handle.request.x, y=goal_handle.request.y)
         obstacle_tol = goal_handle.request.obstacle_tol
@@ -76,6 +79,8 @@ class NavigationServer(ActionServerBase):
         self.planner = PlannerExecutor(goal_handle.request.planner)
         path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
         path.poses = path.poses[:: goal_handle.request.choose_every]
+
+        self.stopped_plan()  # Release the semaphore
         return path
 
     def send_waypoint(self, goal_handle, pose, is_stationary):
@@ -99,6 +104,21 @@ class NavigationServer(ActionServerBase):
     def waypoint_result_callback(self, future):
         self.result = future.result().result.is_finished
 
+    def find_first_waypoint(self, path, lookahead):
+        last_in_lookahead = -1
+        closest_wpt = 0
+        min_dist = math.inf
+        for i, pose in enumerate(path.poses):
+            dx = pose.position.x - self.nav_x
+            dy = pose.position.y - self.nav_y
+            dist = math.hypot(dx, dy)
+            if dist < lookahead:
+                last_in_lookahead = i
+            if dist < min_dist:
+                closest_wpt = i
+                min_dist = dist
+        return closest_wpt if last_in_lookahead == -1 else last_in_lookahead + 1
+
     def follow_path_callback(self, goal_handle):
         self.get_logger().info("Path following started!")
 
@@ -109,10 +129,7 @@ class NavigationServer(ActionServerBase):
             return FollowPath.Result()
 
         # Generate path using requested planner
-        self.start_plan()  # Protect the long-running generate path function with semaphores
         path = self.generate_path(goal_handle)
-        self.stopped_plan()
-
         if not path.poses:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
@@ -122,8 +139,15 @@ class NavigationServer(ActionServerBase):
 
         self.visualize_path(path)
 
+        first_wpt_idx = self.find_first_waypoint(path, lookahead=goal_handle.request.xy_threshold)
         for i, pose in enumerate(path.poses):
+            # Skip if waypoints before first_wpt_idx (boat shouldn't backtrack)
+            if i < first_wpt_idx:
+                continue
+
+            # Last request should be "station keeping" if is_stationary is True
             is_stationary = (i == len(path.poses)-1 and goal_handle.request.is_stationary)
+
             self.send_waypoint(goal_handle, pose, is_stationary)
 
             # Wait until the boat finished reaching the waypoint
