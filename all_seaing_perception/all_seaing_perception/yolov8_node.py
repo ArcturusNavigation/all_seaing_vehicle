@@ -167,11 +167,16 @@ class Yolov8Node(Node):
                         color = (0,0,0)
                     elif color_name == "white":
                         color = (255,255,255)
+                    else: 
+                        color = (0, 0, 255)
 
                     if color_name in label_dict:
                         box_msg.label = label_dict[color_name]
                         annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
-                        self.get_logger().debug(f"Detected: {class_name} Msg Label is {box_msg.label}")
+                        self.get_logger().info(f"Detected: {class_name} Msg Label is {box_msg.label}")
+                    else: 
+                        annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), str(class_name), color, text_color)
+                        self.get_logger().info(f'Detected: {class_name} Item not in label_dict')
 
             # Publish detections
             self._pub.publish(labeled_bounding_box_msgs)
