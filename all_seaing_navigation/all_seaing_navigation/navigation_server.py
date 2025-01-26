@@ -104,14 +104,20 @@ class NavigationServer(ActionServerBase):
     def waypoint_result_callback(self, future):
         self.result = future.result().result.is_finished
 
-    def find_last_in_lookahead(self, path, lookahead):
+    def find_first_waypoint(self, path, lookahead):
         last_in_lookahead = -1
+        closest_wpt = 0
+        min_dist = math.inf
         for i, pose in enumerate(path.poses):
             dx = pose.position.x - self.nav_x
             dy = pose.position.y - self.nav_y
-            if math.hypot(dx, dy) < lookahead:
+            dist = math.hypot(dx, dy)
+            if dist < lookahead:
                 last_in_lookahead = i
-        return last_in_lookahead
+            if dist < min_dist:
+                closest_wpt = i
+                min_dist = dist
+        return closest_wpt if last_in_lookahead == -1 else last_in_lookahead + 1
 
     def follow_path_callback(self, goal_handle):
         self.get_logger().info("Path following started!")
@@ -133,10 +139,10 @@ class NavigationServer(ActionServerBase):
 
         self.visualize_path(path)
 
-        last_in_lookahead = self.find_last_in_lookahead(path, lookahead=goal_handle.request.xy_threshold)
+        first_wpt_idx = self.find_first_waypoint(path, lookahead=goal_handle.request.xy_threshold)
         for i, pose in enumerate(path.poses):
-            # Skip if the boat shouldn't backtrack
-            if i <= last_in_lookahead:
+            # Skip if waypoints before first_wpt_idx (boat shouldn't backtrack)
+            if i < first_wpt_idx:
                 continue
 
             # Last request should be "station keeping" if is_stationary is True
