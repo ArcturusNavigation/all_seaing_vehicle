@@ -125,7 +125,7 @@ T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_hea
 //TODO: Check it works, especially combined with the above
 //(range, bearing, signature)
 template <typename T>
-det_rbs local_to_range_bearing_signature(T point, int label){
+ObjectTrackingMap::det_rbs ObjectTrackingMap::local_to_range_bearing_signature(T point, int label){
     return det_rbs(std::hypot(point.x, point.y), std::atan2(point.y, point.x), label);
 }
 
@@ -191,7 +191,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             float d_y = m_map(3*tracked_id+1) - m_nav_y;
             float q = d_x*d_x + d_y*d_y;
             Eigen::Vector3f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading, m_map(3*tracked_id+2));
-            Eigen::MatrixXf F(3, 3*m_num_obj+3);
+            Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3*m_num_obj+3);
             F(0, 3*tracked_id) = F(1, 3*tracked_id+1) = F(2, 3*tracked_id+2) = 1;
             Eigen::Matrix<float, 3, 3> h{
                 { std::sqrt(q)*d_x, std::sqrt(q)*d_y, 0},
@@ -199,8 +199,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 { 0, 0, 1},
             };
             //Do not store vectors, since they don't compute covariance with other obstacles in the same detection batch
-            std::vector<Eigen::MatrixXf> H = h*F/q;
-            std::vector<Eigen::MatrixXf> Psi = H*m_cov*H.transpose()+Q;
+            Eigen::MatrixXf H = h*F/q;
+            Eigen::MatrixXf Psi = H*m_cov*H.transpose()+Q;
             Eigen::Vector3f z_actual(range, bearing, signature);
             p.back().push_back((z_actual-z_pred).transpose()*Psi.inverse()*(z_actual-z_pred));
         }
@@ -214,8 +214,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         min_p = m_new_obj_slam_thres;
         std::pair<int,int> best_match = std::make_pair(-1,-1);
         for(int i=0; i < detected_obstacles.size(); i++){
+            if(chosen_detected.count(i)) continue;
             for(int tracked_id = 0; tracked_id < m_num_obj; tracked_id++){
-                if(chosen_indices.count(tracked_id) || m_tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label) continue;
+                if(chosen_tracked.count(tracked_id) || m_tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label) continue;
                 if (p[i][tracked_id] < min_p) {
                     best_match = std::make_pair(i, tracked_id);
                     min_p = p[i][tracked_id];
@@ -224,7 +225,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
         if(min_p < m_new_obj_slam_thres){
             match[best_match.first] = best_match.second;
-            chosen_indices.insert(best_match.second);
+            chosen_tracked.insert(best_match.second);
+            chosen_detected.insert(best_match.first);
         }
     }
 
@@ -238,7 +240,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             m_num_obj++;
             m_map.conservativeResize(3*m_num_obj);
             m_map.tail(3) = Eigen::Vector3f(m_nav_x, m_nav_y, signature) + range*Eigen::Vector3f(std::cos(bearing + m_nav_heading), std::sin(bearing + m_nav_heading), 0);
-            m_cov.conservativeResize(3*m_num_obj, 3*m_num_obj);
+            m_cov.conservativeResizeLike(Eigen::MatrixXf::Zero(3*m_num_obj, 3*m_num_obj));
             m_cov(3*m_num_obj, 3*m_num_obj) = m_cov(3*m_num_obj+1, 3*m_num_obj+1) = m_cov(3*m_num_obj+2, 3*m_num_obj+2) = std::numeric_limits<double>::infinity();
             //add object to tracked obstacles vector
             detected_obstacles[i]->id = m_obstacle_id++;
@@ -249,28 +251,28 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         float d_y = m_map(3*tracked_id+1) - m_nav_y;
         float q = d_x*d_x + d_y*d_y;
         Eigen::Vector3f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading, m_map(3*tracked_id+2));
-        Eigen::MatrixXf F(3, 3*m_num_obj);
+        Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3*m_num_obj);
         F(0, 3*tracked_id) = F(1, 3*tracked_id+1) = F(2, 3*tracked_id+2) = 1;
         Eigen::Matrix<float, 3, 3> h{
             { std::sqrt(q)*d_x, std::sqrt(q)*d_y, 0},
             { -d_y, d_x, 0},
             { 0, 0, 1},
         };
-        std::vector<Eigen::MatrixXf> H = h*F/q;
-        std::vector<Eigen::MatrixXf> K = m_cov*H.transpose()*(H*m_cov*H.transpose()+Q).inverse();
+        Eigen::MatrixXf H = h*F/q;
+        Eigen::MatrixXf K = m_cov*H.transpose()*(H*m_cov*H.transpose()+Q).inverse();
         Eigen::Vector3f z_actual(range, bearing, signature);
         m_map += K*(z_actual-z_pred);
         m_cov = (Eigen::MatrixXf(3*m_num_obj, 3*m_num_obj)-K*H)*m_cov;
 
         //update data for matched obstacles (we'll update position after we update SLAM with all points)
-        det_obs->id = m_tracked_obstacles[tracked_id]->id;
-        m_tracked_obstacles[tracked_id] = det_obs;
+        detected_obstacles[i]->id = m_tracked_obstacles[tracked_id]->id;
+        m_tracked_obstacles[tracked_id] = detected_obstacles[i];
     }
 
     // Update all (new and old, since they also have correlation with each other) objects global positions (including the cloud, and then the local points respectively)
     for(int i=0; i<m_tracked_obstacles.size(); i++){
         pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
-        upd_glob_centr.x = m_map[3*i]
+        upd_glob_centr.x = m_map[3*i];
         upd_glob_centr.y = m_map[3*i+1];//to not lose the z coordinate, it's useful for checking if the objects should be in the camera frame
         pcl::PointXYZ upd_loc_centr;
         upd_loc_centr = this->convert_to_local(m_nav_x, m_nav_y, m_nav_heading, upd_glob_centr);
@@ -288,7 +290,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     // Filter old obstacles
     for (int tracked_id = 0; tracked_id < m_tracked_obstacles.size(); tracked_id++) {
-        if(chosen_indices.count(tracked_id)) continue;
+        if(chosen_tracked.count(tracked_id)) continue;
         // Check if in FoV (which'll mean it's dead, at least temporarily)
         geometry_msgs::msg::Point lidar_point;
         lidar_point.x = m_tracked_obstacles[tracked_id]->local_centroid.x;
@@ -311,9 +313,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                     RCLCPP_DEBUG(this->get_logger(), "OBSTACLE ID %d DROPPED", m_tracked_obstacles[tracked_id]->id);
                     m_tracked_obstacles.erase(m_tracked_obstacles.begin()+tracked_id);
                     //need to be careful with deleting the object from the SLAM map mean & covariance matrices
-                    m_map = m_map({Eigen::seq(0, 3*tracked_id-1), Eigen::seq(3*tracked_id+4, Eigen::placeholders::last)});
-                    m_cov = m_cov({Eigen::seq(0, 3*tracked_id-1), Eigen::seq(3*tracked_id+4, Eigen::placeholders::last)},
-                                {Eigen::seq(0, 3*tracked_id-1), Eigen::seq(3*tracked_id+4, Eigen::placeholders::last)});
+                    std::vector<int> new_ind(3*m_num_obj-3);
+                    std::iota(std::begin(new_ind), std::begin(new_ind)+3*tracked_id, 0);
+                    std::iota(std::begin(new_ind)+3*tracked_id+3, std::end(new_ind), 3*tracked_id+3);
+                    m_map = m_map(new_ind);
+                    m_cov = m_map(new_ind, new_ind);
                     m_num_obj--;
                     tracked_id--;
                     continue;

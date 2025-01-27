@@ -85,7 +85,7 @@ private:
 
     typedef std::tuple<float, float, int> det_rbs;
     template <typename T>
-    det_rbs local_to_range_bearing_signature(T point);
+    det_rbs local_to_range_bearing_signature(T point, int label);
 
     // Get intrinsic camera model information needed for projection
     void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
