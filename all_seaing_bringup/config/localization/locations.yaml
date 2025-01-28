@@ -10,6 +10,8 @@ boathouse:
 
 conference:
   indoors: true
+  lat: 0.0
+  lon: 0.0
 
 nbpark:
   indoors: false
@@ -23,3 +25,6 @@ sydney:
 
 z_center:
   indoors: true
+  lat: 0.0
+  lon: 0.0
+

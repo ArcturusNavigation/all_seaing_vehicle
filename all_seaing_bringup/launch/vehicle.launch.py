@@ -95,6 +95,50 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    point_cloud_filter_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/velodyne_points"),
+        ],
+        parameters=[
+            {"robot_frame_id": "velodyne"},
+            #{"range_x": [0.0, 100000.0]},
+            #{"range_y": [5.0, 100000.0]},
+            {"range_radius": [1.0, 100000.0]},
+            #{"range_intensity": [0.0, 50.0]},
+            {"leaf_size": 0.0},
+        ],
+    )
+
+    obstacle_bbox_overlay_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_bbox_overlay",
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
+        ],
+    )
+
+    obstacle_detector_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("odometry/filtered", "/zed/zed_node/odom"),
+            ("point_cloud", "point_cloud/filtered"),
+        ],
+        parameters=[
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"polygon_area_thresh": 100000.0},
+        ],
+    )
+
     rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
@@ -118,6 +162,15 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
         ]
+    )
+
+    navigation_server = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server.py",
+        parameters=[
+            {"global_frame_id": "odom"},
+        ],
+        output="screen",
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -184,8 +237,12 @@ def launch_setup(context, *args, **kwargs):
             controller_node,
             controller_server,
             rviz_waypoint_sender,
-            rover_lora_controller,
+            #rover_lora_controller,
             thrust_commander_node,
+            point_cloud_filter_node,
+            obstacle_bbox_overlay_node,
+            obstacle_detector_node,
+            navigation_server,
             lidar_ld,
             mavros_ld,
             yolov8_node,
