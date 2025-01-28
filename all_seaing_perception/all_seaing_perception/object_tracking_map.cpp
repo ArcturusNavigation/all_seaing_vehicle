@@ -16,7 +16,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     m_range_std = this->get_parameter("range_uncertainty").as_double();
     m_bearing_std = this->get_parameter("bearing_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
-    RCLCPP_DEBUG(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf", m_obstacle_seg_thresh, m_obstacle_drop_thresh);
+    RCLCPP_DEBUG(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf, SLAM RANGE UNCERTAINTY: %lf, SLAM BEARING UNCERTAINTY: %lf, SLAM NEW OBJECT THRESHOLD: %lf", m_obstacle_seg_thresh, m_obstacle_drop_thresh, m_range_std, m_bearing_std, m_new_obj_slam_thres);
     // Initialize navigation variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
@@ -185,14 +185,19 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         float range, bearing;
         int signature;
         std::tie(range, bearing, signature) = local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
-        m_map.tail(3) = Eigen::Vector3f(m_nav_x, m_nav_y, signature) + range*Eigen::Vector3f(std::cos(bearing + m_nav_heading), std::sin(bearing + m_nav_heading), 0);
+        p.push_back(std::vector<float>());
         for(int tracked_id = 0; tracked_id < m_num_obj; tracked_id++){
             float d_x = m_map(3*tracked_id) - m_nav_x;
             float d_y = m_map(3*tracked_id+1) - m_nav_y;
             float q = d_x*d_x + d_y*d_y;
             Eigen::Vector3f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading, m_map(3*tracked_id+2));
-            Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3*m_num_obj+3);
-            F(0, 3*tracked_id) = F(1, 3*tracked_id+1) = F(2, 3*tracked_id+2) = 1;
+            Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3*m_num_obj);
+            Eigen::Matrix<float, 3, 3> i_3{
+                {1, 0, 0},
+                {0, 1, 0},
+                {0, 0, 1},
+            };
+            F.block(0, 3*tracked_id, 3, 3) = i_3;
             Eigen::Matrix<float, 3, 3> h{
                 { std::sqrt(q)*d_x, std::sqrt(q)*d_y, 0},
                 { -d_y, d_x, 0},
@@ -202,6 +207,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             Eigen::MatrixXf H = h*F/q;
             Eigen::MatrixXf Psi = H*m_cov*H.transpose()+Q;
             Eigen::Vector3f z_actual(range, bearing, signature);
+            
             p.back().push_back((z_actual-z_pred).transpose()*Psi.inverse()*(z_actual-z_pred));
         }
     }
@@ -210,6 +216,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     std::vector<int> match(detected_obstacles.size(), -1);
     float min_p = 0;
     std::unordered_set<int> chosen_detected, chosen_tracked;
+    if(!p.empty()) RCLCPP_DEBUG(this->get_logger(), "P SIZE: (%d, %d), DETECTED OBSTACLES: %d, TRACKED OBSTACLES: %d", p.size(), p.back().size(), detected_obstacles.size(), m_num_obj);
     while(min_p < m_new_obj_slam_thres){
         min_p = m_new_obj_slam_thres;
         std::pair<int,int> best_match = std::make_pair(-1,-1);
@@ -224,11 +231,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             }
         }
         if(min_p < m_new_obj_slam_thres){
+            RCLCPP_DEBUG(this->get_logger(), "MATCHING (%d, %d)", best_match.first, best_match.second);
             match[best_match.first] = best_match.second;
             chosen_tracked.insert(best_match.second);
             chosen_detected.insert(best_match.first);
         }
     }
+
 
     //Update vectors, now with known correspondence
     for(int i=0; i < detected_obstacles.size(); i++){
@@ -240,19 +249,29 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             m_num_obj++;
             m_map.conservativeResize(3*m_num_obj);
             m_map.tail(3) = Eigen::Vector3f(m_nav_x, m_nav_y, signature) + range*Eigen::Vector3f(std::cos(bearing + m_nav_heading), std::sin(bearing + m_nav_heading), 0);
-            m_cov.conservativeResizeLike(Eigen::MatrixXf::Zero(3*m_num_obj, 3*m_num_obj));
-            m_cov(3*m_num_obj, 3*m_num_obj) = m_cov(3*m_num_obj+1, 3*m_num_obj+1) = m_cov(3*m_num_obj+2, 3*m_num_obj+2) = std::numeric_limits<double>::infinity();
+            m_cov.conservativeResizeLike(Eigen::MatrixXf::Zero(3*m_num_obj, 3*m_num_obj)); 
+            Eigen::Matrix<float, 3, 3> inf_diag{
+                {std::numeric_limits<float>::infinity(), 0, 0},
+                {0, std::numeric_limits<float>::infinity(), 0},
+                {0, 0, std::numeric_limits<float>::infinity()},
+            };
+            m_cov.bottomRightCorner(3,3) = inf_diag;
             //add object to tracked obstacles vector
             detected_obstacles[i]->id = m_obstacle_id++;
             m_tracked_obstacles.push_back(detected_obstacles[i]);
         }
-        int tracked_id = match[i]>0?match[i]:m_num_obj;
+        int tracked_id = match[i]>0?match[i]:m_num_obj-1;
         float d_x = m_map(3*tracked_id) - m_nav_x;
         float d_y = m_map(3*tracked_id+1) - m_nav_y;
         float q = d_x*d_x + d_y*d_y;
         Eigen::Vector3f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading, m_map(3*tracked_id+2));
         Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3*m_num_obj);
-        F(0, 3*tracked_id) = F(1, 3*tracked_id+1) = F(2, 3*tracked_id+2) = 1;
+        Eigen::Matrix<float, 3, 3> i_3{
+                {1, 0, 0},
+                {0, 1, 0},
+                {0, 0, 1},
+            };
+        F.block(0, 3*tracked_id, 3, 3) = i_3;
         Eigen::Matrix<float, 3, 3> h{
             { std::sqrt(q)*d_x, std::sqrt(q)*d_y, 0},
             { -d_y, d_x, 0},
@@ -276,6 +295,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         upd_glob_centr.y = m_map[3*i+1];//to not lose the z coordinate, it's useful for checking if the objects should be in the camera frame
         pcl::PointXYZ upd_loc_centr;
         upd_loc_centr = this->convert_to_local(m_nav_x, m_nav_y, m_nav_heading, upd_glob_centr);
+        RCLCPP_DEBUG(this->get_logger(), "ROBOT POSE: (%lf, %lf, %lf), TRACKED OBSTACLE %d GLOBAL COORDS: (%lf, %lf), LOCAL COORDS: (%lf, %lf)", m_nav_x, m_nav_y, m_nav_heading, m_tracked_obstacles[i]->id, upd_glob_centr.x, upd_glob_centr.y, upd_loc_centr.x, upd_loc_centr.y);
         //move everything based on the difference between that and the previous assumed global (then local) centroid
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(new pcl::PointCloud<pcl::PointXYZHSV>);
         for(pcl::PointXYZHSV& global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points){
