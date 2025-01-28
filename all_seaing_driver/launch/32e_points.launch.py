@@ -1,14 +1,15 @@
 import os
 
-import ament_index_python.packages
-
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
 
 def generate_launch_description():
-    pc_share_dir = ament_index_python.packages.get_package_share_directory(
+    pc_share_dir = get_package_share_directory(
         "velodyne_pointcloud"
     )
     tf_params = {}
@@ -59,4 +60,13 @@ def generate_launch_description():
         output="both",
     )
 
-    return LaunchDescription([driver_container, transform_container])
+    laserscan_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                get_package_share_directory("velodyne_laserscan"),
+                "/launch/velodyne_laserscan_node-composed-launch.py",
+            ]
+        ),
+    )
+
+    return LaunchDescription([driver_container, transform_container, laserscan_launch])
