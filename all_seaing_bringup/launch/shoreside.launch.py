@@ -33,7 +33,7 @@ def generate_launch_description():
 
     onshore_lora_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
-        executable="onshore_lora_combined.py",
+        executable="onshore_lora_controller.py",
         output="screen",
     )
 

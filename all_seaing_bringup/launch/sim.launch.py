@@ -42,7 +42,6 @@ def launch_setup(context, *args, **kwargs):
     xy_threshold = LaunchConfiguration("xy_threshold")
     theta_threshold = LaunchConfiguration("theta_threshold")
 
-
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="ekf_node",

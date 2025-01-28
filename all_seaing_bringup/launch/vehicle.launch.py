@@ -27,14 +27,15 @@ def launch_setup(context, *args, **kwargs):
 
     location = context.perform_substitution(LaunchConfiguration("location"))
 
+    with open(locations_file, "r") as f:
+        locations = yaml.safe_load(f)
+
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="ekf_node",
         parameters=[robot_localization_params],
     )
-
-    with open(locations_file, "r") as f:
-        locations = yaml.safe_load(f)
+        
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     navsat_node = launch_ros.actions.Node(
@@ -106,7 +107,7 @@ def launch_setup(context, *args, **kwargs):
 
     rover_lora_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
-        executable="rover_lora_combined.py",
+        executable="rover_lora_controller.py",
         output="screen",
     )
 
@@ -149,7 +150,7 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
-    static_transforms = IncludeLaunchDescription(
+    static_transforms_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
                 description_prefix,
@@ -158,21 +159,41 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
-    return [
-        ekf_node,
-        navsat_node,
-        control_mux,
-        controller_node,
-        controller_server,
-        rviz_waypoint_sender,
-        rover_lora_controller,
-        thrust_commander_node,
-        lidar_ld,
-        mavros_ld,
-        yolov8_node,
-        zed_ld,
-        static_transforms,
-    ]
+    amcl_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                bringup_prefix,
+                "/launch/amcl.launch.py"
+            ]
+        ),
+        launch_arguments={
+            "location": location,
+        }.items(),
+    )
+
+    launches = []
+    if locations[location]["indoors"]:
+        launches.append(amcl_ld)
+    else:
+        launches.append(ekf_node)
+        launches.append(navsat_node)
+
+    launches.extend(
+        [
+            control_mux,
+            controller_node,
+            controller_server,
+            rviz_waypoint_sender,
+            rover_lora_controller,
+            thrust_commander_node,
+            lidar_ld,
+            mavros_ld,
+            yolov8_node,
+            zed_ld,
+            static_transforms_ld,
+        ]
+    )
+    return launches
 
 
 def generate_launch_description():

@@ -8,7 +8,6 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-
             DeclareLaunchArgument(
                 "port",
                 default_value='/dev/ttyACM0',

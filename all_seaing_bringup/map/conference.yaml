@@ -1,4 +1,4 @@
-image: sea_grant.pgm
+image: conference.pgm
 mode: trinary
 resolution: 0.05
 origin: [-3.2, -3.6, 0]
