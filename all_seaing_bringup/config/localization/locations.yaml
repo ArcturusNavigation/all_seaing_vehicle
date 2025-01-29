@@ -28,3 +28,8 @@ z_center:
   lat: 0.0
   lon: 0.0
 
+tank:
+  indoors: true
+  lat: 0.0
+  lon: 0.0
+
