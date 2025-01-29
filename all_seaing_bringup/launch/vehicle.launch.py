@@ -101,7 +101,6 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            {"robot_frame_id": "velodyne"},
             #{"range_x": [0.0, 100000.0]},
             #{"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},

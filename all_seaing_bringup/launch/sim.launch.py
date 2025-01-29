@@ -137,7 +137,6 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
         parameters=[
-            {"robot_frame_id": "wamv/wamv/base_link"},
             {"range_x": [0.0, 100000.0]},
             {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
