@@ -27,14 +27,15 @@ def launch_setup(context, *args, **kwargs):
 
     location = context.perform_substitution(LaunchConfiguration("location"))
 
+    with open(locations_file, "r") as f:
+        locations = yaml.safe_load(f)
+
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="ekf_node",
         parameters=[robot_localization_params],
     )
-
-    with open(locations_file, "r") as f:
-        locations = yaml.safe_load(f)
+        
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     navsat_node = launch_ros.actions.Node(
@@ -94,19 +95,63 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    point_cloud_filter_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/velodyne_points"),
+        ],
+        parameters=[
+            {"robot_frame_id": "velodyne"},
+            #{"range_x": [0.0, 100000.0]},
+            #{"range_y": [5.0, 100000.0]},
+            {"range_radius": [1.0, 100000.0]},
+            #{"range_intensity": [0.0, 50.0]},
+            {"leaf_size": 0.0},
+        ],
+    )
+
+    obstacle_bbox_overlay_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_bbox_overlay",
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
+        ],
+    )
+
+    obstacle_detector_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("odometry/filtered", "/zed/zed_node/odom"),
+            ("point_cloud", "point_cloud/filtered"),
+        ],
+        parameters=[
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"polygon_area_thresh": 100000.0},
+        ],
+    )
+
     rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": 0.1},
-            {"theta_threshold": 5.0},
+            {"xy_threshold": 2.0},
+            {"theta_threshold": 180.0},
         ],
         output="screen",
     )
 
     rover_lora_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
-        executable="rover_lora_combined.py",
+        executable="rover_lora_controller.py",
         output="screen",
     )
 
@@ -117,6 +162,15 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
         ]
+    )
+
+    navigation_server = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server.py",
+        parameters=[
+            {"global_frame_id": "odom"},
+        ],
+        output="screen",
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -149,7 +203,7 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
-    static_transforms = IncludeLaunchDescription(
+    static_transforms_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
                 description_prefix,
@@ -158,9 +212,19 @@ def launch_setup(context, *args, **kwargs):
         )
     )
 
-    return [
-        ekf_node,
-        navsat_node,
+    amcl_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                bringup_prefix,
+                "/launch/amcl.launch.py"
+            ]
+        ),
+        launch_arguments={
+            "location": location,
+        }.items(),
+    )
+
+    launches = [
         control_mux,
         controller_node,
         controller_server,
@@ -171,8 +235,16 @@ def launch_setup(context, *args, **kwargs):
         mavros_ld,
         yolov8_node,
         zed_ld,
-        static_transforms,
+        static_transforms_ld,
     ]
+
+    if locations[location]["indoors"]:
+        launches.append(amcl_ld)
+    else:
+        launches.append(ekf_node)
+        launches.append(navsat_node)
+
+    return launches
 
 
 def generate_launch_description():
