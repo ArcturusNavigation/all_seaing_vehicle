@@ -184,7 +184,6 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
-            {"global_frame_id": "odom"},
             {"Kpid_x": [1.0, 0.0, 0.0]},
             {"Kpid_y": [1.0, 0.0, 0.0]},
             {"Kpid_theta": [1.0, 0.0, 0.0]},
@@ -196,9 +195,6 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
-        parameters=[
-            {"global_frame_id": "odom"},
-        ],
         output="screen",
     )
 
@@ -207,7 +203,6 @@ def launch_setup(context, *args, **kwargs):
         executable="grid_map_generator.py",
         remappings=[("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan")],
         parameters=[
-            {"global_frame_id": "odom"},
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"grid_resolution": 0.3},
@@ -241,6 +236,17 @@ def launch_setup(context, *args, **kwargs):
             {"xy_threshold": 3.0},
             {"theta_threshold": 180.0},
             {"use_waypoint_client": use_waypoint_client},
+        ],
+    )
+
+    map_to_odom = launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--frame-id",
+            "map",
+            "--child-frame-id",
+            "odom",
         ],
     )
 
@@ -278,6 +284,7 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         waypoint_finder,
         rviz_waypoint_sender,
+        map_to_odom,
         keyboard_ld,
         sim_ld,
         perception_eval_node,

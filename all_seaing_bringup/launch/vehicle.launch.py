@@ -86,7 +86,6 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
-            {"global_frame_id": "odom"},
             {"Kpid_x": [0.3, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
@@ -167,9 +166,6 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
-        parameters=[
-            {"global_frame_id": "odom"},
-        ],
         output="screen",
     )
 
@@ -209,7 +205,10 @@ def launch_setup(context, *args, **kwargs):
                 description_prefix,
                 "/launch/static_transforms.launch.py",
             ]
-        )
+        ),
+        launch_arguments={
+            "indoors": locations[location]["indoors"]
+        }.items(),
     )
 
     amcl_ld = IncludeLaunchDescription(
@@ -228,6 +227,7 @@ def launch_setup(context, *args, **kwargs):
         control_mux,
         controller_node,
         controller_server,
+        navigation_server,
         rviz_waypoint_sender,
         rover_lora_controller,
         thrust_commander_node,

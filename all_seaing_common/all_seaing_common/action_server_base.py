@@ -22,7 +22,7 @@ class ActionServerBase(ABC, Node):
         # --------------- PARAMETERS ---------------#
 
         self.global_frame_id = (
-            self.declare_parameter("global_frame_id", "odom")
+            self.declare_parameter("global_frame_id", "map")
             .get_parameter_value()
             .string_value
         )
