@@ -20,10 +20,18 @@ def launch_setup(context, *args, **kwargs):
     map_server = Node(
         package="nav2_map_server",
         executable="map_server",
-        output="screen",
         parameters=[{
             "yaml_filename": map_file,
         }],
+    )
+
+    lifecycle_manager = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        parameters=[{
+            "autostart": True,
+            "node_names": ["map_server"],
+        }]
     )
 
     amcl_node = Node(
@@ -41,6 +49,7 @@ def launch_setup(context, *args, **kwargs):
     return [
         map_server,
         amcl_node,
+        lifecycle_manager,
     ]
 
 

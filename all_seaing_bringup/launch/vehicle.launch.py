@@ -143,8 +143,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": 0.1},
-            {"theta_threshold": 5.0},
+            {"xy_threshold": 2.0},
+            {"theta_threshold": 180.0},
         ],
         output="screen",
     )
@@ -224,32 +224,26 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
-    launches = []
+    launches = [
+        control_mux,
+        controller_node,
+        controller_server,
+        rviz_waypoint_sender,
+        rover_lora_controller,
+        thrust_commander_node,
+        lidar_ld,
+        mavros_ld,
+        yolov8_node,
+        zed_ld,
+        static_transforms_ld,
+    ]
+
     if locations[location]["indoors"]:
         launches.append(amcl_ld)
     else:
         launches.append(ekf_node)
         launches.append(navsat_node)
 
-    launches.extend(
-        [
-            control_mux,
-            controller_node,
-            controller_server,
-            rviz_waypoint_sender,
-            #rover_lora_controller,
-            thrust_commander_node,
-            point_cloud_filter_node,
-            obstacle_bbox_overlay_node,
-            obstacle_detector_node,
-            navigation_server,
-            lidar_ld,
-            mavros_ld,
-            yolov8_node,
-            zed_ld,
-            static_transforms_ld,
-        ]
-    )
     return launches
 
 

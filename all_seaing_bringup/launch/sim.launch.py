@@ -6,8 +6,8 @@ from launch.actions import (
     OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 import launch_ros
 import os
 import subprocess
@@ -39,8 +39,6 @@ def launch_setup(context, *args, **kwargs):
     launch_rviz = LaunchConfiguration("launch_rviz")
     no_gui = str(context.perform_substitution(LaunchConfiguration("no_gui")))
     use_waypoint_client = LaunchConfiguration("use_waypoint_client")
-    xy_threshold = LaunchConfiguration("xy_threshold")
-    theta_threshold = LaunchConfiguration("theta_threshold")
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -240,8 +238,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": xy_threshold},
-            {"theta_threshold": theta_threshold},
+            {"xy_threshold": 3.0},
+            {"theta_threshold": 180.0},
             {"use_waypoint_client": use_waypoint_client},
         ],
     )
@@ -296,12 +294,6 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
-            ),
-            DeclareLaunchArgument(
-                "xy_threshold", default_value="3.0",
-            ),
-            DeclareLaunchArgument(
-                "theta_threshold", default_value="180.0",
             ),
             OpaqueFunction(function=launch_setup),
         ]

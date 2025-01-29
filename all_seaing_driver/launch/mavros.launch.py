@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 import launch_ros
 
@@ -24,9 +24,5 @@ def generate_launch_description():
                 package="all_seaing_driver",
                 executable="gps_converter.py",
             ),
-    #        ExecuteProcess(
-    #            cmd=['ros2', 'run', 'mavros', 'mav', 'sys', 'rate', '--all', '10'],
-    #            output='screen',
-    #        ),
         ]
     )
