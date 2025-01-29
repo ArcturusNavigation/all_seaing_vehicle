@@ -56,7 +56,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="seagrant"),
+            DeclareLaunchArgument("location", default_value="conference"),
             OpaqueFunction(function=launch_setup),
         ]
     )
