@@ -203,7 +203,8 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "indoors": locations[location]["indoors"]
+            #"indoors": str(locations[location]["indoors"])
+            "indoors": "true"
         }.items(),
     )
 
