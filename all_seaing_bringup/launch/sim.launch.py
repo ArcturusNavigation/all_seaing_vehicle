@@ -92,6 +92,7 @@ def launch_setup(context, *args, **kwargs):
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
             ),
         ],
+        parameters=[{"is_sim": True}],
     )
 
     perception_eval_node = launch_ros.actions.Node(
@@ -152,6 +153,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},

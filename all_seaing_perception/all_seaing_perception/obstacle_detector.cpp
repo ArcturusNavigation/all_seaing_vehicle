@@ -13,6 +13,7 @@ ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
 
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "odom");
+    this->declare_parameter<std::string>("robot_frame_id", "base_link");
     this->declare_parameter<int>("obstacle_size_min", 20);
     this->declare_parameter<int>("obstacle_size_max", 100000);
     this->declare_parameter<double>("clustering_distance", 0.75);
@@ -22,12 +23,17 @@ ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
 
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
+    m_robot_frame_id = this->get_parameter("robot_frame_id").as_string();
     m_obstacle_size_min = this->get_parameter("obstacle_size_min").as_int();
     m_obstacle_size_max = this->get_parameter("obstacle_size_max").as_int();
     m_clustering_distance = this->get_parameter("clustering_distance").as_double();
     m_obstacle_seg_thresh = this->get_parameter("obstacle_seg_thresh").as_double();
     m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
     m_polygon_area_thresh = this->get_parameter("polygon_area_thresh").as_double();
+
+    // Initialize tf_listener pointer
+    m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 
     // Initialize navigation variables to 0
     m_nav_x = 0;
@@ -42,9 +48,6 @@ ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
     m_cloud_sub = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "point_cloud", rclcpp::SensorDataQoS(),
         std::bind(&ObstacleDetector::pc_callback, this, std::placeholders::_1));
-    m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
-        "odometry/filtered", 10,
-        std::bind(&ObstacleDetector::odom_callback, this, std::placeholders::_1));
 }
 
 std::vector<std::shared_ptr<all_seaing_perception::Obstacle>>
@@ -172,6 +175,8 @@ void ObstacleDetector::publish_map(
 
 // Main callback loop
 void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud) {
+    // Get robot odometry
+    set_odom();
 
     // Convert ROS2 PointCloud2 to pcl PointCloud
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
@@ -184,19 +189,26 @@ void ObstacleDetector::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSha
     // Match raw obstacles and tracked obstacles
     track_obstacles(in_cloud->header.stamp, raw_obstacles);
 
+
     // Publish raw and unlabeled maps
     publish_map(in_cloud->header, "raw", false, raw_obstacles, m_raw_map_pub);
     publish_map(in_cloud->header, "unlabeled", true, m_tracked_obstacles, m_unlabeled_map_pub);
 }
 
-void ObstacleDetector::odom_callback(const nav_msgs::msg::Odometry &msg) {
-    m_nav_x = msg.pose.pose.position.x;
-    m_nav_y = msg.pose.pose.position.y;
+void ObstacleDetector::set_odom() {
+    geometry_msgs::msg::TransformStamped tf;
+    try {
+        tf = m_tf_buffer->lookupTransform(m_global_frame_id, m_robot_frame_id, tf2::TimePointZero);
+    } catch (tf2::TransformException &ex) {
+        RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+    }
+    m_nav_x = tf.transform.translation.x;
+    m_nav_y = tf.transform.translation.y;
     tf2::Quaternion q;
-    q.setW(msg.pose.pose.orientation.w);
-    q.setX(msg.pose.pose.orientation.x);
-    q.setY(msg.pose.pose.orientation.y);
-    q.setZ(msg.pose.pose.orientation.z);
+    q.setW(tf.transform.rotation.w);
+    q.setX(tf.transform.rotation.x);
+    q.setY(tf.transform.rotation.y);
+    q.setZ(tf.transform.rotation.z);
     tf2::Matrix3x3 m(q);
     double r, p, y;
     m.getRPY(r, p, y);

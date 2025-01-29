@@ -103,9 +103,6 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             #{"range_x": [0.0, 100000.0]},
             #{"range_y": [5.0, 100000.0]},
-            {"range_radius": [1.0, 100000.0]},
-            #{"range_intensity": [0.0, 50.0]},
-            {"leaf_size": 0.0},
         ],
     )
 
@@ -231,6 +228,9 @@ def launch_setup(context, *args, **kwargs):
         rover_lora_controller,
         thrust_commander_node,
         lidar_ld,
+        point_cloud_filter_node,
+        obstacle_bbox_overlay_node,
+        obstacle_detector_node,
         mavros_ld,
         yolov8_node,
         zed_ld,

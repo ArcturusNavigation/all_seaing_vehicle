@@ -75,7 +75,7 @@ private:
         for (const auto &point : in_cloud_ptr->points) {
             double radius = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
 
-            // Convert point to odom
+            // Convert point to map
             geometry_msgs::msg::Point point_msg;
             geometry_msgs::msg::Point point_tf;
             point_msg.x = point.x;

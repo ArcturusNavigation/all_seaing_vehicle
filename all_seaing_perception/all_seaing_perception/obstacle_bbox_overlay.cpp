@@ -89,12 +89,14 @@ int ObstacleBboxOverlay::get_matching_obstacle_centroid(
 
     // Project 3D point onto the image plane using the intrinsic matrix.
     // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-    cv::Point2d xy_rect = m_cam_model.project3dToPixel(
-        cv::Point3d(camera_point.y, camera_point.z, -camera_point.x));
+    cv::Point2d xy_rect = m_is_sim? 
+        m_cam_model.project3dToPixel(cv::Point3d(camera_point.y, camera_point.z, -camera_point.x)) :
+        m_cam_model.project3dToPixel(cv::Point3d(camera_point.x, camera_point.y, camera_point.z));
 
     // Match clusters if within bounds and in front of the boat
-    if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-        (xy_rect.y < m_cam_model.cameraInfo().height) && (obstacle.local_point.point.x >= 0)) {
+    if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) &&
+        (xy_rect.y >= 0) && (xy_rect.y < m_cam_model.cameraInfo().height) &&
+        (m_is_sim ? obstacle.local_point.point.x >= 0 : obstacle.local_point.point.z >= 0)) {
 
         // Iterate through bounding boxes
         double best_dist = 1e9;
@@ -182,6 +184,10 @@ void ObstacleBboxOverlay::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info
 }
 
 ObstacleBboxOverlay::ObstacleBboxOverlay() : Node("obstacle_bbox_overlay") {
+    // Initialize parameters
+    this->declare_parameter<bool>("is_sim", false);
+    m_is_sim = this->get_parameter("is_sim").as_bool();
+
     // Initialize tf_listener pointer
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
