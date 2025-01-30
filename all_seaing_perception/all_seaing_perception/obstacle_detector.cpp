@@ -12,7 +12,7 @@
 ObstacleDetector::ObstacleDetector() : Node("obstacle_detector") {
 
     // Initialize parameters
-    this->declare_parameter<std::string>("global_frame_id", "odom");
+    this->declare_parameter<std::string>("global_frame_id", "map");
     this->declare_parameter<std::string>("robot_frame_id", "base_link");
     this->declare_parameter<int>("obstacle_size_min", 20);
     this->declare_parameter<int>("obstacle_size_max", 100000);
