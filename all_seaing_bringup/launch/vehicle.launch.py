@@ -5,6 +5,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     OpaqueFunction,
 )
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 import launch_ros
@@ -26,6 +27,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     location = context.perform_substitution(LaunchConfiguration("location"))
+    use_lora = LaunchConfiguration("use_lora")
 
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
@@ -147,6 +149,7 @@ def launch_setup(context, *args, **kwargs):
     rover_lora_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="rover_lora_controller.py",
+        condition=IfCondition(use_lora),
         output="screen",
     )
 
@@ -203,8 +206,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            #"indoors": str(locations[location]["indoors"])
-            "indoors": "true"
+            "indoors": str(locations[location]["indoors"]).lower()
         }.items(),
     )
 
@@ -226,7 +228,7 @@ def launch_setup(context, *args, **kwargs):
         controller_server,
         navigation_server,
         rviz_waypoint_sender,
-        #rover_lora_controller,
+        rover_lora_controller,
         thrust_commander_node,
         lidar_ld,
         point_cloud_filter_node,
@@ -251,6 +253,9 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("location", default_value="boathouse"),
+            DeclareLaunchArgument(
+                "use_lora", default_value="false", choices=["true", "false"]
+            ),
             OpaqueFunction(function=launch_setup),
         ]
     )
