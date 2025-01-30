@@ -101,8 +101,8 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            #{"range_x": [0.0, 100000.0]},
-            #{"range_y": [5.0, 100000.0]},
+            {"range_x": [-0.5, 1.5]},
+            {"range_y": [0.0, 3.0]},
         ],
     )
 
@@ -121,12 +121,12 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="obstacle_detector",
         remappings=[
-            ("odometry/filtered", "/zed/zed_node/odom"),
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
+            {"robot_frame_id": "zed_camera_link"},
             {"obstacle_size_min": 2},
-            {"obstacle_size_max": 60},
+            {"obstacle_size_max": 1000},
             {"clustering_distance": 1.0},
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
@@ -226,7 +226,7 @@ def launch_setup(context, *args, **kwargs):
         controller_server,
         navigation_server,
         rviz_waypoint_sender,
-        rover_lora_controller,
+        #rover_lora_controller,
         thrust_commander_node,
         lidar_ld,
         point_cloud_filter_node,
