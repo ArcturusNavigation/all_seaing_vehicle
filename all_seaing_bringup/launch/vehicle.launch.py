@@ -5,9 +5,9 @@ from launch.actions import (
     IncludeLaunchDescription,
     OpaqueFunction,
 )
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 import launch_ros
 import os
 import yaml
@@ -25,17 +25,27 @@ def launch_setup(context, *args, **kwargs):
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
     )
-
-    location = context.perform_substitution(LaunchConfiguration("location"))
-    use_lora = LaunchConfiguration("use_lora")
+    color_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+    )
 
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
+
+    location = context.perform_substitution(LaunchConfiguration("location"))
+    use_lora = LaunchConfiguration("use_lora")
+    use_bag = LaunchConfiguration("use_bag")
+    is_indoors = str(locations[location]["indoors"]).lower()
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="ekf_node",
         parameters=[robot_localization_params],
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'"
+            ]),
+        ),
     )
         
     lat = locations[location]["lat"]
@@ -47,6 +57,11 @@ def launch_setup(context, *args, **kwargs):
             robot_localization_params,
             {"datum": [lat, lon, 0.0]},
         ],
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'",
+            ]),
+        ),
     )
 
     controller_node = launch_ros.actions.Node(
@@ -103,8 +118,8 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            {"range_x": [-0.5, 1.5]},
-            {"range_y": [0.0, 3.0]},
+            #{"range_x": [-0.5, 1.5]},
+            #{"range_y": [0.0, 3.0]},
         ],
     )
 
@@ -126,13 +141,29 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"robot_frame_id": "zed_camera_link"},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
             {"clustering_distance": 1.0},
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
             {"polygon_area_thresh": 100000.0},
+        ],
+    )
+
+    obstacle_bbox_visualizer_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_bbox_visualizer",
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+            }
         ],
     )
 
@@ -143,13 +174,18 @@ def launch_setup(context, *args, **kwargs):
             {"xy_threshold": 2.0},
             {"theta_threshold": 180.0},
         ],
+        condition=UnlessCondition(use_bag),
         output="screen",
     )
 
     rover_lora_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="rover_lora_controller.py",
-        condition=IfCondition(use_lora),
+        condition=IfCondition(
+            PythonExpression([
+                "'", use_lora, "' == 'true' and '", use_bag, "' == 'false'",
+            ]),
+        ),
         output="screen",
     )
 
@@ -174,7 +210,8 @@ def launch_setup(context, *args, **kwargs):
                 driver_prefix,
                 "/launch/32e_points.launch.py",
             ]
-        )
+        ),
+        condition=UnlessCondition(use_bag),
     )
 
     mavros_ld = IncludeLaunchDescription(
@@ -187,6 +224,7 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "port": "/dev/ttyACM0",
         }.items(),
+        condition=UnlessCondition(use_bag),
     )
 
     zed_ld = IncludeLaunchDescription(
@@ -195,7 +233,8 @@ def launch_setup(context, *args, **kwargs):
                 driver_prefix,
                 "/launch/zed2i.launch.py",
             ]
-        )
+        ),
+        condition=UnlessCondition(use_bag),
     )
 
     static_transforms_ld = IncludeLaunchDescription(
@@ -206,8 +245,9 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "indoors": str(locations[location]["indoors"]).lower()
+            "indoors": is_indoors,
         }.items(),
+        condition=UnlessCondition(use_bag),
     )
 
     amcl_ld = IncludeLaunchDescription(
@@ -220,12 +260,15 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "location": location,
         }.items(),
+        condition=IfCondition(PythonExpression(["'", is_indoors, "' == 'true'"])),
     )
-
-    launches = [
+    
+    return [
         control_mux,
         controller_node,
         controller_server,
+        ekf_node,
+        navsat_node,
         navigation_server,
         rviz_waypoint_sender,
         rover_lora_controller,
@@ -233,20 +276,14 @@ def launch_setup(context, *args, **kwargs):
         lidar_ld,
         point_cloud_filter_node,
         obstacle_bbox_overlay_node,
+        obstacle_bbox_visualizer_node,
         obstacle_detector_node,
+        amcl_ld,
         mavros_ld,
         yolov8_node,
         zed_ld,
         static_transforms_ld,
     ]
-
-    if locations[location]["indoors"]:
-        launches.append(amcl_ld)
-    else:
-        launches.append(ekf_node)
-        launches.append(navsat_node)
-
-    return launches
 
 
 def generate_launch_description():
@@ -255,6 +292,9 @@ def generate_launch_description():
             DeclareLaunchArgument("location", default_value="boathouse"),
             DeclareLaunchArgument(
                 "use_lora", default_value="false", choices=["true", "false"]
+            ),
+            DeclareLaunchArgument(
+                "use_bag", default_value="false", choices=["true", "false"]
             ),
             OpaqueFunction(function=launch_setup),
         ]
