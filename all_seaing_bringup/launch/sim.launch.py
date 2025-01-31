@@ -92,6 +92,7 @@ def launch_setup(context, *args, **kwargs):
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
             ),
         ],
+        parameters=[{"is_sim": True}],
     )
 
     perception_eval_node = launch_ros.actions.Node(
@@ -137,7 +138,6 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
         parameters=[
-            {"robot_frame_id": "wamv/wamv/base_link"},
             {"range_x": [0.0, 100000.0]},
             {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
@@ -153,6 +153,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
@@ -184,7 +185,6 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
-            {"global_frame_id": "odom"},
             {"Kpid_x": [1.0, 0.0, 0.0]},
             {"Kpid_y": [1.0, 0.0, 0.0]},
             {"Kpid_theta": [1.0, 0.0, 0.0]},
@@ -196,9 +196,6 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
-        parameters=[
-            {"global_frame_id": "odom"},
-        ],
         output="screen",
     )
 
@@ -207,7 +204,6 @@ def launch_setup(context, *args, **kwargs):
         executable="grid_map_generator.py",
         remappings=[("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan")],
         parameters=[
-            {"global_frame_id": "odom"},
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"grid_resolution": 0.3},
@@ -244,6 +240,17 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    map_to_odom = launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--frame-id",
+            "map",
+            "--child-frame-id",
+            "odom",
+        ],
+    )
+
     keyboard_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
@@ -268,9 +275,9 @@ def launch_setup(context, *args, **kwargs):
         controller_server,
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
+        obstacle_detector_node,
         color_segmentation_node,
         point_cloud_filter_node,
-        obstacle_detector_node,
         rviz_node,
         control_mux,
         navigation_server,
@@ -278,6 +285,7 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         waypoint_finder,
         rviz_waypoint_sender,
+        map_to_odom,
         keyboard_ld,
         sim_ld,
         perception_eval_node,

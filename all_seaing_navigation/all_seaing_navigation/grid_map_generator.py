@@ -16,7 +16,7 @@ class GridMapGenerator(Node):
         # --------------- PARAMETERS ---------------#
 
         self.global_frame_id = (
-            self.declare_parameter("global_frame_id", "odom")
+            self.declare_parameter("global_frame_id", "map")
             .get_parameter_value()
             .string_value
         )
@@ -65,7 +65,7 @@ class GridMapGenerator(Node):
             10,
         )
 
-        self.grid_pub = self.create_publisher(OccupancyGrid, "grid_map/global", 10)
+        self.grid_pub = self.create_publisher(OccupancyGrid, "/dynamic_map", 10)
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
 
         # --------------- MEMBER VARIABLES ---------------#

@@ -69,6 +69,9 @@ private:
     geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
                                                 const std::string &in_src_frame);
 
+    // Check if running in sim
+    bool m_is_sim;
+
 public:
     ObstacleBboxOverlay();
     virtual ~ObstacleBboxOverlay();
