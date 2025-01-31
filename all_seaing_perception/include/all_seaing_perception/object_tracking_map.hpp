@@ -70,7 +70,10 @@ struct ObjectCloud{
 
 class ObjectTrackingMap : public rclcpp::Node{
 private:
+    //Publishes the map with the untracked (but labeled, with color) obstacles, and performs euclidean distance (in the global frame) object tracking
+    //using the centroid of the object point clouds to publish the map with the tracked and labeled obstacles
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
+
     void odom_callback(const nav_msgs::msg::Odometry &msg);
     void publish_map(std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
                      const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
