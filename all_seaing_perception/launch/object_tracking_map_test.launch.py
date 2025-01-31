@@ -16,6 +16,7 @@ def generate_launch_description():
             ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
         ],
         parameters=[
+            {"global_frame_id": "odom"},
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
         ]
