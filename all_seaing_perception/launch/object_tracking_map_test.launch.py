@@ -11,14 +11,14 @@ def generate_launch_description():
         package="all_seaing_perception",
         executable="object_tracking_map",
         output="screen",
-        arguments=['--ros-args', '--log-level', 'debug'],
+        # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
         ],
         parameters=[
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
-            {"range_uncertainty": 1.0},
+            {"range_uncertainty": 0.01},
             {"bearing_uncertainty": 1.0},
             {"new_object_slam_threshold": 1.0}
         ]
