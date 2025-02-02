@@ -87,7 +87,6 @@ class Yolov8Node(Node):
             self.model = YOLO(pt_path)
         else:
             self.get_logger().error(f"Both model paths do not exist :( TensorRT: {engine_path} and pt: {pt_path}")
-            
 
         # Setup QoS profile
         image_qos_profile = QoSProfile(
