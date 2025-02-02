@@ -16,9 +16,12 @@
     <depend>pcl_ros</depend>
     <depend>tf2</depend>
     <depend>tf2_ros</depend>
+    <depend>tf2_geometry_msgs</depend>
     <depend>tf2_sensor_msgs</depend>
 
     <depend>all_seaing_interfaces</depend>
+    <depend>all_seaing_common</depend>
+
     <depend>geometry_msgs</depend>
     <depend>nav_msgs</depend>
     <depend>sensor_msgs</depend>

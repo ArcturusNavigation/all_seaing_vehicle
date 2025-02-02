@@ -9,11 +9,13 @@
 
     <buildtool_depend>ament_cmake_auto</buildtool_depend>
 
+    <depend>all_seaing_common</depend>
+    <depend>all_seaing_interfaces</depend>
+
     <depend>pluginlib</depend>
     <depend>rviz_common</depend>
     <depend>rviz_default_plugins</depend>
     <depend>rviz_rendering</depend>
-    <depend>all_seaing_interfaces</depend>
 
     <export>
         <build_type>ament_cmake</build_type>

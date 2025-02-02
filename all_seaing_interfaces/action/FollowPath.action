@@ -1,0 +1,16 @@
+# Request
+string planner
+# Options: "astar," "rrt"
+
+float64 x
+float64 y
+float64 xy_threshold
+float64 theta_threshold
+float64 goal_tol
+int64 obstacle_tol
+int64 choose_every
+bool is_stationary
+---
+# Result
+bool is_finished
+---
