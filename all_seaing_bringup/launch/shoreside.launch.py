@@ -56,14 +56,12 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
-    return LaunchDescription(
-        [
-            rviz_node,
-            onshore_lora_controller,
-            onshore_node,
-            keyboard_ld,
-        ]
-    )
+    return [
+        rviz_node,
+        onshore_lora_controller,
+        onshore_node,
+        keyboard_ld,
+    ]
 
 def generate_launch_description():
     return LaunchDescription(

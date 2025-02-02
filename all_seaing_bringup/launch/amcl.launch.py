@@ -39,7 +39,7 @@ def launch_setup(context, *args, **kwargs):
         executable="amcl",
         output="screen",
         parameters=[{
-            "min_particles": 500,
+            "min_particles": 1000,
             "max_particles": 2000,
             "global_frame_id": "map",
             "base_frame_id": "zed_camera_link",
