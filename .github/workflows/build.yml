@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  lockfile:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -24,7 +24,7 @@ jobs:
           cp -r ../all_seaing_vehicle dev_ws/src/
           nix develop -i --accept-flake-config --keep HOME --command bash -c "build;"
       - name: Build modules and run nodes
-        run: cd ../arcturus_nix
+        run: cd ../arcturus_nix;
           nix develop -i --accept-flake-config --keep HOME --command bash -c "
           ci/run.sh all_seaing_autonomy
           ci/run.sh all_seaing_bringup
