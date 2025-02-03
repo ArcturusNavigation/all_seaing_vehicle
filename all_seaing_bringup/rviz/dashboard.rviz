@@ -368,6 +368,18 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /refined_object_segments_viz
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /obstacle_map/map_cov_viz
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -414,16 +426,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 59.75430679321289
+      Distance: 69.62364196777344
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 34.421382904052734
-        Y: 16.84052276611328
-        Z: 1.149369478225708
+        X: 44.580535888671875
+        Y: 23.84090805053711
+        Z: 14.400632858276367
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
