@@ -105,6 +105,7 @@ private:
     int m_obstacle_id;
     double m_obstacle_seg_thresh;
     double m_obstacle_drop_thresh;
+    double m_init_new_cov;
 
     float m_nav_x, m_nav_y, m_nav_heading;
 

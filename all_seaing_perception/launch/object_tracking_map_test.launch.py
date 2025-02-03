@@ -20,7 +20,8 @@ def generate_launch_description():
             {"obstacle_drop_thresh": 1.0},
             {"range_uncertainty": 0.01},
             {"bearing_uncertainty": 1.0},
-            {"new_object_slam_threshold": 3.0}
+            {"new_object_slam_threshold": 3.0},
+            {"init_new_cov": 10.0},
         ]
     )
     return LaunchDescription([

@@ -1,7 +1,5 @@
 #include "all_seaing_perception/object_tracking_map.hpp"
 
-#define FLOAT_INF (float)1e9
-
 ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "odom");
@@ -10,6 +8,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     this->declare_parameter<double>("range_uncertainty", 1.0);
     this->declare_parameter<double>("bearing_uncertainty", 1.0);
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
+    this->declare_parameter<double>("init_new_cov", 10.0);
 
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
@@ -18,6 +17,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     m_range_std = this->get_parameter("range_uncertainty").as_double();
     m_bearing_std = this->get_parameter("bearing_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
+    m_init_new_cov = this->get_parameter("init_new_cov").as_double();
     RCLCPP_INFO(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf, SLAM RANGE UNCERTAINTY: %lf, SLAM BEARING UNCERTAINTY: %lf, SLAM NEW OBJECT THRESHOLD: %lf", m_obstacle_seg_thresh, m_obstacle_drop_thresh, m_range_std, m_bearing_std, m_new_obj_slam_thres);
     // Initialize navigation variables to 0
     m_nav_x = 0;
@@ -123,6 +123,7 @@ T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_hea
     double point_angle = std::atan2(diff_y, diff_x);
     new_point.x = std::cos(point_angle - nav_heading) * magnitude;
     new_point.y = std::sin(point_angle - nav_heading) * magnitude;
+    RCLCPP_INFO(this->get_logger(), "GLOBAL: (%lf, %lf) -> LOCAL: (%lf, %lf)", point.x, point.y, new_point.x, new_point.y);
     return new_point;
 }
 
@@ -130,7 +131,10 @@ T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_hea
 //(range, bearing, signature)
 template <typename T>
 ObjectTrackingMap::det_rbs ObjectTrackingMap::local_to_range_bearing_signature(T point, int label){
-    return det_rbs(std::hypot(point.x, point.y), std::atan2(point.y, point.x), label);
+    double range = std::hypot(point.x, point.y);
+    double bearing = std::atan2(point.y, point.x);
+    RCLCPP_INFO(this->get_logger(), "LOCAL: (%lf, %lf) -> RBS: (%lf, %lf, %d)", point.x, point.y, range, bearing, label);
+    return det_rbs(range, bearing, label);
 }
 
 template <typename T_matrix>
@@ -299,13 +303,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             // RCLCPP_INFO(this->get_logger(), "COVARIANCE BEFORE RESIZE");
             // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
             m_cov.conservativeResizeLike(Eigen::MatrixXf::Zero(2*m_num_obj, 2*m_num_obj)); 
-            RCLCPP_INFO(this->get_logger(), "INF = %lf", FLOAT_INF);
+            RCLCPP_INFO(this->get_logger(), "INITIAL NEW COVARIANCE = %lf", m_init_new_cov);
             //TODO: Replace that initialization part with directly computing the covariance, to not have to deal with infinites
-            Eigen::Matrix<float, 2, 2> inf_diag{
-                {FLOAT_INF, 0},
-                {0, FLOAT_INF},
+            Eigen::Matrix<float, 2, 2> init_new_cov{
+                {m_init_new_cov, 0},
+                {0, m_init_new_cov},
             };
-            m_cov.bottomRightCorner(2,2) = inf_diag;
+            m_cov.bottomRightCorner(2,2) = init_new_cov;
             // RCLCPP_INFO(this->get_logger(), "COVARIANCE AFTER RESIZE");
             // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
             //add object to tracked obstacles vector
@@ -332,10 +336,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
         m_map += K*(z_actual-z_pred);
         m_cov = (Eigen::MatrixXf::Identity(2*m_num_obj, 2*m_num_obj)-K*H)*m_cov;
-        // RCLCPP_INFO(this->get_logger(), "MAP AFTER UPDATE");
-        // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
-        // RCLCPP_INFO(this->get_logger(), "COVARIANCE AFTER UPDATE");
-        // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
+        RCLCPP_INFO(this->get_logger(), "MAP AFTER UPDATE");
+        RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
+        RCLCPP_INFO(this->get_logger(), "COVARIANCE AFTER UPDATE");
+        RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
 
         //update data for matched obstacles (we'll update position after we update SLAM with all points)
         detected_obstacles[i]->id = m_tracked_obstacles[tracked_id]->id;
