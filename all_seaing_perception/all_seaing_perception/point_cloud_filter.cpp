@@ -25,6 +25,7 @@ public:
         this->declare_parameter<std::vector<double>>("range_intensity", {0.0, 100000.0});
         this->declare_parameter<std::vector<double>>("range_x", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("range_y", {-100000.0, 100000.0});
+        this->declare_parameter<std::vector<double>>("range_z", {-100000.0, 100000.0});
         this->declare_parameter<double>("leaf_size", 0.0);
 
         // Initialize tf_listener pointer
@@ -46,6 +47,7 @@ public:
         m_range_intensity = this->get_parameter("range_intensity").as_double_array();
         m_range_x = this->get_parameter("range_x").as_double_array();
         m_range_y = this->get_parameter("range_y").as_double_array();
+        m_range_z = this->get_parameter("range_z").as_double_array();
         m_leaf_size = this->get_parameter("leaf_size").as_double();
     }
 
@@ -85,6 +87,7 @@ private:
 
             if (m_range_x[0] <= point_tf.x && point_tf.x <= m_range_x[1] &&
                 m_range_y[0] <= point_tf.y && point_tf.y <= m_range_y[1] &&
+                m_range_z[0] <= point_tf.x && point_tf.x <= m_range_z[1] &&
                 m_range_radius[0] <= radius && radius <= m_range_radius[1] &&
                 m_range_intensity[0] <= point.intensity &&
                 point.intensity <= m_range_intensity[1] && 
@@ -136,6 +139,7 @@ private:
     std::vector<double> m_range_intensity;
     std::vector<double> m_range_x;
     std::vector<double> m_range_y;
+    std::vector<double> m_range_z;
     double m_leaf_size;
 };
 
