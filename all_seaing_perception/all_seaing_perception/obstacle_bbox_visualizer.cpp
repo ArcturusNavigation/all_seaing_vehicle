@@ -72,7 +72,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
 
     for (const auto &obstacle : in_map_msg->obstacles) {
 
-        // transform the lidar point to camera frame
+        // Transform the lidar point to camera frame
         geometry_msgs::msg::Point lidar_point;
         lidar_point.x = obstacle.local_point.point.x;
         lidar_point.y = obstacle.local_point.point.y;
@@ -80,11 +80,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
         geometry_msgs::msg::Point camera_point;
         tf2::doTransform<geometry_msgs::msg::Point>(lidar_point, camera_point, m_pc_cam_tf);
 
-        // RCLCPP_INFO(this->get_logger(), "Lidar point: (%f, %f, %f)", lidar_point.x,
-        // lidar_point.y, lidar_point.z); RCLCPP_INFO(this->get_logger(), "Camera point: (%f, %f,
-        // %f)", camera_point.x, camera_point.y, camera_point.z);
-
-        // find the centroid and display it.
+        // Find the centroid and display it.
         cv::Point3d centroid(camera_point.y, camera_point.z, -camera_point.x);
         cv::Point2d pixel_centroid = m_cam_model.project3dToPixel(centroid);
 
@@ -98,7 +94,7 @@ void ObstacleBboxVisualizer::image_obstacle_cb(
                         pixel_centroid.x, pixel_centroid.y);
         }
 
-        // display bbox -> 2d bbox. this is the 2d bbox of the lidar point.
+        // Display bbox -> 2d bbox. This is the 2d bbox of the lidar point.
         geometry_msgs::msg::Point camera_bbox_min;
         geometry_msgs::msg::Point camera_bbox_max;
         tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_min, camera_bbox_min,
