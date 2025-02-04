@@ -75,7 +75,7 @@ private:
                       pcl::PointCloud<pcl::PointXYZI>::Ptr &out_cloud_ptr) {
         // Keep point if in radius thresholds, intensity threshold, and is finite
         for (const auto &point : in_cloud_ptr->points) {
-            double radius = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+            double radius = sqrt(point.x * point.x + point.y * point.y);
 
             // Convert point to map
             geometry_msgs::msg::Point point_msg;
@@ -87,7 +87,7 @@ private:
 
             if (m_range_x[0] <= point_tf.x && point_tf.x <= m_range_x[1] &&
                 m_range_y[0] <= point_tf.y && point_tf.y <= m_range_y[1] &&
-                m_range_z[0] <= point_tf.x && point_tf.x <= m_range_z[1] &&
+                m_range_z[0] <= point_tf.z && point_tf.z <= m_range_z[1] &&
                 m_range_radius[0] <= radius && radius <= m_range_radius[1] &&
                 m_range_intensity[0] <= point.intensity &&
                 point.intensity <= m_range_intensity[1] && 

@@ -119,9 +119,6 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"range_radius": [0.5, 100000.0]},
-            {"range_x": [-100000.0, 0.0]},
-            {"range_y": [-100000.0, 0.0]},
-            {"range_z": [-0.80, 0.0]},
         ],
     )
 
@@ -143,8 +140,8 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"obstacle_size_min": 2},
-            {"obstacle_size_max": 1000},
+            {"obstacle_size_min": 20},
+            {"obstacle_size_max": 800},
             {"clustering_distance": 0.1},
         ],
     )
