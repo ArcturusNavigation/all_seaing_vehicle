@@ -118,8 +118,10 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            #{"range_x": [-0.5, 1.5]},
-            #{"range_y": [0.0, 3.0]},
+            {"range_radius": [0.5, 100000.0]},
+            {"range_x": [-100000.0, 0.0]},
+            {"range_y": [-100000.0, 0.0]},
+            {"range_z": [-0.80, 0.0]},
         ],
     )
 
@@ -143,10 +145,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
-            {"clustering_distance": 1.0},
-            {"obstacle_seg_thresh": 10.0},
-            {"obstacle_drop_thresh": 1.0},
-            {"polygon_area_thresh": 100000.0},
+            {"clustering_distance": 0.1},
         ],
     )
 

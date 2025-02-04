@@ -153,13 +153,9 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"robot_frame_id": "wamv/wamv/base_link"},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
-            {"obstacle_seg_thresh": 10.0},
-            {"obstacle_drop_thresh": 1.0},
-            {"polygon_area_thresh": 100000.0},
         ],
     )
 

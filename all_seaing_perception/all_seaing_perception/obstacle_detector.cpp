@@ -27,18 +27,12 @@ public:
         this->declare_parameter<int>("obstacle_size_min", 20);
         this->declare_parameter<int>("obstacle_size_max", 100000);
         this->declare_parameter<double>("clustering_distance", 0.75);
-        this->declare_parameter<double>("obstacle_seg_thresh", 1.0);
-        this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
-        this->declare_parameter<double>("polygon_area_thresh", 100000.0);
 
         // Initialize member variables from parameters
         m_global_frame_id = this->get_parameter("global_frame_id").as_string();
         m_obstacle_size_min = this->get_parameter("obstacle_size_min").as_int();
         m_obstacle_size_max = this->get_parameter("obstacle_size_max").as_int();
         m_clustering_distance = this->get_parameter("clustering_distance").as_double();
-        m_obstacle_seg_thresh = this->get_parameter("obstacle_seg_thresh").as_double();
-        m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
-        m_polygon_area_thresh = this->get_parameter("polygon_area_thresh").as_double();
 
         // Initialize tf_listener pointer
         m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -139,9 +133,6 @@ private:
     int m_obstacle_size_min;
     int m_obstacle_size_max;
     double m_clustering_distance;
-    double m_obstacle_seg_thresh;
-    double m_obstacle_drop_thresh;
-    double m_polygon_area_thresh;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
