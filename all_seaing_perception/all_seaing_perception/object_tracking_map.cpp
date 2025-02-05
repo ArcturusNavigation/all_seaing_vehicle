@@ -327,13 +327,28 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             { std::sqrt(q)*d_x, std::sqrt(q)*d_y},
             { -d_y, d_x},
         };
-        Eigen::MatrixXf H = h*F/q;
-        Eigen::MatrixXf K = m_cov*H.transpose()*(H*m_cov*H.transpose()+Q).inverse();
+        // RCLCPP_INFO(this->get_logger(), "h");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(h).c_str());
+        // RCLCPP_INFO(this->get_logger(), "F");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(F).c_str());
+        // Eigen::MatrixXf H = h*F/q;
+        // RCLCPP_INFO(this->get_logger(), "H");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(H).c_str());
+        // RCLCPP_INFO(this->get_logger(), "q: %lf", q);
+        // RCLCPP_INFO(this->get_logger(), "Q");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(Q).c_str());
+        // Eigen::MatrixXf K = m_cov*H.transpose()*(H*m_cov*H.transpose()+Q).inverse();
+        // RCLCPP_INFO(this->get_logger(), "K");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(K).c_str());
         Eigen::Vector2f z_actual(range, bearing);
         // RCLCPP_INFO(this->get_logger(), "MAP BEFORE UPDATE");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
         // RCLCPP_INFO(this->get_logger(), "COVARIANCE BEFORE UPDATE");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
+        // RCLCPP_INFO(this->get_logger(), "z_pred");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(z_pred).c_str());
+        // RCLCPP_INFO(this->get_logger(), "z_actual");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(z_actual).c_str());
         m_map += K*(z_actual-z_pred);
         m_cov = (Eigen::MatrixXf::Identity(2*m_num_obj, 2*m_num_obj)-K*H)*m_cov;
         RCLCPP_INFO(this->get_logger(), "MAP AFTER UPDATE");
