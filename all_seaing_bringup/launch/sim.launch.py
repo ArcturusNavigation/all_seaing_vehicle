@@ -113,7 +113,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {
                 "color_label_mappings_file": color_label_mappings,
-            }
+            },
+            {
+                "is_sim": True,
+            },
         ],
     )
 
