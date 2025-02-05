@@ -11,6 +11,9 @@ from std_msgs.msg import Header, ColorRGBA
 import math
 import os
 from ament_index_python.packages import get_package_share_directory
+from rclpy.action import ActionClient, ActionServer
+from all_seaing_interfaces.action import FollowPath
+
 
 
 class WaypointFinder(Node):
@@ -24,9 +27,18 @@ class WaypointFinder(Node):
         )
         self.buoy_pair_pub = self.create_publisher(BuoyPairArray, "buoy_pairs", 10)
         self.waypoint_pub = self.create_publisher(WaypointArray, "waypoints", 10)
+        self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
         )
+
+        self.declare_parameter("xy_threshold", 2.0)
+        self.declare_parameter("theta_threshold", 180.0)
+        self.declare_parameter("goal_tol", 0.5)
+        self.declare_parameter("obstacle_tol", 50)
+        self.declare_parameter("choose_every", 5)
+        self.declare_parameter("use_waypoint_client", False)
+        self.declare_parameter("planner", "astar")
 
         self.robot_pos = (0, 0)
 
@@ -48,6 +60,8 @@ class WaypointFinder(Node):
         ).value
         with open(color_label_mappings_file, "r") as f:
             self.color_label_mappings = yaml.safe_load(f)
+
+        self.last_sent_waypoint = None
 
     def norm_squared(self, vec, ref=(0, 0)):
         return vec[0] ** 2 + vec[1] ** 2
@@ -342,6 +356,7 @@ class WaypointFinder(Node):
                 for wpt, pair in zip(waypoints, buoy_pairs)
             ]
         )
+
         buoy_pair_arr = BuoyPairArray(
             pairs=[
                 BuoyPair(left=pair[0], right=pair[1], waypoint=waypoint)
@@ -354,6 +369,31 @@ class WaypointFinder(Node):
         self.waypoint_pub.publish(waypoint_arr)
         # publish the markers that show up in RViz
         self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers(buoy_pair_arr))
+
+        # def send_path(self, msg: PointStamped):
+
+
+        if waypoints:
+            waypoint = waypoints[0]
+            last_waypoint = self.last_sent_waypoint
+            if last_waypoint is None or (last_waypoint.x != waypoint[0] or last_waypoint.y != waypoint[1]):
+                self.follow_path_client.wait_for_server() 
+                goal_msg = FollowPath.Goal()
+                goal_msg.planner = self.get_parameter("planner").value
+                goal_msg.x = waypoint.point.x
+                goal_msg.y = waypoint.point.y
+                goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+                goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
+                goal_msg.goal_tol = self.get_parameter("goal_tol").value
+                goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
+                goal_msg.choose_every = self.get_parameter("choose_every").value
+                goal_msg.is_stationary = True
+                self.follow_path_client.wait_for_server()
+                self.send_goal_future = self.follow_path_client.send_goal_async(goal_msg)
+                self.last_sent_waypoint = waypoint
+
+
+
 
     def map_cb(self, msg):
         """
