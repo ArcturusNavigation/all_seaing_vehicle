@@ -43,6 +43,17 @@ def generate_launch_description():
         ],
     )
 
+    onshore_lora_controller = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="onshore_lore_controller.py",
+        output="screen",
+        parameters=[
+            {"y": 1.0},
+            {"x": 1.0},
+            {"angular": 1.0},
+        ],
+    )
+
     keyboard_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
@@ -52,6 +63,7 @@ def generate_launch_description():
             launch_rviz_launch_arg,
             rviz_node,
             onshore_node,
+            onshore_lora_controller,
             keyboard_ld,
         ]
     )
