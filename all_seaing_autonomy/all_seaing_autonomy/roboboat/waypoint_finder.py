@@ -328,17 +328,19 @@ class WaypointFinder(Node):
         buoy_pairs = [self.pair_to]
         waypoints = [self.midpoint_pair(self.pair_to)]
 
+        self.get_logger().debug(f"pair to: {len(buoy_pairs)}")
+
         # form a sequence of buoy pairs (and the respective waypoints) that form a path that the robot can follow
         # will terminate if we run out of either green or red buoys
         while True:
-            try:
-                buoy_pairs.append(
-                    self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
-                )
-                waypoints.append(self.midpoint_pair(buoy_pairs[-1]))
-            except Exception as e:
-                self.get_logger().debug(repr(e))
-                break
+            # try:
+            buoy_pairs.append(
+                self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
+            )
+            waypoints.append(self.midpoint_pair(buoy_pairs[-1]))
+            # except Exception as e:
+            #     self.get_logger().info(repr(e))
+            #     break
 
         # convert the sequence to a format appropriate to publishing for the path planner to use
         waypoint_arr = WaypointArray(
@@ -372,16 +374,17 @@ class WaypointFinder(Node):
 
         # def send_path(self, msg: PointStamped):
 
+        self.get_logger().info(f"waypoints: {waypoints}")
 
         if waypoints:
             waypoint = waypoints[0]
             last_waypoint = self.last_sent_waypoint
-            if last_waypoint is None or (last_waypoint.x != waypoint[0] or last_waypoint.y != waypoint[1]):
+            if last_waypoint is None or (last_waypoint[0] != waypoint[0] or last_waypoint[1] != waypoint[1]):
                 self.follow_path_client.wait_for_server() 
                 goal_msg = FollowPath.Goal()
                 goal_msg.planner = self.get_parameter("planner").value
-                goal_msg.x = waypoint.point.x
-                goal_msg.y = waypoint.point.y
+                goal_msg.x = waypoint[0]
+                goal_msg.y = waypoint[1]
                 goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
                 goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
                 goal_msg.goal_tol = self.get_parameter("goal_tol").value
