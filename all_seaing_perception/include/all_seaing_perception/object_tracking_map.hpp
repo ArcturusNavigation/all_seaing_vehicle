@@ -68,8 +68,8 @@ struct ObjectCloud{
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr global_pcloud_ptr;
     pcl::PointXYZ local_centroid;
     pcl::PointXYZ global_centroid;
-    Eigen::Vector2f mean_pred;
-    Eigen::Matrix2f cov; 
+    // Eigen::Vector2f mean_pred;
+    // Eigen::Matrix2f cov; 
 
     ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob);
 
@@ -109,7 +109,8 @@ private:
     double m_obstacle_drop_thresh;
     double m_init_new_cov;
 
-    float m_nav_x, m_nav_y, m_nav_heading;
+    float m_nav_x, m_nav_y, m_nav_heading, m_nav_omega;
+    rclcpp::Time m_last_odom_time;
 
     geometry_msgs::msg::Pose m_nav_pose;
 
@@ -132,9 +133,11 @@ private:
 
     //SLAM matrices & variables
     float m_range_std, m_bearing_std, m_new_obj_slam_thres;
+    float m_xy_noise, m_theta_noise;
     int m_num_obj;
-    // Eigen::VectorXf m_map;//obstacle map
-    // Eigen::MatrixXf m_cov;//covariance matrix
+    Eigen::VectorXf m_state;//obstacle map
+    Eigen::MatrixXf m_cov;//covariance matrix
+    bool m_first_state;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();
