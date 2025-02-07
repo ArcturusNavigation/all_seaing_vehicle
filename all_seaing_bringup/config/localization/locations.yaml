@@ -1,12 +1,35 @@
 seagrant:
+  indoors: false
   lat: 42.3599
   lon: -71.1044
+
 boathouse:
+  indoors: false
   lat: 42.3551
   lon: -71.0972
-nbpark:
+
+conference:
+  indoors: true
   lat: 0.0
   lon: 0.0
+
+nbpark:
+  indoors: false
+  lat: 0.0
+  lon: 0.0
+
 sydney:
+  indoors: false
   lat: -33.7228
-  lon: 150.6740
+  lon: 150.67365
+
+z_center:
+  indoors: true
+  lat: 0.0
+  lon: 0.0
+
+tank:
+  indoors: true
+  lat: 0.0
+  lon: 0.0
+

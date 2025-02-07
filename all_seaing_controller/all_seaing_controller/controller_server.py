@@ -49,7 +49,6 @@ class ControllerServer(ActionServerBase):
             "waypoint",
             execute_callback=self.waypoint_callback,
             cancel_callback=self.default_cancel_callback,
-            callback_group=self.group,
         )
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
 
@@ -127,6 +126,7 @@ class ControllerServer(ActionServerBase):
         theta_threshold = goal_handle.request.theta_threshold
         goal_x = goal_handle.request.x
         goal_y = goal_handle.request.y
+        is_stationary = goal_handle.request.is_stationary
         if goal_handle.request.ignore_theta:
             goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
         else:
@@ -140,6 +140,7 @@ class ControllerServer(ActionServerBase):
             not self.x_pid.is_done(self.nav_x, xy_threshold)
             or not self.y_pid.is_done(self.nav_y, xy_threshold)
             or not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))
+            or is_stationary
         ):
 
             if self.should_abort():

@@ -15,6 +15,7 @@ class PlannerBase(ABC):
         goal: Point,
         obstacle_tol,
         goal_tol,
+        should_abort,
     ):
         self.map = map
         self.world_start = start
@@ -24,6 +25,7 @@ class PlannerBase(ABC):
         self.obstacle_tol = obstacle_tol
         self.goal_tol = goal_tol
         self.logger = get_logger("path_planner")
+        self.should_abort = should_abort
 
     @abstractmethod
     def plan(self) -> PoseArray:
