@@ -3,15 +3,14 @@
 import rclpy
 from rclpy.node import Node # imports Node class from ros2 packages
 from std_msgs.msg import UInt8
-from sensor_msgs.msg import Joy
 from all_seaing_driver.driver_lib import ESTOP
 import serial
 import time
 
-from all_seaing_interfaces.msg import ControlOption
+from all_seaing_interfaces.msg import ControlOption, Heartbeat
 from geometry_msgs.msg import Twist
 
-TIMER_RATE = 1
+HEART_RATE = 1
 
 class DriverPublisher(Node):
     def __init__(self):
@@ -28,46 +27,38 @@ class DriverPublisher(Node):
         self.ser = serial.Serial(self.get_parameter("serial_port").value, 115200, timeout = 1)
         self.estop = ESTOP(self.ser)
 
-        self.estop_msg = UInt8()
-        self.estop_pub = self.create_publisher(UInt8, "estop_stat", 10)
-        self.estop_msg.e_stopped = 0
-
-        self.enter_held = False
-
         self.control_option_pub = self.create_publisher(
             ControlOption, "control_options", 10
         )
-        self.joy_control_sub = self.create_subscription(
-            Joy, "/joy", self.joystick_callback, 10
-        )
-        self.estop_stat_timer = self.create_timer(TIMER_RATE, self.send_estop_stat)
 
-        self.get_logger().info("Starting driver node, teleop enabled")
+        self.heartbeat_message = Heartbeat()
+        self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
+        self.heartbeat_message.in_teleop = True
+        self.heartbeat_message.e_stopped = False
 
-    def send_estop_stat(self):
-        self.estop_pub.publish(self.estop_msg)
+        self.heartbeat_timer = self.create_timer(HEART_RATE, self.timer_callback)
 
-    def send_controls(self, x, y, angular):
+        self.get_logger().info("Starting onshore node, teleop enabled")
+
+    def timer_callback(self):
+        # beat heart
+        self.heartbeat_message.in_teleop = bool(self.estop.mode())
+        self.heartbeat_message.e_stopped = bool(self.estop.estop())
+        self.heartbeat_publisher.publish(self.heartbeat_message)
+
+        if self.heartbeat_message.e_stopped:
+            self.get_logger().fatal("E-STOP ACTIVATED :<")
+            return
+        else:
+            self.send_controls()
+
+    def send_controls(self):
         control_option = ControlOption()
         control_option.priority = 0  # TeleOp has the highest priority value
         control_option.twist.linear.x = self.estop.drive_x()[0]
-        control_option.twist.linear.y = self.estop.drive_y()[0]
-        control_option.twist.angular.z = angular
+        control_option.twist.linear.y = 0.0
+        control_option.twist.angular.z = self.estop.drive_y()[0]
         self.control_option_pub.publish(control_option)
-
-    def joystick_callback(self, msg):
-        self.estop_msg.e_stopped = self.estop.estop()
-
-        if self.estop_msg.e_stopped == 1:
-            self.get_logger().info("E-stop activated.")
-            self.estop_pub.publish(self.estop_msg)
-            return
-        else:
-            self.send_controls(
-                msg.axes[1] * self.joy_x_scale,
-                msg.axes[0] * self.joy_y_scale,
-                msg.axes[2] * self.joy_ang_scale,
-            )
 
 
 def main(args=None):
