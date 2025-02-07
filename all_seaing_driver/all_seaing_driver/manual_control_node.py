@@ -12,7 +12,7 @@ from geometry_msgs.msg import Twist
 
 HEART_RATE = 1
 
-class DriverPublisher(Node):
+class ManualControl(Node):
     def __init__(self):
         super().__init__("driver_publisher")
 
@@ -21,9 +21,6 @@ class DriverPublisher(Node):
         self.declare_parameter("joy_ang_scale", -0.8)
         self.declare_parameter("serial_port", "COM16")
 
-        self.joy_x_scale = self.get_parameter("joy_x_scale").value
-        self.joy_y_scale = self.get_parameter("joy_y_scale").value
-        self.joy_ang_scale = self.get_parameter("joy_ang_scale").value
         self.ser = serial.Serial(self.get_parameter("serial_port").value, 115200, timeout = 1)
         self.estop = ESTOP(self.ser)
 
@@ -55,15 +52,15 @@ class DriverPublisher(Node):
     def send_controls(self):
         control_option = ControlOption()
         control_option.priority = 0  # TeleOp has the highest priority value
-        control_option.twist.linear.x = self.estop.drive_x()[0]
+        control_option.twist.linear.x = self.estop.drive_y()[0]
         control_option.twist.linear.y = 0.0
-        control_option.twist.angular.z = self.estop.drive_y()[0]
+        control_option.twist.angular.z = self.estop.drive_x()[0]
         self.control_option_pub.publish(control_option)
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = DriverPublisher()
+    node = ManualControl()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
