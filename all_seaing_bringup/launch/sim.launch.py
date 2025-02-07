@@ -191,6 +191,24 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    object_tracking_map_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+        ],
+        parameters=[
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 2.0},
+            {"range_uncertainty": 1.0},
+            {"bearing_uncertainty": 0.1},
+            {"new_object_slam_threshold": 2.0},
+            {"init_new_cov": 10.0},
+        ]
+    )
+
     rviz_node = launch_ros.actions.Node(
         package="rviz2",
         executable="rviz2",
@@ -287,6 +305,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         bbox_project_pcloud_node,
+        object_tracking_map_node,
         color_segmentation_node,
         point_cloud_filter_node,
         obstacle_detector_node,

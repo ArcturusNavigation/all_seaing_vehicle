@@ -32,7 +32,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     m_map_cov_viz_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(
         "obstacle_map/map_cov_viz", 10);
     m_object_sub = this->create_subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>(
-        "refined_object_point_clouds_segments", rclcpp::SensorDataQoS(),
+        "refined_object_point_clouds_segments", 10,
         std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
     m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "odometry/filtered", 10,
@@ -158,7 +158,7 @@ void ObjectTrackingMap::visualize_predictions(){
         Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
         Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
         // double cov_scale = sqrt(5.991);
-        double cov_scale = 1;
+        double cov_scale = m_new_obj_slam_thres;//to visualize the threshold where new obstacles are added
         tf2::Matrix3x3 rot_mat(
             axis_x(0), axis_y(0), 0,
             axis_x(1), axis_y(1), 0,
@@ -241,7 +241,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     TODO: JUST PUT THE ANGLE OF THE ROBOT IN THE PREDICTED STATE, TO SOLVE THE DRIFT ISSUE, HOPEFULLY FIX THE IMU PREDICTIONS AND THE LAG ISSUE WHEN TURNING BY ALIGNING IT WITH THE BUOYS
     --> FOR NOW JUST GO WITH THE SIMPLER OPTION
     */
-    //TODO: INCREASE BEARING STD TO MAYBE COMPENSATE FOR THE DRIFT IN PREDICTIONS WHILE TURNING THIS WAY
+    //TODO: When the robot has large angular velocity temporarily increase bearing uncertainty to model drift and lag effects
     Eigen::Matrix<float, 2, 2> Q{
         {m_range_std, 0},
         {0, m_bearing_std},
@@ -368,6 +368,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
         // RCLCPP_INFO(this->get_logger(), "COVARIANCE BEFORE UPDATE");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
+        RCLCPP_INFO(this->get_logger(), "POSITION %d BEFORE UPDATE", tracked_id);
+        RCLCPP_INFO(this->get_logger(), matrix_to_string(m_tracked_obstacles[tracked_id]->mean_pred).c_str());
+        RCLCPP_INFO(this->get_logger(), "COVARIANCE %d BEFORE UPDATE", tracked_id);
+        RCLCPP_INFO(this->get_logger(), matrix_to_string(m_tracked_obstacles[tracked_id]->cov).c_str());
         // RCLCPP_INFO(this->get_logger(), "z_pred");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(z_pred).c_str());
         // RCLCPP_INFO(this->get_logger(), "z_actual");
@@ -380,9 +384,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
         // RCLCPP_INFO(this->get_logger(), "COVARIANCE AFTER UPDATE");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
-        RCLCPP_INFO(this->get_logger(), "POSITION %d AFTER UPDATE");
+        RCLCPP_INFO(this->get_logger(), "POSITION %d AFTER UPDATE", tracked_id);
         RCLCPP_INFO(this->get_logger(), matrix_to_string(m_tracked_obstacles[tracked_id]->mean_pred).c_str());
-        RCLCPP_INFO(this->get_logger(), "COVARIANCE %d AFTER UPDATE");
+        RCLCPP_INFO(this->get_logger(), "COVARIANCE %d AFTER UPDATE", tracked_id);
         RCLCPP_INFO(this->get_logger(), matrix_to_string(m_tracked_obstacles[tracked_id]->cov).c_str());
 
         //update data for matched obstacles (we'll update position after we update SLAM with all points)
