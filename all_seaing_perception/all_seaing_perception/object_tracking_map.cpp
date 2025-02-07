@@ -147,8 +147,10 @@ std::string matrix_to_string(T_matrix matrix){
 void ObjectTrackingMap::visualize_predictions(){
     visualization_msgs::msg::MarkerArray ellipse_arr;
     for(int i=0; i<m_num_obj; i++){
-        Eigen::Vector2f obj_mean = m_map.segment(2*i, 2);//z coord is the label (will visualize the variance of that too to identify possible bugs in its update, because it should not be changed)
-        Eigen::Matrix2f obj_cov = m_cov.block(2*i, 2*i, 2, 2);
+        // Eigen::Vector2f obj_mean = m_map.segment(2*i, 2);//z coord is the label (will visualize the variance of that too to identify possible bugs in its update, because it should not be changed)
+        // Eigen::Matrix2f obj_cov = m_cov.block(2*i, 2*i, 2, 2);
+        Eigen::Vector2f obj_mean = m_tracked_obstacles[i]->mean_pred;
+        Eigen::Matrix2f obj_cov = m_tracked_obstacles[i]->cov;
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(obj_cov);
         double a_x = eigen_solver.eigenvalues()(0);
         double a_y = eigen_solver.eigenvalues()(1);
@@ -227,6 +229,19 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     //TODO: Maybe use some better metric except from only the centroid of the objects
 
     //EKF SLAM ("Probabilistic Robotics", Seb. Thrun, implementation, removed robot pose from the state and the respective motion updates, changed assignment algorithm)
+    /*
+    ******NOTES*******
+    BECAUSE THE BUOY POSITION PREDICTIONS ARE NOT CORRELATED WITH ONE ANOTHER DIRECTLY, BUT JUST VIA THE ROBOT POSE THERE ARE TWO OPTIONS
+    EITHER I DON'T INCLUDE THE ROBOT POSE, SO THEN THE CORRELATION BETWEEN BUOYS WILL BE ZERO SO I WILL JUST STORE ONE COVARIANCE MATRIX FOR EACH BUOY (2x2)
+    WHICH WILL ALSO BE COMPUTATIONALLY EFFICIENT, BUT WON'T FIX THE POSITIONS OF OTHER BUOYS WHEN THE ROBOT FIXES ITS POSE USING THE POSITION OF THE OTHER BUOYS (MOSTLY DURING TURNS AS IT DRIFTS)
+    TO DO THE LATTER I NEED TO FIND AN APPROPRIATE MOTION UPDATE SINCE I HAVE THE POSITION AND ORIENTATION USING THE ODOMETRY DATA
+    SO I NEED TO JUST SET IT TO THAT POSE AND ADD GAUSSIAN NOISE (THAT FOR THE MOTION UPDATE) AND THEN THE MEASUREMENT UPDATE WILL UPDATE THE BUOYS POSITIONS APPROPRIATELY BASED ON THE NEW POSITION AND COVARIANCE
+    AND HAVE THE ENTIRE (2N+2)x(2N+2) COVARIANCE MATRIX STORED, BUT WILL BE MORE COMPLICATED CODE-WISE AND SPEED-WISE
+    THE LATTER WILL JUST KEEP THE CORRELATION BETWEEN THE OBSERVED OBSTACLES, SUCH THAT WHEN IT PERFORMS A MINOR FIX TO ONE OF THEM THAT MIGHT HAVE BEEN DUE TO TEMPORAY DRIFT, IT FIXES THE OTHERS AS WELL
+    TODO: JUST PUT THE ANGLE OF THE ROBOT IN THE PREDICTED STATE, TO SOLVE THE DRIFT ISSUE, HOPEFULLY FIX THE IMU PREDICTIONS AND THE LAG ISSUE WHEN TURNING BY ALIGNING IT WITH THE BUOYS
+    --> FOR NOW JUST GO WITH THE SIMPLER OPTION
+    */
+    //TODO: INCREASE BEARING STD TO MAYBE COMPENSATE FOR THE DRIFT IN PREDICTIONS WHILE TURNING THIS WAY
     Eigen::Matrix<float, 2, 2> Q{
         {m_range_std, 0},
         {0, m_bearing_std},
@@ -238,19 +253,22 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::tie(range, bearing, signature) = local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
         p.push_back(std::vector<float>());
         for(int tracked_id = 0; tracked_id < m_num_obj; tracked_id++){
-            float d_x = m_map(2*tracked_id) - m_nav_x;
-            float d_y = m_map(2*tracked_id+1) - m_nav_y;
+            // float d_x = m_map(2*tracked_id) - m_nav_x;
+            // float d_y = m_map(2*tracked_id+1) - m_nav_y;
+            float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_nav_x;
+            float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_nav_y;
             float q = d_x*d_x + d_y*d_y;
             Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
-            Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 2*m_num_obj);
-            F.block(0, 2*tracked_id, 2, 2) = Eigen::MatrixXf::Identity(2,2);
+            // Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 2*m_num_obj);
+            // F.block(0, 2*tracked_id, 2, 2) = Eigen::MatrixXf::Identity(2,2);
             Eigen::Matrix<float, 2, 2> h{
                 { std::sqrt(q)*d_x, std::sqrt(q)*d_y},
                 { -d_y, d_x},
             };
             //Do not store vectors, since they don't compute covariance with other obstacles in the same detection batch
-            Eigen::MatrixXf H = h*F/q;
-            Eigen::MatrixXf Psi = H*m_cov*H.transpose()+Q;
+            // Eigen::MatrixXf H = h*F/q;
+            Eigen::MatrixXf H = h/q;
+            Eigen::MatrixXf Psi = H*m_tracked_obstacles[tracked_id]->cov*H.transpose()+Q;
             Eigen::Vector2f z_actual(range, bearing);
             
             p.back().push_back((z_actual-z_pred).transpose()*Psi.inverse()*(z_actual-z_pred));
@@ -286,7 +304,6 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
 
     //Update vectors, now with known correspondence
-    //TODO: Check for float overflows (maybe due to the infs in new obstacle covariances) and find out how to prevent them
     for(int i=0; i < detected_obstacles.size(); i++){
         float range, bearing;
         int signature;
@@ -294,35 +311,39 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         if(match[i] == -1){
             //increase object count and expand & initialize matrices
             m_num_obj++;
+            //add object to tracked obstacles vector
+            detected_obstacles[i]->id = m_obstacle_id++;
+            m_tracked_obstacles.push_back(detected_obstacles[i]);
             // RCLCPP_INFO(this->get_logger(), "MAP BEFORE RESIZE");
             // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
-            m_map.conservativeResize(2*m_num_obj);
-            m_map.tail(2) = Eigen::Vector2f(m_nav_x, m_nav_y) + range*Eigen::Vector2f(std::cos(bearing + m_nav_heading), std::sin(bearing + m_nav_heading));
+            // m_map.conservativeResize(2*m_num_obj);
+            // m_map.tail(2) = Eigen::Vector2f(m_nav_x, m_nav_y) + range*Eigen::Vector2f(std::cos(bearing + m_nav_heading), std::sin(bearing + m_nav_heading));
+            m_tracked_obstacles.back()->mean_pred = Eigen::Vector2f(m_nav_x, m_nav_y) + range*Eigen::Vector2f(std::cos(bearing + m_nav_heading), std::sin(bearing + m_nav_heading));
             // RCLCPP_INFO(this->get_logger(), "MAP AFTER RESIZE");
             // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
             // RCLCPP_INFO(this->get_logger(), "COVARIANCE BEFORE RESIZE");
             // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
-            m_cov.conservativeResizeLike(Eigen::MatrixXf::Zero(2*m_num_obj, 2*m_num_obj)); 
+            // m_cov.conservativeResizeLike(Eigen::MatrixXf::Zero(2*m_num_obj, 2*m_num_obj)); 
             RCLCPP_INFO(this->get_logger(), "INITIAL NEW COVARIANCE = %lf", m_init_new_cov);
             //TODO: Replace that initialization part with directly computing the covariance, to not have to deal with infinites
             Eigen::Matrix<float, 2, 2> init_new_cov{
                 {m_init_new_cov, 0},
                 {0, m_init_new_cov},
             };
-            m_cov.bottomRightCorner(2,2) = init_new_cov;
+            // m_cov.bottomRightCorner(2,2) = init_new_cov;
+            m_tracked_obstacles.back()->cov = init_new_cov;
             // RCLCPP_INFO(this->get_logger(), "COVARIANCE AFTER RESIZE");
             // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
-            //add object to tracked obstacles vector
-            detected_obstacles[i]->id = m_obstacle_id++;
-            m_tracked_obstacles.push_back(detected_obstacles[i]);
         }
         int tracked_id = match[i]>0?match[i]:m_num_obj-1;
-        float d_x = m_map(2*tracked_id) - m_nav_x;
-        float d_y = m_map(2*tracked_id+1) - m_nav_y;
+        // float d_x = m_map(2*tracked_id) - m_nav_x;
+        // float d_y = m_map(2*tracked_id+1) - m_nav_y;
+        float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_nav_x;
+        float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_nav_y;
         float q = d_x*d_x + d_y*d_y;
         Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
-        Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 2*m_num_obj);
-        F.block(0, 2*tracked_id, 2, 2) = Eigen::MatrixXf::Identity(2,2);
+        // Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 2*m_num_obj);
+        // F.block(0, 2*tracked_id, 2, 2) = Eigen::MatrixXf::Identity(2,2);
         Eigen::Matrix<float, 2, 2> h{
             { std::sqrt(q)*d_x, std::sqrt(q)*d_y},
             { -d_y, d_x},
@@ -332,12 +353,14 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         // RCLCPP_INFO(this->get_logger(), "F");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(F).c_str());
         // Eigen::MatrixXf H = h*F/q;
+        Eigen::MatrixXf H = h/q;
         // RCLCPP_INFO(this->get_logger(), "H");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(H).c_str());
         // RCLCPP_INFO(this->get_logger(), "q: %lf", q);
         // RCLCPP_INFO(this->get_logger(), "Q");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(Q).c_str());
         // Eigen::MatrixXf K = m_cov*H.transpose()*(H*m_cov*H.transpose()+Q).inverse();
+        Eigen::MatrixXf K = m_tracked_obstacles[tracked_id]->cov*H.transpose()*(H*m_tracked_obstacles[tracked_id]->cov*H.transpose()+Q).inverse();
         // RCLCPP_INFO(this->get_logger(), "K");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(K).c_str());
         Eigen::Vector2f z_actual(range, bearing);
@@ -349,23 +372,33 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(z_pred).c_str());
         // RCLCPP_INFO(this->get_logger(), "z_actual");
         // RCLCPP_INFO(this->get_logger(), matrix_to_string(z_actual).c_str());
-        m_map += K*(z_actual-z_pred);
-        m_cov = (Eigen::MatrixXf::Identity(2*m_num_obj, 2*m_num_obj)-K*H)*m_cov;
-        RCLCPP_INFO(this->get_logger(), "MAP AFTER UPDATE");
-        RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
-        RCLCPP_INFO(this->get_logger(), "COVARIANCE AFTER UPDATE");
-        RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
+        // m_map += K*(z_actual-z_pred);
+        // m_cov = (Eigen::MatrixXf::Identity(2*m_num_obj, 2*m_num_obj)-K*H)*m_cov;
+        m_tracked_obstacles[tracked_id]->mean_pred += K*(z_actual-z_pred);
+        m_tracked_obstacles[tracked_id]->cov = (Eigen::Matrix2f::Identity()-K*H)*m_tracked_obstacles[tracked_id]->cov;
+        // RCLCPP_INFO(this->get_logger(), "MAP AFTER UPDATE");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_map).c_str());
+        // RCLCPP_INFO(this->get_logger(), "COVARIANCE AFTER UPDATE");
+        // RCLCPP_INFO(this->get_logger(), matrix_to_string(m_cov).c_str());
+        RCLCPP_INFO(this->get_logger(), "POSITION %d AFTER UPDATE");
+        RCLCPP_INFO(this->get_logger(), matrix_to_string(m_tracked_obstacles[tracked_id]->mean_pred).c_str());
+        RCLCPP_INFO(this->get_logger(), "COVARIANCE %d AFTER UPDATE");
+        RCLCPP_INFO(this->get_logger(), matrix_to_string(m_tracked_obstacles[tracked_id]->cov).c_str());
 
         //update data for matched obstacles (we'll update position after we update SLAM with all points)
         detected_obstacles[i]->id = m_tracked_obstacles[tracked_id]->id;
+        detected_obstacles[i]->mean_pred = m_tracked_obstacles[tracked_id]->mean_pred;
+        detected_obstacles[i]->cov = m_tracked_obstacles[tracked_id]->cov;
         m_tracked_obstacles[tracked_id] = detected_obstacles[i];
     }
 
     // Update all (new and old, since they also have correlation with each other) objects global positions (including the cloud, and then the local points respectively)
     for(int i=0; i<m_tracked_obstacles.size(); i++){
         pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
-        upd_glob_centr.x = m_map[2*i];
-        upd_glob_centr.y = m_map[2*i+1];//to not lose the z coordinate, it's useful for checking if the objects should be in the camera frame
+        // upd_glob_centr.x = m_map[2*i];
+        // upd_glob_centr.y = m_map[2*i+1];//to not lose the z coordinate, it's useful for checking if the objects should be in the camera frame
+        upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
+        upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
         pcl::PointXYZ upd_loc_centr;
         upd_loc_centr = this->convert_to_local(m_nav_x, m_nav_y, m_nav_heading, upd_glob_centr);
         RCLCPP_INFO(this->get_logger(), "ROBOT POSE: (%lf, %lf, %lf), TRACKED OBSTACLE %d GLOBAL COORDS: (%lf, %lf), LOCAL COORDS: (%lf, %lf)", m_nav_x, m_nav_y, m_nav_heading, m_tracked_obstacles[i]->id, upd_glob_centr.x, upd_glob_centr.y, upd_loc_centr.x, upd_loc_centr.y);
@@ -406,11 +439,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                     RCLCPP_INFO(this->get_logger(), "OBSTACLE ID %d DROPPED", m_tracked_obstacles[tracked_id]->id);
                     m_tracked_obstacles.erase(m_tracked_obstacles.begin()+tracked_id);
                     //need to be careful with deleting the object from the SLAM map mean & covariance matrices
-                    std::vector<int> new_ind(2*m_num_obj-2);
-                    std::iota(std::begin(new_ind), std::begin(new_ind)+2*tracked_id, 0);
-                    std::iota(std::begin(new_ind)+2*tracked_id+2, std::end(new_ind), 2*tracked_id+2);
-                    m_map = m_map(new_ind);
-                    m_cov = m_map(new_ind, new_ind);
+                    // std::vector<int> new_ind(2*m_num_obj-2);
+                    // std::iota(std::begin(new_ind), std::begin(new_ind)+2*tracked_id, 0);
+                    // std::iota(std::begin(new_ind)+2*tracked_id+2, std::end(new_ind), 2*tracked_id+2);
+                    // m_map = m_map(new_ind);
+                    // m_cov = m_map(new_ind, new_ind);
                     m_num_obj--;
                     tracked_id--;
                     continue;
