@@ -215,7 +215,7 @@ class ESTOP:
             float: Joystick X-direction between -1 and 1
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x03])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def drive_y(self):
         """
@@ -225,7 +225,7 @@ class ESTOP:
             float: Joystick Y-direction between -1 and 1
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x04])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def connected(self):
         """

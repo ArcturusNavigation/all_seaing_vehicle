@@ -12,9 +12,9 @@ from geometry_msgs.msg import Twist
 
 HEART_RATE = 1
 
-class ManualControl(Node):
+class ManualController(Node):
     def __init__(self):
-        super().__init__("driver_publisher")
+        super().__init__("manual_controller")
 
         self.declare_parameter("joy_x_scale", 2.0)
         self.declare_parameter("joy_y_scale", -1.0)
@@ -52,15 +52,15 @@ class ManualControl(Node):
     def send_controls(self):
         control_option = ControlOption()
         control_option.priority = 0  # TeleOp has the highest priority value
-        control_option.twist.linear.x = self.estop.drive_y()[0]
+        control_option.twist.linear.x = self.estop.drive_y()
         control_option.twist.linear.y = 0.0
-        control_option.twist.angular.z = self.estop.drive_x()[0]
+        control_option.twist.angular.z = self.estop.drive_x()
         self.control_option_pub.publish(control_option)
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ManualControl()
+    node = ManualController()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
