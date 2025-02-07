@@ -67,7 +67,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument(
-                "launch_rviz", default_value="true", choices=["true", "false"]
+                "launch_rviz", default_value="false", choices=["true", "false"]
             ),
             DeclareLaunchArgument(
                 "use_lora", default_value="false", choices=["true", "false"]
