@@ -19,7 +19,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/rover_lora_controller.py
     ${PROJECT_NAME}/onshore_lora_controller.py
     ${PROJECT_NAME}/gps_converter.py
-    ${PROJECT_NAME}/driver_publisher.py
+    ${PROJECT_NAME}/manual_controller.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
