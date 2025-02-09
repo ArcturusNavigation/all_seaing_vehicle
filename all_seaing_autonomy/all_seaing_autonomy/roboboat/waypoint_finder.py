@@ -61,7 +61,8 @@ class WaypointFinder(Node):
         with open(color_label_mappings_file, "r") as f:
             self.color_label_mappings = yaml.safe_load(f)
 
-        self.last_sent_waypoint = None
+        # self.last_sent_waypoint = None
+        self.sent_waypoints = set()
 
     def norm_squared(self, vec, ref=(0, 0)):
         return vec[0] ** 2 + vec[1] ** 2
@@ -281,7 +282,12 @@ class WaypointFinder(Node):
         front_green = self.filter_front_buoys(prev_pair, green)
 
         if not front_red or not front_green:
-            self.get_logger().info("buoys: ", prev_pair, red, green)
+            prev_coords = self.ob_coords(prev_pair[0]), self.ob_coords(prev_pair[1])
+            red_coords = self.obs_to_pos(red)
+            green_coords = self.obs_to_pos(green)
+
+            self.get_logger().info(f"buoys:  {prev_coords} \nred: {red_coords} \ngreen: {green_coords}")
+            self.get_logger().info(f"robot: {self.robot_pos}")
             self.get_logger().info("Missing at least one front buoy")
             return None
 
@@ -324,7 +330,7 @@ class WaypointFinder(Node):
         # split the buoys into red and green
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
         self.get_logger().info(
-            f"red buoys: {self.obs_to_pos(red_buoys)}, green buoys: {self.obs_to_pos(green_buoys)}"
+            f"robot pos: {self.robot_pos}, red buoys: {self.obs_to_pos(red_buoys)}, green buoys: {self.obs_to_pos(green_buoys)}"
         )
         # RED BUOYS LEFT, GREEN RIGHT
 
@@ -397,14 +403,17 @@ class WaypointFinder(Node):
         self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers(buoy_pair_arr))
 
         # def send_path(self, msg: PointStamped):
-        self.get_logger().info(f"buoy pairs: {buoy_pairs}")
+        # self.get_logger().info(f"buoy pairs: {buoy_pairs}")
 
         self.get_logger().info(f"waypoints: {waypoints}")
 
         if waypoints:
-            waypoint = waypoints[0]
-            last_waypoint = self.last_sent_waypoint
-            if last_waypoint is None or (last_waypoint[0] != waypoint[0] or last_waypoint[1] != waypoint[1]):
+            waypoint = waypoints[-1]
+            self.get_logger().info(f"cur_waypoint: {waypoint}, sent_waypoints: {self.sent_waypoints}")
+            self.get_logger().info(f"len(waypoints): {len(waypoints)}")
+            if waypoint not in self.sent_waypoints:
+            # last_waypoint = self.last_sent_waypoint
+            # if last_waypoint is None or (last_waypoint[0] != waypoint[0] or last_waypoint[1] != waypoint[1]):
                 self.follow_path_client.wait_for_server() 
                 goal_msg = FollowPath.Goal()
                 goal_msg.planner = self.get_parameter("planner").value
@@ -418,10 +427,8 @@ class WaypointFinder(Node):
                 goal_msg.is_stationary = True
                 self.follow_path_client.wait_for_server()
                 self.send_goal_future = self.follow_path_client.send_goal_async(goal_msg)
-                self.last_sent_waypoint = waypoint
-
-
-
+                # self.last_sent_waypoint = waypoint
+                self.sent_waypoints.add(waypoint)
 
     def map_cb(self, msg):
         """
