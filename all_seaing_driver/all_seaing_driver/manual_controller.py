@@ -19,7 +19,7 @@ class ManualController(Node):
         self.declare_parameter("joy_x_scale", 2.0)
         self.declare_parameter("joy_y_scale", -1.0)
         self.declare_parameter("joy_ang_scale", -0.8)
-        self.declare_parameter("serial_port", "COM16")
+        self.declare_parameter("serial_port", "ACM0")
 
         self.ser = serial.Serial(self.get_parameter("serial_port").value, 115200, timeout = 1)
         self.estop = ESTOP(self.ser)
