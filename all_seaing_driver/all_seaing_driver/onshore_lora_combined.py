@@ -16,7 +16,6 @@ serial_port = serial.Serial("/dev/ttyUSB0", 57600, timeout=1)
 time.sleep(2)  # Allow serial port to stabilize
 
 
-
 heartbeat_msg = {
     "in_teleop": True,
     "e_stopped": False,

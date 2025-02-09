@@ -87,7 +87,7 @@ class DriverPublisher(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = OnshoreNode()
+    node = DriverPublisher()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
