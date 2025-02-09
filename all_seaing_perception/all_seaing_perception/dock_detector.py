@@ -5,6 +5,7 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Odometry, PointCloud2
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+import sensor_msgs_py.point_cloud2 as pc2
 
 class DockDetector(Node):
 
@@ -31,19 +32,19 @@ class DockDetector(Node):
         self.timer = self.create_timer(1, self.detect_dock)
 
         with open(dock_point_cloud_file, 'r') as f:
-            # self.known_dock_pc =
-           pass 
-           # store the known point cloud of the dock from f
+            self.known_dock_pc = np.loadtxt(f) # TODO fix for actual loader
+            # store the known point cloud of the dock from f
     def get_point_cloud_transform(self, point_cloud_1, point_cloud_2):
         # Convert 
         # use ICP here
         # return transform and confidence
+        return self.icp(point_cloud_1_np, point_cloud_2_np)
     def detect_dock(self):
-        pass
+        transform, distances, _ = self.get_point_cloud_transform(self.known_dock_pc, self.lidar_point_cloud)
         # self.lidar_point_cloud_flat = # flatten
         # self.get_point_cloud_transform(__, __)
         # publish something
-    def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
+    def icp(self, A, B, init_pose=None, max_iterations=20, tolerance=0.001):
         '''
         https://github.com/ClayFlannigan/icp/
         
@@ -141,9 +142,7 @@ class DockDetector(Node):
         """
         self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
     def point_cloud_cb(self, msg):
-        self.lidar_point_cloud = msg.data # TODO convert to actual numpy array
-
-
+        self.lidar_point_cloud = pc2.read_points_numpy(msg)
 
 
 def main(args=None):
