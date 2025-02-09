@@ -87,7 +87,7 @@ class BMS:
             float: battery voltage
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x02])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def current(self):
         """
@@ -97,7 +97,7 @@ class BMS:
             float: current
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x03])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def cell1(self):
         """
@@ -107,7 +107,7 @@ class BMS:
             float: cell 1 voltage
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x04])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def cell2(self):
         """
@@ -127,7 +127,7 @@ class BMS:
             float: cell 3 voltage
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x06])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def cell4(self):
         """
@@ -137,7 +137,7 @@ class BMS:
             float: cell 4 voltage
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x07])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def cell5(self):
         """
@@ -147,7 +147,7 @@ class BMS:
             float: cell 5 voltage
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x08])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def cell6(self):
         """
@@ -157,7 +157,7 @@ class BMS:
             float: cell 6 voltage
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x09])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def temp(self):
         """
@@ -167,7 +167,7 @@ class BMS:
             float: temperature (deg F)
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x0A])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
 class ESTOP:
     def __init__(self, ser):
@@ -245,7 +245,7 @@ class ESTOP:
             int: RSSI
         """
         self.ser.write((bytes([self.adr << 1, 2, 0x06])))
-        return struct.unpack("<h", self.ser.read(2))
+        return struct.unpack("<h", self.ser.read(2))[0]
 
     def snr(self):
         """
@@ -255,7 +255,7 @@ class ESTOP:
             int: snr
         """
         self.ser.write((bytes([self.adr << 1, 2, 0x07])))
-        return struct.unpack("<h", self.ser.read(2))
+        return struct.unpack("<h", self.ser.read(2))[0]
 
 class Buck:
     def __init__(self, ser):
@@ -338,7 +338,7 @@ class Buck:
             float: current (amps)
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x01])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def current_12v(self):
         """
@@ -348,7 +348,7 @@ class Buck:
             float: current (amps)
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x02])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def current_19v(self):
         """
@@ -358,7 +358,7 @@ class Buck:
             float: current (amps)
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x03])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def current_adj1(self):
         """
@@ -368,7 +368,7 @@ class Buck:
             float: current (amps)
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x04])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
     def current_adj2(self):
         """
@@ -378,7 +378,7 @@ class Buck:
             float: current (amps)
         """
         self.ser.write((bytes([self.adr << 1, 4, 0x05])))
-        return struct.unpack("<f", self.ser.read(4))
+        return struct.unpack("<f", self.ser.read(4))[0]
 
 class Mechanisms:
     def __init__(self, ser):
