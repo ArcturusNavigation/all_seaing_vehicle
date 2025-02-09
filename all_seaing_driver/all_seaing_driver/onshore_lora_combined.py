@@ -36,7 +36,7 @@ while running:
                 heartbeat_msg["in_teleop"] = not heartbeat_msg["in_teleop"]
 
     keys = pygame.key.get_pressed()
-    
+
     # Control message format
     control_msg = {
         "priority": 0,
@@ -44,18 +44,18 @@ while running:
         "y": 0.0,
         "angular": 0.0,
     }
-    
+
     # Adjust control message based on arrow keys
     if keys[pygame.K_a]:
         control_msg["y"] = 1.0  # Move left
     elif keys[pygame.K_d]:
         control_msg["y"] = -1.0  # Move right
-    
+
     if keys[pygame.K_w]:
         control_msg["x"] = 1.0  # Move forward
     elif keys[pygame.K_s]:
         control_msg["x"] = -1.0  # Move backward
-        
+
     if keys[pygame.K_q]:
         control_msg["angular"] = 1.0
     elif keys[pygame.K_e]:
@@ -71,7 +71,7 @@ while running:
         heartbeat_msg["in_teleop"],
         heartbeat_msg["e_stopped"],
     )
-    
+
     checksum = calculate_checksum(serialized_msg)
     serialized_msg_with_checksum = serialized_msg + struct.pack("B", checksum)
 
