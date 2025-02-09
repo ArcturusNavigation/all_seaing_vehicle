@@ -14,7 +14,8 @@ void PclImageOverlay::pc_image_fusion_cb(
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg) {
 
     // Only continue if intrinsics has been initialized
-    if (!m_cam_model.initialized()) return;
+    if (!m_cam_model.initialized())
+        return;
 
     // Get transform the first iteration
     if (!m_pc_cam_tf.has_value())
@@ -31,33 +32,36 @@ void PclImageOverlay::pc_image_fusion_cb(
 
     // Transform in_cloud_msg and convert PointCloud2 to PCL PointCloud
     sensor_msgs::msg::PointCloud2 in_cloud_tf;
-    tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, m_pc_cam_tf.value());
+    tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf,
+                                                    m_pc_cam_tf.value());
     pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
 
     for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
 
         // Ignore points which are NaN
-        if (isnan(point_tf.x) || isnan(point_tf.y) || isnan(point_tf.z)) continue;
+        if (isnan(point_tf.x) || isnan(point_tf.y) || isnan(point_tf.z))
+            continue;
 
         // Project 3D point onto the image plane using the intrinsic matrix.
         // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-        cv::Point2d xy_rect = m_is_sim ?
-            m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) :
-            m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
+        cv::Point2d xy_rect =
+            m_is_sim
+                ? m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x))
+                : m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
 
         // Plot projected point onto image if within bounds and in front of the boat
-        if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) &&
-            (xy_rect.y >= 0) && (xy_rect.y < m_cam_model.cameraInfo().height) &&
+        if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
+            (xy_rect.y < m_cam_model.cameraInfo().height) &&
             (m_is_sim ? point_tf.x >= 0 : point_tf.z >= 0)) {
             cv::circle(cv_ptr->image, cv::Point(xy_rect.x, xy_rect.y), 2, cv::Scalar(255, 0, 0), 4);
         }
-        
+
         // Debug statements
-        RCLCPP_DEBUG(this->get_logger(), "3D point in camera frame: (%.2f, %.2f, %.2f)",
-                point_tf.x, point_tf.y, point_tf.z);
-        RCLCPP_DEBUG(this->get_logger(), "2D point in pixel coordinates: (%.2f, %.2f)",
-                xy_rect.x, xy_rect.y);
+        RCLCPP_DEBUG(this->get_logger(), "3D point in camera frame: (%.2f, %.2f, %.2f)", point_tf.x,
+                     point_tf.y, point_tf.z);
+        RCLCPP_DEBUG(this->get_logger(), "2D point in pixel coordinates: (%.2f, %.2f)", xy_rect.x,
+                     xy_rect.y);
     }
     m_image_pub->publish(*cv_ptr->toImageMsg());
 }

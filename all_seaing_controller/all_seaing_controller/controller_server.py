@@ -49,7 +49,6 @@ class ControllerServer(ActionServerBase):
             "waypoint",
             execute_callback=self.waypoint_callback,
             cancel_callback=self.default_cancel_callback,
-            callback_group=self.group,
         )
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
 

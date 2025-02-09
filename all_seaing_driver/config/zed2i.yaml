@@ -1,0 +1,5 @@
+/**:
+    ros__parameters:
+        pos_tracking:
+            publish_map_tf: false
+            reset_odom_with_loop_closure: false
