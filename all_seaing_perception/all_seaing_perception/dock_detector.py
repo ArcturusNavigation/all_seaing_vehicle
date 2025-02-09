@@ -6,6 +6,7 @@ from sensor_msgs.msg import Odometry, PointCloud2
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import sensor_msgs_py.point_cloud2 as pc2
+from pyminiply import read
 
 class DockDetector(Node):
 
@@ -31,14 +32,15 @@ class DockDetector(Node):
         self.robot_pos = (0, 0)
         self.timer = self.create_timer(1, self.detect_dock)
 
-        with open(dock_point_cloud_file, 'r') as f:
-            self.known_dock_pc = np.loadtxt(f) # TODO fix for actual loader
-            # store the known point cloud of the dock from f
+        vertices, _ = read(dock_point_cloud_file, False, False, False)
+        self.known_dock_pc = vertices
+
     def get_point_cloud_transform(self, point_cloud_1, point_cloud_2):
         # Convert 
         # use ICP here
         # return transform and confidence
         return self.icp(point_cloud_1_np, point_cloud_2_np)
+
     def detect_dock(self):
         transform, distances, _ = self.get_point_cloud_transform(self.known_dock_pc, self.lidar_point_cloud)
         # self.lidar_point_cloud_flat = # flatten
