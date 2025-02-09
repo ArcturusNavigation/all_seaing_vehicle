@@ -1,8 +1,8 @@
 from all_seaing_navigation.planner_base import PlannerBase
 
-from typing import List
 from geometry_msgs.msg import Point, Pose, PoseArray
 
+from collections import defaultdict
 import math
 import heapq
 
@@ -21,7 +21,7 @@ class AStar(PlannerBase):
     def heuristic(self, gp: Point) -> float:
         return math.hypot(gp.x - self.grid_goal.x, gp.y - self.grid_goal.y)
 
-    def get_path(self, end: Point, parent: List[Point]) -> PoseArray:
+    def get_path(self, end: Point, parent: defaultdict[Point]) -> PoseArray:
         ans = PoseArray(header=self.map.header)
         curr = Pose(position=end)
         while curr.position != self.grid_start:
@@ -53,14 +53,15 @@ class AStar(PlannerBase):
         ]
 
         # Matrix of scores and parent pointers for each cell
-        gscore = [math.inf for _ in range(self.map.info.height * self.map.info.width)]
-        parent = [Point() for _ in range(self.map.info.height * self.map.info.width)]
+        gscore = defaultdict(lambda: math.inf)
+        parent = defaultdict(Point)
 
         # Check if the starting and end positions are invalid
         if (
             not self.is_in_bounds(self.grid_start)
             or not self.is_in_bounds(self.grid_goal)
             or self.is_grid_occupied(self.grid_start)
+            or self.is_grid_occupied(self.grid_goal)
         ):
             return PoseArray(header=self.map.header)
 
@@ -68,7 +69,7 @@ class AStar(PlannerBase):
         parent[self.get_grid_index(self.grid_start)] = self.grid_start
         pq = []
         heapq.heappush(pq, PQNode(self.heuristic(self.grid_start), self.grid_start))
-        while pq:
+        while pq and not self.should_abort():
             node = heapq.heappop(pq)
             curr_score = node.score
             curr_pos = node.point
