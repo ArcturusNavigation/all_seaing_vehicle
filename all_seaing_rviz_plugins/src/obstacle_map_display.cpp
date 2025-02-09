@@ -150,7 +150,7 @@ ObstacleMapDisplay::get_text(bool is_labeled, const all_seaing_interfaces::msg::
     if (is_labeled)
         marker->text = std::to_string(obstacle.label);
     else
-        marker->text = std::to_string(obstacle.id);
+        marker->text = "";
     
 
     marker->pose.position.x = obstacle.global_point.point.x;
