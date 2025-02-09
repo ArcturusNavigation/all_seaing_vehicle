@@ -118,6 +118,9 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
+            {"range_x": [0.0, 4.9]},
+            {"range_y": [-0.55, 0.75]},
+            {"range_z": [-0.83, 0.5]},
             {"range_radius": [0.5, 100000.0]},
         ],
     )
