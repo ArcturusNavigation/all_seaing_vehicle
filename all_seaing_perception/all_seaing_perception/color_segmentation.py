@@ -8,7 +8,8 @@ from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 import numpy as np
 import yaml
-
+from ament_index_python.packages import get_package_share_directory
+import os
 
 class ColorSegmentation(Node):
 
@@ -28,9 +29,13 @@ class ColorSegmentation(Node):
             self.img_callback,
             qos_profile_sensor_data,
         )
+        bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-        self.declare_parameter('color_ranges_file', '')
-        self.declare_parameter('color_label_mappings_file', '')
+        color_label_mappings = os.path.join(bringup_prefix, "config", "perception", "color_label_mappings.yaml")
+        color_ranges = os.path.join(bringup_prefix, "config", "perception", "color_ranges.yaml")
+
+        self.declare_parameter('color_ranges_file', color_ranges)
+        self.declare_parameter('color_label_mappings_file', color_label_mappings)
 
         color_ranges_file = self.get_parameter('color_ranges_file').value
         color_label_mappings_file = self.get_parameter('color_label_mappings_file').value
