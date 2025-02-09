@@ -40,6 +40,7 @@ class ManualController(Node):
     def timer_callback(self):
         # beat heart
         self.heartbeat_message.in_teleop = bool(self.estop.mode())
+        self.get_logger().info(f"----In state: {self.estop.mode}----")
         self.heartbeat_message.e_stopped = bool(self.estop.estop())
         self.heartbeat_publisher.publish(self.heartbeat_message)
 
@@ -47,6 +48,7 @@ class ManualController(Node):
             self.get_logger().fatal("E-STOP ACTIVATED :<")
             return
         else:
+            self.get_logger().info("E-STOP not activated :)")
             self.send_controls()
 
     def send_controls(self):
@@ -55,6 +57,8 @@ class ManualController(Node):
         control_option.twist.linear.x = self.estop.drive_y()
         control_option.twist.linear.y = 0.0
         control_option.twist.angular.z = self.estop.drive_x()
+        self.get_logger().info("Controls sent to joystick.")
+        self.get_logger().info(f"Driving forward with {self.estop.drive_y()} and rotating iwht {self.estop.drive_x()}")
         self.control_option_pub.publish(control_option)
 
 
