@@ -292,8 +292,6 @@ void BBoxProjectPCloud::bb_pcl_project(
         std::vector<pcl::PointIndices> clusters_indices;
 
         // CONDITIONAL (WITH HSV-BASED CONDITION) EUCLIDEAN CLUSTERING
-        // TODO: USE AN ALGORITHM THAT MAKES SURE THE CONTOUR IS CONTINUOUS (WITHOUT NON-SELECTED POINTS INSIDE IT, AS IT'S PROBABLY THE CASE NOW)
-        //(though seems to work pretty well as it is now)
         pcl::ConditionalEuclideanClustering<pcl::PointXYZHSV> cec;
         cec.setClusterTolerance(m_clustering_distance);
         cec.setMinClusterSize(m_obstacle_size_min);
