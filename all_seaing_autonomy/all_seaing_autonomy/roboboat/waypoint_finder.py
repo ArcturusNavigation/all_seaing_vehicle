@@ -411,9 +411,16 @@ class WaypointFinder(Node):
             waypoint = waypoints[-1]
             self.get_logger().info(f"cur_waypoint: {waypoint}, sent_waypoints: {self.sent_waypoints}")
             self.get_logger().info(f"len(waypoints): {len(waypoints)}")
-            if waypoint not in self.sent_waypoints:
-            # last_waypoint = self.last_sent_waypoint
-            # if last_waypoint is None or (last_waypoint[0] != waypoint[0] or last_waypoint[1] != waypoint[1]):
+
+            #check if waypoint is close enough (check_dist) to some previous waypoint
+            passed_waypoint = False
+            check_dist = 1 #magic number T_T
+            for sent_waypoint in self.sent_waypoints:
+                if (waypoint[0]-sent_waypoint[0])**2+(waypoint[1]-sent_waypoint[1])**2 < check_dist**2:
+                    passed_waypoint = True
+
+            if not passed_waypoint:
+            # if waypoint not in self.sent_waypoints:
                 self.follow_path_client.wait_for_server() 
                 goal_msg = FollowPath.Goal()
                 goal_msg.planner = self.get_parameter("planner").value
