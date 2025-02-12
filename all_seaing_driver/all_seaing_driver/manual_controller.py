@@ -49,7 +49,7 @@ class ManualController(Node):
             return
         else:
             self.get_logger().info("E-STOP not activated :)")
-        self.send_controls()
+            self.send_controls()
 
     def send_controls(self):
         control_option = ControlOption()
