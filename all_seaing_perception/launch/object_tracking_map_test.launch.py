@@ -24,6 +24,7 @@ def generate_launch_description():
             {"motion_theta_noise": 0.2},
             {"new_object_slam_threshold": 1.5},
             {"init_new_cov": 10.0},
+            {"track_robot": True},
         ]
     )
     return LaunchDescription([

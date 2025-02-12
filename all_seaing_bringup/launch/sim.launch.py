@@ -206,6 +206,7 @@ def launch_setup(context, *args, **kwargs):
             {"bearing_uncertainty": 0.1},
             {"new_object_slam_threshold": 2.0},
             {"init_new_cov": 10.0},
+            {"track_robot": False},
         ]
     )
 
