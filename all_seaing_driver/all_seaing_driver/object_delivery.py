@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import rclpy
-from rclpy.action import ActionServer
 from rclpy.node import Node # imports Node class from ros2 packages
+from rclpy.action import ActionServer
 from all_seaing_driver.driver_library import Buck, Mechanisms
 from all_seaing_interfaces.action import Delivery
 import serial
@@ -14,7 +14,7 @@ import time
 #TODO: Write action client for perception OR figure out who to report result back to
 #TODO: How to localize delivery boats and flag as delivered
 
-def ObjectDelivery(Node):
+class ObjectDelivery(Node):
     def __init__(self):
         super().__init__("object_delivery_node")
 
@@ -92,6 +92,7 @@ def main(args=None):
     rclpy.init(args=args)
     node = ObjectDelivery()
     rclpy.spin(node)
+    rclpy.shutdown()
 
 
 if __name__ == '__main__':
