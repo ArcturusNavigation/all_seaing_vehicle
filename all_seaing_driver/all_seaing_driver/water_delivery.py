@@ -3,7 +3,7 @@
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.node import Node # imports Node class from ros2 packages
-from all_seaing_driver.driver_library import Mechanisms, Buck
+from all_seaing_driver.driver_library import Buck
 import serial
 import time
 
@@ -21,7 +21,7 @@ def WaterDelivery(Node):
 
         self.ser = serial.Serial(self.get_parameter("serial_port").value, 115200, timeout = 1)
         self.buck = Buck(self.ser)
-        self.mechanisms = Mechanisms(self.ser)
+        # self.mechanisms = Mechanisms(self.ser)
 
         self.water_delivery_server = ActionServer(
             self,
@@ -30,11 +30,21 @@ def WaterDelivery(Node):
             self.execute_callback)
 
     def execute_callback(self, goal_handle):
-        self.get_logger().info('Executing goal...')
+        self.get_logger().info('Goal Received. Turning on water pump.')
         self.buck.adj1_en(1)
+
+        # TODO: Send feedback once pump switch state is on
+        feedback_msg = WaterDelivery.Feedback()
+        feedback_msg.switch_state = 1
+        goal_handle.publish_feedback(feedback_msg)
+
         time.sleep(10)
         self.buck.adj1_en(0)
+
+        goal_handle.succeed()
+
         result = WaterDelivery.Result()
+        result.delivered = True
         return result
 
 
