@@ -1,5 +1,0 @@
-string shape
----
-bool water_delivered
----
-int64 switch_state
