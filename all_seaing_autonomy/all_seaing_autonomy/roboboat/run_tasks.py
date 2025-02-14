@@ -19,8 +19,6 @@ from all_seaing_interfaces.action import ShootBoat
 
 ###
 
-
-
 class RunTasks(Node):
     def __init__(self):
         super().__init__('run_tasks')
