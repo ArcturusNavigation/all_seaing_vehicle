@@ -10,7 +10,7 @@ from all_seaing_navigation.planner_executor import PlannerExecutor
 from std_msgs.msg import ColorRGBA
 from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Point, PoseArray
+from geometry_msgs.msg import Point, PoseArray, Pose
 
 from threading import Semaphore, Event
 import math
@@ -124,12 +124,26 @@ class NavigationServer(ActionServerBase):
         Returns a smoothed path of points.
 
         Parameters: 
-        path: PoseArray
+        path: PoseArray (needs to be nonempty)
 
         Returns:
         Modified points in PoseArray.
         """
-        pass
+        smoothed_path = PoseArray()
+        fill_density = 10
+        for i in range(len(path.poses)-1):
+            pose_one = path.poses[i]
+            pose_two = path.poses[i+1]
+            for j in range(fill_density):
+                inbetween_pose = Pose()
+                inbetween_pose.x = pose_one.x + (pose_two.x-pose_one.x) * j/fill_density
+                inbetween_pose.y = pose_one.y + (pose_two.y-pose_one.y) * j/fill_density
+                smoothed_path.poses.append(inbetween_pose)
+        
+        # TO DO: implement rounds of smoothing
+
+
+        return smoothed_path
 
 
         
