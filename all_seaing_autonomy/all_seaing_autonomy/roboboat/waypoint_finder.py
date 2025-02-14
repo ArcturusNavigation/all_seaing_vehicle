@@ -11,6 +11,9 @@ from std_msgs.msg import Header, ColorRGBA
 import math
 import os
 from ament_index_python.packages import get_package_share_directory
+from rclpy.action import ActionClient, ActionServer
+from all_seaing_interfaces.action import FollowPath
+
 
 
 class WaypointFinder(Node):
@@ -24,9 +27,18 @@ class WaypointFinder(Node):
         )
         self.buoy_pair_pub = self.create_publisher(BuoyPairArray, "buoy_pairs", 10)
         self.waypoint_pub = self.create_publisher(WaypointArray, "waypoints", 10)
+        self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
         )
+
+        self.declare_parameter("xy_threshold", 2.0)
+        self.declare_parameter("theta_threshold", 180.0)
+        self.declare_parameter("goal_tol", 0.5)
+        self.declare_parameter("obstacle_tol", 50)
+        self.declare_parameter("choose_every", 5)
+        self.declare_parameter("use_waypoint_client", False)
+        self.declare_parameter("planner", "astar")
 
         self.robot_pos = (0, 0)
 
@@ -48,6 +60,9 @@ class WaypointFinder(Node):
         ).value
         with open(color_label_mappings_file, "r") as f:
             self.color_label_mappings = yaml.safe_load(f)
+
+        # self.last_sent_waypoint = None
+        self.sent_waypoints = set()
 
     def norm_squared(self, vec, ref=(0, 0)):
         return vec[0] ** 2 + vec[1] ** 2
@@ -164,11 +179,11 @@ class WaypointFinder(Node):
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(
             red_init
         )
-        self.get_logger().debug(
-            "initial red buoys: {red_buoys}, green buoys: {green_buoys}"
+        self.get_logger().info(
+            f"initial red buoys: {red_buoys}, green buoys: {green_buoys}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
-            self.get_logger().debug("No starting buoy pairs!")
+            self.get_logger().info("No starting buoy pairs!")
             return False
 
         # from the red buoys that are in front of the robot, take the one that is closest to it, and do the same for the green buoys
@@ -262,13 +277,35 @@ class WaypointFinder(Node):
         Returns the next buoy pair (red left, green right) from the previous pair,
         by checking the closest one to the middle of the previous buoy pair that's in front of the pair
         """
-        prev_pair_midpoint = self.midpoint_pair(prev_pair)
+
         front_red = self.filter_front_buoys(prev_pair, red)
         front_green = self.filter_front_buoys(prev_pair, green)
-        return (
-            self.get_closest_to(prev_pair_midpoint, front_red),
-            self.get_closest_to(prev_pair_midpoint, front_green),
-        )
+
+        if not front_red or not front_green:
+            prev_coords = self.ob_coords(prev_pair[0]), self.ob_coords(prev_pair[1])
+            red_coords = self.obs_to_pos(red)
+            green_coords = self.obs_to_pos(green)
+
+            self.get_logger().info(f"buoys:  {prev_coords} \nred: {red_coords} \ngreen: {green_coords}")
+            self.get_logger().info(f"robot: {self.robot_pos}")
+            self.get_logger().info("Missing at least one front buoy")
+            return None
+
+        if prev_pair is not None:
+            prev_pair_midpoint = self.midpoint_pair(prev_pair)
+            self.get_logger().info(f"prev pair midpoint: {prev_pair_midpoint}")
+            return (
+                self.get_closest_to(prev_pair_midpoint, front_red),
+                self.get_closest_to(prev_pair_midpoint, front_green),
+            )
+        else:
+            self.get_logger().info("No previous pair!")
+            self.get_logger().info(f"next buoys: red: {self.get_closest_to(self.robot_pos, red)}, green: {self.get_closest_to(self.robot_pos, green)}")
+            # if there is no previous pair, just take the closest red and green buoys
+            return (
+                self.get_closest_to(self.robot_pos, red),
+                self.get_closest_to(self.robot_pos, green),
+            )
 
     def pair_to_pose(self, pair):
         return Pose(position=Point(x=pair[0], y=pair[1]))
@@ -282,7 +319,8 @@ class WaypointFinder(Node):
 
     def generate_waypoints(self):
         """
-        Runs every time a new obstacle map is received, keeps track of the pair of buoys the robot is heading towards,
+        Runs every time a new obstacle map is received, keeps 
+        track of the pair of buoys the robot is heading towards,
         checks if it passed it (the robot is in front of the pair of buoys)
         (#TODO: add a margin of error such that the robot is considered to have passed the buoys if it's a bit in front of them)
         and update the pair accordingly, and afterwards computes the sequence of future waypoints based on the first waypoint
@@ -291,40 +329,48 @@ class WaypointFinder(Node):
         """
         # split the buoys into red and green
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
-        self.get_logger().debug(
-            f"red buoys: {self.obs_to_pos(red_buoys)}, green buoys: {self.obs_to_pos(green_buoys)}"
+        self.get_logger().info(
+            f"robot pos: {self.robot_pos}, red buoys: {self.obs_to_pos(red_buoys)}, green buoys: {self.obs_to_pos(green_buoys)}"
         )
         # RED BUOYS LEFT, GREEN RIGHT
 
         # TODO: Match the previous pair of buoys to the new obstacle map (in terms of global position) to eliminate any big drift that may mess up the selection of the next pair
 
+        if self.pair_to is None:
+            self.get_logger().info("No pair to go to.")
+            return
         # Check if we passed that pair of buoys (the robot is in front of the pair), then move on to the next one
         if self.ccw(
             self.ob_coords(self.pair_to[0]),
             self.ob_coords(self.pair_to[1]),
             self.robot_pos,
         ):
-            try:
-                # keep the next pair as the one the robot is heading to
-                self.pair_to = self.next_pair(self.pair_to, red_buoys, green_buoys)
-            except Exception as e:
-                self.get_logger().debug(repr(e))
-                self.get_logger().debug("No next buoy pair to go to!")
+            new_pair = self.next_pair(self.pair_to, red_buoys, green_buoys)
+            if new_pair is not None:
+                self.pair_to = new_pair
+            else:
+                self.get_logger().info("No next buoy pair to go to.")
+                # wait for next spin
+                return
+            # TODO: there is no longer a case where it is done wiht the task. 
+            # also, what happens when eg. the green buoy is passed but not the red?
 
         buoy_pairs = [self.pair_to]
         waypoints = [self.midpoint_pair(self.pair_to)]
 
+        self.get_logger().info(f"pair to: {len(buoy_pairs)}")
+
         # form a sequence of buoy pairs (and the respective waypoints) that form a path that the robot can follow
         # will terminate if we run out of either green or red buoys
+
         while True:
-            try:
-                buoy_pairs.append(
-                    self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
-                )
-                waypoints.append(self.midpoint_pair(buoy_pairs[-1]))
-            except Exception as e:
-                self.get_logger().debug(repr(e))
+            next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
+            if next_buoy_pair is None:
                 break
+            buoy_pairs.append(next_buoy_pair)
+            waypoints.append(self.midpoint_pair(next_buoy_pair))
+            next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
+
 
         # convert the sequence to a format appropriate to publishing for the path planner to use
         waypoint_arr = WaypointArray(
@@ -342,6 +388,7 @@ class WaypointFinder(Node):
                 for wpt, pair in zip(waypoints, buoy_pairs)
             ]
         )
+
         buoy_pair_arr = BuoyPairArray(
             pairs=[
                 BuoyPair(left=pair[0], right=pair[1], waypoint=waypoint)
@@ -354,6 +401,41 @@ class WaypointFinder(Node):
         self.waypoint_pub.publish(waypoint_arr)
         # publish the markers that show up in RViz
         self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers(buoy_pair_arr))
+
+        # def send_path(self, msg: PointStamped):
+        # self.get_logger().info(f"buoy pairs: {buoy_pairs}")
+
+        self.get_logger().info(f"waypoints: {waypoints}")
+
+        if waypoints:
+            waypoint = waypoints[-1]
+            self.get_logger().info(f"cur_waypoint: {waypoint}, sent_waypoints: {self.sent_waypoints}")
+            self.get_logger().info(f"len(waypoints): {len(waypoints)}")
+
+            #check if waypoint is close enough (check_dist) to some previous waypoint
+            passed_waypoint = False
+            check_dist = 1 #magic number T_T
+            for sent_waypoint in self.sent_waypoints:
+                if (waypoint[0]-sent_waypoint[0])**2+(waypoint[1]-sent_waypoint[1])**2 < check_dist**2:
+                    passed_waypoint = True
+
+            if not passed_waypoint:
+            # if waypoint not in self.sent_waypoints:
+                self.follow_path_client.wait_for_server() 
+                goal_msg = FollowPath.Goal()
+                goal_msg.planner = self.get_parameter("planner").value
+                goal_msg.x = waypoint[0]
+                goal_msg.y = waypoint[1]
+                goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+                goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
+                goal_msg.goal_tol = self.get_parameter("goal_tol").value
+                goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
+                goal_msg.choose_every = self.get_parameter("choose_every").value
+                goal_msg.is_stationary = True
+                self.follow_path_client.wait_for_server()
+                self.send_goal_future = self.follow_path_client.send_goal_async(goal_msg)
+                # self.last_sent_waypoint = waypoint
+                self.sent_waypoints.add(waypoint)
 
     def map_cb(self, msg):
         """
