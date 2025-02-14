@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+import math
 
 from nav_msgs.msg import MapMetaData, OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
@@ -29,6 +30,12 @@ class GridMapGenerator(Node):
 
         default_lidar_range = (
             self.declare_parameter("default_lidar_range", 130.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.default_obstacle_radius = (
+            self.declare_parameter("default_obstacle_radius", 3.0)
             .get_parameter_value()
             .double_value
         )
@@ -105,33 +112,49 @@ class GridMapGenerator(Node):
 
     def find_active_cells(self):
         """
-        Mark cells inside bbox of each obstacle as active,
-        Then modifies probability of each cell based on active/not
+        Create a Gaussian distribution around obstacles using their radius
         """
+        # Reset grid data for active cells
+        for i in range(len(self.active_cells)):
+            if self.active_cells[i]:
+                self.grid.data[i] = -1
+                self.active_cells[i] = False
+
         for obstacle in self.obstacle_map.obstacles:
-            minx, miny = self.world_to_grid(
-                obstacle.global_bbox_min.x, obstacle.global_bbox_min.y
+            # Get obstacle center in grid coordinates
+            center_x, center_y = self.world_to_grid(
+                obstacle.global_point.point.x, obstacle.global_point.point.y
             )
-            maxx, maxy = self.world_to_grid(
-                obstacle.global_bbox_max.x, obstacle.global_bbox_max.y
-            )
-            for x in range(max(0, minx - 1), min(self.grid.info.width, maxx + 1)):
-                for y in range(max(0, miny - 1), min(self.grid.info.height, maxy + 1)):
-                    self.active_cells[x + y * self.grid.info.width] = True
-                    self.grid.data[x + y * self.grid.info.width] = 100
+
+            # Use default radius if not set or is zero
+            radius = obstacle.radius if hasattr(obstacle, 'radius') and obstacle.radius > 0 else self.default_obstacle_radius
+
+            # Convert radius to grid cells (3 sigma)
+            sigma = radius / (3 * self.grid_resolution)
+            search_radius = int(3 * sigma)
+
+            # Calculate bounding box
+            minx = max(0, center_x - search_radius)
+            miny = max(0, center_y - search_radius)
+            maxx = min(self.grid.info.width, center_x + search_radius + 1)
+            maxy = min(self.grid.info.height, center_y + search_radius + 1)
+
+            # Create Gaussian distribution
+            for x in range(minx, maxx):
+                for y in range(miny, maxy):
+                    # Calculate squared distance from center
+                    dx = x - center_x
+                    dy = y - center_y
+                    dist_sq = dx * dx + dy * dy
+
+                    if dist_sq <= search_radius * search_radius:
+                        # Calculate Gaussian probability
+                        prob = int(100 * math.exp(-0.5 * dist_sq / (sigma * sigma)))
+                        idx = x + y * self.grid.info.width
+                        self.active_cells[idx] = True
+                        self.grid.data[idx] = max(prob, self.grid.data[idx])
 
         self.modify_probability()
-
-        for obstacle in self.obstacle_map.obstacles:
-            minx, miny = self.world_to_grid(
-                obstacle.global_bbox_min.x, obstacle.global_bbox_min.y
-            )
-            maxx, maxy = self.world_to_grid(
-                obstacle.global_bbox_max.x, obstacle.global_bbox_max.y
-            )
-            for x in range(max(0, minx - 1), min(self.grid.info.width, maxx + 1)):
-                for y in range(max(0, miny - 1), min(self.grid.info.height, maxy + 1)):
-                    self.active_cells[x + y * self.grid.info.width] = False
 
     def modify_probability(self):
         """Decay or increase probability of obstacle in active cells based on sensor observations"""
