@@ -118,11 +118,26 @@ class NavigationServer(ActionServerBase):
                 closest_wpt = i
                 min_dist = dist
         return closest_wpt if last_in_lookahead == -1 else last_in_lookahead + 1
+    
+    def smooth_path(path):
+        """
+        Returns a smoothed path of points.
+
+        Parameters: 
+        path: PoseArray
+
+        Returns:
+        Modified points in PoseArray.
+        """
+        pass
+
+
+        
 
     def follow_path_callback(self, goal_handle):
         self.get_logger().info("Path following started!")
 
-         # Immediately start and end process if no map is found
+        # Immediately start and end process if no map is found
         if self.map is None:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
@@ -134,6 +149,8 @@ class NavigationServer(ActionServerBase):
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
             return FollowPath.Result()
+        
+        path = self.smooth_path(path)
 
         self.start_process()
 
