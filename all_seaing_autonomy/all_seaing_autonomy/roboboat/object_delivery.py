@@ -83,10 +83,12 @@ class ObjectDelivery(Node):
         self.get_logger().info(f'Goal Received: Aiming water pump with target angle {target_angle}.')
         feedback_msg = Delivery.Feedback()
 
-        self.mechanisms.servo1_angle(target_angle)
-        feedback_msg.status = 'Aim IN PROGRESS'
-        goal_handle.publish_feedback(feedback_msg)
-        time.sleep(10)   # TODO: parameterize this
+        self.prev_update_time = self.get_clock().now()
+        while self.servo1_pid.is_done(0, self.threshold):
+            self.control_loop(feedback_msg)
+            goal_handle.publish_feedback(feedback_msg)
+            #TODO: may need a time.sleep()
+        self.servo1_pid.reset()
 
         self.mechanisms.stop_servo1()
 
@@ -121,6 +123,8 @@ class ObjectDelivery(Node):
         self.prev_update_time = self.get_clock().now()
         while self.servo1_pid.is_done(0, self.threshold):
             self.control_loop(feedback_msg)
+            goal_handle.publish_feedback(feedback_msg)
+            #TODO: may need a time.sleep()
         self.servo1_pid.reset()
 
         self.mechanisms.servo2_angle(self.target_speed)
@@ -132,7 +136,7 @@ class ObjectDelivery(Node):
 
         self.mechanisms.reset_launched()
 
-        self.mechanisms.servo1_angle(0)
+        self.mechanisms.stop_servo1()
         self.mechanisms.stop_servo2()
 
         self.buck.adj2_en(0)
