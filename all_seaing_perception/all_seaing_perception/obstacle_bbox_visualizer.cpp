@@ -184,6 +184,7 @@ private:
     cv::Scalar get_color_for_label(const int &label) {
         std::string color = m_label_color_map[label];
 
+        // In BGR format
         if (color == "orange")
             return cv::Scalar(0, 165, 255);
         if (color == "red")
@@ -194,6 +195,8 @@ private:
             return cv::Scalar(0, 0, 0);
         if (color == "white")
             return cv::Scalar(255, 255, 255);
+        if (color == "yellow")
+            return cv::Scalar(0, 255, 255);
         return cv::Scalar(255, 0, 0); // blue
     }
 
