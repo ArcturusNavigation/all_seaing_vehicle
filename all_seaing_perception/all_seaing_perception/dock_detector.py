@@ -9,6 +9,7 @@ import sensor_msgs_py.point_cloud2 as pc2
 from pyminiply import read
 from ament_index_python.packages import get_package_share_directory
 import open3d as o3d
+import random
 
 class DockDetector(Node):
 
@@ -35,13 +36,16 @@ class DockDetector(Node):
         # self.known_dock_pc, _ = read(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply", False, False, False)
         self.get_logger().info('type of known dock point cloud ' + str((self.known_dock_pc)))
 
+        # remove nans from template TODO actually fix template
+        self.known_dock_pc = self.known_dock_pc[~np.isnan(self.known_dock_pc).any(axis=1)]
+
         self.lidar_point_cloud = None
         self.robot_pos = (0, 0)
         self.timer = self.create_timer(1, self.detect_dock)
 
         # vertices, _ = read(dock_point_cloud_file, False, False, False)
         # self.known_dock_pc = vertices
-    def nearest_neighbor(src, dst):
+    def nearest_neighbor(self, src, dst):
         '''
         Find the nearest (Euclidean) neighbor in dst for each point in src
         Input:
@@ -56,7 +60,7 @@ class DockDetector(Node):
         neigh.fit(dst)
         distances, indices = neigh.kneighbors(src, return_distance=True)
         return distances.ravel(), indices.ravel()
-    def best_fit_transform(A, B):
+    def best_fit_transform(self, A, B):
         '''
         Calculates the least-squares best-fit transform that maps corresponding points A to B in m spatial dimensions
         Input:
@@ -121,9 +125,17 @@ class DockDetector(Node):
             T: final homogeneous transformation that maps A on to B
             distances: Euclidean distances (errors) of the nearest neighbor
             i: number of iterations to converge
+            
         '''
+        # self.get_logger().info('LIDAR point cloud ' + str(A))
+        self.get_logger().info('LIDAR point cloud ' + str(B))
+        B = B[:,:3] # get rid of intensity
+        rand_indices = random.sample(range(A.shape[0]), B.shape[0])
+        A = A[rand_indices]
         self.get_logger().info('known point cloud shape ' + str(A.shape))
         self.get_logger().info('lidar point cloud shape ' + str(B.shape))
+        self.get_logger().info('known point cloud nan ' + str(np.any(np.isnan(A))))
+        self.get_logger().info('lidar point cloud nan ' + str(np.any(np.isnan(B))))
         assert A.shape == B.shape
         # get number of dimensions
         m = A.shape[1]
