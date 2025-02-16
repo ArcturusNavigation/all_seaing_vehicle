@@ -467,23 +467,3 @@ class Mechanisms:
         """
         self.ser.write((bytes([self.adr << 1, 1, 0x08])))
         return self.ser.read(1)[0]
-
-    def switch1(self):
-        """
-        Switch 1 status
-
-        Returns:
-            int: 1 if open, 0 if closed
-        """
-        self.ser.write((bytes([self.adr << 1, 1, 0x09])))
-        return self.ser.read(1)[0]
-
-    def switch2(self):
-        """
-        Switch 2 status
-
-        Returns:
-            int: 1 if open, 0 if closed
-        """
-        self.ser.write((bytes([self.adr << 1, 1, 0x10])))
-        return self.ser.read(1)[0]
