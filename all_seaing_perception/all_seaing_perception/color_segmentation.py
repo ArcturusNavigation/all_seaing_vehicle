@@ -34,8 +34,8 @@ class ColorSegmentation(Node):
         color_label_mappings = os.path.join(bringup_prefix, "config", "perception", "color_label_mappings.yaml")
         color_ranges = os.path.join(bringup_prefix, "config", "perception", "color_ranges.yaml")
 
-        self.declare_parameter('color_ranges_file', color_ranges)
-        self.declare_parameter('color_label_mappings_file', color_label_mappings)
+        self.declare_parameter('color_ranges_file', '/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_bringup/config/perception/color_ranges.yaml')
+        self.declare_parameter('color_label_mappings_file', '/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_bringup/config/perception/color_label_mappings.yaml')
 
         color_ranges_file = self.get_parameter('color_ranges_file').value
         color_label_mappings_file = self.get_parameter('color_label_mappings_file').value
