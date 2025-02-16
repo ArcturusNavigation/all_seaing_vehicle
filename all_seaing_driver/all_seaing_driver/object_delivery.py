@@ -5,6 +5,8 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from all_seaing_driver.central_hub import Buck, Mechanisms
 from all_seaing_interfaces.action import Delivery
+from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
+
 import serial
 import time
 
@@ -18,7 +20,11 @@ class ObjectDelivery(Node):
         self.buck = Buck(self.ser)
         self.mechanisms = Mechanisms(self.ser)
         self.target_speed = 0
-        # self.launch_begin = False
+
+        self.center_x = float("inf")
+        self.center_y = float("inf")
+
+        self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "bounding_boxes", self.compute_center, 10)
 
         self.water_delivery_server = ActionServer(
             self,
@@ -32,6 +38,13 @@ class ObjectDelivery(Node):
             'object_delivery',
             self.object_callback
         )
+
+    def compute_center(self, msg):
+        self.center_x = (msg.min_x + msg.max_x) / 2
+        self.center_y = (msg.min_y + msg.max_y) / 2
+
+    def control_loop(self):
+
 
     def water_callback(self, goal_handle):
         target_angle = goal_handle.request.target
