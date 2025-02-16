@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
 
 import rclpy
-from rclpy.node import Node # imports Node class from ros2 packages
-from std_msgs.msg import UInt8
+from rclpy.node import Node
 from all_seaing_driver.central_hub import ESTOP
 import serial
-import time
 
 from all_seaing_interfaces.msg import ControlOption, Heartbeat
-from geometry_msgs.msg import Twist
 
 HEART_RATE = 1
 
-class ManualController(Node):
+class CustomOnshoreNode(Node):
     def __init__(self):
         super().__init__("manual_controller")
 
         self.declare_parameter("joy_x_scale", 2.0)
         self.declare_parameter("joy_y_scale", -1.0)
         self.declare_parameter("joy_ang_scale", -0.8)
-        self.declare_parameter("serial_port", "ACM0")
+        self.declare_parameter("serial_port", "/dev/ttyACM0")
 
         self.ser = serial.Serial(self.get_parameter("serial_port").value, 115200, timeout = 1)
         self.estop = ESTOP(self.ser)
@@ -38,17 +35,14 @@ class ManualController(Node):
         self.get_logger().info("Starting onshore node, teleop enabled")
 
     def timer_callback(self):
-        # beat heart
         self.heartbeat_message.in_teleop = bool(self.estop.mode())
-        self.get_logger().info(f"----In state: {self.estop.mode()}----")
         self.heartbeat_message.e_stopped = bool(self.estop.estop())
         self.heartbeat_publisher.publish(self.heartbeat_message)
 
         if self.heartbeat_message.e_stopped:
             self.get_logger().fatal("E-STOP ACTIVATED :<")
             return
-        else:
-            self.get_logger().info("E-STOP not activated :)")
+
         self.send_controls()
 
     def send_controls(self):
@@ -57,14 +51,12 @@ class ManualController(Node):
         control_option.twist.linear.x = self.estop.drive_y()
         control_option.twist.linear.y = 0.0
         control_option.twist.angular.z = self.estop.drive_x()
-        self.get_logger().info("Joystick positions sent to control.")
-        self.get_logger().info(f"Driving forward with {self.estop.drive_y()} and rotating with {self.estop.drive_x()}")
         self.control_option_pub.publish(control_option)
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ManualController()
+    node = CustomOnshoreNode()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

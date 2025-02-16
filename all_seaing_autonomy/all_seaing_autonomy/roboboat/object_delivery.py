@@ -49,13 +49,12 @@ class ObjectDelivery(Node):
     def water_callback(self, goal_handle):
         target_angle = goal_handle.request.target
         self.get_logger().info(f'Goal Received: Aiming water pump with target angle {target_angle}.')
-        # wait_time = goal_handle.request.target
         feedback_msg = Delivery.Feedback()
 
         self.mechanisms.servo1_angle(target_angle)
         feedback_msg.status = 'Aim IN PROGRESS'
         goal_handle.publish_feedback(feedback_msg)
-        time.sleep(10)
+        time.sleep(10)   # TODO: parameterize this
 
         self.mechanisms.stop_servo1()
 
@@ -63,7 +62,6 @@ class ObjectDelivery(Node):
         feedback_msg.status = 'Pump ON'
         goal_handle.publish_feedback(feedback_msg)
 
-        # time.sleep(wait_time) #TODO: uncomment later
         time.sleep(5)
 
         self.buck.adj1_en(0)
@@ -83,21 +81,21 @@ class ObjectDelivery(Node):
         feedback_msg = Delivery.Feedback()
 
         # TODO: Fix feedback?
-
         self.buck.adj2_voltage(12)
         self.buck.adj2_en(1)
-        feedback_msg.status = 'Ball launcher ON'
+        feedback_msg.status = "Ball launcher ON"
         goal_handle.publish_feedback(feedback_msg)
 
-        #TODO: Change standard servo angle
+        # TODO: Change standard servo angle
         self.mechanisms.servo1_angle(target_angle)
-        feedback_msg.status = 'Aim IN PROGRESS'
+        feedback_msg.status = "Aim IN PROGRESS"
         goal_handle.publish_feedback(feedback_msg)
 
         self.mechanisms.servo2_angle(self.target_speed)
 
+        self.mechanisms.reset_launched()
         while self.mechanisms.launched() == 0:
-            feedback_msg.status = 'Launch IN PROGRESS'
+            feedback_msg.status = "Launch IN PROGRESS"
             goal_handle.publish_feedback(feedback_msg)
 
         self.mechanisms.reset_launched()
@@ -106,7 +104,7 @@ class ObjectDelivery(Node):
         self.mechanisms.stop_servo2()
 
         self.buck.adj2_en(0)
-        feedback_msg.status = 'Ball launcher OFF'
+        feedback_msg.status = "Ball launcher OFF"
         goal_handle.publish_feedback(feedback_msg)
 
         goal_handle.succeed()
