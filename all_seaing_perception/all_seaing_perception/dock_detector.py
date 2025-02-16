@@ -2,11 +2,13 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import Odometry, PointCloud2
+from sensor_msgs.msg import PointCloud2
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import sensor_msgs_py.point_cloud2 as pc2
 from pyminiply import read
+from ament_index_python.packages import get_package_share_directory
+import open3d as o3d
 
 class DockDetector(Node):
 
@@ -17,9 +19,9 @@ class DockDetector(Node):
         
         # self.img_pub = self.create_publisher(Image, "image/segmented", 5)
        
-        self.odometry_sub = self.create_subscription(
-            Odometry, "/odometry/filtered", self.odometry_cb, 10
-        )
+        # self.odometry_sub = self.create_subscription(
+        #     Odometry, "/odometry/filtered", self.odometry_cb, 10
+        # )
         self.point_cloud_sub = self.create_subscription(
             PointCloud2, "point_cloud", self.point_cloud_cb, qos_profile_sensor_data
         )
@@ -28,7 +30,8 @@ class DockDetector(Node):
         # self.declare_parameter('dock_point_cloud_file', '')
         # dock_point_cloud_file = self.get_parameter('dock_point_cloud_file').value
 
-        self.known_dock_pc, _ = read("point_clouds/roboboat_dock.ply", False, False, False)
+        self.known_dock_pc = o3d.io.read_point_cloud(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply")
+        # self.known_dock_pc, _ = read(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply", False, False, False)
         self.lidar_point_cloud = None
         self.robot_pos = (0, 0)
         self.timer = self.create_timer(1, self.detect_dock)
@@ -143,11 +146,11 @@ class DockDetector(Node):
         return T, distances, i
     
     
-    def odometry_cb(self, msg):
-        """
-        Update the stored robot's position based on the odometry messages
-        """
-        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+    # def odometry_cb(self, msg):
+    #     """
+    #     Update the stored robot's position based on the odometry messages
+    #     """
+    #     self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
     def point_cloud_cb(self, msg):
         self.lidar_point_cloud = pc2.read_points_numpy(msg)
 
