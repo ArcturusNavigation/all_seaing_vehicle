@@ -163,27 +163,6 @@ class WaypointFinder(Node):
                     id=(4 * i) + 2,
                 )
             )
-            else:
-                marker_array.markers.append(
-                    Marker(
-                        type=Marker.SPHERE,
-                        pose=self.pair_to_pose(self.ob_coords(buoy_pair.left)),
-                        header=Header(frame_id="odom"),
-                        scale=Vector3(x=1.0, y=1.0, z=1.0),
-                        color=ColorRGBA(g=1.0, a=1.0),
-                        id=(4 * i) + 1,
-                    )
-                )
-                marker_array.markers.append(
-                    Marker(
-                        type=Marker.SPHERE,
-                        pose=self.pair_to_pose(self.ob_coords(buoy_pair.right)),
-                        header=Header(frame_id="odom"),
-                        scale=Vector3(x=1.0, y=1.0, z=1.0),
-                        color=ColorRGBA(r=1.0, a=1.0),
-                        id=(4 * i) + 2,
-                    )
-                )
             marker_array.markers.append(
                 Marker(
                     type=Marker.CYLINDER,
