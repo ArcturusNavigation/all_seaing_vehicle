@@ -5,6 +5,7 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from all_seaing_driver.central_hub import Buck, Mechanisms
 from all_seaing_interfaces.action import Delivery
+from all_seaing_controller.pid_controller import PIDController
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 
 import serial
@@ -26,6 +27,29 @@ class ObjectDelivery(Node):
 
         self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "bounding_boxes", self.compute_center, 10)
 
+        # PID controls for servo 2
+        Kpid = (
+            self.declare_parameter("Kpid", [1.0, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+
+        # self.max_vel = (
+        #     self.declare_parameter("max_vel", [4.0, 2.0, 1.0])
+        #     .get_parameter_value()
+        #     .double_array_value
+        # )
+
+        self.servo1_pid = PIDController(*Kpid)
+
+        self.servo1_pid.set_setpoint(0)
+        # self.servo1_pid.set_effort_min(-self.max_vel[2])
+        # self.servo1_pid.set_effort_max(self.max_vel[2]) #TODO: change parameter values
+
+        self.prev_update_time = self.get_clock().now()
+        self.threshold = 0.5 #TODO: Change
+
+        # Action servers
         self.water_delivery_server = ActionServer(
             self,
             Delivery,
@@ -41,10 +65,18 @@ class ObjectDelivery(Node):
 
     def compute_center(self, msg):
         self.center_x = (msg.min_x + msg.max_x) / 2
-        self.center_y = (msg.min_y + msg.max_y) / 2
 
-    def control_loop(self):
+    def update_pid(self):
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        self.servo1_pid.update(self.center_x, dt)
+        self.prev_update_time = self.get_clock().now()
 
+    def control_loop(self, feedback_msg):
+        self.update_pid()
+        servo1_output = self.servo1_pid.get_effort()
+        self.mechanisms.servo1_angle(servo1_output)
+
+        feedback_msg.status = "Aim IN PROGRESS" #TODO: feedback report
 
     def water_callback(self, goal_handle):
         target_angle = goal_handle.request.target
@@ -86,10 +118,10 @@ class ObjectDelivery(Node):
         feedback_msg.status = "Ball launcher ON"
         goal_handle.publish_feedback(feedback_msg)
 
-        # TODO: Change standard servo angle
-        self.mechanisms.servo1_angle(target_angle)
-        feedback_msg.status = "Aim IN PROGRESS"
-        goal_handle.publish_feedback(feedback_msg)
+        self.prev_update_time = self.get_clock().now()
+        while self.servo1_pid.is_done(0, self.threshold):
+            self.control_loop(feedback_msg)
+        self.servo1_pid.reset()
 
         self.mechanisms.servo2_angle(self.target_speed)
 
