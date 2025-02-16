@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 
 import rclpy
-from rclpy.node import Node # imports Node class from ros2 packages
+from rclpy.node import Node
 from rclpy.action import ActionServer
 from all_seaing_driver.central_hub import Buck, Mechanisms
 from all_seaing_interfaces.action import Delivery
 import serial
 import time
-
-# from all_seaing_interfaces.msg import ControlOption, Heartbeat
-# from geometry_msgs.msg import Twist
-
-#TODO: Write action client for perception OR figure out who to report result back to
-#TODO: How to localize delivery boats and flag as delivered
 
 class ObjectDelivery(Node):
     def __init__(self):
