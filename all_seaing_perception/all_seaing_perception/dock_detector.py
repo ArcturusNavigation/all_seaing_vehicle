@@ -23,15 +23,18 @@ class DockDetector(Node):
         #     Odometry, "/odometry/filtered", self.odometry_cb, 10
         # )
         self.point_cloud_sub = self.create_subscription(
-            PointCloud2, "point_cloud", self.point_cloud_cb, qos_profile_sensor_data
+            PointCloud2, "/point_cloud/filtered", self.point_cloud_cb, qos_profile_sensor_data
         )
         
         # self.declare_parameter("lidar_point_cloud", "")
         # self.declare_parameter('dock_point_cloud_file', '')
         # dock_point_cloud_file = self.get_parameter('dock_point_cloud_file').value
 
-        self.known_dock_pc = o3d.io.read_point_cloud(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply")
+        self.known_dock_pc = np.asarray(o3d.io.read_point_cloud(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply").points)
+        
         # self.known_dock_pc, _ = read(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply", False, False, False)
+        self.get_logger().info('type of known dock point cloud ' + str((self.known_dock_pc)))
+
         self.lidar_point_cloud = None
         self.robot_pos = (0, 0)
         self.timer = self.create_timer(1, self.detect_dock)
@@ -95,9 +98,11 @@ class DockDetector(Node):
 
     def detect_dock(self):
         self.get_logger().info('DETECT DOCK')
-
-        transform, distances, _ = self.get_point_cloud_transform(self.known_dock_pc, self.lidar_point_cloud)
-        self.get_logger().info('got point cloud transform')
+        if type(self.lidar_point_cloud) != None:
+            transform, distances, _ = self.get_point_cloud_transform(self.known_dock_pc, self.lidar_point_cloud)
+            self.get_logger().info('got point cloud transform')
+        else:
+            self.get_logger().info('lidar point cloud is None')
         # self.lidar_point_cloud_flat = # flatten
         # self.get_point_cloud_transform(__, __)
         # publish something
@@ -117,6 +122,8 @@ class DockDetector(Node):
             distances: Euclidean distances (errors) of the nearest neighbor
             i: number of iterations to converge
         '''
+        self.get_logger().info('known point cloud shape ' + str(A.shape))
+        self.get_logger().info('lidar point cloud shape ' + str(B.shape))
         assert A.shape == B.shape
         # get number of dimensions
         m = A.shape[1]
