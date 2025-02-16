@@ -45,11 +45,6 @@ class ObjectDelivery(Node):
         # wait_time = goal_handle.request.target
         feedback_msg = Delivery.Feedback()
 
-        self.buck.adj2_en(1)
-        feedback_msg.status = 'Turret ON'
-        goal_handle.publish_feedback(feedback_msg)
-        time.sleep(5)
-
         self.mechanisms.servo1_angle(target_angle)
         feedback_msg.status = 'Aim IN PROGRESS'
         goal_handle.publish_feedback(feedback_msg)
@@ -81,6 +76,8 @@ class ObjectDelivery(Node):
         feedback_msg = Delivery.Feedback()
 
         # TODO: Fix feedback?
+
+        self.buck.adj2_voltage(12)
         self.buck.adj2_en(1)
         feedback_msg.status = 'Ball launcher ON'
         goal_handle.publish_feedback(feedback_msg)
@@ -98,7 +95,7 @@ class ObjectDelivery(Node):
 
         self.mechanisms.reset_launched()
 
-        self.mechanisms.stop_servo1()
+        self.mechanisms.servo1_angle(0)
         self.mechanisms.stop_servo2()
 
         self.buck.adj2_en(0)
