@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
-
 import struct
 
 class LED:
     def __init__(self, ser):
         self.adr = 0x11
-        self.ser = ser #pyserial interface
+        self.ser = ser
 
     def wait(self):
         """
