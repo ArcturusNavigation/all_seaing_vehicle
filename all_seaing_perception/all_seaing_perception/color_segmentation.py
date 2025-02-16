@@ -25,7 +25,7 @@ class ColorSegmentation(Node):
         self.img_pub = self.create_publisher(Image, "image/segmented", 5)
         self.img_sub = self.create_subscription(
             Image,
-            "image",
+            "/webcam_image",
             self.img_callback,
             qos_profile_sensor_data,
         )
