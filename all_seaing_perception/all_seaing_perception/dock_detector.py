@@ -3,6 +3,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import PointCloud2
+from geometry_msgs.msg import Point, PointStamped
+from nav_msgs.msg import Odometry
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import sensor_msgs_py.point_cloud2 as pc2
@@ -20,18 +22,23 @@ class DockDetector(Node):
         
         # self.img_pub = self.create_publisher(Image, "image/segmented", 5)
        
-        # self.odometry_sub = self.create_subscription(
-        #     Odometry, "/odometry/filtered", self.odometry_cb, 10
-        # )
+        self.odometry_sub = self.create_subscription(
+            Odometry, "/odometry/filtered", self.odometry_cb, 10
+        )
+
         self.point_cloud_sub = self.create_subscription(
             PointCloud2, "/point_cloud/filtered", self.point_cloud_cb, qos_profile_sensor_data
+        )
+
+        self.dock_location_pub = self.create_publisher(
+            PointStamped, "/dock_location/dock", 5
         )
         
         # self.declare_parameter("lidar_point_cloud", "")
         # self.declare_parameter('dock_point_cloud_file', '')
         # dock_point_cloud_file = self.get_parameter('dock_point_cloud_file').value
 
-        self.known_dock_pc = np.asarray(o3d.io.read_point_cloud(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply").points)
+        self.known_dock_pc = np.asarray(o3d.io.read_point_cloud(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock2.ply").points)
         
         # self.known_dock_pc, _ = read(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply", False, False, False)
         self.get_logger().info('type of known dock point cloud ' + str((self.known_dock_pc)))
@@ -45,6 +52,7 @@ class DockDetector(Node):
 
         # vertices, _ = read(dock_point_cloud_file, False, False, False)
         # self.known_dock_pc = vertices
+
     def nearest_neighbor(self, src, dst):
         '''
         Find the nearest (Euclidean) neighbor in dst for each point in src
@@ -60,6 +68,7 @@ class DockDetector(Node):
         neigh.fit(dst)
         distances, indices = neigh.kneighbors(src, return_distance=True)
         return distances.ravel(), indices.ravel()
+
     def best_fit_transform(self, A, B):
         '''
         Calculates the least-squares best-fit transform that maps corresponding points A to B in m spatial dimensions
@@ -94,6 +103,7 @@ class DockDetector(Node):
         T[:m, :m] = R
         T[:m, m] = t
         return T, R, t
+
     def get_point_cloud_transform(self, point_cloud_1, point_cloud_2):
         # Convert 
         # use ICP here
@@ -105,11 +115,31 @@ class DockDetector(Node):
         if type(self.lidar_point_cloud) != None:
             transform, distances, _ = self.get_point_cloud_transform(self.known_dock_pc, self.lidar_point_cloud)
             self.get_logger().info('got point cloud transform')
+            self.get_logger().info(str(transform))
+            dock_point = Point()
+
+            transformed = transform @ np.array([0,0,0,1]).T
+            self.get_logger().info(str(transformed))
+            dock_point.x = transformed[0]
+            dock_point.y = transformed[1]
+            dock_point.z = transformed[2]
+
+            '''
+            dock_point.x = transform[0][3]# + self.robot_pos[0]
+            dock_point.y = transform[1][3]# + self.robot_pos[1]
+            dock_point.z = transform[2][3]
+            '''
+
+            dock_point_stamped = PointStamped()
+            dock_point_stamped.header.frame_id = "map"
+            dock_point_stamped.point = dock_point
+            self.dock_location_pub.publish(dock_point_stamped)
         else:
             self.get_logger().info('lidar point cloud is None')
         # self.lidar_point_cloud_flat = # flatten
         # self.get_point_cloud_transform(__, __)
         # publish something
+
     def icp(self, A, B, init_pose=None, max_iterations=20, tolerance=0.001):
         '''
         https://github.com/ClayFlannigan/icp/
@@ -163,13 +193,13 @@ class DockDetector(Node):
         # calculate final transformation
         T,_,_ = self.best_fit_transform(A, src[:m,:].T)
         return T, distances, i
-    
-    
-    # def odometry_cb(self, msg):
-    #     """
-    #     Update the stored robot's position based on the odometry messages
-    #     """
-    #     self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        
+    def odometry_cb(self, msg):
+        """
+        Update the stored robot's position based on the odometry messages
+        """
+        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+
     def point_cloud_cb(self, msg):
         self.lidar_point_cloud = pc2.read_points_numpy(msg)
 
