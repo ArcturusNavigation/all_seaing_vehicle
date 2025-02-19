@@ -141,6 +141,12 @@ class NavigationServer(ActionServerBase):
                 smoothed_path.poses.append(inbetween_pose)
         
         # TO DO: implement rounds of smoothing
+        for i in range(1, len(smoothed_path.poses)-1):
+            pose_one = path.poses[i-1]
+            pose_two = path.poses[i] # edit pose two
+            pose_three = path.poses[i+1]
+
+            #project pose_two onto pose_one-pose_three line
 
 
         return smoothed_path
