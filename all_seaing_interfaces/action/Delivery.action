@@ -1,4 +1,4 @@
-int64 target
+float64 target
 ---
 bool delivered
 ---
