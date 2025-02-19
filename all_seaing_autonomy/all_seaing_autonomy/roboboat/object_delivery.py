@@ -72,7 +72,8 @@ class ObjectDelivery(Node):
 
     def control_loop(self, feedback_msg):
         self.update_pid()
-        servo1_output = self.servo1_pid.get_effort()
+        servo1_output = int(self.servo1_pid.get_effort()).to_bytes(1, 'big')
+
         self.mechanisms.servo1_angle(servo1_output)
 
         feedback_msg.status = "Aim IN PROGRESS" #TODO: feedback report
@@ -108,7 +109,7 @@ class ObjectDelivery(Node):
         return result
 
     def object_callback(self, goal_handle):
-        target_angle = goal_handle.request.target
+        # target_angle = goal_handle.request.target
         self.get_logger().info(f'Goal Received: Aiming servo with target angle of {target_angle}.')
 
         feedback_msg = Delivery.Feedback()
