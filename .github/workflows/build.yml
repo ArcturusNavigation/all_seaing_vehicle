@@ -22,7 +22,7 @@ jobs:
           chmod +x ci/*.sh;
           bash ci/pull.sh;
           cp -r ../all_seaing_vehicle dev_ws/src/;
-          nix develop -i --accept-flake-config --keep HOME --command bash -c "./build.sh;";
+          nix develop -i --accept-flake-config --keep HOME --command bash -c "bash ./build.sh;";
       - name: Build modules and run nodes
         run: cd ../arcturus_nix;
           nix develop -i --accept-flake-config --keep HOME --command bash -c "
