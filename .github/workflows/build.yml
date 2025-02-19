@@ -13,7 +13,7 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
       - name: Setup CI binary cache
-        uses: DeterminateSystems/magic-nix-cache-action@main
+        uses: DeterminateSystems/flakehub-cache-action@main
       - name: Launch Nix development environment and build Nix package manifests
         run: cd ..;
           git clone https://github.com/ArcturusNavigation/arcturus_nix;
