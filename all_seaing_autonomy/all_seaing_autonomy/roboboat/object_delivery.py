@@ -22,9 +22,7 @@ class ObjectDelivery(Node):
         self.buck = Buck(self.ser)
         self.mechanisms = Mechanisms(self.ser)
         self.target_speed = 0
-
-        self.center_x = float("inf")
-        self.center_y = float("inf")
+        self.center_x = 1
 
         self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "bounding_boxes", self.compute_center, 10)
 
