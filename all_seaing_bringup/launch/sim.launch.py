@@ -229,6 +229,16 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    run_tasks = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="run_tasks.py",
+    )
+
+    task_1_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_1.py",
+    )
+
     rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
@@ -283,7 +293,9 @@ def launch_setup(context, *args, **kwargs):
         navigation_server,
         grid_map_generator,
         onshore_node,
-        waypoint_finder,
+        run_tasks,
+        task_1_server,
+        # waypoint_finder,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,

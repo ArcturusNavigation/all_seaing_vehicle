@@ -24,7 +24,7 @@ class RunTasks(Node):
         super().__init__('run_tasks')
         self.task_list = [
             ActionClient(self, Task, 'task_1'),
-            ActionClient(self, Task, 'task_2')
+            # ActionClient(self, Task, 'task_2')
         ]
         # self.task_5_signal_listener = self.create_subscription(
         #     BoatInfo,
@@ -84,7 +84,9 @@ class RunTasks(Node):
         self.current_task = self.task_list.pop(0)
         self.get_logger().info("Starting sequential actions...")
         self.current_task.wait_for_server()
+        self.get_logger().info(f'Starting task: {self.current_task._action_name}')
         task_goal_msg = Task.Goal()
+        self.get_logger().info(f'Sending goal: {task_goal_msg}')
         send_goal_future = self.current_task.send_goal_async(
             task_goal_msg,
             feedback_callback=self.feedback_callback

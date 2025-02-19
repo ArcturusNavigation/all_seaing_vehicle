@@ -42,6 +42,7 @@ class Task1ActionServer(Node):
         self.get_logger().info('Executing Task 1: Starting WaypointFinder node')
 
         # Start the WaypointFinder node in a separate thread.
+        # no params passed in for now.
         waypoint_finder = WaypointFinder()
         wf_executor = rclpy.executors.SingleThreadedExecutor()
         wf_executor.add_node(waypoint_finder)
