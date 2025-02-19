@@ -20,21 +20,21 @@ jobs:
           cd arcturus_nix;
           chmod +x *.sh;
           chmod +x ci/*.sh;
-          ci/pull.sh;
+          bash ci/pull.sh;
           cp -r ../all_seaing_vehicle dev_ws/src/;
           nix develop -i --accept-flake-config --keep HOME --command bash -c "./build.sh;";
       - name: Build modules and run nodes
         run: cd ../arcturus_nix;
           nix develop -i --accept-flake-config --keep HOME --command bash -c "
-          ci/run.sh all_seaing_autonomy;
-          ci/run.sh all_seaing_bringup;
-          ci/run.sh all_seaing_common;
-          ci/run.sh all_seaing_controller;
-          ci/run.sh all_seaing_description;
-          ci/run.sh all_seaing_driver;
-          ci/run.sh all_seaing_interfaces;
-          ci/run.sh all_seaing_navigation;
-          ci/run.sh all_seaing_perception;
-          ci/run.sh all_seaing_rviz_plugins;
-          ci/run.sh all_seaing_utility;
+          bash ci/run.sh all_seaing_autonomy;
+          bash ci/run.sh all_seaing_bringup;
+          bash ci/run.sh all_seaing_common;
+          bash ci/run.sh all_seaing_controller;
+          bash ci/run.sh all_seaing_description;
+          bash ci/run.sh all_seaing_driver;
+          bash ci/run.sh all_seaing_interfaces;
+          bash ci/run.sh all_seaing_navigation;
+          bash ci/run.sh all_seaing_perception;
+          bash ci/run.sh all_seaing_rviz_plugins;
+          bash ci/run.sh all_seaing_utility;
           "
