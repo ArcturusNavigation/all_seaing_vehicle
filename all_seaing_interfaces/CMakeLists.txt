@@ -18,7 +18,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/LabeledBoundingBox2DArray.msg"
     "msg/LabeledBoundingBox2D.msg"
     "msg/Heartbeat.msg"
-    "msg/ASV2State.msg"
     "msg/BuoyPair.msg"
     "msg/BuoyPairArray.msg"
     "msg/Waypoint.msg"
