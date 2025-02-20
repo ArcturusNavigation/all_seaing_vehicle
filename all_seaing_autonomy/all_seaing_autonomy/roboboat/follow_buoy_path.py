@@ -6,7 +6,7 @@ from rclpy.action import ActionClient, ActionServer
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_interfaces.action import FollowPath
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
+from geometry_msgs.msg import Point, Pose, Vector3
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
@@ -28,9 +28,9 @@ class InternalBuoyPair:
             self.right = right_buoy
 
 
-class WaypointFinder(Node):
+class FollowBuoyPath(Node):
     def __init__(self):
-        super().__init__("waypoint_finder")
+        super().__init__("follow_path")
         self.map_sub = self.create_subscription(
             ObstacleMap, "/obstacle_map/labeled", self.map_cb, 10
         )
@@ -433,7 +433,7 @@ class WaypointFinder(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = WaypointFinder()
+    node = FollowBuoyPath()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

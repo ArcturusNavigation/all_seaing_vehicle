@@ -224,9 +224,9 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    waypoint_finder = launch_ros.actions.Node(
+    follow_buoy_path = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="waypoint_finder.py",
+        executable="follow_buoy_path.py",
         parameters=[
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
@@ -299,7 +299,7 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         #run_tasks,
         #task_1_server,
-        waypoint_finder,
+        follow_buoy_path,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,
