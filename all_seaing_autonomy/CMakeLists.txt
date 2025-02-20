@@ -10,10 +10,7 @@ ament_auto_find_build_dependencies()
 
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
-    ${PROJECT_NAME}/roboboat/FollowThePath.py
     ${PROJECT_NAME}/roboboat/waypoint_finder.py
-    ${PROJECT_NAME}/roboboat/task_manager.py
-    ${PROJECT_NAME}/roboboat/Task.py
     ${PROJECT_NAME}/roboboat/run_tasks.py
     ${PROJECT_NAME}/roboboat/task_1.py
     ${PROJECT_NAME}/roboboat/task_2.py
