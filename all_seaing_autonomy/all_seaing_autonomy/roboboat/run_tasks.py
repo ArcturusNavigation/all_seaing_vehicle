@@ -39,7 +39,9 @@ class RunTasks(Node):
 
         # self.task_5_action_client = ActionClient(self, ShootBoat, "task_5")
         self.current_task = None
-        self.next_task_index = 0 # by default the next task is idling
+        self.idle_index = 0
+        self.end_index = -1
+        self.next_task_index = self.idle_index # by default the next task is idling
 
         self.pause_publisher = self.create_publisher(Bool, "pause", 10)
 
@@ -119,9 +121,18 @@ class RunTasks(Node):
         result = future.result().result
         if result.success:
             self.get_logger().info("Goal succeeded!")
-            self.start_task() if self.task_list else rclpy.shutdown()
+            
             # TODO: modify this so that when a task is finished, or the task list is empty,
             # enter a transition state to search for a new task. 
+
+            if self.next_task_index != self.idle_index:
+                self.next_task_index = self.idle_index
+            else:
+                self.next_task_index = result.next_task_index # to be implemented in idle action server?
+
+            if self.next_task_index == self.end_index: # when end, shut down the node
+                rclpy.shutdown()
+            self.start_task()
         else:
             self.get_logger().info("Goal failed")
 
