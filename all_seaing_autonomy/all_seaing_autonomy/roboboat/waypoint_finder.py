@@ -50,6 +50,9 @@ class WaypointFinder(Node):
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
 
+        self.declare_parameter("is_sim", False)
+        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+
         self.robot_pos = (0, 0)
 
         self.declare_parameter("safe_margin", 0.2)
@@ -192,7 +195,8 @@ class WaypointFinder(Node):
         )  # split all the buoys into red and green
         # lambda function that filters the buoys that are in front of the robot (using their local coordinates, but provides the global ones as output)
         obstacles_in_front = lambda obs: [
-            ob for ob in obs if ob.local_point.point.x > 0
+            ob for ob in obs
+            if (self.is_sim and ob.local_point.point.x > 0) or (not self.is_sim and ob.local_point.point.y > 0)
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(

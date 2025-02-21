@@ -224,6 +224,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_autonomy",
         executable="waypoint_finder.py",
         parameters=[
+            {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
