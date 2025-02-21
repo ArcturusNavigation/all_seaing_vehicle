@@ -11,7 +11,7 @@ HEART_RATE = 1
 
 class CustomOnshoreNode(Node):
     def __init__(self):
-        super().__init__("manual_controller")
+        super().__init__("custom_onshore_node")
 
         self.declare_parameter("joy_x_scale", 2.0)
         self.declare_parameter("joy_y_scale", -1.0)
@@ -38,10 +38,12 @@ class CustomOnshoreNode(Node):
         self.heartbeat_message.in_teleop = bool(self.estop.mode())
         self.heartbeat_message.e_stopped = bool(self.estop.estop())
         self.heartbeat_publisher.publish(self.heartbeat_message)
-
+        self.get_logger().info(f"Current mode:{self.heartbeat_message.in_teleop}")
         if self.heartbeat_message.e_stopped:
             self.get_logger().fatal("E-STOP ACTIVATED :<")
             return
+        else:
+            self.get_logger().info("E-STOP not activated :D")
 
         self.send_controls()
 

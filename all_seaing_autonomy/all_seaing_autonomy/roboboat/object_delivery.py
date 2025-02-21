@@ -5,7 +5,7 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from all_seaing_driver.central_hub import Buck, Mechanisms
 from all_seaing_interfaces.action import Delivery
-from std_msgs.msg import Float64
+from std_msgs.msg import String
 from all_seaing_controller.pid_controller import PIDController
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 
@@ -22,7 +22,7 @@ class ObjectDelivery(Node):
         self.buck = Buck(self.ser)
         self.mechanisms = Mechanisms(self.ser)
         self.target_speed = 0
-        self.center_x = 1
+        self.center_x = 10
 
         self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "bounding_boxes", self.compute_center, 10)
 
@@ -72,15 +72,17 @@ class ObjectDelivery(Node):
 
     def control_loop(self, feedback_msg):
         self.update_pid()
-        servo1_output = int(self.servo1_pid.get_effort()).to_bytes(1, 'big')
+        servo1_output = 5 #max(int(self.servo1_pid.get_effort()),0)
 
-        self.mechanisms.servo1_angle(servo1_output)
+        self.mechanisms.servo2_angle(servo1_output)
 
         feedback_msg.status = "Aim IN PROGRESS" #TODO: feedback report
 
+    
+
     def water_callback(self, goal_handle):
-        target_angle = goal_handle.request.target
-        self.get_logger().info(f'Goal Received: Aiming water pump with target angle {target_angle}.')
+        # received = goal_handle.request.target
+        self.get_logger().info(f'Goal Received: Input message {goal_handle.request.target}.')
         feedback_msg = Delivery.Feedback()
 
         self.prev_update_time = self.get_clock().now()
@@ -110,38 +112,50 @@ class ObjectDelivery(Node):
 
     def object_callback(self, goal_handle):
         # target_angle = goal_handle.request.target
-        self.get_logger().info(f'Goal Received: Aiming servo with target angle of {target_angle}.')
+        self.get_logger().info(f'Goal Received: Input message {goal_handle.request.target}.')
 
         feedback_msg = Delivery.Feedback()
 
         # TODO: Fix feedback?
         self.buck.adj2_voltage(12)
+        self.get_logger().info(f'Buck 2 voltage set to: 12.')
+
         self.buck.adj2_en(1)
+        self.get_logger().info(f'Buck 2 POWERED ON')
+
         feedback_msg.status = "Ball launcher ON"
         goal_handle.publish_feedback(feedback_msg)
 
-        self.prev_update_time = self.get_clock().now()
-        while self.servo1_pid.is_done(0, self.threshold):
-            self.control_loop(feedback_msg)
-            goal_handle.publish_feedback(feedback_msg)
-            #TODO: may need a time.sleep()
-        self.servo1_pid.reset()
+        self.mechanisms.servo1_angle(0)
+        self.get_logger().info(f'Servo 1 POWERED ON')
+        self.mechanisms.servo2_angle(0)
+        self.get_logger().info(f'Servo 2 POWERED ON')
 
-        self.mechanisms.servo2_angle(self.target_speed)
+        # self.prev_update_time = self.get_clock().now()
+        # self.get_logger().info(f'Starting controls...')
+        # while self.servo1_pid.is_done(0, self.threshold):
+        #     self.control_loop(feedback_msg)
+        #     goal_handle.publish_feedback(feedback_msg)
+        #     #TODO: may need a time.sleep()
+        # self.servo1_pid.reset()
+        # self.get_logger().info(f'PID reseted.')
 
-        self.mechanisms.reset_launched()
-        while self.mechanisms.launched() == 0:
-            feedback_msg.status = "Launch IN PROGRESS"
-            goal_handle.publish_feedback(feedback_msg)
 
-        self.mechanisms.reset_launched()
+        # self.mechanisms.servo2_angle(self.target_speed)
 
-        self.mechanisms.stop_servo1()
-        self.mechanisms.stop_servo2()
+        # self.mechanisms.reset_launched()
+        # while self.mechanisms.launched() == 0:
+        #     feedback_msg.status = "Launch IN PROGRESS"
+        #     goal_handle.publish_feedback(feedback_msg)
 
-        self.buck.adj2_en(0)
-        feedback_msg.status = "Ball launcher OFF"
-        goal_handle.publish_feedback(feedback_msg)
+        # self.mechanisms.reset_launched()
+
+        # self.mechanisms.stop_servo1()
+        # self.mechanisms.stop_servo2()
+
+        # self.buck.adj2_en(0)
+        # feedback_msg.status = "Ball launcher OFF"
+        # goal_handle.publish_feedback(feedback_msg)
 
         goal_handle.succeed()
 

@@ -442,7 +442,7 @@ class Mechanisms:
         Args:
             value: angle (degrees)
         """
-        self.ser.write((bytes([(self.adr << 1) + 1, 0x06, int(value)])))
+        self.ser.write((bytes([(self.adr << 1) + 1, 0x06, value])))
         self.wait()
 
     def servo2_angle(self, value):
@@ -455,7 +455,7 @@ class Mechanisms:
         Args:
             value: angle (degrees)
         """
-        self.ser.write((bytes([(self.adr << 1) + 1, 0x07, int(value)])))
+        self.ser.write((bytes([(self.adr << 1) + 1, 0x07, value])))
         self.wait()
 
     def launched(self):
