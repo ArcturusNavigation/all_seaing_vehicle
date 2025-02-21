@@ -23,8 +23,12 @@ class RunTasks(Node):
     def __init__(self):
         super().__init__("run_tasks")
         self.task_list = [
+            # ActionClient(self, Task, "task_idle")
+            # ActionClient(self, Task, "follow_buoy_path")
+
             ActionClient(self, Task, "task_1"),
             # ActionClient(self, Task, "task_2")
+            # ActionClient(self, Task, "task_6")
         ]
         # self.task_5_signal_listener = self.create_subscription(
         #     BoatInfo,
@@ -35,8 +39,11 @@ class RunTasks(Node):
 
         # self.task_5_action_client = ActionClient(self, ShootBoat, "task_5")
         self.current_task = None
+        self.next_task_index = 0 # by default the next task is idling
 
         self.pause_publisher = self.create_publisher(Bool, "pause", 10)
+
+        self.start_task()
 
     # def task_5_signal_callback(self, msg):
     #     self.get_logger().info("Received signal for task 5")
@@ -81,8 +88,8 @@ class RunTasks(Node):
     #     self.get_logger().info(f"Current task: task_5")
 
     def start_task(self):
-        self.current_task = self.task_list.pop(0)
-        self.get_logger().info("Starting sequential actions...")
+        self.current_task = self.task_list[self.next_task_index]
+        self.get_logger().info(f"Starting Task Manager States...")
         self.current_task.wait_for_server()
         self.get_logger().info(f"Starting task: {self.current_task._action_name}")
         task_goal_msg = Task.Goal()
