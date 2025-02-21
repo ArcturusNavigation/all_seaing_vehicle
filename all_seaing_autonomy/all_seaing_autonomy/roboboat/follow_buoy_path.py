@@ -27,7 +27,6 @@ class InternalBuoyPair:
         else:
             self.right = right_buoy
 
-
 class FollowBuoyPath(Node):
     def __init__(self):
         super().__init__("follow_path")
@@ -122,11 +121,11 @@ class FollowBuoyPath(Node):
         """
         marker_array = MarkerArray()
         i = 0
-        for buoy_pair in buoy_pairs.pairs:
+        for p_left, p_right, point, radius in buoy_pairs:
             marker_array.markers.append(
                 Marker(
                     type=Marker.ARROW,
-                    pose=buoy_pair.waypoint.point,
+                    pose=point,
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=0.05, z=0.05),
                     color=ColorRGBA(a=1.0),
@@ -143,7 +142,7 @@ class FollowBuoyPath(Node):
             marker_array.markers.append(
                 Marker(
                     type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(buoy_pair.left)),
+                    pose=self.pair_to_pose(self.ob_coords(p_left)),
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=left_color,
@@ -153,7 +152,7 @@ class FollowBuoyPath(Node):
             marker_array.markers.append(
                 Marker(
                     type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(buoy_pair.right)),
+                    pose=self.pair_to_pose(self.ob_coords(p_right)),
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=right_color,
@@ -165,13 +164,13 @@ class FollowBuoyPath(Node):
                     type=Marker.CYLINDER,
                     pose=Pose(
                         position=Point(
-                            x=buoy_pair.waypoint.point.position.x,
-                            y=buoy_pair.waypoint.point.position.y,
+                            x=point.position.x,
+                            y=point.position.y,
                         )
                     ),
                     header=Header(frame_id="odom"),
                     scale=Vector3(
-                        x=buoy_pair.waypoint.radius, y=buoy_pair.waypoint.radius, z=1.0
+                        x=radius, y=radius, z=1.0
                     ),
                     color=ColorRGBA(g=1.0, a=0.5),
                     id=(4 * i) + 3,
@@ -374,6 +373,14 @@ class FollowBuoyPath(Node):
                 break
             buoy_pairs.append(next_buoy_pair)
             waypoints.append(self.midpoint_pair(next_buoy_pair))
+
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(pair.left, pair.right, self.pair_angle_to_pose(
+                        pair=wpt,
+                        angle=(
+                            math.atan(self.ob_coords(pair.right)[1] - self.ob_coords(pair.left)[1]) /
+                            (self.ob_coords(pair.right)[0] - self.ob_coords(pair.left)[0])
+                        ) + (math.pi / 2),
+                    ), self.norm(self.ob_coords(pair.left), self.ob_coords(pair.right))/2 - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)]))
 
         self.get_logger().debug(f"Waypoints: {waypoints}")
 
