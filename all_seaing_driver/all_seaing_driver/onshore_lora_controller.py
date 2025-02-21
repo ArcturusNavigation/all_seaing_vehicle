@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import ControlOption
-import serial
 import pygame
 import struct
 import serial
@@ -14,31 +12,45 @@ class OnshoreLoraController(Node):
 
         # Initialize Pygame
         pygame.init()
-        self.screen = pygame.display.set_mode((400, 400))
+        self.screen = pygame.display.set_mode((800, 400))
         pygame.display.set_caption("Keyboard Controller")
-
-        self.data_size = struct.calcsize('Bddd')
+        self.font = pygame.font.Font(None, 36)
 
         # Serial setup
         '''
         self.serial_port = serial.Serial("/dev/ttyUSB0", 57600, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
         '''
-        
-        self.timer = self.create_timer(0.1, self.read_keyboard_data)
 
-        self.declare_parameter("y", 0.0)
-        self.declare_parameter("x", 0.0)
-        self.declare_parameter("angular", 0.0)
+        # Initialize Heartbeat Message
+        self.heartbeat_msg = {
+            "in_teleop": True,
+            "e_stopped": False,
+        }
+
+        # Initialize Timer to Read Keyboard Inputs
+        self.timer = self.create_timer(0.05, self.read_keyboard_data)  # 50ms like the original
+
+        # ROS2 Parameters
+        self.declare_parameter("y", 0.8)
+        self.declare_parameter("x", 1.0)
+        self.declare_parameter("angular", 0.3)
 
         self.y = self.get_parameter("y").value
         self.x = self.get_parameter("x").value
         self.angular = self.get_parameter("angular").value
 
     def read_keyboard_data(self):
+        # Handle events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                rclpy.shutdown()
                 return
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    self.heartbeat_msg["e_stopped"] = not self.heartbeat_msg["e_stopped"]
+                elif event.key == pygame.K_RETURN:
+                    self.heartbeat_msg["in_teleop"] = not self.heartbeat_msg["in_teleop"]
 
         keys = pygame.key.get_pressed()
 
@@ -54,107 +66,77 @@ class OnshoreLoraController(Node):
         if keys[pygame.K_a]:
             control_msg["y"] = self.y  # Move left
         elif keys[pygame.K_d]:
-            control_msg["y"] = -1.0 * self.y  # Move right
+            control_msg["y"] = -self.y  # Move right
         else:
-            control_msg["y"] = 0.0  # Stop horizontal movement
-        
+            control_msg["y"] = 0.0
+
         if keys[pygame.K_w]:
             control_msg["x"] = self.x  # Move forward
         elif keys[pygame.K_s]:
-            control_msg["x"] = -1.0 * self.x  # Move backward
+            control_msg["x"] = -self.x  # Move backward
         else:
-            control_msg["x"] = 0.0  # Stop vertical movement
-            
+            control_msg["x"] = 0.0
+
         if keys[pygame.K_q]:
             control_msg["angular"] = self.angular
         elif keys[pygame.K_e]:
-            control_msg["angular"] = -1.0 * self.angular
+            control_msg["angular"] = -self.angular
         else:
-            control_msg["angular"] = 0.0 
+            control_msg["angular"] = 0.0
 
-        # Serialize to binary format
+        # Serialize to binary format (matching original: BdddBB)
         serialized_msg = struct.pack(
-            "Bddd",
+            "BdddBB",
             control_msg["priority"],
             control_msg["x"],
             control_msg["y"],
             control_msg["angular"],
+            int(self.heartbeat_msg["in_teleop"]),
+            int(self.heartbeat_msg["e_stopped"]),
         )
 
-        # Send over serial
-        self.serial_port.write(serialized_msg)
-        
-        # Print sent message for debugging
-        print(f"Sent: {control_msg}")
+        checksum = calculate_checksum(serialized_msg)
+        serialized_msg_with_checksum = serialized_msg + struct.pack("B", checksum)
 
-        pygame.time.delay(100)  # 100 ms delay
+        # Send over serial
+        # self.serial_port.write(serialized_msg_with_checksum)
+
+        # Clear the screen
+        self.screen.fill((0, 0, 0))
+
+        # Render control message status
+        control_text = self.font.render(f"Control - x: {control_msg['x']}, y: {control_msg['y']}, angular: {control_msg['angular']}", True, (255, 255, 255))
+        self.screen.blit(control_text, (20, 20))
+
+        # Render heartbeat message status
+        heartbeat_text = self.font.render(f"Heartbeat - in_teleop (Enter): {self.heartbeat_msg['in_teleop']}, e_stopped (Space): {self.heartbeat_msg['e_stopped']}", True, (255, 255, 255))
+        self.screen.blit(heartbeat_text, (20, 60))
+
+        # Update the display
+        pygame.display.flip()
+
+    def close(self):
+        """Close resources."""
+        self.serial_port.close()
+        pygame.quit()
+
+def calculate_checksum(data):
+    """Calculate checksum for data integrity."""
+    return sum(data) % 256
 
 def main(args=None):
     rclpy.init(args=args)
-    serial_control_subscriber = OnshoreLoraController()
+    node = OnshoreLoraController()
 
     try:
-        rclpy.spin(serial_control_subscriber)
+        rclpy.spin(node)
     except KeyboardInterrupt:
         pass
+    finally:
+        node.close()  # Ensures cleanup happens no matter what
+        rclpy.shutdown()
 
-    # Close serial connection
-    serial_control_subscriber.serial_port.close()
-    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
 
-
-'''
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
-    keys = pygame.key.get_pressed()
-    
-    # Adjust control message based on arrow keys
-    if keys[pygame.K_a]:
-        control_msg["y"] = 1.0  # Move left
-    elif keys[pygame.K_d]:
-        control_msg["y"] = -1.0  # Move right
-    else:
-        control_msg["y"] = 0.0  # Stop horizontal movement
-    
-    if keys[pygame.K_w]:
-        control_msg["x"] = 1.0  # Move forward
-    elif keys[pygame.K_s]:
-        control_msg["x"] = -1.0  # Move backward
-    else:
-        control_msg["x"] = 0.0  # Stop vertical movement
-        
-    if keys[pygame.K_q]:
-        control_msg["angular"] = 1.0
-    elif keys[pygame.K_e]:
-        control_msg["angular"] = -1.0
-    else:
-        control_msg["angular"] = 0.0
-
-    # Serialize to binary format
-    serialized_msg = struct.pack(
-        "Bddd",
-        control_msg["priority"],
-        control_msg["x"],
-        control_msg["y"],
-        control_msg["angular"],
-    )
-
-    # Send over serial
-    serial_port.write(serialized_msg)
-    
-    # Print sent message for debugging
-    print(f"Sent: {control_msg}")
-
-    pygame.time.delay(100)  # 100 ms delay
-
-# Close serial and pygame
-serial_port.close()
-pygame.quit()
-'''
