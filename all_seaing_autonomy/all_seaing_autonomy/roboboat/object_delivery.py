@@ -5,7 +5,6 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from all_seaing_driver.central_hub import Buck, Mechanisms
 from all_seaing_interfaces.action import Delivery
-from std_msgs.msg import String
 from all_seaing_controller.pid_controller import PIDController
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 
@@ -33,17 +32,9 @@ class ObjectDelivery(Node):
             .double_array_value
         )
 
-        # self.max_vel = (
-        #     self.declare_parameter("max_vel", [4.0, 2.0, 1.0])
-        #     .get_parameter_value()
-        #     .double_array_value
-        # )
-
         self.servo1_pid = PIDController(*Kpid)
 
         self.servo1_pid.set_setpoint(0)
-        # self.servo1_pid.set_effort_min(-self.max_vel[2])
-        # self.servo1_pid.set_effort_max(self.max_vel[2]) #TODO: change parameter values
 
         self.prev_update_time = self.get_clock().now()
         self.threshold = 0.5 #TODO: Change
@@ -70,15 +61,10 @@ class ObjectDelivery(Node):
         self.servo1_pid.update(self.center_x, dt)
         self.prev_update_time = self.get_clock().now()
 
-    def control_loop(self, feedback_msg):
+    def control_loop(self):
         self.update_pid()
         servo1_output = 5 #max(int(self.servo1_pid.get_effort()),0)
-
         self.mechanisms.servo2_angle(servo1_output)
-
-        feedback_msg.status = "Aim IN PROGRESS" #TODO: feedback report
-
-    
 
     def water_callback(self, goal_handle):
         # received = goal_handle.request.target
@@ -89,20 +75,16 @@ class ObjectDelivery(Node):
         while self.servo1_pid.is_done(0, self.threshold):
             self.control_loop(feedback_msg)
             goal_handle.publish_feedback(feedback_msg)
-            #TODO: may need a time.sleep()
+            time.sleep()
         self.servo1_pid.reset()
 
         self.mechanisms.stop_servo1()
 
         self.buck.adj1_en(1)
-        feedback_msg.status = 'Pump ON'
-        goal_handle.publish_feedback(feedback_msg)
 
         time.sleep(5)
 
         self.buck.adj1_en(0)
-        feedback_msg.status = 'Pump OFF'
-        goal_handle.publish_feedback(feedback_msg)
 
         goal_handle.succeed()
 
@@ -116,7 +98,6 @@ class ObjectDelivery(Node):
 
         feedback_msg = Delivery.Feedback()
 
-        # TODO: Fix feedback?
         self.buck.adj2_voltage(12)
         self.get_logger().info(f'Buck 2 voltage set to: 12.')
 

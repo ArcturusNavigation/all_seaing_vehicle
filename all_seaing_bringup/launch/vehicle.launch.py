@@ -103,6 +103,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
             {"Kpid_x": [0.3, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
@@ -197,6 +198,9 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
+        parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ],
         output="screen",
     )
 
