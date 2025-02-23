@@ -23,7 +23,7 @@ class RunTasks(Node):
     def __init__(self):
         super().__init__("run_tasks")
         self.task_list = [
-            ActionClient(self, Task, "task_1"),
+            ActionClient(self, Task, "follow_buoy_path"),
             # ActionClient(self, Task, "task_2")
         ]
         # self.task_5_signal_listener = self.create_subscription(
@@ -37,6 +37,7 @@ class RunTasks(Node):
         self.current_task = None
 
         self.pause_publisher = self.create_publisher(Bool, "pause", 10)
+        self.start_task() # um idk if this is right
 
     # def task_5_signal_callback(self, msg):
     #     self.get_logger().info("Received signal for task 5")

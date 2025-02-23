@@ -2,18 +2,22 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient, ActionServer
+from rclpy.executors import MultiThreadedExecutor
+
 
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
-from all_seaing_interfaces.action import FollowPath
+from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Point, Pose, Vector3
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
+from all_seaing_common.action_server_base import ActionServerBase
 
 import math
 import os
 import yaml
+import time
 
 class InternalBuoyPair:
     def __init__(self, left_buoy=None, right_buoy=None):
@@ -28,9 +32,19 @@ class InternalBuoyPair:
             self.right = right_buoy
 
 
-class FollowBuoyPath(Node):
+class FollowBuoyPath(ActionServerBase):
     def __init__(self):
-        super().__init__("follow_path")
+        super().__init__("follow_path_server")
+
+        self._action_server = ActionServer(
+            self, 
+            Task, 
+            "follow_buoy_path", 
+            execute_callback=self.execute_callback,
+            cancel_callback=self.default_cancel_callback,
+
+        )
+
         self.map_sub = self.create_subscription(
             ObstacleMap, "/obstacle_map/labeled", self.map_cb, 10
         )
@@ -78,6 +92,8 @@ class FollowBuoyPath(Node):
         self.sent_waypoints = set()
 
         self.red_left = True
+        self.result = False
+        self.timer_period = 1/60
 
     def ob_coords(self, buoy, local=False):
         if local:
@@ -371,6 +387,10 @@ class FollowBuoyPath(Node):
         while True:
             next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
             if next_buoy_pair is None:
+                if len(self.sent_waypoints):
+                    self.result = True
+                    # if we've previously sent waypoints, and there are no more detected
+                    # buoy pairs, then we're done. 
                 break
             buoy_pairs.append(next_buoy_pair)
             waypoints.append(self.midpoint_pair(next_buoy_pair))
@@ -418,23 +438,46 @@ class FollowBuoyPath(Node):
         """
         self.obstacles = msg.obstacles
 
-        success = False
         if self.first_map:
             success = self.setup_buoys()
-            self.first_map = not success
-        else:
-            success = True
-        if success:
+            self.first_map = False if success else True
+            if not success:
+                return
+
+        if not self.proc_cancel_evt.is_set():
             self.generate_waypoints()
 
     def odometry_cb(self, msg):
         self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
 
+    def execute_callback(self, goal_handle):
+        self.start_process("Follow buoy path (task 1/2) started.")
+
+        while not self.result:
+            # Check if we should abort/cancel if a new goal arrived
+            if self.should_abort():
+                self.end_process("New request received. Aborting path following.")
+                goal_handle.abort()
+                return Task.Result() 
+            
+            if goal_handle.is_cancel_requested:
+                self.end_process("Cancel requested. Aborting path following.")
+                goal_handle.canceled()
+                return Task.Result()
+
+            time.sleep(self.timer_period)
+        
+        self.end_process("Completed FollowBuoyPath request.")
+        goal_handle.succeed()
+        return Task.Result(success=True)
+
 
 def main(args=None):
     rclpy.init(args=args)
     node = FollowBuoyPath()
-    rclpy.spin(node)
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
+    executor.spin()
     node.destroy_node()
     rclpy.shutdown()
 

@@ -297,7 +297,7 @@ def launch_setup(context, *args, **kwargs):
         navigation_server,
         grid_map_generator,
         onshore_node,
-        #run_tasks,
+        run_tasks,
         #task_1_server,
         follow_buoy_path,
         rviz_waypoint_sender,
