@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.node import Node
 from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
 
@@ -37,9 +36,9 @@ class FollowBuoyPath(ActionServerBase):
         super().__init__("follow_path_server")
 
         self._action_server = ActionServer(
-            self, 
-            Task, 
-            "follow_buoy_path", 
+            self,
+            Task,
+            "follow_buoy_path",
             execute_callback=self.execute_callback,
             cancel_callback=self.default_cancel_callback,
 
@@ -199,7 +198,7 @@ class FollowBuoyPath(ActionServerBase):
     def setup_buoys(self):
         """
         Runs when the first obstacle map is received, filters the buoys that are in front of
-        the robot (x>0 in local coordinates) and finds (and stores) the closest green one and 
+        the robot (x>0 in local coordinates) and finds (and stores) the closest green one and
         the closest red one, and because the robot is in the starting position these
         are the front buoys of the robot starting box.
         """
@@ -390,7 +389,7 @@ class FollowBuoyPath(ActionServerBase):
                 if len(self.sent_waypoints):
                     self.result = True
                     # if we've previously sent waypoints, and there are no more detected
-                    # buoy pairs, then we're done. 
+                    # buoy pairs, then we're done.
                 break
             buoy_pairs.append(next_buoy_pair)
             waypoints.append(self.midpoint_pair(next_buoy_pair))
@@ -466,15 +465,15 @@ class FollowBuoyPath(ActionServerBase):
             if self.should_abort():
                 self.end_process("New request received. Aborting path following.")
                 goal_handle.abort()
-                return Task.Result() 
-            
+                return Task.Result()
+
             if goal_handle.is_cancel_requested:
                 self.end_process("Cancel requested. Aborting path following.")
                 goal_handle.canceled()
                 return Task.Result()
 
             time.sleep(self.timer_period)
-        
+
         self.end_process("Completed FollowBuoyPath request.")
         goal_handle.succeed()
         return Task.Result(success=True)
