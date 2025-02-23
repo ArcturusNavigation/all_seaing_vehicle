@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import PointCloud2, PointField
 from geometry_msgs.msg import Point, PointStamped
 from nav_msgs.msg import Odometry
 import numpy as np
@@ -33,18 +33,28 @@ class DockDetector(Node):
         self.dock_location_pub = self.create_publisher(
             PointStamped, "/dock_location/dock", 5
         )
+
+        self.dock_template_pub = self.create_publisher(
+            PointCloud2, "/dock_location/template", 5
+        )
         
         # self.declare_parameter("lidar_point_cloud", "")
         # self.declare_parameter('dock_point_cloud_file', '')
         # dock_point_cloud_file = self.get_parameter('dock_point_cloud_file').value
 
-        self.known_dock_pc = np.asarray(o3d.io.read_point_cloud(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock2.ply").points)
+        self.known_dock_pc = np.asarray(
+            o3d.io.read_point_cloud(
+                get_package_share_directory("all_seaing_perception")
+                + "/point_clouds/roboboat_dock2.ply"
+            ).points
+        ) / 3.9
         
         # self.known_dock_pc, _ = read(get_package_share_directory("all_seaing_perception") + "/point_clouds/roboboat_dock.ply", False, False, False)
         self.get_logger().info('type of known dock point cloud ' + str((self.known_dock_pc)))
 
         # remove nans from template TODO actually fix template
         self.known_dock_pc = self.known_dock_pc[~np.isnan(self.known_dock_pc).any(axis=1)]
+        self.known_dock_pc[:,2] = 0
 
         self.lidar_point_cloud = None
         self.robot_pos = (0, 0)
@@ -112,8 +122,25 @@ class DockDetector(Node):
 
     def detect_dock(self):
         self.get_logger().info('DETECT DOCK')
-        if type(self.lidar_point_cloud) != None:
-            transform, distances, _ = self.get_point_cloud_transform(self.known_dock_pc, self.lidar_point_cloud)
+        if self.lidar_point_cloud is not None:
+            # x = np.sum(self.lidar_point_cloud, axis=0)/float(self.lidar_point_cloud.shape[0])
+            # dock_point = Point()
+            # dock_point.x = float(x[0]) + self.robot_pos[0]
+            # dock_point.y = float(x[1]) + self.robot_pos[1]
+            # dock_point.z = float(x[2])
+
+            # dock_point_stamped = PointStamped()
+            # dock_point_stamped.header.frame_id = "wamv/wamv/lidar_wamv_link"
+            # dock_point_stamped.point = dock_point
+            # print(x)
+            # self.dock_location_pub.publish(dock_point_stamped)
+            # return
+
+            print(type(self.lidar_point_cloud))
+            print(type(self.known_dock_pc))
+            rand_indices = random.sample(range(self.known_dock_pc.shape[0]), self.lidar_point_cloud.shape[0])
+            A = self.known_dock_pc[rand_indices]
+            transform, distances, _ = self.get_point_cloud_transform(A, self.lidar_point_cloud)
             self.get_logger().info('got point cloud transform')
             self.get_logger().info(str(transform))
             dock_point = Point()
@@ -131,9 +158,20 @@ class DockDetector(Node):
             '''
 
             dock_point_stamped = PointStamped()
-            dock_point_stamped.header.frame_id = "map"
+            dock_point_stamped.header.frame_id = "wamv/wamv/lidar_wamv_link"
             dock_point_stamped.point = dock_point
             self.dock_location_pub.publish(dock_point_stamped)
+
+            transformed_template_pts = (transform @ np.vstack([A.T, np.ones(A.shape[0])])).T
+            # fields = [
+            #     PointField('x', 0, PointField.FLOAT32, 1),
+            #     PointField('y', 4, PointField.FLOAT32, 1),
+            #     PointField('z', 8, PointField.FLOAT32, 1),
+            # ]
+
+            cloud = pc2.create_cloud(dock_point_stamped.header, self.pc_msg.fields, transformed_template_pts)
+
+            self.dock_template_pub.publish(cloud)
         else:
             self.get_logger().info('lidar point cloud is None')
         # self.lidar_point_cloud_flat = # flatten
@@ -160,8 +198,6 @@ class DockDetector(Node):
         # self.get_logger().info('LIDAR point cloud ' + str(A))
         self.get_logger().info('LIDAR point cloud ' + str(B))
         B = B[:,:3] # get rid of intensity
-        rand_indices = random.sample(range(A.shape[0]), B.shape[0])
-        A = A[rand_indices]
         self.get_logger().info('known point cloud shape ' + str(A.shape))
         self.get_logger().info('lidar point cloud shape ' + str(B.shape))
         self.get_logger().info('known point cloud nan ' + str(np.any(np.isnan(A))))
@@ -202,6 +238,8 @@ class DockDetector(Node):
 
     def point_cloud_cb(self, msg):
         self.lidar_point_cloud = pc2.read_points_numpy(msg)
+        self.lidar_point_cloud[:,2] = 0
+        self.pc_msg = msg
 
 
 def main(args=None):

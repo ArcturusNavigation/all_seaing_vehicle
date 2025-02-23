@@ -261,7 +261,7 @@ def launch_setup(context, *args, **kwargs):
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "scan_dock_deliver_task",
+            "world": "follow_path_task", # "scan_dock_deliver_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -300,7 +300,7 @@ def generate_launch_description():
                 "no_gui", default_value="false", choices=["true", "false"]
             ),
             DeclareLaunchArgument(
-                "use_waypoint_client", default_value="false", choices=["true", "false"]
+                "use_waypoint_client", default_value="true", choices=["true", "false"]
             ),
             OpaqueFunction(function=launch_setup),
         ]
