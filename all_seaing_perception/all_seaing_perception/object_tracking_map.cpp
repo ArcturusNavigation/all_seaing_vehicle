@@ -170,15 +170,10 @@ void ObjectTrackingMap::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_m
 }
 
 geometry_msgs::msg::TransformStamped ObjectTrackingMap::get_tf(const std::string &in_target_frame,
-                                                             const std::string &in_src_frame) {
+                                            const std::string &in_src_frame) {
     geometry_msgs::msg::TransformStamped tf;
-    m_pc_cam_tf_ok = false;
     try {
         tf = m_tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
-        m_pc_cam_tf_ok = true;
-        RCLCPP_INFO(this->get_logger(), "LiDAR to Camera Transform good");
-        RCLCPP_INFO(this->get_logger(), "in_target_frame: %s, in_src_frame: %s",
-                    in_target_frame.c_str(), in_src_frame.c_str());
     } catch (tf2::TransformException &ex) {
         RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
     }
@@ -195,7 +190,6 @@ T ObjectTrackingMap::convert_to_global(double nav_x, double nav_y, double nav_he
     return new_point;
 }
 
-//TODO: Check it actually works, individually from the other parts
 template <typename T>
 T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_heading, T point) {
     T new_point = point;//to keep color-related data and z coordinate
@@ -209,7 +203,6 @@ T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_hea
     return new_point;
 }
 
-//TODO: Check it works, especially combined with the above
 //(range, bearing, signature)
 template <typename T>
 ObjectTrackingMap::det_rbs ObjectTrackingMap::local_to_range_bearing_signature(T point, int label){
@@ -231,6 +224,8 @@ void ObjectTrackingMap::visualize_predictions(){
     delete_mark.action = visualization_msgs::msg::Marker::DELETEALL;
     delete_arr.markers.push_back(delete_mark);
     m_map_cov_viz_pub->publish(delete_arr);
+
+    m_lidar_map_tf = get_tf(m_global_frame_id, m_local_header.frame_id);
     
     visualization_msgs::msg::MarkerArray ellipse_arr;
     //robot pose prediction
@@ -324,8 +319,14 @@ void ObjectTrackingMap::visualize_predictions(){
 }
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
-    if(msg->objects.size()==0 || (m_track_robot && m_first_state)) return;
+    if(msg->objects.size()==0 || (m_track_robot && m_first_state)) return;    
     RCLCPP_INFO(this->get_logger(), "GOT DATA");
+
+    // Set up headers and transforms
+    m_local_header = in_cloud->header;
+    m_global_header.frame_id = m_global_frame_id;
+    m_global_header.stamp = m_local_header.stamp;
+
     std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles;
     for(all_seaing_interfaces::msg::LabeledObjectPointCloud obj : msg->objects){
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_obj_pcloud(new pcl::PointCloud<pcl::PointXYZHSV>);
@@ -353,8 +354,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::vector<int> ind(raw_cloud->size());
         std::iota (std::begin(ind), std::end(ind), 0);
         std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
-            new all_seaing_perception::Obstacle(raw_cloud, ind, m_obstacle_id++,
-                                                det_obs->time_seen, m_nav_x, m_nav_y, m_nav_heading));
+            new all_seaing_perception::Obstacle(m_local_header, m_global_header, raw_cloud, ind, m_obstacle_id++,
+                                                det_obs->time_seen, m_nav_x, m_nav_y, m_lidar_map_tf));
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
@@ -641,8 +642,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::vector<int> ind(tracked_cloud->size());
         std::iota (std::begin(ind), std::end(ind), 0);
         std::shared_ptr<all_seaing_perception::Obstacle> tracked_ob(
-            new all_seaing_perception::Obstacle(tracked_cloud, ind, t_ob->id,
-                                                t_ob->time_seen, m_nav_x, m_nav_y, m_nav_heading));
+            new all_seaing_perception::Obstacle(m_local_header, m_global_header, tracked_cloud, ind, t_ob->id,
+                                                t_ob->time_seen, m_lidar_map_tf));
         tracked_labels.push_back(t_ob->label);
         tracked_obs.push_back(tracked_ob);
     }

@@ -104,6 +104,8 @@ private:
     // Member variables
     std::vector<std::shared_ptr<ObjectCloud>> m_tracked_obstacles;
     std::string m_global_frame_id;
+    std_msgs::msg::Header m_local_header;
+    std_msgs::msg::Header m_global_header;
     int m_obstacle_id;
     double m_obstacle_seg_thresh;
     double m_obstacle_drop_thresh;
@@ -126,8 +128,7 @@ private:
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
-    geometry_msgs::msg::TransformStamped m_pc_cam_tf;
-    bool m_pc_cam_tf_ok;
+    geometry_msgs::msg::TransformStamped m_lidar_map_tf;
 
     // Intrinsics callback camera model variables
     image_geometry::PinholeCameraModel m_cam_model;
