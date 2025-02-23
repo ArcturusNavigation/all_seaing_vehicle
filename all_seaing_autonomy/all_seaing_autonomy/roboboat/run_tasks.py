@@ -25,6 +25,7 @@ class RunTasks(Node):
         self.task_list = [
             ActionClient(self, Task, "follow_buoy_path"),
             # ActionClient(self, Task, "task_2")
+            # ActionClient(self, Task, "task_6")
         ]
         # self.task_5_signal_listener = self.create_subscription(
         #     BoatInfo,
@@ -35,6 +36,9 @@ class RunTasks(Node):
 
         # self.task_5_action_client = ActionClient(self, ShootBoat, "task_5")
         self.current_task = None
+        self.idle_index = 0
+        self.end_index = -1
+        self.next_task_index = self.idle_index # by default the next task is idling
 
         self.pause_publisher = self.create_publisher(Bool, "pause", 10)
         self.start_task() # um idk if this is right
@@ -82,8 +86,8 @@ class RunTasks(Node):
     #     self.get_logger().info(f"Current task: task_5")
 
     def start_task(self):
-        self.current_task = self.task_list.pop(0)
-        self.get_logger().info("Starting sequential actions...")
+        self.current_task = self.task_list[self.next_task_index]
+        self.get_logger().info(f"Starting Task Manager States...")
         self.current_task.wait_for_server()
         self.get_logger().info(f"Starting task: {self.current_task._action_name}")
         task_goal_msg = Task.Goal()
@@ -113,9 +117,18 @@ class RunTasks(Node):
         result = future.result().result
         if result.success:
             self.get_logger().info("Goal succeeded!")
-            self.start_task() if self.task_list else rclpy.shutdown()
+            
             # TODO: modify this so that when a task is finished, or the task list is empty,
             # enter a transition state to search for a new task. 
+
+            if self.next_task_index != self.idle_index:
+                self.next_task_index = self.idle_index
+            else:
+                self.next_task_index = result.next_task_index # to be implemented in idle action server?
+
+            if self.next_task_index == self.end_index: # when end, shut down the node
+                rclpy.shutdown()
+            self.start_task()
         else:
             self.get_logger().info("Goal failed")
 
