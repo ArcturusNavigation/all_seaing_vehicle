@@ -68,7 +68,7 @@ ObstacleMapDisplay::get_centroid_marker(const all_seaing_interfaces::msg::Obstac
 
     marker->pose.position.x = obstacle.global_point.point.x;
     marker->pose.position.y = obstacle.global_point.point.y;
-    marker->pose.position.z = 0;
+    marker->pose.position.z = obstacle.global_point.point.z;
 
     return marker;
 }
@@ -93,7 +93,7 @@ ObstacleMapDisplay::get_vertices_marker(const all_seaing_interfaces::msg::Obstac
         geometry_msgs::msg::Point p;
         p.x = obstacle.global_chull.polygon.points[i].x;
         p.y = obstacle.global_chull.polygon.points[i].y;
-        p.z = 0;
+        p.z = obstacle.global_point.point.z;
 
         marker->points.push_back(p);
     }
@@ -121,11 +121,11 @@ ObstacleMapDisplay::get_edges_marker(const all_seaing_interfaces::msg::Obstacle 
         geometry_msgs::msg::Point p1, p2;
         p1.x = obstacle.global_chull.polygon.points[i].x;
         p1.y = obstacle.global_chull.polygon.points[i].y;
-        p1.z = 0;
+        p1.z = obstacle.global_point.point.z;
 
         p2.x = obstacle.global_chull.polygon.points[(i+1) % obstacle.global_chull.polygon.points.size()].x;
         p2.y = obstacle.global_chull.polygon.points[(i+1) % obstacle.global_chull.polygon.points.size()].y;
-        p2.z = 0;
+        p2.z = obstacle.global_point.point.z;
 
         marker->points.push_back(p1);
         marker->points.push_back(p2);
@@ -150,12 +150,12 @@ ObstacleMapDisplay::get_text(bool is_labeled, const all_seaing_interfaces::msg::
     if (is_labeled)
         marker->text = std::to_string(obstacle.label);
     else
-        marker->text = std::to_string(obstacle.id);
+        marker->text = "";
     
 
     marker->pose.position.x = obstacle.global_point.point.x;
     marker->pose.position.y = obstacle.global_point.point.y;
-    marker->pose.position.z = 1.0;
+    marker->pose.position.z = obstacle.global_point.point.z + 1.0;
 
     return marker;
 }

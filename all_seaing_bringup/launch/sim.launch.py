@@ -6,8 +6,8 @@ from launch.actions import (
     OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 import launch_ros
 import os
 import subprocess
@@ -44,9 +44,6 @@ def launch_setup(context, *args, **kwargs):
     launch_rviz = LaunchConfiguration("launch_rviz")
     no_gui = str(context.perform_substitution(LaunchConfiguration("no_gui")))
     use_waypoint_client = LaunchConfiguration("use_waypoint_client")
-    xy_threshold = LaunchConfiguration("xy_threshold")
-    theta_threshold = LaunchConfiguration("theta_threshold")
-
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -100,6 +97,7 @@ def launch_setup(context, *args, **kwargs):
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
             ),
         ],
+        parameters=[{"is_sim": True}],
     )
 
     perception_eval_node = launch_ros.actions.Node(
@@ -120,7 +118,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {
                 "color_label_mappings_file": color_label_mappings,
-            }
+            },
+            {
+                "is_sim": True,
+            },
         ],
     )
 
@@ -145,7 +146,6 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
         parameters=[
-            {"robot_frame_id": "wamv/wamv/base_link"},
             {"range_x": [0.0, 100000.0]},
             {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
@@ -164,9 +164,6 @@ def launch_setup(context, *args, **kwargs):
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
-            {"obstacle_seg_thresh": 10.0},
-            {"obstacle_drop_thresh": 1.0},
-            {"polygon_area_thresh": 100000.0},
         ],
     )
 
@@ -232,7 +229,6 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
-            {"global_frame_id": "odom"},
             {"Kpid_x": [1.0, 0.0, 0.0]},
             {"Kpid_y": [1.0, 0.0, 0.0]},
             {"Kpid_theta": [1.0, 0.0, 0.0]},
@@ -244,21 +240,29 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
-        parameters=[
-            {"global_frame_id": "odom"},
-        ],
         output="screen",
+    )
+
+    grid_map_generator = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="grid_map_generator.py",
+        remappings=[("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan")],
+        parameters=[
+            {"timer_period": 1.0},
+            {"grid_dim": [800, 800]},
+            {"grid_resolution": 0.3},
+        ],
     )
 
     onshore_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_node.py",
-        output="screen",
         parameters=[
             {"joy_x_scale": 3.0},
             {"joy_y_scale": -2.0},
             {"joy_ang_scale": -1.5},
         ],
+        output="screen",
     )
 
     waypoint_finder = launch_ros.actions.Node(
@@ -274,11 +278,21 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": xy_threshold},
-            {"theta_threshold": theta_threshold},
+            {"xy_threshold": 3.0},
+            {"theta_threshold": 180.0},
             {"use_waypoint_client": use_waypoint_client},
         ],
-        output="screen",
+    )
+
+    map_to_odom = launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--frame-id",
+            "map",
+            "--child-frame-id",
+            "odom",
+        ],
     )
 
     keyboard_ld = IncludeLaunchDescription(
@@ -292,6 +306,7 @@ def launch_setup(context, *args, **kwargs):
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
+            # "world": "rb2025/rb2025_task1_task2.sdf",
             "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
@@ -307,15 +322,17 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
+        obstacle_detector_node,
         color_segmentation_node,
         point_cloud_filter_node,
-        obstacle_detector_node,
         rviz_node,
         control_mux,
         navigation_server,
+        grid_map_generator,
         onshore_node,
         waypoint_finder,
         rviz_waypoint_sender,
+        map_to_odom,
         keyboard_ld,
         sim_ld,
         perception_eval_node,
@@ -332,12 +349,6 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
-            ),
-            DeclareLaunchArgument(
-                "xy_threshold", default_value="2.0",
-            ),
-            DeclareLaunchArgument(
-                "theta_threshold", default_value="30.0",
             ),
             OpaqueFunction(function=launch_setup),
         ]
