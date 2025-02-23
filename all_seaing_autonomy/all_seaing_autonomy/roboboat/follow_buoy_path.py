@@ -3,7 +3,6 @@ import rclpy
 from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
 
-
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
@@ -41,7 +40,6 @@ class FollowBuoyPath(ActionServerBase):
             "follow_buoy_path",
             execute_callback=self.execute_callback,
             cancel_callback=self.default_cancel_callback,
-
         )
 
         self.map_sub = self.create_subscription(
@@ -94,42 +92,35 @@ class FollowBuoyPath(ActionServerBase):
         self.result = False
         self.timer_period = 1/60
 
-    def ob_coords(self, buoy, local=False):
-        if local:
-            return (buoy.local_point.point.x, buoy.local_point.point.y)
-        else:
-            return (buoy.global_point.point.x, buoy.global_point.point.y)
+    ob_coords = lambda self, buoy, local=False: \
+        (buoy.local_point.point.x, buoy.local_point.point.y) if local \
+        else (buoy.global_point.point.x, buoy.global_point.point.y)
 
-    def get_closest_to(self, source, buoys, local=False):
-        return min(
-            buoys,
-            key=lambda buoy: math.dist(source, self.ob_coords(buoy, local)),
+    get_closest_to = lambda self, source, buoys, local=False: \
+        min(
+          buoys,
+          key=lambda buoy: math.dist(source, self.ob_coords(buoy, local)),
         )
 
-    def midpoint(self, vec1, vec2):
-        return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
+    avg = lambda self, a, b: (a+b)/2
+    pavg = lambda self, x: self.avg(x[0], x[1])
+    fmap = lambda self, f, l: [f(x) for x in l]
+    vavg = lambda self, u, v: self.fmap(self.pavg, zip(u, v))
+    midpoint = lambda self, vec1, vec2: self.vavg(vec1, vec2)
 
-    def midpoint_pair(self, pair):
-        return self.midpoint(self.ob_coords(pair.left), self.ob_coords(pair.right))
+    midpoint_pair = lambda self, pair: \
+      self.midpoint(self.ob_coords(pair.left), self.ob_coords(pair.right))
 
-    def split_buoys(self, obstacles):
-        """
-        Splits the buoys into red and green based on their labels in the obstacle map
-        """
-        green_bouy_points = []
-        red_bouy_points = []
-        for obstacle in obstacles:
-            if obstacle.label == self.color_label_mappings["green"]:
-                green_bouy_points.append(obstacle)
-            elif obstacle.label == self.color_label_mappings["red"]:
-                red_bouy_points.append(obstacle)
-        return green_bouy_points, red_bouy_points
+    isColor = lambda self, color, x: x.label == self.color_label_mappings[color]
+    isGreen = lambda self, x: self.isColor("green", x)
+    isRed = lambda self, x: self.isColor("red", x)
+    filter = lambda self, p, l: [x for x in l if p(x)]
+    green_buoy_points = lambda self, obstacles: self.filter(self.isGreen, obstacles)
+    red_buoy_points = lambda self, obstacles: self.filter(self.isRed, obstacles)
+    split_buoys = lambda self, obstacles: (self.green_buoy_points(obstacles), self.red_buoy_points(obstacles))
 
-    def obs_to_pos(self, obs):
-        return [self.ob_coords(ob, local=False) for ob in obs]
-
-    def obs_to_pos_label(self, obs):
-        return [self.ob_coords(ob, local=False) + (ob.label,) for ob in obs]
+    obs_to_pos = lambda self, obs: [self.ob_coords(ob, local=False) for ob in obs]
+    obs_to_pos_label = lambda self, obs: [self.ob_coords(ob, local=False) + (ob.label,) for ob in obs]
 
     def buoy_pairs_to_markers(self, buoy_pairs):
         """
@@ -249,34 +240,25 @@ class FollowBuoyPath(ActionServerBase):
         self.pair_to = self.starting_buoys
         return True
 
-    def ccw(self, a, b, c):
-        """Return True if the points a, b, c are counterclockwise, respectively"""
-        area = (
+    """Return True if the points a, b, c are counterclockwise, respectively"""
+    ccw = lambda self, a, b, c: \
+        (
+            # area of triangle enclosed by vertices
             a[0] * b[1]
             + b[0] * c[1]
             + c[0] * a[1]
             - a[1] * b[0]
             - b[1] * c[0]
             - c[1] * a[0]
-        )
-        return area > 0
+        ) > 0
 
-    def filter_front_buoys(self, pair, buoys):
-        """
-        Returns the buoys (from the given array) that are in front of a pair of points,
-        considering the forward direction to be the one such that
-        the first point of the pair is in the left and the second is in the right
-        """
-        # (red, green)
-        return [
-            buoy
-            for buoy in buoys
-            if self.ccw(
-                self.ob_coords(pair.left),
-                self.ob_coords(pair.right),
-                self.ob_coords(buoy),
-            )
-        ]
+    isFontBuoy = lambda self, pair: lambda buoy: \
+        self.ccw(
+            self.ob_coords(pair.left),
+            self.ob_coords(pair.right),
+            self.ob_coords(buoy),
+        )
+    filter_front_buoys = lambda self, pair, buoys: self.filter(self.isFrontBuoy(pair), buoys)
 
     def next_pair(self, prev_pair, red, green):
         """
@@ -332,8 +314,7 @@ class FollowBuoyPath(ActionServerBase):
                     self.get_closest_to(self.robot_pos, red),
                 )
 
-    def pair_to_pose(self, pair):
-        return Pose(position=Point(x=pair[0], y=pair[1]))
+    pair_to_pose = lambda self, pair: Pose(position=Point(x=pair[0], y=pair[1]))
 
     def generate_waypoints(self):
         """
