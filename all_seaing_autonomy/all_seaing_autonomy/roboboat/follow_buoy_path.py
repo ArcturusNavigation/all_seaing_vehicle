@@ -94,6 +94,9 @@ class FollowBuoyPath(ActionServerBase):
         self.red_left = True
         self.result = False
         self.timer_period = 1/60
+        self.time_last_seen_buoys = time.time()
+
+        self.obstacles = None
 
     def ob_coords(self, buoy, local=False):
         if local:
@@ -367,8 +370,11 @@ class FollowBuoyPath(ActionServerBase):
             new_pair = self.next_pair(self.pair_to, red_buoys, green_buoys)
             if new_pair is not None:
                 self.pair_to = new_pair
+                self.time_last_seen_buoys = time.time()
             else:
                 self.get_logger().debug("No next buoy pair to go to.")
+                if time.time() - self.time_last_seen_buoys > 1:
+                    self.result = True
                 # wait for next spin
                 return
             # TODO: there is no longer a case where it is done wiht the task.
@@ -384,16 +390,11 @@ class FollowBuoyPath(ActionServerBase):
         will terminate if we run out of either green or red buoys
         """
 
-        while True:
-            next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
-            if next_buoy_pair is None:
-                if len(self.sent_waypoints):
-                    self.result = True
-                    # if we've previously sent waypoints, and there are no more detected
-                    # buoy pairs, then we're done. 
-                break
+        next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
+        while next_buoy_pair is not None:
             buoy_pairs.append(next_buoy_pair)
             waypoints.append(self.midpoint_pair(next_buoy_pair))
+            next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
 
         self.get_logger().debug(f"Waypoints: {waypoints}")
 
@@ -438,20 +439,33 @@ class FollowBuoyPath(ActionServerBase):
         """
         self.obstacles = msg.obstacles
 
-        if self.first_map:
-            success = self.setup_buoys()
-            self.first_map = False if success else True
-            if not success:
-                return
-
-        if not self.proc_cancel_evt.is_set():
-            self.generate_waypoints()
-
     def odometry_cb(self, msg):
         self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
 
     def execute_callback(self, goal_handle):
+        self.get_logger().info("FollowBuoyPath request received.")
+
         self.start_process("Follow buoy path (task 1/2) started.")
+
+        while rclpy.ok() and self.obstacles is None:
+            self.get_logger().info("No obstacle map yet; waiting...")
+            time.sleep(1.0) # maybe change this
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                return Task.Result()
+        
+        self.get_logger().info("received first map")
+
+        success = False
+        while not success:
+            success = self.setup_buoys()
+            time.sleep(1.0)
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                return Task.Result()
+
+        self.get_logger().info("Setup buoys succeeded!")
+
 
         while not self.result:
             # Check if we should abort/cancel if a new goal arrived
@@ -464,6 +478,8 @@ class FollowBuoyPath(ActionServerBase):
                 self.end_process("Cancel requested. Aborting path following.")
                 goal_handle.canceled()
                 return Task.Result()
+            
+            self.generate_waypoints()
 
             time.sleep(self.timer_period)
         
@@ -475,7 +491,7 @@ class FollowBuoyPath(ActionServerBase):
 def main(args=None):
     rclpy.init(args=args)
     node = FollowBuoyPath()
-    executor = MultiThreadedExecutor()
+    executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
     executor.spin()
     node.destroy_node()

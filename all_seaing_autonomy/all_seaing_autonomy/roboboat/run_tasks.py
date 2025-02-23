@@ -87,7 +87,7 @@ class RunTasks(Node):
 
     def start_task(self):
         self.current_task = self.task_list[self.next_task_index]
-        self.get_logger().info(f"Starting Task Manager States...")
+        self.get_logger().info("Starting Task Manager States...")
         self.current_task.wait_for_server()
         self.get_logger().info(f"Starting task: {self.current_task._action_name}")
         task_goal_msg = Task.Goal()
