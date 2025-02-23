@@ -13,6 +13,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/nav_to_tile.py
     ${PROJECT_NAME}/rosbag_to_image.py
     ${PROJECT_NAME}/rosbag_to_mp4.py
+    ${PROJECT_NAME}/webcam_publisher.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

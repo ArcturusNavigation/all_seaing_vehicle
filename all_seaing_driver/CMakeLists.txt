@@ -15,7 +15,6 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/onshore_node.py
     ${PROJECT_NAME}/thrust_commander.py
-    ${PROJECT_NAME}/webcam_publisher.py
     ${PROJECT_NAME}/rover_lora_controller.py
     ${PROJECT_NAME}/onshore_lora_controller.py
     ${PROJECT_NAME}/gps_converter.py
