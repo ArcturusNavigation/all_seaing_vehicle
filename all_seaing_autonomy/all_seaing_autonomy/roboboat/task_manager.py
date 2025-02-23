@@ -5,7 +5,10 @@ from all_seaing_interfaces.msg import Heartbeat, ASV2State, ControlOption
 from nav_msgs.msg import Odometry
 from all_seaing_autonomy.roboboat.Task import Task
 from all_seaing_autonomy.roboboat.FollowThePath import FollowThePath
+from all_seaing_autonomy.roboboat.docking import DockingTask
 from all_seaing_interfaces.msg import ObstacleMap
+from rclpy.action import ActionClient
+from all_seaing_interfaces.action import Waypoint
 
 
 def point_diff_2d(a, b):
@@ -87,9 +90,12 @@ class TaskManager(Node):
             ControlOption, "control_options", 10
         )
 
+        self.waypoint_action_client = ActionClient(self, Waypoint, "waypoint")
+
         self.TASK_LIST = [
-            FollowThePath(self.get_logger()),
+            # FollowThePath(self.get_logger()),
             # NavigationChannel(self.control_message_publisher, self.get_logger()),
+            DockingTask(self.waypoint_action_client, self.get_clock(), self.get_logger()),
             Idling(),
         ]
 
@@ -101,7 +107,7 @@ class TaskManager(Node):
 
         self.timer = self.create_timer(UPDATE_RATE, self.update)
 
-        self.paused = True
+        self.paused = False
         self.has_started_for_the_first_time = False
 
         self.get_logger().info("starting task manager (paused for now)")
@@ -145,13 +151,14 @@ class TaskManager(Node):
         if msg.e_stopped:
             raise Exception("received e-stop message, shutting down task manager")
 
+        '''
         if msg.in_teleop != self.paused:
             self.paused = msg.in_teleop
             if self.paused:
                 self.get_logger().info("detected teleop mode, pausing task manager")
             else:
                 self.get_logger().info("unpausing task manager")
-
+        '''
         self.last_heartbeat_timestamp = self.clock.now()
 
 
