@@ -140,7 +140,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"obstacle_size_min": 20},
+            {"obstacle_size_min": 10},
             {"obstacle_size_max": 800},
             {"clustering_distance": 0.1},
         ],

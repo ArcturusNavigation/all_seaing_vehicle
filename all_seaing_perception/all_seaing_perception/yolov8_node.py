@@ -109,6 +109,7 @@ class Yolov8Node(Node):
         label_dict = self.label_dict
 
         labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
+        labeled_bounding_box_msgs.header = msg.header
         for box_data in results.boxes:
 
             box_msg = LabeledBoundingBox2D()

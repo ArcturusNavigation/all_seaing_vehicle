@@ -16,14 +16,17 @@ from rclpy.action import ActionClient, ActionServer
 from all_seaing_interfaces.action import FollowPath
 
 class InternalBuoyPair():
-    def __init__(self):
-        self.left = Obstacle()
-        self.right = Obstacle()
+    def __init__(self, left_buoy=None, right_buoy=None):
+        if left_buoy is None:
+            self.left = Obstacle()
+        else: 
+            self.left = left_buoy
+        
+        if right_buoy is None:
+            self.right = Obstacle()
+        else:
+            self.right = right_buoy
     
-    def __init__(self, left_buoy, right_buoy):
-        self.left = left_buoy
-        self.right = right_buoy
-
 class WaypointFinder(Node):
     def __init__(self):
         super().__init__("waypoint_finder")
@@ -135,47 +138,32 @@ class WaypointFinder(Node):
                 )
             )
             if(self.red_left):
-                marker_array.markers.append(
-                    Marker(
-                        type=Marker.SPHERE,
-                        pose=self.pair_to_pose(self.ob_coords(buoy_pair.left)),
-                        header=Header(frame_id="odom"),
-                        scale=Vector3(x=1.0, y=1.0, z=1.0),
-                        color=ColorRGBA(r=1.0, a=1.0),
-                        id=(4 * i) + 1,
-                    )
+                left_color = ColorRGBA(r=1.0, a=1.0)
+                right_color = ColorRGBA(g=1.0, a=1.0)
+            else: 
+                left_color = ColorRGBA(g=1.0, a=1.0)
+                right_color = ColorRGBA(r=1.0, a=1.0)
+                
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.SPHERE,
+                    pose=self.pair_to_pose(self.ob_coords(buoy_pair.left)),
+                    header=Header(frame_id="odom"),
+                    scale=Vector3(x=1.0, y=1.0, z=1.0),
+                    color=left_color,
+                    id=(4 * i) + 1,
                 )
-                marker_array.markers.append(
-                    Marker(
-                        type=Marker.SPHERE,
-                        pose=self.pair_to_pose(self.ob_coords(buoy_pair.right)),
-                        header=Header(frame_id="odom"),
-                        scale=Vector3(x=1.0, y=1.0, z=1.0),
-                        color=ColorRGBA(g=1.0, a=1.0),
-                        id=(4 * i) + 2,
-                    )
+            )
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.SPHERE,
+                    pose=self.pair_to_pose(self.ob_coords(buoy_pair.right)),
+                    header=Header(frame_id="odom"),
+                    scale=Vector3(x=1.0, y=1.0, z=1.0),
+                    color=right_color,
+                    id=(4 * i) + 2,
                 )
-            else:
-                marker_array.markers.append(
-                    Marker(
-                        type=Marker.SPHERE,
-                        pose=self.pair_to_pose(self.ob_coords(buoy_pair.left)),
-                        header=Header(frame_id="odom"),
-                        scale=Vector3(x=1.0, y=1.0, z=1.0),
-                        color=ColorRGBA(g=1.0, a=1.0),
-                        id=(4 * i) + 1,
-                    )
-                )
-                marker_array.markers.append(
-                    Marker(
-                        type=Marker.SPHERE,
-                        pose=self.pair_to_pose(self.ob_coords(buoy_pair.right)),
-                        header=Header(frame_id="odom"),
-                        scale=Vector3(x=1.0, y=1.0, z=1.0),
-                        color=ColorRGBA(r=1.0, a=1.0),
-                        id=(4 * i) + 2,
-                    )
-                )
+            )
             marker_array.markers.append(
                 Marker(
                     type=Marker.CYLINDER,
