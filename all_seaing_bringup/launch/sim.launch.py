@@ -224,6 +224,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_autonomy",
         executable="waypoint_finder.py",
         parameters=[
+            {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
@@ -261,8 +262,8 @@ def launch_setup(context, *args, **kwargs):
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            # "world": "rb2025/rb2025_task1_task2.sdf",
-            "world": "follow_path_task",
+            "world": "rb2025/rb2025_task1_task2.sdf",
+            #"world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
