@@ -53,7 +53,6 @@ class ActionServerBase(ABC, Node):
         """Canceling has no extra functionalities by default"""
         return CancelResponse.ACCEPT
 
-
     def start_process(self, msg=None):
         """
         Manages the beginning of new client request.
