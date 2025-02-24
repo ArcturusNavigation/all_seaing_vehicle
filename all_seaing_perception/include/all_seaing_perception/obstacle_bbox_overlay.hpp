@@ -32,7 +32,6 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
     geometry_msgs::msg::TransformStamped m_pc_cam_tf;
-    bool m_viz;
     bool m_pc_cam_tf_ok;
 
     // Intrinsics callback camera model variables
@@ -46,6 +45,18 @@ private:
     typedef message_filters::Synchronizer<ObstacleBboxPolicy> ObstacleBboxSync;
     std::shared_ptr<ObstacleBboxSync> m_obstacle_bbox_sync;
 
+    // Get the closest obstacle
+    // Diff criteria options (centroid matching, IoU)
+    int get_matching_obstacle_centroid(
+    const all_seaing_interfaces::msg::Obstacle &obstacle,
+        const std::unordered_set<int> &chosen_indices,
+        const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg);
+
+    int get_matching_obstacle_iou(
+    const all_seaing_interfaces::msg::Obstacle &obstacle,
+        const std::unordered_set<int> &chosen_indices,
+        const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg);
+
     // Fuse image and obstacle by projecting 3D points onto 2D image.
     void obstacle_bbox_fusion_cb(
         const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg,
@@ -57,6 +68,9 @@ private:
     // Get transform from source frame to target frame
     geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
                                                 const std::string &in_src_frame);
+
+    // Check if running in sim
+    bool m_is_sim;
 
 public:
     ObstacleBboxOverlay();

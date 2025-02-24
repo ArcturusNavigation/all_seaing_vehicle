@@ -20,5 +20,9 @@ def generate_launch_description():
                 ],
                 output="both",
             ),
+            launch_ros.actions.Node(
+                package="all_seaing_driver",
+                executable="gps_converter.py",
+            ),
         ]
     )
