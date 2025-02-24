@@ -123,7 +123,7 @@ class FollowBuoyPath(ActionServerBase):
         right_coords = self.ob_coords(pair.right)
         midpoint = self.midpoint(left_coords, right_coords)
         
-        scale = 5 # number of meters to translate
+        scale = 5 # number of meters to translate forward. TODO: parametrize.
         dy = right_coords[1] - left_coords[1]
         dx = right_coords[0] - left_coords[0]
         norm = math.sqrt(dx**2 + dy**2)
@@ -307,7 +307,7 @@ class FollowBuoyPath(ActionServerBase):
 
         front_red = self.filter_front_buoys(prev_pair, red)
         front_green = self.filter_front_buoys(prev_pair, green)
-        self.get_logger().info(
+        self.get_logger().debug(
             f"robot pos: {self.robot_pos}, front red buoys: {self.obs_to_pos(front_red)}, front green buoys: {self.obs_to_pos(front_green)}"
         )
 
@@ -322,7 +322,7 @@ class FollowBuoyPath(ActionServerBase):
                 f"buoys:  {prev_coords} \nred: {red_coords} \ngreen: {green_coords}"
             )
             self.get_logger().debug(f"robot: {self.robot_pos}")
-            self.get_logger().info("Missing at least one front buoy")
+            self.get_logger().debug("Missing at least one front buoy")
             return None
 
         if prev_pair is not None:
@@ -339,9 +339,9 @@ class FollowBuoyPath(ActionServerBase):
                     self.get_closest_to(prev_pair_midpoint, front_red),
                 )
         else:
-            self.get_logger().info("No previous pair!")
+            self.get_logger().debug("No previous pair!")
             # TODO: change those to: self.get_closest_to((0,0), red/green, local=True) to not have to use odometry position but just local obstacle positions (wrt the robot)?
-            self.get_logger().info(
+            self.get_logger().debug(
                 f"next buoys: red: {self.get_closest_to(self.robot_pos, red)}, green: {self.get_closest_to(self.robot_pos, green)}"
             )
             # if there is no previous pair, just take the closest red and green buoys
@@ -400,7 +400,7 @@ class FollowBuoyPath(ActionServerBase):
         """
         # split the buoys into red and green
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
-        self.get_logger().info(
+        self.get_logger().debug(
             f"robot pos: {self.robot_pos}, red buoys: {self.obs_to_pos(red_buoys)}, green buoys: {self.obs_to_pos(green_buoys)}"
         )
 
