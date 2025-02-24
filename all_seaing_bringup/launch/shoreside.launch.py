@@ -55,6 +55,7 @@ def launch_setup(context, *args, **kwargs):
 
     keyboard_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
+        condition=UnlessCondition(use_lora),
     )
 
     return [
