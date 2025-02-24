@@ -7,7 +7,7 @@ from rclpy.executors import MultiThreadedExecutor
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import Point, Pose, Vector3
+from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
@@ -97,6 +97,12 @@ class FollowBuoyPath(ActionServerBase):
 
         self.obstacles = None
 
+    def norm_squared(self, vec, ref=(0, 0)):
+        return vec[0] ** 2 + vec[1] ** 2
+
+    def norm(self, vec, ref=(0, 0)):
+        return math.sqrt(self.norm_squared(vec, ref))
+
     def ob_coords(self, buoy, local=False):
         if local:
             return (buoy.local_point.point.x, buoy.local_point.point.y)
@@ -152,11 +158,11 @@ class FollowBuoyPath(ActionServerBase):
         """
         marker_array = MarkerArray()
         i = 0
-        for buoy_pair in buoy_pairs.pairs:
+        for p_left, p_right, point, radius in buoy_pairs:
             marker_array.markers.append(
                 Marker(
                     type=Marker.ARROW,
-                    pose=buoy_pair.waypoint.point,
+                    pose=point,
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=0.05, z=0.05),
                     color=ColorRGBA(a=1.0),
@@ -173,7 +179,7 @@ class FollowBuoyPath(ActionServerBase):
             marker_array.markers.append(
                 Marker(
                     type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(buoy_pair.left)),
+                    pose=self.pair_to_pose(self.ob_coords(p_left)),
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=left_color,
@@ -183,7 +189,7 @@ class FollowBuoyPath(ActionServerBase):
             marker_array.markers.append(
                 Marker(
                     type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(buoy_pair.right)),
+                    pose=self.pair_to_pose(self.ob_coords(p_right)),
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=right_color,
@@ -195,13 +201,13 @@ class FollowBuoyPath(ActionServerBase):
                     type=Marker.CYLINDER,
                     pose=Pose(
                         position=Point(
-                            x=buoy_pair.waypoint.point.position.x,
-                            y=buoy_pair.waypoint.point.position.y,
+                            x=point.position.x,
+                            y=point.position.y,
                         )
                     ),
                     header=Header(frame_id="odom"),
                     scale=Vector3(
-                        x=buoy_pair.waypoint.radius, y=buoy_pair.waypoint.radius, z=1.0
+                        x=radius, y=radius, z=1.0
                     ),
                     color=ColorRGBA(g=1.0, a=0.5),
                     id=(4 * i) + 3,
@@ -301,6 +307,9 @@ class FollowBuoyPath(ActionServerBase):
 
         front_red = self.filter_front_buoys(prev_pair, red)
         front_green = self.filter_front_buoys(prev_pair, green)
+        self.get_logger().info(
+            f"robot pos: {self.robot_pos}, front red buoys: {self.obs_to_pos(front_red)}, front green buoys: {self.obs_to_pos(front_green)}"
+        )
 
         if not front_red or not front_green:
             prev_coords = self.ob_coords(prev_pair.left), self.ob_coords(
@@ -313,7 +322,7 @@ class FollowBuoyPath(ActionServerBase):
                 f"buoys:  {prev_coords} \nred: {red_coords} \ngreen: {green_coords}"
             )
             self.get_logger().debug(f"robot: {self.robot_pos}")
-            self.get_logger().debug("Missing at least one front buoy")
+            self.get_logger().info("Missing at least one front buoy")
             return None
 
         if prev_pair is not None:
@@ -330,9 +339,9 @@ class FollowBuoyPath(ActionServerBase):
                     self.get_closest_to(prev_pair_midpoint, front_red),
                 )
         else:
-            self.get_logger().debug("No previous pair!")
+            self.get_logger().info("No previous pair!")
             # TODO: change those to: self.get_closest_to((0,0), red/green, local=True) to not have to use odometry position but just local obstacle positions (wrt the robot)?
-            self.get_logger().debug(
+            self.get_logger().info(
                 f"next buoys: red: {self.get_closest_to(self.robot_pos, red)}, green: {self.get_closest_to(self.robot_pos, green)}"
             )
             # if there is no previous pair, just take the closest red and green buoys
@@ -349,6 +358,34 @@ class FollowBuoyPath(ActionServerBase):
 
     def pair_to_pose(self, pair):
         return Pose(position=Point(x=pair[0], y=pair[1]))
+    
+    def quaternion_from_euler(self, roll, pitch, yaw):
+        """
+        Converts euler roll, pitch, yaw to quaternion (w in last place)
+        quat = [x, y, z, w]
+        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
+        """
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        q = [0] * 4
+        q[0] = cy * cp * cr + sy * sp * sr
+        q[1] = cy * cp * sr - sy * sp * cr
+        q[2] = sy * cp * sr + cy * sp * cr
+        q[3] = sy * cp * cr - cy * sp * sr
+
+        return q
+    
+    def pair_angle_to_pose(self, pair, angle):
+        quat = self.quaternion_from_euler(0, angle, 0)
+        return Pose(
+            position=Point(x=pair[0], y=pair[1]),
+            orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
+        )
 
     def generate_waypoints(self):
         """
@@ -363,7 +400,7 @@ class FollowBuoyPath(ActionServerBase):
         """
         # split the buoys into red and green
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
-        self.get_logger().debug(
+        self.get_logger().info(
             f"robot pos: {self.robot_pos}, red buoys: {self.obs_to_pos(red_buoys)}, green buoys: {self.obs_to_pos(green_buoys)}"
         )
 
@@ -405,6 +442,14 @@ class FollowBuoyPath(ActionServerBase):
             next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
 
         self.get_logger().debug(f"Waypoints: {waypoints}")
+
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(pair.left, pair.right, self.pair_angle_to_pose(
+            pair=wpt,
+            angle=(
+                math.atan(self.ob_coords(pair.right)[1] - self.ob_coords(pair.left)[1]) /
+                (self.ob_coords(pair.right)[0] - self.ob_coords(pair.left)[0])
+            ) + (math.pi / 2),
+        ), self.norm(self.ob_coords(pair.left), self.ob_coords(pair.right))/2 - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)]))
 
         if waypoints:
             waypoint = waypoints[0]
