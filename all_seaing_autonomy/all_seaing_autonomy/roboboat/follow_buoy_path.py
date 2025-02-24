@@ -113,7 +113,19 @@ class FollowBuoyPath(ActionServerBase):
         return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
 
     def midpoint_pair(self, pair):
-        return self.midpoint(self.ob_coords(pair.left), self.ob_coords(pair.right))
+        left_coords = self.ob_coords(pair.left)
+        right_coords = self.ob_coords(pair.right)
+        midpoint = self.midpoint(left_coords, right_coords)
+        
+        scale = 5 # number of meters to translate
+        dy = right_coords[1] - left_coords[1]
+        dx = right_coords[0] - left_coords[0]
+        norm = math.sqrt(dx**2 + dy**2)
+        dx /= norm
+        dy /= norm
+        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
+
+        return midpoint
 
     def split_buoys(self, obstacles):
         """
@@ -241,14 +253,14 @@ class FollowBuoyPath(ActionServerBase):
                 self.get_closest_to((0, 0), red_buoys, local=True),
                 self.get_closest_to((0, 0), green_buoys, local=True),
             )
-            self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
+            self.get_logger().info("RED BUOYS LEFT, GREEN BUOYS RIGHT")
         else:
             self.red_left = False
             self.starting_buoys = InternalBuoyPair(
                 self.get_closest_to((0, 0), green_buoys, local=True),
                 self.get_closest_to((0, 0), red_buoys, local=True),
             )
-            self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
+            self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
         self.pair_to = self.starting_buoys
         return True
 
@@ -374,10 +386,7 @@ class FollowBuoyPath(ActionServerBase):
                 self.get_logger().debug("No next buoy pair to go to.")
                 if time.time() - self.time_last_seen_buoys > 1:
                     self.result = True
-                # wait for next spin
                 return
-            # TODO: there is no longer a case where it is done wiht the task.
-            # also, what happens when eg. the green buoy is passed but not the red?
 
         buoy_pairs = [self.pair_to]
         waypoints = [self.midpoint_pair(self.pair_to)]
@@ -410,6 +419,14 @@ class FollowBuoyPath(ActionServerBase):
             for sent_waypoint in self.sent_waypoints:
                 if math.dist(waypoint, sent_waypoint) < check_dist:
                     passed_waypoint = True
+            
+            # buoy_pair = buoy_pairs[0]
+            # left_coords = self.ob_coords(buoy_pair.left)
+            # right_coords = self.ob_coords(buoy_pair.right)
+            # # get the perp forward direction
+            # forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
+            
+
 
             if not passed_waypoint:
                 self.get_logger().info(f"sending waypoint {waypoint} to action server")
