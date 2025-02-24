@@ -189,6 +189,11 @@ def launch_setup(context, *args, **kwargs):
     rover_custom_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
+        parameters=[
+            {"joy_x_scale": 2.0},
+            {"joy_ang_scale": 0.8},
+            {"serial_port": "/dev/ttyACM0"},
+        ],
         condition=IfCondition(
             PythonExpression([
                 "'", comms, "' == 'custom' and '", use_bag, "' == 'false'",
@@ -232,7 +237,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
