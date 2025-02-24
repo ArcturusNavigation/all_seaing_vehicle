@@ -201,13 +201,44 @@ def launch_setup(context, *args, **kwargs):
         ),
     )
 
-    yolov8_node = launch_ros.actions.Node(
+    webcam_publisher = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="webcam_publisher.py",
+        parameters=[
+            {"video_index": 0},
+        ],
+        remappings=[
+            ("webcam_image", "turret_image"),
+        ]
+    )
+
+    buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
-        output="screen",
+        parameters=[
+            {"model": "yolov8m_roboboat_current_model"},
+            {"conf": 0.6},
+        ],
         remappings=[
             ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
-        ]
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
+    shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "YoloV8s-Shape-Detector"},
+            {"conf": 0.6},
+        ],
+        remappings=[
+            ("image_raw", "turret_image"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "shape_boxes"),
+        ],
+        output="screen",
     )
 
     navigation_server = launch_ros.actions.Node(
@@ -293,11 +324,13 @@ def launch_setup(context, *args, **kwargs):
         rover_lora_controller,
         rviz_waypoint_sender,
         thrust_commander_node,
+        webcam_publisher,
+        buoy_yolo_node,
+        shape_yolo_node,
         amcl_ld,
         lidar_ld,
         mavros_ld,
         static_transforms_ld,
-        yolov8_node,
         zed_ld,
     ]
 

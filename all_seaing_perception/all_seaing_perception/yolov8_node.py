@@ -36,28 +36,22 @@ from sensor_msgs.msg import Image
 
 class Yolov8Node(Node):
 
-
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__("yolov8_node")
 
         perception_prefix = get_package_share_directory("all_seaing_perception")
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-        self.get_logger().info(perception_prefix)
-        self.get_logger().info(bringup_prefix)
-
-        # Declare parameters
-        self.declare_parameter("model", "yolov8m_roboboat_current_model")
-        self.declare_parameter("device", "default")
-        self.declare_parameter("threshold", 0.5)
-
-        # Get parameters
-        model_name = self.get_parameter("model").get_parameter_value().string_value
-        self.device = self.get_parameter("device").get_parameter_value().string_value
-        self.threshold = self.get_parameter("threshold").get_parameter_value().double_value
+        # Declare/get ROS parameters
+        model_name = self.declare_parameter(
+            "model", "yolov8m_roboboat_current_model").get_parameter_value().string_value
+        self.device = self.declare_parameter(
+            "device", "default").get_parameter_value().string_value
+        self.conf = self.declare_parameter(
+            "conf", 0.6).get_parameter_value().double_value
 
         if self.device == "default":
-            self.device = "cuda"  if torch.cuda.is_available() else "cpu"
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         yaml_file_path = os.path.join(bringup_prefix, 'config','perception','color_label_mappings.yaml')
         
@@ -79,6 +73,7 @@ class Yolov8Node(Node):
             self.model = YOLO(pt_path)
         else:
             self.get_logger().error(f"Both model paths do not exist :( TensorRT: {engine_path} and pt: {pt_path}")
+
         # Setup QoS profile
         image_qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -101,7 +96,7 @@ class Yolov8Node(Node):
             source=cv_image,
             verbose=False,
             stream=False,
-            conf=self.threshold,
+            conf=self.conf,
             device=self.device
         )
         results: Results = pred_results[0].cpu()
