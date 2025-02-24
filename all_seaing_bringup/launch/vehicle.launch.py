@@ -33,7 +33,7 @@ def launch_setup(context, *args, **kwargs):
         locations = yaml.safe_load(f)
 
     location = context.perform_substitution(LaunchConfiguration("location"))
-    use_lora = LaunchConfiguration("use_lora")
+    comms = LaunchConfiguration("comms")
     use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
 
@@ -180,10 +180,20 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_lora_controller.py",
         condition=IfCondition(
             PythonExpression([
-                "'", use_lora, "' == 'true' and '", use_bag, "' == 'false'",
+                "'", comms, "' == 'lora' and '", use_bag, "' == 'false'",
             ]),
         ),
         output="screen",
+    )
+
+    rover_custom_controller = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="rover_custom_controller.py",
+        condition=IfCondition(
+            PythonExpression([
+                "'", comms, "' == 'custom' and '", use_bag, "' == 'false'",
+            ]),
+        ),
     )
 
     yolov8_node = launch_ros.actions.Node(
@@ -270,19 +280,20 @@ def launch_setup(context, *args, **kwargs):
         ekf_node,
         navsat_node,
         navigation_server,
-        rviz_waypoint_sender,
-        rover_lora_controller,
-        thrust_commander_node,
-        lidar_ld,
-        point_cloud_filter_node,
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
+        point_cloud_filter_node,
+        rover_custom_controller,
+        rover_lora_controller,
+        rviz_waypoint_sender,
+        thrust_commander_node,
         amcl_ld,
+        lidar_ld,
         mavros_ld,
+        static_transforms_ld,
         yolov8_node,
         zed_ld,
-        static_transforms_ld,
     ]
 
 
@@ -291,7 +302,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("location", default_value="boathouse"),
             DeclareLaunchArgument(
-                "use_lora", default_value="false", choices=["true", "false"]
+                "comms", default_value="wifi", choices=["wifi", "lora", "custom"]
             ),
             DeclareLaunchArgument(
                 "use_bag", default_value="false", choices=["true", "false"]
