@@ -253,7 +253,7 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "YoloV8s-Shape-Detector"},
-            {"conf": 0.6},
+            {"conf": 0.4},
         ],
         remappings=[
             ("image_raw", "turret_image"),
