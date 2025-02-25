@@ -95,14 +95,29 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(use_bag),
     )
 
-    waypoint_finder = launch_ros.actions.Node(
+    run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="waypoint_finder.py",
+        executable="run_tasks.py",
+    )
+
+    follow_buoy_path = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_path.py",
         parameters=[
+            {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
     )
+
+    # waypoint_finder = launch_ros.actions.Node(
+    #     package="all_seaing_autonomy",
+    #     executable="waypoint_finder.py",
+    #     parameters=[
+    #         {"color_label_mappings_file": color_label_mappings},
+    #         {"safe_margin": 0.2},
+    #     ],
+    # )
 
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
@@ -304,7 +319,9 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
-        waypoint_finder,
+        # waypoint_finder,
+        run_tasks,
+        follow_buoy_path,
         grid_map_generator,
         amcl_ld,
         mavros_ld,
