@@ -506,9 +506,9 @@ void BBoxProjectPCloud::bb_pcl_project(
         // cv::imshow("Clusters & contours & matching", upscaled);
         // cv::waitKey();
     }
-    RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS & CONTOURS");
+    // RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS & CONTOURS");
     m_refined_object_pcl_segment_pub->publish(refined_objects_pub);
-    RCLCPP_INFO(this->get_logger(), "PUBLISHED REFINED OBJECT POINT CLOUDS & CONTOURS");
+    // RCLCPP_INFO(this->get_logger(), "PUBLISHED REFINED OBJECT POINT CLOUDS & CONTOURS");
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>());
     all_obj_refined_pcls_ptr->header = in_cloud_tf_ptr->header;
     //convert vector of PointCloud to a single PointCloud with channels
@@ -537,7 +537,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     // cv::imshow("Object contour image to be published:", all_obj_refined_contours);
     // cv::waitKey();
     m_refined_object_segment_viz_pub->publish(*all_obj_refined_contour_ptr->toImageMsg());
-    RCLCPP_INFO(this->get_logger(), "SENT OBJECT POINT CLOUDS FOR VISUALIZATION");
+    // RCLCPP_INFO(this->get_logger(), "SENT OBJECT POINT CLOUDS FOR VISUALIZATION");
 }
 
 geometry_msgs::msg::TransformStamped BBoxProjectPCloud::get_tf(const std::string &in_target_frame,

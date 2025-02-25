@@ -46,6 +46,10 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
         "camera_info_topic", 10, std::bind(&ObjectTrackingMap::intrinsics_cb, this, std::placeholders::_1));
 
+    // Initialize tf_listener pointer
+    m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
+
     m_first_state=true;
 }
 
@@ -224,8 +228,6 @@ void ObjectTrackingMap::visualize_predictions(){
     delete_mark.action = visualization_msgs::msg::Marker::DELETEALL;
     delete_arr.markers.push_back(delete_mark);
     m_map_cov_viz_pub->publish(delete_arr);
-
-    m_lidar_map_tf = get_tf(m_global_frame_id, m_local_header.frame_id);
     
     visualization_msgs::msg::MarkerArray ellipse_arr;
     //robot pose prediction
@@ -320,12 +322,16 @@ void ObjectTrackingMap::visualize_predictions(){
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
     if(msg->objects.size()==0 || (m_track_robot && m_first_state)) return;    
-    RCLCPP_INFO(this->get_logger(), "GOT DATA");
+    // RCLCPP_INFO(this->get_logger(), "GOT DATA");
 
     // Set up headers and transforms
-    m_local_header = in_cloud->header;
+    m_local_header = msg->objects[0].cloud.header;
     m_global_header.frame_id = m_global_frame_id;
     m_global_header.stamp = m_local_header.stamp;
+
+    // RCLCPP_INFO(this->get_logger(), "BEFORE GETTING ODOMETRY TF");
+    m_lidar_map_tf = get_tf(m_global_frame_id, m_local_header.frame_id);
+    // RCLCPP_INFO(this->get_logger(), "GOT ODOMETRY TF");
 
     std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles;
     for(all_seaing_interfaces::msg::LabeledObjectPointCloud obj : msg->objects){
@@ -354,12 +360,12 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::vector<int> ind(raw_cloud->size());
         std::iota (std::begin(ind), std::end(ind), 0);
         std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
-            new all_seaing_perception::Obstacle(m_local_header, m_global_header, raw_cloud, ind, m_obstacle_id++,
-                                                det_obs->time_seen, m_nav_x, m_nav_y, m_lidar_map_tf));
+            new all_seaing_perception::Obstacle(m_local_header, m_global_header, raw_cloud, ind,
+                                                m_obstacle_id++, m_lidar_map_tf));
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-    this->publish_map(msg->objects[0].cloud.header, "untracked", true, untracked_obs, m_untracked_map_pub, untracked_labels);
+    this->publish_map(m_local_header, "untracked", true, untracked_obs, m_untracked_map_pub, untracked_labels);
 
     //EKF SLAM ("Probabilistic Robotics", Seb. Thrun, implementation, in one case removed robot pose from the state and the respective motion updates, changed assignment algorithm)
     
@@ -437,7 +443,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     std::vector<int> match(detected_obstacles.size(), -1);
     float min_p = 0;
     std::unordered_set<int> chosen_detected, chosen_tracked;
-    if(!p.empty()) RCLCPP_INFO(this->get_logger(), "P SIZE: (%d, %d), DETECTED OBSTACLES: %d, TRACKED OBSTACLES: %d", p.size(), p.back().size(), detected_obstacles.size(), m_num_obj);
+    // if(!p.empty()) RCLCPP_INFO(this->get_logger(), "P SIZE: (%d, %d), DETECTED OBSTACLES: %d, TRACKED OBSTACLES: %d", p.size(), p.back().size(), detected_obstacles.size(), m_num_obj);
     while(min_p < m_new_obj_slam_thres){
         min_p = m_new_obj_slam_thres;
         std::pair<int,int> best_match = std::make_pair(-1,-1);
@@ -453,7 +459,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             }
         }
         if(min_p < m_new_obj_slam_thres){
-            RCLCPP_INFO(this->get_logger(), "MATCHING (%d, %d), with p: %lf", best_match.first, best_match.second, p[best_match.first][best_match.second]);
+            // RCLCPP_INFO(this->get_logger(), "MATCHING (%d, %d), with p: %lf", best_match.first, best_match.second, p[best_match.first][best_match.second]);
             match[best_match.first] = best_match.second;
             chosen_tracked.insert(best_match.second);
             chosen_detected.insert(best_match.first);
@@ -462,7 +468,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
 
     //Update vectors, now with known correspondence
-    RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN CORRESPONDENCE");
+    // RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN CORRESPONDENCE");
     for(int i=0; i < detected_obstacles.size(); i++){
         float range, bearing;
         int signature;
@@ -581,6 +587,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d TIME PERIOD FROM PREVIOUS DEAD: %lf - %lf", tracked_id, m_tracked_obstacles[tracked_id]->last_dead.seconds(), rclcpp::Time(msg->objects[0].time).seconds());
                 m_tracked_obstacles[tracked_id]->time_dead = rclcpp::Time(msg->objects[0].time) - m_tracked_obstacles[tracked_id]->last_dead + m_tracked_obstacles[tracked_id]->time_dead;
                 // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d DEAD FOR %lf SECONDS, OBSTACLE DROP THRESHOLD: %lf", tracked_id, m_tracked_obstacles[tracked_id]->time_dead.seconds(), m_obstacle_drop_thresh);
+                // TODO: MAKE THE DROP TIME THRESHOLD BE DEPENDENT ON THE DISTANCE, TO NOT DELETE OBJECTS THAT ARE FAR AND DETECTED INFREQUENTLY, THEY MIGHT BE USEFUL E.G. IN BUOY PAIR FINDING IN FOLLOW THE PATH
                 if(m_tracked_obstacles[tracked_id]->time_dead.seconds() > m_obstacle_drop_thresh){
                     // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d/%d DROPPED", tracked_id, m_num_obj);
                     to_remove.push_back(tracked_id);
@@ -642,13 +649,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::vector<int> ind(tracked_cloud->size());
         std::iota (std::begin(ind), std::end(ind), 0);
         std::shared_ptr<all_seaing_perception::Obstacle> tracked_ob(
-            new all_seaing_perception::Obstacle(m_local_header, m_global_header, tracked_cloud, ind, t_ob->id,
-                                                t_ob->time_seen, m_lidar_map_tf));
+            new all_seaing_perception::Obstacle(m_local_header, m_global_header, tracked_cloud, ind,
+                                                t_ob->id, m_lidar_map_tf));
         tracked_labels.push_back(t_ob->label);
         tracked_obs.push_back(tracked_ob);
     }
-    this->publish_map(msg->objects[0].cloud.header, "tracked", true, tracked_obs, m_tracked_map_pub, tracked_labels);
-    RCLCPP_INFO(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
+    this->publish_map(m_local_header, "tracked", true, tracked_obs, m_tracked_map_pub, tracked_labels);
+    // RCLCPP_INFO(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
     //publish covariance ellipsoid markers to understand prediction uncertainty (& fine-tune & debug)
     this->visualize_predictions();
 }
@@ -670,13 +677,12 @@ void ObjectTrackingMap::publish_map(
     map_msg.is_labeled = is_labeled;
     for (unsigned int i = 0; i < map.size(); i++) {
         all_seaing_interfaces::msg::Obstacle det_obstacle;
-        map[i]->to_ros_msg(local_header, global_header, det_obstacle);
+        map[i]->to_ros_msg(det_obstacle);
         if(is_labeled){
             det_obstacle.label = labels[i];
         }
         map_msg.obstacles.push_back(det_obstacle);
     }
-    map_msg.pose = m_nav_pose;
     pub->publish(map_msg);
 }
 

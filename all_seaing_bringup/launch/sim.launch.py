@@ -268,6 +268,7 @@ def launch_setup(context, *args, **kwargs):
     waypoint_finder = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="waypoint_finder.py",
+        remappings=[("/obstacle_map/labeled","obstacle_map/refined_tracked")],
         parameters=[
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
@@ -318,11 +319,11 @@ def launch_setup(context, *args, **kwargs):
         navsat_node,
         controller_node,
         controller_server,
-        obstacle_bbox_overlay_node,
+        # obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
-        obstacle_detector_node,
+        # obstacle_detector_node,
         color_segmentation_node,
         point_cloud_filter_node,
         rviz_node,
