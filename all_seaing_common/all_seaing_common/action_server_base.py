@@ -1,8 +1,12 @@
 from abc import ABC
+import rclpy
 from rclpy.action import CancelResponse
 from rclpy.node import Node
 
-from nav_msgs.msg import Odometry
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+
 from tf_transformations import euler_from_quaternion
 from threading import Semaphore, Event
 from visualization_msgs.msg import Marker
@@ -10,14 +14,13 @@ from visualization_msgs.msg import Marker
 
 class ActionServerBase(ABC, Node):
     """
-    Abstract base class for action servers. Includes useful odometry, marker deletion,
+    Abstract base class for action servers. Includes useful robot pose, marker deletion,
     and multithreaded process management functions.
     """
 
-    def __init__(self, node_name, marker_ns, timer_period):
+    def __init__(self, node_name):
         super().__init__(node_name)
-        self.marker_ns = marker_ns
-        self.timer_period = timer_period
+        self.marker_ns = node_name
 
         # --------------- PARAMETERS ---------------#
 
@@ -26,22 +29,20 @@ class ActionServerBase(ABC, Node):
             .get_parameter_value()
             .string_value
         )
+        self.robot_frame_id = (
+            self.declare_parameter("robot_frame_id", "base_link")
+            .get_parameter_value()
+            .string_value
+        )
 
         # --------------- SUBSCRIBERS AND PUBLISHERS ---------------#
 
-        self.odom_sub = self.create_subscription(
-            Odometry,
-            "odometry/filtered",
-            self.odom_callback,
-            10,
-        )
         self.marker_pub = self.create_publisher(Marker, "action_marker", 10)
 
-        # --------------- MEMBER VARIABLES ---------------#
+        # --------------- TF SETUP ---------------#
 
-        self.nav_x = 0.0
-        self.nav_y = 0.0
-        self.heading = 0.0
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # --------------- PROCESS MANAGEMENT ---------------#
 
@@ -52,17 +53,6 @@ class ActionServerBase(ABC, Node):
         """Canceling has no extra functionalities by default"""
         return CancelResponse.ACCEPT
 
-    def odom_callback(self, msg: Odometry):
-        self.nav_x = msg.pose.pose.position.x
-        self.nav_y = msg.pose.pose.position.y
-        _, _, self.heading = euler_from_quaternion(
-            [
-                msg.pose.pose.orientation.x,
-                msg.pose.pose.orientation.y,
-                msg.pose.pose.orientation.z,
-                msg.pose.pose.orientation.w,
-            ]
-        )
 
     def start_process(self, msg=None):
         """
@@ -103,3 +93,29 @@ class ActionServerBase(ABC, Node):
         marker_msg.ns = self.marker_ns
         marker_msg.action = Marker.DELETEALL
         self.marker_pub.publish(marker_msg)
+
+    def get_robot_pose(self):
+        """
+        Return robot pose as a tuple of (x, y, heading).
+        """
+        try:
+            t = self.tf_buffer.lookup_transform(
+                self.global_frame_id,
+                self.robot_frame_id,
+                rclpy.time.Time())
+        except TransformException as ex:
+            self.get_logger().info(
+                f'Could not transform {self.global_frame_id} to {self.robot_frame_id}: {ex}')
+            return 0, 0, 0
+        
+        x = t.transform.translation.x
+        y = t.transform.translation.y
+        _, _, heading = euler_from_quaternion(
+            [
+                t.transform.rotation.x,
+                t.transform.rotation.y,
+                t.transform.rotation.z,
+                t.transform.rotation.w,
+            ]
+        )
+        return x, y, heading
