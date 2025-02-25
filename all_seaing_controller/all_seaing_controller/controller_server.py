@@ -10,13 +10,14 @@ from all_seaing_controller.pid_controller import CircularPID, PIDController
 from all_seaing_interfaces.action import Waypoint
 from all_seaing_interfaces.msg import ControlOption
 
+
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
 
 class ControllerServer(ActionServerBase):
     def __init__(self):
-        super().__init__("controller_server", "controller", 1 / 60)
+        super().__init__("controller_server")
 
         # --------------- PARAMETERS ---------------#
 
@@ -61,6 +62,10 @@ class ControllerServer(ActionServerBase):
         self.theta_pid.set_effort_max(self.max_vel[2])
         self.prev_update_time = self.get_clock().now()
 
+        # --------------- MEMBER VARIABLES ---------------#
+
+        self.timer_period = 1 / 60
+
     def visualize_waypoint(self, x, y):
         marker_msg = Marker()
         marker_msg.header.frame_id = self.global_frame_id
@@ -89,11 +94,11 @@ class ControllerServer(ActionServerBase):
         self.y_pid.set_setpoint(y)
         self.theta_pid.set_setpoint(theta)
 
-    def update_pid(self):
+    def update_pid(self, x, y, heading):
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.x_pid.update(self.nav_x, dt)
-        self.y_pid.update(self.nav_y, dt)
-        self.theta_pid.update(self.heading, dt)
+        self.x_pid.update(x, dt)
+        self.y_pid.update(y, dt)
+        self.theta_pid.update(heading, dt)
         self.prev_update_time = self.get_clock().now()
 
     def scale_thrust(self, x_vel, y_vel):
@@ -103,17 +108,17 @@ class ControllerServer(ActionServerBase):
         scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
         return scale * x_vel, scale * y_vel
 
-    def control_loop(self):
-        self.update_pid()
+    def control_loop(self, nav_x, nav_y, heading):
+        self.update_pid(nav_x, nav_y, heading)
         x_output = self.x_pid.get_effort()
         y_output = self.y_pid.get_effort()
         theta_output = self.theta_pid.get_effort()
-        x_vel = x_output * math.cos(self.heading) + y_output * math.sin(self.heading)
-        y_vel = y_output * math.cos(self.heading) - x_output * math.sin(self.heading)
+        x_vel = x_output * math.cos(heading) + y_output * math.sin(heading)
+        y_vel = y_output * math.cos(heading) - x_output * math.sin(heading)
 
         x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
         control_msg = ControlOption()
-        control_msg.priority = 1
+        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
         control_msg.twist.linear.x = x_vel
         control_msg.twist.linear.y = y_vel
         control_msg.twist.angular.z = theta_output
@@ -127,8 +132,10 @@ class ControllerServer(ActionServerBase):
         goal_x = goal_handle.request.x
         goal_y = goal_handle.request.y
         is_stationary = goal_handle.request.is_stationary
+
+        nav_x, nav_y, heading = self.get_robot_pose()
         if goal_handle.request.ignore_theta:
-            goal_theta = math.atan2(goal_y - self.nav_y, goal_x - self.nav_x)
+            goal_theta = math.atan2(goal_y - nav_y, goal_x - nav_x)
         else:
             goal_theta = goal_handle.request.theta
 
@@ -137,9 +144,9 @@ class ControllerServer(ActionServerBase):
         self.reset_pid()
         self.set_pid_setpoints(goal_x, goal_y, goal_theta)
         while (
-            not self.x_pid.is_done(self.nav_x, xy_threshold)
-            or not self.y_pid.is_done(self.nav_y, xy_threshold)
-            or not self.theta_pid.is_done(self.heading, math.radians(theta_threshold))
+            not self.x_pid.is_done(nav_x, xy_threshold)
+            or not self.y_pid.is_done(nav_y, xy_threshold)
+            or not self.theta_pid.is_done(heading, math.radians(theta_threshold))
             or is_stationary
         ):
 
@@ -153,7 +160,8 @@ class ControllerServer(ActionServerBase):
                 goal_handle.canceled()
                 return Waypoint.Result()
 
-            self.control_loop()
+            nav_x, nav_y, heading = self.get_robot_pose()
+            self.control_loop(nav_x, nav_y, heading)
             time.sleep(self.timer_period)
 
         self.end_process("Waypoint following completed!")

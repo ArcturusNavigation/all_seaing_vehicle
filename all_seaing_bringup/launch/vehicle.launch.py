@@ -92,6 +92,16 @@ def launch_setup(context, *args, **kwargs):
                 "back_left_port": 5,
             }
         ],
+        condition=UnlessCondition(use_bag),
+    )
+
+    waypoint_finder = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="waypoint_finder.py",
+        parameters=[
+            {"color_label_mappings_file": color_label_mappings},
+            {"safe_margin": 0.2},
+        ],
     )
 
     control_mux = launch_ros.actions.Node(
@@ -103,6 +113,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
             {"Kpid_x": [0.3, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
@@ -120,6 +131,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"range_radius": [0.5, 100000.0]},
         ],
+        condition=UnlessCondition(use_bag),
     )
 
     obstacle_bbox_overlay_node = launch_ros.actions.Node(
@@ -185,6 +197,17 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    grid_map_generator = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="grid_map_generator.py",
+        parameters=[
+            {"timer_period": 1.0},
+            {"grid_dim": [800, 800]},
+            {"default_range": 60},
+            {"grid_resolution": 0.1},
+        ],
+    )
+
     yolov8_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
@@ -197,6 +220,9 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
+        parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ],
         output="screen",
     )
 
@@ -256,7 +282,11 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "location": location,
         }.items(),
-        condition=IfCondition(PythonExpression(["'", is_indoors, "' == 'true'"])),
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'true' and '", use_bag, "' == 'false'",
+            ]),
+        ),
     )
     
     return [
@@ -274,6 +304,8 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
+        waypoint_finder,
+        grid_map_generator,
         amcl_ld,
         mavros_ld,
         yolov8_node,
