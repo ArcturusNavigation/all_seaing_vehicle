@@ -45,7 +45,7 @@ class FollowBuoyPath(ActionServerBase):
         )
 
         self.map_sub = self.create_subscription(
-            ObstacleMap, "/obstacle_map/labeled", self.map_cb, 10
+            ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
         )
         self.odometry_sub = self.create_subscription(
             Odometry, "/odometry/filtered", self.odometry_cb, 10

@@ -12,6 +12,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
     this->declare_parameter<double>("init_new_cov", 10.0);
     this->declare_parameter<bool>("track_robot", false);
+    this->declare_parameter<double>("normalize_drop_dist", 1.0);
 
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
@@ -24,6 +25,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
     m_init_new_cov = this->get_parameter("init_new_cov").as_double();
     m_track_robot = this->get_parameter("track_robot").as_bool();
+    m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
     RCLCPP_INFO(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf, SLAM RANGE UNCERTAINTY: %lf, SLAM BEARING UNCERTAINTY: %lf, SLAM NEW OBJECT THRESHOLD: %lf", m_obstacle_seg_thresh, m_obstacle_drop_thresh, m_range_std, m_bearing_std, m_new_obj_slam_thres);
     // Initialize navigation variables to 0
     m_nav_x = 0;
@@ -534,6 +536,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     }
 
     // Update all (new and old, since they also have correlation with each other) objects global positions (including the cloud, and then the local points respectively)
+    pcl::PointXYZ p0(0,0,0);
+    float avg_dist = 0;
     for(int i=0; i<m_tracked_obstacles.size(); i++){
         pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
         if(m_track_robot){
@@ -556,6 +560,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         m_tracked_obstacles[i]->local_pcloud_ptr = upd_local_obj_pcloud;
         m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
         m_tracked_obstacles[i]->local_centroid = upd_loc_centr;
+        avg_dist += pcl::euclideanDistance(p0,upd_loc_centr)/((float)m_tracked_obstacles.size());
     }
 
     // Filter old obstacles
@@ -587,8 +592,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d TIME PERIOD FROM PREVIOUS DEAD: %lf - %lf", tracked_id, m_tracked_obstacles[tracked_id]->last_dead.seconds(), rclcpp::Time(msg->objects[0].time).seconds());
                 m_tracked_obstacles[tracked_id]->time_dead = rclcpp::Time(msg->objects[0].time) - m_tracked_obstacles[tracked_id]->last_dead + m_tracked_obstacles[tracked_id]->time_dead;
                 // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d DEAD FOR %lf SECONDS, OBSTACLE DROP THRESHOLD: %lf", tracked_id, m_tracked_obstacles[tracked_id]->time_dead.seconds(), m_obstacle_drop_thresh);
-                // TODO: MAKE THE DROP TIME THRESHOLD BE DEPENDENT ON THE DISTANCE, TO NOT DELETE OBJECTS THAT ARE FAR AND DETECTED INFREQUENTLY, THEY MIGHT BE USEFUL E.G. IN BUOY PAIR FINDING IN FOLLOW THE PATH
-                if(m_tracked_obstacles[tracked_id]->time_dead.seconds() > m_obstacle_drop_thresh){
+                if(m_tracked_obstacles[tracked_id]->time_dead.seconds() > m_obstacle_drop_thresh*(pcl::euclideanDistance(p0,m_tracked_obstacles[tracked_id]->local_centroid)/avg_dist)*m_normalize_drop_dist){
                     // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d/%d DROPPED", tracked_id, m_num_obj);
                     to_remove.push_back(tracked_id);
                     continue;

@@ -111,6 +111,7 @@ private:
     double m_obstacle_drop_thresh;
     double m_init_new_cov;
     bool m_track_robot;
+    double m_normalize_drop_dist;
 
     float m_nav_x, m_nav_y, m_nav_heading, m_nav_omega;
     rclcpp::Time m_last_odom_time;

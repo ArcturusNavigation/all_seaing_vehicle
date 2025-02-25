@@ -203,7 +203,7 @@ def launch_setup(context, *args, **kwargs):
             {"bearing_uncertainty": 0.1},
             {"new_object_slam_threshold": 2.0},
             {"init_new_cov": 10.0},
-            {"track_robot": False},
+            {"track_robot": True},
         ]
     )
 
@@ -323,7 +323,7 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             "world": "rb2025/rb2025_task1_task2.sdf",
-            #"world": "follow_path_task",
+            # "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -338,7 +338,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
-        # obstacle_detector_node,
+        obstacle_detector_node,
         color_segmentation_node,
         point_cloud_filter_node,
         rviz_node,
