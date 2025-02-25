@@ -239,10 +239,10 @@ def launch_setup(context, *args, **kwargs):
         executable="run_tasks.py",
     )
 
-    task_1_server = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="task_1.py",
-    )
+    # task_1_server = launch_ros.actions.Node(
+    #     package="all_seaing_autonomy",
+    #     executable="task_1.py",
+    # )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
