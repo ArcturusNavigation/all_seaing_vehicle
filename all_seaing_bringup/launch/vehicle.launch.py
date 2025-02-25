@@ -167,8 +167,8 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"obstacle_size_min": 10},
-            {"obstacle_size_max": 800},
+            {"obstacle_size_min": 5},
+            {"obstacle_size_max": 300},
             {"clustering_distance": 0.1},
         ],
     )
@@ -259,7 +259,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
