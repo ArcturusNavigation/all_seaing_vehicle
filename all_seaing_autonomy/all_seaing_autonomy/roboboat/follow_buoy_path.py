@@ -272,6 +272,7 @@ class FollowBuoyPath(ActionServerBase):
             )
             self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
         self.pair_to = self.starting_buoys
+        self.backup_pair = None
         return True
 
     def ccw(self, a, b, c):
@@ -424,10 +425,15 @@ class FollowBuoyPath(ActionServerBase):
                 self.pair_to = new_pair
                 self.time_last_seen_buoys = time.time()
             else:
-                self.get_logger().debug("No next buoy pair to go to.")
-                if time.time() - self.time_last_seen_buoys > 1:
-                    self.result = True
-                return
+                if self.backup_pair is not None:
+                    self.get_logger().info("Using previously seen backup pair")
+                    self.pair_to = self.backup_pair
+                    self.backup_pair = None
+                else:
+                    self.get_logger().debug("No next buoy pair to go to.")
+                    if time.time() - self.time_last_seen_buoys > 1:
+                        self.result = True
+                    return
 
         buoy_pairs = [self.pair_to]
         waypoints = [self.midpoint_pair(self.pair_to)]
@@ -445,8 +451,11 @@ class FollowBuoyPath(ActionServerBase):
             waypoints.append(self.midpoint_pair(next_buoy_pair))
             next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
 
+        if(len(buoy_pairs)>=2):
+            self.backup_pair = buoy_pairs[1]
         self.get_logger().debug(f"Waypoints: {waypoints}")
 
+        self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
         self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(pair.left, pair.right, self.pair_angle_to_pose(
             pair=wpt,
             angle=(

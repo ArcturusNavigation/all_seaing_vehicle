@@ -272,7 +272,7 @@ def launch_setup(context, *args, **kwargs):
     follow_buoy_path = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_path.py",
-        remappings=[("/obstacle_map/labeled","obstacle_map/refined_tracked")],
+        # remappings=[("/obstacle_map/labeled","obstacle_map/refined_tracked")],
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
@@ -322,8 +322,8 @@ def launch_setup(context, *args, **kwargs):
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "rb2025/rb2025_task1_task2.sdf",
-            # "world": "follow_path_task",
+            # "world": "rb2025/rb2025_task1_task2.sdf",
+            "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -334,7 +334,7 @@ def launch_setup(context, *args, **kwargs):
         navsat_node,
         controller_node,
         controller_server,
-        # obstacle_bbox_overlay_node,
+        obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
