@@ -11,17 +11,13 @@ ament_auto_find_build_dependencies()
 rosidl_generate_interfaces(${PROJECT_NAME}
     "action/FollowPath.action"
     "action/Waypoint.action"
+    "action/Task.action"
     "msg/ObstacleMap.msg"
     "msg/Obstacle.msg"
     "msg/ControlOption.msg"
     "msg/LabeledBoundingBox2DArray.msg"
     "msg/LabeledBoundingBox2D.msg"
     "msg/Heartbeat.msg"
-    "msg/ASV2State.msg"
-    "msg/BuoyPair.msg"
-    "msg/BuoyPairArray.msg"
-    "msg/Waypoint.msg"
-    "msg/WaypointArray.msg"
     "msg/ObstacleCounter.msg"
     "msg/ObstacleCounterArray.msg"
     DEPENDENCIES

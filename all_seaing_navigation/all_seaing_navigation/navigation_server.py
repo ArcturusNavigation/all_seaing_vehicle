@@ -19,7 +19,7 @@ import time
 
 class NavigationServer(ActionServerBase):
     def __init__(self):
-        super().__init__("navigation_server", "navigation", 1 / 60)
+        super().__init__("navigation_server")
 
         self.follow_path_server = ActionServer(
             self,
@@ -38,6 +38,8 @@ class NavigationServer(ActionServerBase):
 
         self.stop_plan_semaphore = Semaphore(1)
         self.stop_plan_evt = Event()
+
+        self.timer_period = 1 / 60
 
     def start_plan(self):
         self.stop_plan_evt.set()
@@ -68,10 +70,10 @@ class NavigationServer(ActionServerBase):
         ]
         self.marker_pub.publish(marker_msg)
 
-    def generate_path(self, goal_handle):
+    def generate_path(self, goal_handle, nav_x, nav_y):
         self.start_plan()  # Protect the long-running generate path function with semaphores
 
-        start = Point(x=self.nav_x, y=self.nav_y)
+        start = Point(x=nav_x, y=nav_y)
         goal = Point(x=goal_handle.request.x, y=goal_handle.request.y)
         obstacle_tol = goal_handle.request.obstacle_tol
         goal_tol = goal_handle.request.goal_tol
@@ -104,13 +106,13 @@ class NavigationServer(ActionServerBase):
     def waypoint_result_callback(self, future):
         self.result = future.result().result.is_finished
 
-    def find_first_waypoint(self, path, lookahead):
+    def find_first_waypoint(self, path, lookahead, nav_x, nav_y):
         last_in_lookahead = -1
         closest_wpt = 0
         min_dist = math.inf
         for i, pose in enumerate(path.poses):
-            dx = pose.position.x - self.nav_x
-            dy = pose.position.y - self.nav_y
+            dx = pose.position.x - nav_x
+            dy = pose.position.y - nav_y
             dist = math.hypot(dx, dy)
             if dist < lookahead:
                 last_in_lookahead = i
@@ -128,8 +130,11 @@ class NavigationServer(ActionServerBase):
             goal_handle.abort()
             return FollowPath.Result()
 
+        # Get robot pose
+        nav_x, nav_y, _ = self.get_robot_pose()
+
         # Generate path using requested planner
-        path = self.generate_path(goal_handle)
+        path = self.generate_path(goal_handle, nav_x, nav_y)
         if not path.poses:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
@@ -139,7 +144,7 @@ class NavigationServer(ActionServerBase):
 
         self.visualize_path(path)
 
-        first_wpt_idx = self.find_first_waypoint(path, lookahead=goal_handle.request.xy_threshold)
+        first_wpt_idx = self.find_first_waypoint(path, goal_handle.request.xy_threshold, nav_x, nav_y)
         for i, pose in enumerate(path.poses):
             # Skip if waypoints before first_wpt_idx (boat shouldn't backtrack)
             if i < first_wpt_idx:
