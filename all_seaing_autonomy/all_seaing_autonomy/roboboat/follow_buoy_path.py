@@ -6,7 +6,7 @@ from rclpy.executors import MultiThreadedExecutor
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import Point, Pose, Vector3
+from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
@@ -61,6 +61,9 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
 
+        self.declare_parameter("is_sim", False)
+        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+
         self.robot_pos = (0, 0)
 
         self.declare_parameter("safe_margin", 0.2)
@@ -91,6 +94,15 @@ class FollowBuoyPath(ActionServerBase):
         self.red_left = True
         self.result = False
         self.timer_period = 1/60
+        self.time_last_seen_buoys = time.time()
+
+        self.obstacles = None
+
+    def norm_squared(self, vec, ref=(0, 0)):
+        return vec[0] ** 2 + vec[1] ** 2
+
+    def norm(self, vec, ref=(0, 0)):
+        return math.sqrt(self.norm_squared(vec, ref))
 
     ob_coords = lambda self, buoy, local=False: \
         (buoy.local_point.point.x, buoy.local_point.point.y) if local \
@@ -108,8 +120,20 @@ class FollowBuoyPath(ActionServerBase):
     vavg = lambda self, u, v: self.fmap(self.pavg, zip(u, v))
     midpoint = lambda self, vec1, vec2: self.vavg(vec1, vec2)
 
-    midpoint_pair = lambda self, pair: \
-      self.midpoint(self.ob_coords(pair.left), self.ob_coords(pair.right))
+    def midpoint_pair(self, pair):
+        left_coords = self.ob_coords(pair.left)
+        right_coords = self.ob_coords(pair.right)
+        midpoint = self.midpoint(left_coords, right_coords)
+        
+        scale = 5 # number of meters to translate forward. TODO: parametrize.
+        dy = right_coords[1] - left_coords[1]
+        dx = right_coords[0] - left_coords[0]
+        norm = math.sqrt(dx**2 + dy**2)
+        dx /= norm
+        dy /= norm
+        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
+
+        return midpoint
 
     isColor = lambda self, color, x: x.label == self.color_label_mappings[color]
     isGreen = lambda self, x: self.isColor("green", x)
@@ -203,7 +227,8 @@ class FollowBuoyPath(ActionServerBase):
 
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
-            ob for ob in obs if ob.local_point.point.x > 0
+            ob for ob in obs
+            if (self.is_sim and ob.local_point.point.x > 0) or (not self.is_sim and ob.local_point.point.y > 0)
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -229,14 +254,14 @@ class FollowBuoyPath(ActionServerBase):
                 self.get_closest_to((0, 0), red_buoys, local=True),
                 self.get_closest_to((0, 0), green_buoys, local=True),
             )
-            self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
+            self.get_logger().info("RED BUOYS LEFT, GREEN BUOYS RIGHT")
         else:
             self.red_left = False
             self.starting_buoys = InternalBuoyPair(
                 self.get_closest_to((0, 0), green_buoys, local=True),
                 self.get_closest_to((0, 0), red_buoys, local=True),
             )
-            self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
+            self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
         self.pair_to = self.starting_buoys
         return True
 
@@ -268,6 +293,9 @@ class FollowBuoyPath(ActionServerBase):
 
         front_red = self.filter_front_buoys(prev_pair, red)
         front_green = self.filter_front_buoys(prev_pair, green)
+        self.get_logger().debug(
+            f"robot pos: {self.robot_pos}, front red buoys: {self.obs_to_pos(front_red)}, front green buoys: {self.obs_to_pos(front_green)}"
+        )
 
         if not front_red or not front_green:
             prev_coords = self.ob_coords(prev_pair.left), self.ob_coords(
@@ -315,6 +343,34 @@ class FollowBuoyPath(ActionServerBase):
                 )
 
     pair_to_pose = lambda self, pair: Pose(position=Point(x=pair[0], y=pair[1]))
+    
+    def quaternion_from_euler(self, roll, pitch, yaw):
+        """
+        Converts euler roll, pitch, yaw to quaternion (w in last place)
+        quat = [x, y, z, w]
+        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
+        """
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        q = [0] * 4
+        q[0] = cy * cp * cr + sy * sp * sr
+        q[1] = cy * cp * sr - sy * sp * cr
+        q[2] = sy * cp * sr + cy * sp * cr
+        q[3] = sy * cp * cr - cy * sp * sr
+
+        return q
+    
+    def pair_angle_to_pose(self, pair, angle):
+        quat = self.quaternion_from_euler(0, angle, 0)
+        return Pose(
+            position=Point(x=pair[0], y=pair[1]),
+            orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
+        )
 
     def generate_waypoints(self):
         """
@@ -347,12 +403,12 @@ class FollowBuoyPath(ActionServerBase):
             new_pair = self.next_pair(self.pair_to, red_buoys, green_buoys)
             if new_pair is not None:
                 self.pair_to = new_pair
+                self.time_last_seen_buoys = time.time()
             else:
                 self.get_logger().debug("No next buoy pair to go to.")
-                # wait for next spin
+                if time.time() - self.time_last_seen_buoys > 1:
+                    self.result = True
                 return
-            # TODO: there is no longer a case where it is done wiht the task.
-            # also, what happens when eg. the green buoy is passed but not the red?
 
         buoy_pairs = [self.pair_to]
         waypoints = [self.midpoint_pair(self.pair_to)]
@@ -364,26 +420,21 @@ class FollowBuoyPath(ActionServerBase):
         will terminate if we run out of either green or red buoys
         """
 
-        while True:
-            next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
-            if next_buoy_pair is None:
-                if len(self.sent_waypoints):
-                    self.result = True
-                    # if we've previously sent waypoints, and there are no more detected
-                    # buoy pairs, then we're done.
-                break
+        next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
+        while next_buoy_pair is not None:
             buoy_pairs.append(next_buoy_pair)
             waypoints.append(self.midpoint_pair(next_buoy_pair))
-
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(pair.left, pair.right, self.pair_angle_to_pose(
-                        pair=wpt,
-                        angle=(
-                            math.atan(self.ob_coords(pair.right)[1] - self.ob_coords(pair.left)[1]) /
-                            (self.ob_coords(pair.right)[0] - self.ob_coords(pair.left)[0])
-                        ) + (math.pi / 2),
-                    ), self.norm(self.ob_coords(pair.left), self.ob_coords(pair.right))/2 - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)]))
+            next_buoy_pair = self.next_pair(buoy_pairs[-1], red_buoys, green_buoys)
 
         self.get_logger().debug(f"Waypoints: {waypoints}")
+
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(pair.left, pair.right, self.pair_angle_to_pose(
+            pair=wpt,
+            angle=(
+                math.atan(self.ob_coords(pair.right)[1] - self.ob_coords(pair.left)[1]) /
+                (self.ob_coords(pair.right)[0] - self.ob_coords(pair.left)[0])
+            ) + (math.pi / 2),
+        ), self.norm(self.ob_coords(pair.left), self.ob_coords(pair.right))/2 - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)]))
 
         if waypoints:
             waypoint = waypoints[0]
@@ -398,6 +449,14 @@ class FollowBuoyPath(ActionServerBase):
             for sent_waypoint in self.sent_waypoints:
                 if math.dist(waypoint, sent_waypoint) < check_dist:
                     passed_waypoint = True
+            
+            # buoy_pair = buoy_pairs[0]
+            # left_coords = self.ob_coords(buoy_pair.left)
+            # right_coords = self.ob_coords(buoy_pair.right)
+            # # get the perp forward direction
+            # forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
+            
+
 
             if not passed_waypoint:
                 self.get_logger().info(f"sending waypoint {waypoint} to action server")
@@ -426,20 +485,33 @@ class FollowBuoyPath(ActionServerBase):
         """
         self.obstacles = msg.obstacles
 
-        if self.first_map:
-            success = self.setup_buoys()
-            self.first_map = False if success else True
-            if not success:
-                return
-
-        if not self.proc_cancel_evt.is_set():
-            self.generate_waypoints()
-
     def odometry_cb(self, msg):
         self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
 
     def execute_callback(self, goal_handle):
+        self.get_logger().info("FollowBuoyPath request received.")
+
         self.start_process("Follow buoy path (task 1/2) started.")
+
+        while rclpy.ok() and self.obstacles is None:
+            self.get_logger().info("No obstacle map yet; waiting...")
+            time.sleep(1.0) # maybe change this
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                return Task.Result()
+        
+        self.get_logger().info("received first map")
+
+        success = False
+        while not success:
+            success = self.setup_buoys()
+            time.sleep(1.0)
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                return Task.Result()
+
+        self.get_logger().info("Setup buoys succeeded!")
+
 
         while not self.result:
             # Check if we should abort/cancel if a new goal arrived
@@ -452,6 +524,8 @@ class FollowBuoyPath(ActionServerBase):
                 self.end_process("Cancel requested. Aborting path following.")
                 goal_handle.canceled()
                 return Task.Result()
+            
+            self.generate_waypoints()
 
             time.sleep(self.timer_period)
 
@@ -463,7 +537,7 @@ class FollowBuoyPath(ActionServerBase):
 def main(args=None):
     rclpy.init(args=args)
     node = FollowBuoyPath()
-    executor = MultiThreadedExecutor()
+    executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
     executor.spin()
     node.destroy_node()
