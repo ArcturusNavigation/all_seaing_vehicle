@@ -52,6 +52,17 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(use_lora),
     )
 
+    onshore_lora_controller = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="onshore_lore_controller.py",
+        output="screen",
+        parameters=[
+            {"y": 1.0},
+            {"x": 1.0},
+            {"angular": 1.0},
+        ],
+    )
+
     keyboard_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
         condition=UnlessCondition(use_lora),
