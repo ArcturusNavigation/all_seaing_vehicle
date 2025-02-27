@@ -86,7 +86,7 @@ class DeliveryServer(ActionServerBase):
             self,
             Task,
             "object_delivery",
-            execute_callback=self.water_callback,
+            execute_callback=self.object_callback,
             cancel_callback=self.default_cancel_callback,
         )
         self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "bounding_boxes", self.bbox_callback, 10)  # TODO: change topic name
