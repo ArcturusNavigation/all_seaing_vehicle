@@ -16,6 +16,8 @@ TIMER_PERIOD = 1 / 60
 SERVO_HALF_RANGE = 90.0
 
 class DeliveryServer(ActionServerBase):
+    serial_instance = None
+
     def __init__(self):
         super().__init__("delivery_server")
 
@@ -58,8 +60,16 @@ class DeliveryServer(ActionServerBase):
         )
 
         # --------------- SERIAL PORTS ---------------#
+        if DeliveryServer.serial_instance is None:
+            try:
+                DeliveryServer.serial_instance = serial.Serial(port, 115200, timeout=1)
+                self.get_logger().info("Serial connection established")
+            except serial.SerialException as e:
+                self.get_logger().error(f"Failed to connect to serial port: {e}")
 
-        self.ser = serial.Serial(port, 115200, timeout = 1)
+        self.ser = DeliveryServer.serial_instance
+
+        # self.ser = serial.Serial(port, 115200, timeout = 1)
         self.buck = Buck(self.ser)
         self.mechanisms = Mechanisms(self.ser)
 
