@@ -103,7 +103,7 @@ class DeliveryServer(ActionServerBase):
             self.update_pid()
             effort = self.aim_pid.get_effort()
             servo_output = effort + SERVO_HALF_RANGE
-            self.mechanisms.servo2_angle(servo_output)
+            self.mechanisms.servo2_angle(int(servo_output))
         else:
             self.prev_update_time = self.get_clock().now()
             self.aim_pid.reset()
