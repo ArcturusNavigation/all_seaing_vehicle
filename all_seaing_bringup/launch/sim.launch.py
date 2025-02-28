@@ -239,10 +239,11 @@ def launch_setup(context, *args, **kwargs):
         executable="run_tasks.py",
     )
 
-    # task_1_server = launch_ros.actions.Node(
-    #     package="all_seaing_autonomy",
-    #     executable="task_1.py",
-    # )
+    task_init_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_init.py",
+        parameters=[{"is_sim": True}],
+    )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
@@ -276,8 +277,8 @@ def launch_setup(context, *args, **kwargs):
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "rb2025/rb2025_task1_task2.sdf",
-            #"world": "follow_path_task",
+            # "world": "rb2025/rb2025_task1_task2.sdf",
+            "world": "follow_path_task",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -299,7 +300,7 @@ def launch_setup(context, *args, **kwargs):
         grid_map_generator,
         onshore_node,
         run_tasks,
-        #task_1_server,
+        task_init_server,
         follow_buoy_path,
         rviz_waypoint_sender,
         map_to_odom,

@@ -2,8 +2,11 @@
 
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import ControlOption
-from all_seaing_interfaces.msg import Heartbeat
+from all_seaing_interfaces.msg import (
+    ControlOption, 
+    Heartbeat, 
+    KeyboardButton
+)
 
 import serial
 import struct
@@ -26,6 +29,8 @@ class RoverLoraController(Node):
         self.timer = self.create_timer(0.01, self.check_serial_data)
                 
         self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
+
+        self.keyboard_publisher = self.create_publisher(KeyboardButton, "keyboard_button", 10)
         
         
     def calculate_checksum(self, data):
@@ -39,7 +44,7 @@ class RoverLoraController(Node):
             if len(serialized_data) != self.data_size:
                 return
         
-            priority, x, y, angular, in_teleop, e_stopped, received_checksum = struct.unpack('BdddBBB', serialized_data)
+            priority, x, y, angular, in_teleop, e_stopped, received_checksum, key = struct.unpack('BdddBBB', serialized_data)
             
             # Verify checksum
             data_without_checksum = serialized_data[:-1]
@@ -60,7 +65,11 @@ class RoverLoraController(Node):
             heartbeat_message.in_teleop = bool(in_teleop)
             heartbeat_message.e_stopped = bool(e_stopped)
             self.heartbeat_publisher.publish(heartbeat_message)
-            
+
+            keyboard_msg = KeyboardButton()
+            keyboard_msg.key = key
+            self.keyboard_publisher.publish(keyboard_msg)
+
 
 
 def main(args=None):
