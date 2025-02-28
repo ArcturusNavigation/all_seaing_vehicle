@@ -51,7 +51,8 @@ class ColorSegmentation(Node):
         bboxes.header = img.header
 
         try:
-            img_to_segment = self.bridge.imgmsg_to_cv2(img, "rgb8")
+            img = self.bridge.imgmsg_to_cv2(img, "rgb8")
+            img = cv2.GaussianBlur(img, (5,5), 0)
         except cv_bridge.CvBridgeError as e:
             self.get_logger().info(str(e))
         # hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
