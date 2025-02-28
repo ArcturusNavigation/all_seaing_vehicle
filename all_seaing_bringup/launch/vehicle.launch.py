@@ -95,14 +95,29 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(use_bag),
     )
 
-    waypoint_finder = launch_ros.actions.Node(
+    run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="waypoint_finder.py",
+        executable="run_tasks.py",
+    )
+
+    follow_buoy_path = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_path.py",
         parameters=[
+            {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
     )
+
+    # waypoint_finder = launch_ros.actions.Node(
+    #     package="all_seaing_autonomy",
+    #     executable="waypoint_finder.py",
+    #     parameters=[
+    #         {"color_label_mappings_file": color_label_mappings},
+    #         {"safe_margin": 0.2},
+    #     ],
+    # )
 
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
@@ -152,8 +167,8 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"obstacle_size_min": 10},
-            {"obstacle_size_max": 800},
+            {"obstacle_size_min": 5},
+            {"obstacle_size_max": 300},
             {"clustering_distance": 0.1},
         ],
     )
@@ -226,6 +241,13 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    task_init_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_init.py",
+        parameters=[{"is_sim": False}],
+    )
+
+
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -244,7 +266,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -304,7 +326,10 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
-        waypoint_finder,
+        # waypoint_finder,
+        run_tasks,
+        task_init_server, 
+        follow_buoy_path,
         grid_map_generator,
         amcl_ld,
         mavros_ld,

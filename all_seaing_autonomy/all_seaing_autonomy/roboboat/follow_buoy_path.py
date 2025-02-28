@@ -132,7 +132,7 @@ class FollowBuoyPath(ActionServerBase):
         right_coords = self.ob_coords(pair.right)
         midpoint = self.midpoint(left_coords, right_coords)
         
-        scale = 5 # number of meters to translate forward. TODO: parametrize.
+        scale = 1 # number of meters to translate forward. TODO: parametrize.
         dy = right_coords[1] - left_coords[1]
         dx = right_coords[0] - left_coords[0]
         norm = math.sqrt(dx**2 + dy**2)

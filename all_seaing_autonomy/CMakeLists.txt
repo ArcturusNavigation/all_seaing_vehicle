@@ -12,6 +12,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/roboboat/follow_buoy_path.py
     ${PROJECT_NAME}/roboboat/run_tasks.py
+    ${PROJECT_NAME}/roboboat/task_init.py
     ${PROJECT_NAME}/vrx/acoustic_tracking/vrx_acoustic_tracking_sub.py
     DESTINATION lib/${PROJECT_NAME}
 )

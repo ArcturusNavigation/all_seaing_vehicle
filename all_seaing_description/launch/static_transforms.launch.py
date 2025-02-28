@@ -18,6 +18,17 @@ def launch_setup(context, *args, **kwargs):
         ],
         condition=UnlessCondition(LaunchConfiguration("indoors")),
     )
+    zed_to_base = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--frame-id",
+            "base_link", 
+            "--child-frame-id",
+            "zed_camera_link",
+        ],
+        condition=UnlessCondition(LaunchConfiguration("indoors")),
+    )
 
     lidar_to_camera = Node(
         package="tf2_ros",
@@ -47,6 +58,7 @@ def launch_setup(context, *args, **kwargs):
     return [
         map_to_odom,
         lidar_to_camera,
+        zed_to_base,
     ]
 
 

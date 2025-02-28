@@ -22,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/ObstacleCounterArray.msg"
     "msg/LabeledObjectPointCloud.msg"
     "msg/LabeledObjectPointCloudArray.msg"
+    "msg/KeyboardButton.msg"
     DEPENDENCIES
     geometry_msgs
     sensor_msgs
