@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
-from all_seaing_interfaces.action import Task
+from all_seaing_interfaces.action import Task, KeyboardButton
 from all_seaing_common.action_server_base import ActionServerBase
 from sensor_msgs.msg import Joy
 import time
@@ -17,9 +17,19 @@ class TaskInitServer(ActionServerBase):
             execute_callback=self.execute_callback,
             cancel_callback=self.default_cancel_callback,
         )
-        self.keyboard_sub = self.create_subscription(
-            Joy, "/joy", self.keyboard_callback, 10
-        )
+
+        self.declare_parameter("is_sim", False)
+        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+
+        self.keyboard_sub = None
+        if not self.is_sim:
+            self.keyboard_sub = self.create_subscription(
+                KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
+            )
+        else: 
+            self.keyboard_sub = self.create_subscription(
+                Joy, "/joy", self.sim_keyboard_callback, 10
+            )
         self.p_pressed = False
         self.timer_period = 1 / 10
     
@@ -50,25 +60,14 @@ class TaskInitServer(ActionServerBase):
         self.get_logger().info("ROS shutdown detected or loop ended unexpectedly.")
         goal_handle.abort()
         return Task.Result(success=False)
-    
 
-
-        # # Here you would initialize the task based on the goal
-        # # For example, setting up parameters, preparing resources, etc.
-        
-        # # Simulate some initialization work
-        # self.get_logger().info("Initializing task...")
-        
-        # # Simulate success
-        # result = Task.Result()
-        # result.success = True
-        # goal_handle.succeed()
-        
-        # self.get_logger().info("Task initialization complete.")
-        # return result
     
-    def keyboard_callback(self, msg):
+    def sim_keyboard_callback(self, msg):
         if msg.buttons[2]: 
+            self.p_pressed = True
+    
+    def real_keyboard_callback(self, msg):
+        if msg.key == "p":
             self.p_pressed = True
 
 def main(args=None):
