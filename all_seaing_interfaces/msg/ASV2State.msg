@@ -1,1 +1,0 @@
-string current_state

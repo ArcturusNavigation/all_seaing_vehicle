@@ -4,8 +4,10 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 
-#include "builtin_interfaces/msg/time.hpp"
 #include "geometry_msgs/msg/polygon.hpp"
+#include "geometry_msgs/msg/point.hpp"
+#include "geometry_msgs/msg/transform_stamped.hpp"
+#include "std_msgs/msg/header.hpp"
 
 #include "all_seaing_interfaces/msg/obstacle.hpp"
 
@@ -13,49 +15,42 @@ namespace all_seaing_perception {
 
 class Obstacle {
 public:
-    void to_ros_msg(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
-                    all_seaing_interfaces::msg::Obstacle &out_obstacle_msg);
+    void to_ros_msg(all_seaing_interfaces::msg::Obstacle &out_obstacle_msg);
 
-    Obstacle(const pcl::PointCloud<pcl::PointXYZI>::Ptr in_origin_cloud_ptr,
+    Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
+             const pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr,
              const std::vector<int> &in_cluster_indices, int in_id,
-             builtin_interfaces::msg::Time last_seen, double nav_x, double nav_y,
-             double nav_heading);
+             geometry_msgs::msg::TransformStamped lidar_map_tf);
 
     virtual ~Obstacle();
 
-    builtin_interfaces::msg::Time get_last_seen();
     int get_id();
     void set_id(int id);
 
-    pcl::PointCloud<pcl::PointXYZI>::Ptr get_cloud();
     pcl::PointXYZI get_local_point();
     pcl::PointXYZI get_global_point();
+    pcl::PointXYZI get_bbox_min();
+    pcl::PointXYZI get_bbox_max();
+    pcl::PointXYZI get_global_bbox_min();
+    pcl::PointXYZI get_global_bbox_max();
 
     geometry_msgs::msg::PolygonStamped get_local_chull();
     geometry_msgs::msg::PolygonStamped get_global_chull();
     float get_polygon_area();
 
-    geometry_msgs::msg::Point get_bbox_min();
-    geometry_msgs::msg::Point get_bbox_max();
-
-    geometry_msgs::msg::Point get_global_bbox_min();
-    geometry_msgs::msg::Point get_global_bbox_max();
-
-    template <typename T>
-    T convert_to_global(double nav_x, double nav_y, double nav_heading, T point);
-
 private:
-    builtin_interfaces::msg::Time m_last_seen;
+    std_msgs::msg::Header m_local_header;
+    std_msgs::msg::Header m_global_header;
     int m_id;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr m_cloud;
     pcl::PointXYZI m_local_point;
     pcl::PointXYZI m_global_point;
+    pcl::PointXYZI m_bbox_min;
+    pcl::PointXYZI m_bbox_max;
+    pcl::PointXYZI m_global_bbox_min;
+    pcl::PointXYZI m_global_bbox_max;
     geometry_msgs::msg::PolygonStamped m_local_chull;
     geometry_msgs::msg::PolygonStamped m_global_chull;
-    geometry_msgs::msg::Point m_bbox_min;
-    geometry_msgs::msg::Point m_bbox_max;
-    geometry_msgs::msg::Point m_global_bbox_min;
-    geometry_msgs::msg::Point m_global_bbox_max;
+    geometry_msgs::msg::TransformStamped m_lidar_map_tf;
     float m_area;
 };
 

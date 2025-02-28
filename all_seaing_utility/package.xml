@@ -3,7 +3,7 @@
 <package format="3">
     <name>all_seaing_utility</name>
     <version>0.0.0</version>
-    <description>Utility nodes for all_seaing_vehicle</description>
+    <description>Utility nodes and scripts for all_seaing_vehicle</description>
     <maintainer email="arcturus-logistics@mit.edu">arcturus</maintainer>
     <license>MIT</license>
 

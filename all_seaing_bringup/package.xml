@@ -10,6 +10,7 @@
     <buildtool_depend>ament_cmake_auto</buildtool_depend>
 
     <depend>all_seaing_autonomy</depend>
+    <depend>all_seaing_common</depend>
     <depend>all_seaing_controller</depend>
     <depend>all_seaing_description</depend>
     <depend>all_seaing_driver</depend>

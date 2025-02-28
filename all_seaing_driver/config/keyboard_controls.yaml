@@ -6,3 +6,4 @@ axes:
 buttons:
   - "KEY_SPACE"
   - "KEY_RETURN"
+  - "KEY_P"

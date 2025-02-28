@@ -1,4 +1,3 @@
-builtin_interfaces/Time last_seen 
 uint32 id
 int8 label
 

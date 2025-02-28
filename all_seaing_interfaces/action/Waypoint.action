@@ -1,10 +1,11 @@
 # Request
-float64 xy_threshold
-float64 theta_threshold
 float64 x
 float64 y
 float64 theta
+float64 xy_threshold
+float64 theta_threshold
 bool ignore_theta
+bool is_stationary
 ---
 # Result
 bool is_finished

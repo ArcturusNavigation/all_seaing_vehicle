@@ -1,6 +1,7 @@
+#!/usr/bin/env python3
+
 import Jetson.GPIO as GPIO
-from colorama import Fore, Back, Style
-import time
+from colorama import Fore 
 import os
 
 # pin 13

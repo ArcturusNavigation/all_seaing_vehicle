@@ -13,6 +13,9 @@
     <depend>rclcpp</depend>
     <depend>cv_bridge</depend>
 
+    <depend>all_seaing_common</depend>
+    <depend>all_seaing_interfaces</depend>
+
     <depend>mavros_msgs</depend>
     <depend>mavros_extras</depend>
     <depend>sensor_msgs</depend>

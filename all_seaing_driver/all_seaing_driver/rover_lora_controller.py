@@ -2,7 +2,11 @@
 
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import ControlOption
+from all_seaing_interfaces.msg import (
+    ControlOption, 
+    Heartbeat, 
+    KeyboardButton
+)
 
 import serial
 import struct
@@ -13,16 +17,20 @@ class RoverLoraController(Node):
         super().__init__('rover_lora_controller')
 
         # Setup serial connection
-        self.serial_port = serial.Serial('/dev/ttyUSB1', 57600, timeout=1)
+        self.serial_port = serial.Serial('/dev/ttyUSB0', 57600, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
         
-        self.data_size = struct.calcsize('BdddB')
+        self.data_size = struct.calcsize('BdddBBB')
 
         # Create ROS 2 publisher for ControlOption
         self.control_publisher = self.create_publisher(ControlOption, 'control_options', 10)
 
         # Start a ROS 2 timer to check for serial data
         self.timer = self.create_timer(0.01, self.check_serial_data)
+                
+        self.heartbeat_publisher = self.create_publisher(Heartbeat, "heartbeat", 10)
+
+        self.keyboard_publisher = self.create_publisher(KeyboardButton, "keyboard_button", 10)
         
         
     def calculate_checksum(self, data):
@@ -36,7 +44,7 @@ class RoverLoraController(Node):
             if len(serialized_data) != self.data_size:
                 return
         
-            priority, x, y, angular, received_checksum = struct.unpack('BdddB', serialized_data)
+            priority, x, y, angular, in_teleop, e_stopped, received_checksum, key = struct.unpack('BdddBBB', serialized_data)
             
             # Verify checksum
             data_without_checksum = serialized_data[:-1]
@@ -53,6 +61,15 @@ class RoverLoraController(Node):
             control_msg.twist.angular.z = angular
             self.control_publisher.publish(control_msg)
             
+            heartbeat_message = Heartbeat()
+            heartbeat_message.in_teleop = bool(in_teleop)
+            heartbeat_message.e_stopped = bool(e_stopped)
+            self.heartbeat_publisher.publish(heartbeat_message)
+
+            keyboard_msg = KeyboardButton()
+            keyboard_msg.key = key
+            self.keyboard_publisher.publish(keyboard_msg)
+
 
 
 def main(args=None):
