@@ -2,7 +2,8 @@
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
-from all_seaing_interfaces.action import Task, KeyboardButton
+from all_seaing_interfaces.action import Task
+from all_seaing_interfaces.msg import KeyboardButton 
 from all_seaing_common.action_server_base import ActionServerBase
 from sensor_msgs.msg import Joy
 import time
@@ -22,13 +23,15 @@ class TaskInitServer(ActionServerBase):
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         self.keyboard_sub = None
-        if not self.is_sim:
-            self.keyboard_sub = self.create_subscription(
-                KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
-            )
-        else: 
+        if self.is_sim: 
+            self.get_logger().info("Running in simulation mode. Listening to joystick input.")
             self.keyboard_sub = self.create_subscription(
                 Joy, "/joy", self.sim_keyboard_callback, 10
+            )
+        else: 
+            self.get_logger().info("Running in real mode. Listening to keyboard input.")
+            self.keyboard_sub = self.create_subscription(
+                KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
             )
         self.p_pressed = False
         self.timer_period = 1 / 10
