@@ -114,11 +114,6 @@ class GridMapGenerator(Node):
         """
         Create a Gaussian distribution around obstacles using their radius
         """
-        # Reset grid data for active cells
-        for i in range(len(self.active_cells)):
-            if self.active_cells[i]:
-                self.grid.data[i] = -1
-                self.active_cells[i] = False
 
         for obstacle in self.obstacle_map.obstacles:
             # Get obstacle center in grid coordinates
@@ -152,7 +147,7 @@ class GridMapGenerator(Node):
                         prob = int(100 * math.exp(-0.5 * dist_sq / (sigma * sigma)))
                         idx = x + y * self.grid.info.width
                         self.active_cells[idx] = True
-                        self.grid.data[idx] = max(prob, self.grid.data[idx])
+                        # self.grid.data[idx] = max(prob, self.grid.data[idx])
 
         self.modify_probability()
 
