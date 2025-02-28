@@ -65,12 +65,12 @@ class RunTasks(Node):
             # TODO: modify this (self.end_index + len(self.task_list)) % len(self.task_list)so that when a task is finished, or the task list is empty,
             # enter a transition state to search for a new task. 
 
-            if self.next_task_index != self.idle_index:
-                self.next_task_index = self.idle_index
-            else:
+            # if self.next_task_index != self.idle_index:
+            #     self.next_task_index = self.idle_index
+            # else:
                 # self.next_task_index = result.next_task_index 
                 # to be implemented in idle action server?
-                self.next_task_index += 1
+            self.next_task_index += 1
 
             if self.next_task_index == len(self.task_list): # TODO: modify this to use end_index in the future.  
                 # when end, shut down the node
