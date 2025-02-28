@@ -18,6 +18,7 @@ class RunTasks(Node):
     def __init__(self):
         super().__init__("run_tasks")
         self.task_list = [
+            ActionClient(self, Task, "task_init"),
             ActionClient(self, Task, "follow_buoy_path"),
         ]
         self.current_task = None
