@@ -26,6 +26,10 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     m_init_new_cov = this->get_parameter("init_new_cov").as_double();
     m_track_robot = this->get_parameter("track_robot").as_bool();
     m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
+
+    this->declare_parameter<bool>("is_sim", false);
+    m_is_sim = this->get_parameter("is_sim").as_bool();
+
     RCLCPP_INFO(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf, SLAM RANGE UNCERTAINTY: %lf, SLAM BEARING UNCERTAINTY: %lf, SLAM NEW OBJECT THRESHOLD: %lf", m_obstacle_seg_thresh, m_obstacle_drop_thresh, m_range_std, m_bearing_std, m_new_obj_slam_thres);
     // Initialize navigation variables to 0
     m_nav_x = 0;
@@ -581,8 +585,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         lidar_point.y = m_tracked_obstacles[tracked_id]->local_centroid.y;
         lidar_point.z = m_tracked_obstacles[tracked_id]->local_centroid.z;
         geometry_msgs::msg::Point camera_point = lidar_point;//ALREADY IN THE SAME FRAME, WAS TRANSFORMED BEFORE BEING PUBLISHED BY bbox_project_pcloud.cpp
-        cv::Point2d xy_rect = m_cam_model.project3dToPixel(
-            cv::Point3d(camera_point.y, camera_point.z, -camera_point.x));
+        cv::Point2d xy_rect = m_is_sim ? m_cam_model.project3dToPixel(
+            cv::Point3d(camera_point.y, camera_point.z, -camera_point.x)) : m_cam_model.project3dToPixel(
+            cv::Point3d(camera_point.x, camera_point.y, camera_point.z));;
         // RCLCPP_INFO(this->get_logger(), "OBSTACLE ID %d (%lf, %lf, %lf)->(%lf, %lf)", m_tracked_obstacles[tracked_id]->id, lidar_point.x, lidar_point.y, lidar_point.z, xy_rect.x, xy_rect.y);
         if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
             (xy_rect.y < m_cam_model.cameraInfo().height) && (lidar_point.x >= 0)) {

@@ -17,6 +17,9 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     m_obstacle_size_max = this->get_parameter("obstacle_size_max").as_int();
     m_clustering_distance = this->get_parameter("clustering_distance").as_double();
 
+    this->declare_parameter<bool>("is_sim", false);
+    m_is_sim = this->get_parameter("is_sim").as_bool();
+
     // for color segmentation
     this->declare_parameter("color_label_mappings_file", "");
 
@@ -161,7 +164,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         // Project 3D point onto the image plane using the intrinsic matrix.
         // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
         RCLCPP_DEBUG(this->get_logger(), "3D POINT: (%lf, %lf, %lf)", point_tf.x, point_tf.y, point_tf.z);
-        cv::Point2d xy_rect = m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));
+        cv::Point2d xy_rect = m_is_sim? m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
         // Check if within bounds & in front of the boat
         RCLCPP_DEBUG(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
     }
@@ -192,7 +195,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
             // Project 3D point onto the image plane using the intrinsic matrix.
             // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-            cv::Point2d xy_rect = m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x));
+            cv::Point2d xy_rect = m_is_sim? m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
             // Check if within bounds & in front of the boat
             if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
                 (xy_rect.y < m_cam_model.cameraInfo().height) && (point_tf.x >= 0)) {          
@@ -306,7 +309,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         for(auto ind_set : clusters_indices){
             RCLCPP_DEBUG(this->get_logger(), "SIZE OF CLUSTER %d: %d", clust_id, ind_set.indices.size());
             for(pcl::index_t ind : ind_set.indices){
-                cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x));
+                cv::Point2d cloud_pt_xy = m_is_sim ? m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
                 mat_clusters.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(clust_id, clusters_indices.size());
             }
             clust_id++;
@@ -400,7 +403,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 //transform to OpenCV HSV
                 std::vector<long long> cloud_pt_hsv = {pcloud_ptr->points[ind].h/2, pcloud_ptr->points[ind].s*((float)255.0), pcloud_ptr->points[ind].v*((float)255.0)};
                 RCLCPP_DEBUG(this->get_logger(), "CONVERTED CLUSTER POINT COLOR: (%d, %d, %d)", cloud_pt_hsv[0], cloud_pt_hsv[1], cloud_pt_hsv[2]);
-                cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x));
+                cv::Point2d cloud_pt_xy = m_is_sim ? m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
                 cluster_pts.push_back(std::make_pair(cloud_pt_xy, cloud_pt_hsv));
                 //store sums
                 cluster_qts.first.first.x+=cloud_pt_xy.x;
@@ -478,7 +481,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         for (pcl::index_t ind : clusters_indices[opt_cluster_id].indices){
             pcl::PointXYZHSV pt = pcloud_ptr->points[ind];
             refined_cloud_ptr->push_back(pt);
-            cv::Point2d cloud_pt_xy = m_cam_model.project3dToPixel(cv::Point3d(pt.y, pt.z, -pt.x));
+            cv::Point2d cloud_pt_xy = m_is_sim ? m_cam_model.project3dToPixel(cv::Point3d(pt.y, pt.z, -pt.x)) : m_cam_model.project3dToPixel(cv::Point3d(pt.x, pt.y, pt.z));
             mat_opt_cluster.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(opt_cluster_id, clusters_indices.size());
         }
         pcl::toROSMsg(*refined_cloud_ptr, refined_pcl_segments.cloud);

@@ -141,6 +141,9 @@ private:
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
     bool m_first_state;
+
+    bool m_is_sim;
+
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();

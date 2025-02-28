@@ -125,6 +125,8 @@ private:
     double m_cluster_contour_size_weight;
     std::map<std::string, std::vector<int>> contour_matching_color_range_map;
 
+    bool m_is_sim;
+
 public:
     BBoxProjectPCloud();
     virtual ~BBoxProjectPCloud();

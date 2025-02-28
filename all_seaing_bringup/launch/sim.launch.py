@@ -184,7 +184,8 @@ def launch_setup(context, *args, **kwargs):
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
             {"matching_weights_file": matching_weights},
-            {"contour_matching_color_ranges_file": contour_matching_color_ranges}
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": True}
         ]
     )
 
@@ -204,6 +205,7 @@ def launch_setup(context, *args, **kwargs):
             {"new_object_slam_threshold": 2.0},
             {"init_new_cov": 10.0},
             {"track_robot": True},
+            {"is_sim": True}
         ]
     )
 
