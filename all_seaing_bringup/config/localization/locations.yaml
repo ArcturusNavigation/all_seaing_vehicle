@@ -7,8 +7,6 @@ boathouse:
   indoors: false
   lat: 42.355
   lon: -71.0975
-    # lat: 42.35
-   # lon: -71.09
 
 conference:
   indoors: true
