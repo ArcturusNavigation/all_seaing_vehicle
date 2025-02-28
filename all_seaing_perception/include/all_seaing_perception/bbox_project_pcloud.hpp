@@ -126,6 +126,7 @@ private:
     std::map<std::string, std::vector<int>> contour_matching_color_range_map;
 
     bool m_is_sim;
+    double m_bbox_margin;
 
 public:
     BBoxProjectPCloud();

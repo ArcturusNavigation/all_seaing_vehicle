@@ -31,6 +31,8 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
 
+    set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
+
     color_segmentation_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="color_segmentation.py",
@@ -55,7 +57,6 @@ def launch_setup(context, *args, **kwargs):
             {"obstacle_size_min": 10},
             {"obstacle_size_max": 800},
             {"clustering_distance": 0.1},
-            {"use_sim_time": True}
         ],
     )
 
@@ -77,7 +78,6 @@ def launch_setup(context, *args, **kwargs):
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
             {"is_sim": False},
-            {"use_sim_time": True}
         ]
     )
 
@@ -99,7 +99,6 @@ def launch_setup(context, *args, **kwargs):
             {"init_new_cov": 10.0},
             {"track_robot": False},
             {"is_sim": False},
-            {"use_sim_time": True}
         ]
     )
 
@@ -116,7 +115,6 @@ def launch_setup(context, *args, **kwargs):
             {"obstacle_drop_thresh": 1.0},
             {"check_fov": False},
             {"is_sim": False},
-            {"use_sim_time": True}
         ]
     )
 
@@ -128,11 +126,11 @@ def launch_setup(context, *args, **kwargs):
             # ("obstacle_map/raw", "obstacle_map/refined_untracked")
         ],
         parameters=[
-            {"use_sim_time": True}
         ]
     )
 
     return [
+        set_use_sim_time,
         bbox_project_pcloud_node,
         # object_tracking_map_node,
         object_tracking_map_euclidean_node,
@@ -144,6 +142,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
+            DeclareLaunchArgument('use_sim_time', default_value='true'),
             OpaqueFunction(function=launch_setup),
         ]
     )

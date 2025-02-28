@@ -6,7 +6,8 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 
     //essential ones
-    this->declare_parameter("bbox_object_margin", 0.0);
+    this->declare_parameter<double>("bbox_object_margin", 0.0);
+    m_bbox_margin = this->get_parameter("bbox_object_margin").as_double();
 
     // for cluster extraction
     this->declare_parameter<int>("obstacle_size_min", 20);
@@ -191,7 +192,16 @@ void BBoxProjectPCloud::bb_pcl_project(
         labeled_pcl.time = in_cloud_msg->header.stamp;
         labeled_pcl.label = bbox.label;
         obj_cloud_ptr->header = in_cloud_tf_ptr->header;
-        RCLCPP_DEBUG(this->get_logger(), "BOUNDING BOX FOR OBJECT %d: (%d,%d), (%d, %d)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y);
+        // Add padding to bbox
+        bbox.min_x -= m_bbox_margin;
+        bbox.max_x += m_bbox_margin;
+        bbox.min_y -= m_bbox_margin;
+        bbox.max_y += m_bbox_margin;
+        bbox.min_x = std::max((int)bbox.min_x,0);
+        bbox.max_x = std::min((int)bbox.max_x+1, cv_hsv.cols);
+        bbox.min_y = std::max((int)bbox.min_y,0);
+        bbox.max_y = std::min((int)bbox.max_y+1, cv_hsv.rows);
+        RCLCPP_DEBUG(this->get_logger(), "PADDED BOUNDING BOX FOR OBJECT %d: (%d,%d), (%d, %d)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y);
         for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
             // Project 3D point onto the image plane using the intrinsic matrix.
             // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
@@ -199,9 +209,8 @@ void BBoxProjectPCloud::bb_pcl_project(
             // Check if within bounds & in front of the boat
             if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
                 (xy_rect.y < m_cam_model.cameraInfo().height) && (point_tf.x >= 0)) {          
-                double bbox_margin = this->get_parameter("bbox_object_margin").as_double();
                 // Check if point is in bbox
-                if(xy_rect.x >= bbox.min_x-bbox_margin && xy_rect.x <= bbox.max_x+bbox_margin && xy_rect.y >= bbox.min_y-bbox_margin && xy_rect.y <= bbox.max_y+bbox_margin){
+                if(xy_rect.x >= bbox.min_x && xy_rect.x <= bbox.max_x && xy_rect.y >= bbox.min_y && xy_rect.y <= bbox.max_y){
                     cv::Vec3b hsv_vec3b = cv_hsv.at<cv::Vec3b>(xy_rect);
                     std::vector<long long> hsv = {(long long)hsv_vec3b[0], (long long)hsv_vec3b[1], (long long)hsv_vec3b[2]};
                     // cv::Vec3b bgr = cv_ptr->image.at<cv::Vec3b>(xy_rect);
@@ -511,7 +520,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     }
     // RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS & CONTOURS");
     m_refined_object_pcl_segment_pub->publish(refined_objects_pub);
-    // RCLCPP_INFO(this->get_logger(), "PUBLISHED REFINED OBJECT POINT CLOUDS & CONTOURS");
+    // RCLCPP_DEBUG(this->get_logger(), "PUBLISHED REFINED OBJECT POINT CLOUDS & CONTOURS");
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
     all_obj_refined_pcls_ptr->header = in_cloud_tf_ptr->header;
     //convert vector of PointCloud to a single PointCloud with channels
@@ -540,7 +549,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     // cv::imshow("Object contour image to be published:", all_obj_refined_contours);
     // cv::waitKey();
     m_refined_object_segment_viz_pub->publish(*all_obj_refined_contour_ptr->toImageMsg());
-    // RCLCPP_INFO(this->get_logger(), "SENT OBJECT POINT CLOUDS FOR VISUALIZATION");
+    // RCLCPP_DEBUG(this->get_logger(), "SENT OBJECT POINT CLOUDS FOR VISUALIZATION");
 }
 
 geometry_msgs::msg::TransformStamped BBoxProjectPCloud::get_tf(const std::string &in_target_frame,
@@ -550,8 +559,8 @@ geometry_msgs::msg::TransformStamped BBoxProjectPCloud::get_tf(const std::string
     try {
         tf = m_tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
         m_pc_cam_tf_ok = true;
-        RCLCPP_INFO(this->get_logger(), "LiDAR to Camera Transform good");
-        RCLCPP_INFO(this->get_logger(), "in_target_frame: %s, in_src_frame: %s",
+        RCLCPP_DEBUG(this->get_logger(), "LiDAR to Camera Transform good");
+        RCLCPP_DEBUG(this->get_logger(), "in_target_frame: %s, in_src_frame: %s",
                     in_target_frame.c_str(), in_src_frame.c_str());
     } catch (tf2::TransformException &ex) {
         RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
