@@ -30,6 +30,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map"){
     this->declare_parameter<bool>("is_sim", false);
     m_is_sim = this->get_parameter("is_sim").as_bool();
 
+    this->declare_parameter<bool>("check_fov", false);
+    m_check_fov = this->get_parameter("check_fov").as_bool();
+
     RCLCPP_INFO(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf, SLAM RANGE UNCERTAINTY: %lf, SLAM BEARING UNCERTAINTY: %lf, SLAM NEW OBJECT THRESHOLD: %lf", m_obstacle_seg_thresh, m_obstacle_drop_thresh, m_range_std, m_bearing_std, m_new_obj_slam_thres);
     // Initialize navigation variables to 0
     m_nav_x = 0;
@@ -590,7 +593,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             cv::Point3d(camera_point.x, camera_point.y, camera_point.z));;
         // RCLCPP_INFO(this->get_logger(), "OBSTACLE ID %d (%lf, %lf, %lf)->(%lf, %lf)", m_tracked_obstacles[tracked_id]->id, lidar_point.x, lidar_point.y, lidar_point.z, xy_rect.x, xy_rect.y);
         if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-            (xy_rect.y < m_cam_model.cameraInfo().height) && (lidar_point.x >= 0)) {
+            (xy_rect.y < m_cam_model.cameraInfo().height) && (lidar_point.x >= 0) || !m_check_fov) {
             // Dead
             if(m_tracked_obstacles[tracked_id]->is_dead){
                 // Was also dead before, add time dead

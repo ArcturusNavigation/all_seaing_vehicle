@@ -6,7 +6,6 @@
 #include "yaml-cpp/yaml.h"
 
 #include <vector>
-#include <tuple>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -26,8 +25,6 @@
 #include "builtin_interfaces/msg/time.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "std_msgs/msg/header.hpp"
-#include "visualization_msgs/msg/marker.hpp"
-#include "visualization_msgs/msg/marker_array.hpp"
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -53,9 +50,6 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include <Eigen/Dense>
-#include <Eigen/Eigenvalues>
-
 //custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)
 struct ObjectCloud{
     int id;
@@ -68,8 +62,6 @@ struct ObjectCloud{
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr global_pcloud_ptr;
     pcl::PointXYZ local_centroid;
     pcl::PointXYZ global_centroid;
-    Eigen::Vector2f mean_pred;
-    Eigen::Matrix2f cov; 
 
     ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob);
 
@@ -88,12 +80,6 @@ private:
     template <typename T>
     T convert_to_local(double nav_x, double nav_y, double nav_heading, T point);
 
-    void visualize_predictions();
-
-    typedef std::tuple<float, float, int> det_rbs;
-    template <typename T>
-    det_rbs local_to_range_bearing_signature(T point, int label);
-
     // Get intrinsic camera model information needed for projection
     void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
 
@@ -109,19 +95,14 @@ private:
     int m_obstacle_id;
     double m_obstacle_seg_thresh;
     double m_obstacle_drop_thresh;
-    double m_init_new_cov;
-    bool m_track_robot;
-    double m_normalize_drop_dist;
 
-    float m_nav_x, m_nav_y, m_nav_heading, m_nav_omega;
-    rclcpp::Time m_last_odom_time;
+    float m_nav_x, m_nav_y, m_nav_heading;
 
     geometry_msgs::msg::Pose m_nav_pose;
 
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_untracked_map_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_map_cov_viz_pub;
     rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
@@ -133,14 +114,6 @@ private:
 
     // Intrinsics callback camera model variables
     image_geometry::PinholeCameraModel m_cam_model;
-
-    //SLAM matrices & variables
-    float m_range_std, m_bearing_std, m_new_obj_slam_thres;
-    float m_xy_noise, m_theta_noise;
-    int m_num_obj;
-    Eigen::VectorXf m_state;//obstacle map
-    Eigen::MatrixXf m_cov;//covariance matrix
-    bool m_first_state;
 
     bool m_is_sim;
     bool m_check_fov;

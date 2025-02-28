@@ -288,7 +288,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         cv::Mat mat_opt_contour = mat_contours.clone();
 
         //extract clusters
-        pcl::search::KdTree<pcl::PointXYZHSV>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZHSV>());
+        pcl::search::KdTree<pcl::PointXYZHSV>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZHSV>);
         // pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>);
         if (!pcloud_ptr->points.empty())
             tree->setInputCloud(pcloud_ptr);
@@ -471,7 +471,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         auto refined_pcl_segments = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         refined_pcl_segments.time = in_cloud_msg->header.stamp;
         refined_pcl_segments.label = bbox.label;
-        pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>());
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         refined_cloud_ptr->header = pcloud_ptr->header;
         cv::Mat refined_obj_contour_mat = cv::Mat::zeros(img_sz, CV_8UC3);
         for (cv::Point image_pt : in_contours[opt_contour_id]){
@@ -512,7 +512,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     // RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS & CONTOURS");
     m_refined_object_pcl_segment_pub->publish(refined_objects_pub);
     // RCLCPP_INFO(this->get_logger(), "PUBLISHED REFINED OBJECT POINT CLOUDS & CONTOURS");
-    pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>());
+    pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
     all_obj_refined_pcls_ptr->header = in_cloud_tf_ptr->header;
     //convert vector of PointCloud to a single PointCloud with channels
     // all_obj_refined_pcls_ptr->resize((pcl::uindex_t)max_refined_len, (pcl::uindex_t)refined_cloud_contour_vec.size());

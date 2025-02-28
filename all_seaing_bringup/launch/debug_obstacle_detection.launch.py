@@ -69,7 +69,7 @@ def launch_setup(context, *args, **kwargs):
             ("lidar_topic", "/point_cloud/filtered")
         ],
         parameters=[
-            {"bbox_object_margin": 0.0},
+            {"bbox_object_margin": 1.0},
             {"color_label_mappings_file": color_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
@@ -95,6 +95,7 @@ def launch_setup(context, *args, **kwargs):
             {"range_uncertainty": 1.0},
             {"bearing_uncertainty": 0.1},
             {"new_object_slam_threshold": 2.0},
+            {"check_fov": False},
             {"init_new_cov": 10.0},
             {"track_robot": False},
             {"is_sim": False},
@@ -102,11 +103,42 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    object_tracking_map_euclidean_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_euclidean",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+        ],
+        parameters=[
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"check_fov": False},
+            {"is_sim": False},
+            {"use_sim_time": True}
+        ]
+    )
+
+    obstacle_bbox_overlay_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_bbox_overlay",
+        remappings=[
+            ("camera_info", "/zed/zed_node/rgb/camera_info"),
+            # ("obstacle_map/raw", "obstacle_map/refined_untracked")
+        ],
+        parameters=[
+            {"use_sim_time": True}
+        ]
+    )
+
     return [
         bbox_project_pcloud_node,
-        object_tracking_map_node,
+        # object_tracking_map_node,
+        object_tracking_map_euclidean_node,
         obstacle_detector_node,
-        color_segmentation_node
+        color_segmentation_node,
+        obstacle_bbox_overlay_node
     ]
 
 def generate_launch_description():
