@@ -77,7 +77,7 @@ while running:
         control_msg["angular"],
         heartbeat_msg["in_teleop"],
         heartbeat_msg["e_stopped"],
-        keyboard_msg["key"] == "p",
+        keyboard_msg["key"],
     )
     
     checksum = calculate_checksum(serialized_msg)

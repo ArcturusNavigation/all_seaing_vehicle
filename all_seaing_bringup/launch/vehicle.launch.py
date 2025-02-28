@@ -241,6 +241,13 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    task_init_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_init.py",
+        parameters=[{"is_sim": False}],
+    )
+
+
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -321,6 +328,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_node,
         # waypoint_finder,
         run_tasks,
+        task_init_server, 
         follow_buoy_path,
         grid_map_generator,
         amcl_ld,

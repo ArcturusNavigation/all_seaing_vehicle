@@ -242,6 +242,7 @@ def launch_setup(context, *args, **kwargs):
     task_init_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="task_init.py",
+        parameters=[{"is_sim": True}],
     )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
