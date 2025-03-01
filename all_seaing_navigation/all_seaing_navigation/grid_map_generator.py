@@ -109,77 +109,52 @@ class GridMapGenerator(Node):
         x = gx * resolution + origin.x
         y = gy * resolution + origin.y
         return x, y
+    
+    def set_active(self, make_active):
+        """
+        Set the active_cells for bounding boxes to be true (or false when resetting)
+        """
+        for obstacle in self.obstacle_map.obstacles:
+            # Get obstacle center in grid coordinates
+            center_x, center_y = self.world_to_grid(
+                obstacle.global_point.point.x, obstacle.global_point.point.y
+            )
+
+            # Use default radius if not set or is zero
+            bbox_width = obstacle.global_bbox_max.x-obstacle.global_bbox_min.x
+            bbox_length = obstacle.global_bbox_max.y-obstacle.global_bbox_min.y
+            radius = math.sqrt((bbox_width/2)**2+(bbox_length/2)**2)
+
+            # Convert radius to grid cells (3 sigma)
+            sigma = radius / (3 * self.grid_resolution)
+            search_radius = int(5 * sigma)
+
+            # Calculate bounding box
+            minx = max(0, center_x - search_radius)
+            miny = max(0, center_y - search_radius)
+            maxx = min(self.grid.info.width, center_x + search_radius + 1)
+            maxy = min(self.grid.info.height, center_y + search_radius + 1)
+
+            # Create Gaussian distribution
+            for x in range(minx, maxx):
+                for y in range(miny, maxy):
+                    # Calculate squared distance from center
+                    dx = x - center_x
+                    dy = y - center_y
+                    dist_sq = dx * dx + dy * dy
+
+                    if dist_sq <= search_radius * search_radius:
+                        idx = x + y * self.grid.info.width
+                        self.active_cells[idx] = make_active
 
     def find_active_cells(self):
         """
         Create a Gaussian distribution around obstacles using their radius
         """
 
-        for obstacle in self.obstacle_map.obstacles:
-            # Get obstacle center in grid coordinates
-            center_x, center_y = self.world_to_grid(
-                obstacle.global_point.point.x, obstacle.global_point.point.y
-            )
-
-            # Use default radius if not set or is zero
-            radius = obstacle.radius if hasattr(obstacle, 'radius') and obstacle.radius > 0 else self.default_obstacle_radius
-
-            # Convert radius to grid cells (3 sigma)
-            sigma = radius / (3 * self.grid_resolution)
-            search_radius = int(5 * sigma)
-
-            # Calculate bounding box
-            minx = max(0, center_x - search_radius)
-            miny = max(0, center_y - search_radius)
-            maxx = min(self.grid.info.width, center_x + search_radius + 1)
-            maxy = min(self.grid.info.height, center_y + search_radius + 1)
-
-            # Create Gaussian distribution
-            for x in range(minx, maxx):
-                for y in range(miny, maxy):
-                    # Calculate squared distance from center
-                    dx = x - center_x
-                    dy = y - center_y
-                    dist_sq = dx * dx + dy * dy
-
-                    if dist_sq <= search_radius * search_radius:
-                        # Calculate Gaussian probability
-                        prob = int(100 * math.exp(-0.5 * dist_sq / (sigma * sigma)))
-                        idx = x + y * self.grid.info.width
-                        self.active_cells[idx] = True
-
+        self.set_active(True)
         self.modify_probability()
-
-        for obstacle in self.obstacle_map.obstacles:
-            # Get obstacle center in grid coordinates
-            center_x, center_y = self.world_to_grid(
-                obstacle.global_point.point.x, obstacle.global_point.point.y
-            )
-
-            # Use default radius if not set or is zero
-            radius = obstacle.radius if hasattr(obstacle, 'radius') and obstacle.radius > 0 else self.default_obstacle_radius
-
-            # Convert radius to grid cells (3 sigma)
-            sigma = radius / (3 * self.grid_resolution)
-            search_radius = int(5 * sigma)
-
-            # Calculate bounding box
-            minx = max(0, center_x - search_radius)
-            miny = max(0, center_y - search_radius)
-            maxx = min(self.grid.info.width, center_x + search_radius + 1)
-            maxy = min(self.grid.info.height, center_y + search_radius + 1)
-
-            # Create Gaussian distribution
-            for x in range(minx, maxx):
-                for y in range(miny, maxy):
-                    # Calculate squared distance from center
-                    dx = x - center_x
-                    dy = y - center_y
-                    dist_sq = dx * dx + dy * dy
-
-                    if dist_sq <= search_radius * search_radius:
-                        idx = x + y * self.grid.info.width
-                        self.active_cells[idx] = False
+        self.set_active(False)
 
     def modify_probability(self):
         """Decay or increase probability of obstacle in active cells based on sensor observations"""
