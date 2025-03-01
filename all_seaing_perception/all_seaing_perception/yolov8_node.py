@@ -7,7 +7,7 @@ https://github.com/mgonzs13/yolov8_ros
 Instructions (run this in terminal):
 ros2 run all_seaing_perception yolov8_node.py \
     --ros-args -p model:=model_name (without .pt) \
-    --ros-args -r image_topic:=your_custom_image_topic
+    --ros-args -r image_raw:=your_custom_image_topic
 """
 
 import rclpy

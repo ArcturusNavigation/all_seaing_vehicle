@@ -34,7 +34,7 @@ class ColorSegmentation(Node):
         color_label_mappings = os.path.join(bringup_prefix, "config", "perception", "color_label_mappings.yaml")
         color_ranges = os.path.join(bringup_prefix, "config", "perception", "color_ranges.yaml")
 
-        self.declare_parameter('color_ranges_file', '/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_bringup/config/perception/color_ranges.yaml')
+        self.declare_parameter('color_ranges_file', '/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_bringup/config/perception/color_ranges_LED_ycrcb.yaml')
         self.declare_parameter('color_label_mappings_file', '/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_bringup/config/perception/color_label_mappings.yaml')
 
         color_ranges_file = self.get_parameter('color_ranges_file').value
@@ -51,10 +51,13 @@ class ColorSegmentation(Node):
         bboxes.header = img.header
 
         try:
-            img = self.bridge.imgmsg_to_cv2(img, "bgr8")
+            img = self.bridge.imgmsg_to_cv2(img, "rgb8")
+            img = cv2.GaussianBlur(img, (5,5), 0)
         except cv_bridge.CvBridgeError as e:
             self.get_logger().info(str(e))
-        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        # hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+        ycrcb_img = cv2.cvtColor(img,cv2.COLOR_BGR2YCrCb)
+
 
         colors = self.colors
         label_dict = self.label_dict
@@ -68,17 +71,17 @@ class ColorSegmentation(Node):
         }
 
         for color in colors:
-            if color == "red2":
-                continue
-            h_min, h_max, s_min, s_max, v_min, v_max = colors[color]
-            lower_limit = np.array([h_min, s_min, v_min])
-            upper_limit = np.array([h_max, s_max, v_max])
-            mask = cv2.inRange(hsv_img, lower_limit, upper_limit)
-            if color == "red":
-                h_min, h_max, s_min, s_max, v_min, v_max = colors["red2"]
-                lower_limit = np.array([h_min, s_min, v_min])
-                upper_limit = np.array([h_max, s_max, v_max])
-                mask = mask + cv2.inRange(hsv_img, lower_limit, upper_limit)
+            # if color == "red2":
+            #     continue
+            r_min, r_max, g_min, g_max, b_min, b_max = colors[color]
+            lower_limit = np.array([r_min, g_min, b_min])
+            upper_limit = np.array([r_max, g_max, b_max])
+            mask = cv2.inRange(ycrcb_img, lower_limit, upper_limit)
+            # if color == "red":
+            #     r_min, r_max, g_min, g_max, b_min, b_max = colors["red2"]
+            #     lower_limit = np.array([r_min, g_min, b_min])
+            #     upper_limit = np.array([r_max, g_max, b_max])
+            #     mask = mask + cv2.inRange(ycrcb_img, lower_limit, upper_limit)
 
             # erode and dilate mask
             # kernel = np.ones((5, 5), np.uint8)
@@ -109,7 +112,7 @@ class ColorSegmentation(Node):
                     4,
                 )
 
-            self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "bgr8"))
+            self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
         self.bbox_pub.publish(bboxes)
 
 
