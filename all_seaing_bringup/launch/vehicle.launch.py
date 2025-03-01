@@ -95,10 +95,16 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(use_bag),
     )
 
+    run_tasks = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="run_tasks.py",
+    )
+
     follow_buoy_path = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_path.py",
         parameters=[
+            {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
@@ -152,8 +158,8 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"obstacle_size_min": 10},
-            {"obstacle_size_max": 800},
+            {"obstacle_size_min": 5},
+            {"obstacle_size_max": 300},
             {"clustering_distance": 0.1},
         ],
     )
@@ -272,6 +278,13 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    task_init_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_init.py",
+        parameters=[{"is_sim": False}],
+    )
+
+
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -353,6 +366,8 @@ def launch_setup(context, *args, **kwargs):
         webcam_publisher,
         buoy_yolo_node,
         shape_yolo_node,
+        run_tasks,
+        task_init_server, 
         follow_buoy_path,
         grid_map_generator,
         amcl_ld,

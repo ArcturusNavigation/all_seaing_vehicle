@@ -7,7 +7,7 @@ from rclpy.executors import MultiThreadedExecutor
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import Point, Pose, Vector3
+from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
@@ -100,6 +100,12 @@ class FollowBuoyPath(ActionServerBase):
 
         self.obstacles = None
 
+    def norm_squared(self, vec, ref=(0, 0)):
+        return vec[0] ** 2 + vec[1] ** 2
+
+    def norm(self, vec, ref=(0, 0)):
+        return math.sqrt(self.norm_squared(vec, ref))
+
     def ob_coords(self, buoy, local=False):
         if local:
             return (buoy.local_point.point.x, buoy.local_point.point.y)
@@ -116,7 +122,19 @@ class FollowBuoyPath(ActionServerBase):
         return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
 
     def midpoint_pair(self, pair):
-        return self.midpoint(self.ob_coords(pair.left), self.ob_coords(pair.right))
+        left_coords = self.ob_coords(pair.left)
+        right_coords = self.ob_coords(pair.right)
+        midpoint = self.midpoint(left_coords, right_coords)
+        
+        scale = 1 # number of meters to translate forward. TODO: parametrize.
+        dy = right_coords[1] - left_coords[1]
+        dx = right_coords[0] - left_coords[0]
+        norm = math.sqrt(dx**2 + dy**2)
+        dx /= norm
+        dy /= norm
+        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
+
+        return midpoint
 
     def split_buoys(self, obstacles):
         """
@@ -143,11 +161,11 @@ class FollowBuoyPath(ActionServerBase):
         """
         marker_array = MarkerArray()
         i = 0
-        for buoy_pair in buoy_pairs.pairs:
+        for p_left, p_right, point, radius in buoy_pairs:
             marker_array.markers.append(
                 Marker(
                     type=Marker.ARROW,
-                    pose=buoy_pair.waypoint.point,
+                    pose=point,
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=0.05, z=0.05),
                     color=ColorRGBA(a=1.0),
@@ -164,7 +182,7 @@ class FollowBuoyPath(ActionServerBase):
             marker_array.markers.append(
                 Marker(
                     type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(buoy_pair.left)),
+                    pose=self.pair_to_pose(self.ob_coords(p_left)),
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=left_color,
@@ -174,7 +192,7 @@ class FollowBuoyPath(ActionServerBase):
             marker_array.markers.append(
                 Marker(
                     type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(buoy_pair.right)),
+                    pose=self.pair_to_pose(self.ob_coords(p_right)),
                     header=Header(frame_id="odom"),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=right_color,
@@ -186,13 +204,13 @@ class FollowBuoyPath(ActionServerBase):
                     type=Marker.CYLINDER,
                     pose=Pose(
                         position=Point(
-                            x=buoy_pair.waypoint.point.position.x,
-                            y=buoy_pair.waypoint.point.position.y,
+                            x=point.position.x,
+                            y=point.position.y,
                         )
                     ),
                     header=Header(frame_id="odom"),
                     scale=Vector3(
-                        x=buoy_pair.waypoint.radius, y=buoy_pair.waypoint.radius, z=1.0
+                        x=radius, y=radius, z=1.0
                     ),
                     color=ColorRGBA(g=1.0, a=0.5),
                     id=(4 * i) + 3,
@@ -245,14 +263,14 @@ class FollowBuoyPath(ActionServerBase):
                 self.get_closest_to((0, 0), red_buoys, local=True),
                 self.get_closest_to((0, 0), green_buoys, local=True),
             )
-            self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
+            self.get_logger().info("RED BUOYS LEFT, GREEN BUOYS RIGHT")
         else:
             self.red_left = False
             self.starting_buoys = InternalBuoyPair(
                 self.get_closest_to((0, 0), green_buoys, local=True),
                 self.get_closest_to((0, 0), red_buoys, local=True),
             )
-            self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
+            self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
         self.pair_to = self.starting_buoys
         return True
 
@@ -293,6 +311,9 @@ class FollowBuoyPath(ActionServerBase):
 
         front_red = self.filter_front_buoys(prev_pair, red)
         front_green = self.filter_front_buoys(prev_pair, green)
+        self.get_logger().debug(
+            f"robot pos: {self.robot_pos}, front red buoys: {self.obs_to_pos(front_red)}, front green buoys: {self.obs_to_pos(front_green)}"
+        )
 
         if not front_red or not front_green:
             prev_coords = self.ob_coords(prev_pair.left), self.ob_coords(
@@ -341,6 +362,34 @@ class FollowBuoyPath(ActionServerBase):
 
     def pair_to_pose(self, pair):
         return Pose(position=Point(x=pair[0], y=pair[1]))
+    
+    def quaternion_from_euler(self, roll, pitch, yaw):
+        """
+        Converts euler roll, pitch, yaw to quaternion (w in last place)
+        quat = [x, y, z, w]
+        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
+        """
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        q = [0] * 4
+        q[0] = cy * cp * cr + sy * sp * sr
+        q[1] = cy * cp * sr - sy * sp * cr
+        q[2] = sy * cp * sr + cy * sp * cr
+        q[3] = sy * cp * cr - cy * sp * sr
+
+        return q
+    
+    def pair_angle_to_pose(self, pair, angle):
+        quat = self.quaternion_from_euler(0, angle, 0)
+        return Pose(
+            position=Point(x=pair[0], y=pair[1]),
+            orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
+        )
 
     def generate_waypoints(self):
         """
@@ -378,10 +427,7 @@ class FollowBuoyPath(ActionServerBase):
                 self.get_logger().debug("No next buoy pair to go to.")
                 if time.time() - self.time_last_seen_buoys > 1:
                     self.result = True
-                # wait for next spin
                 return
-            # TODO: there is no longer a case where it is done wiht the task.
-            # also, what happens when eg. the green buoy is passed but not the red?
 
         buoy_pairs = [self.pair_to]
         waypoints = [self.midpoint_pair(self.pair_to)]
@@ -401,6 +447,14 @@ class FollowBuoyPath(ActionServerBase):
 
         self.get_logger().debug(f"Waypoints: {waypoints}")
 
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(pair.left, pair.right, self.pair_angle_to_pose(
+            pair=wpt,
+            angle=(
+                math.atan(self.ob_coords(pair.right)[1] - self.ob_coords(pair.left)[1]) /
+                (self.ob_coords(pair.right)[0] - self.ob_coords(pair.left)[0])
+            ) + (math.pi / 2),
+        ), self.norm(self.ob_coords(pair.left), self.ob_coords(pair.right))/2 - self.safe_margin) for wpt, pair in zip(waypoints, buoy_pairs)]))
+
         if waypoints:
             waypoint = waypoints[0]
             self.get_logger().debug(
@@ -414,6 +468,14 @@ class FollowBuoyPath(ActionServerBase):
             for sent_waypoint in self.sent_waypoints:
                 if math.dist(waypoint, sent_waypoint) < check_dist:
                     passed_waypoint = True
+            
+            # buoy_pair = buoy_pairs[0]
+            # left_coords = self.ob_coords(buoy_pair.left)
+            # right_coords = self.ob_coords(buoy_pair.right)
+            # # get the perp forward direction
+            # forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
+            
+
 
             if not passed_waypoint:
                 self.get_logger().info(f"sending waypoint {waypoint} to action server")

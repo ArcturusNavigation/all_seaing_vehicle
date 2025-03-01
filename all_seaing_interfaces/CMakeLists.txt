@@ -20,6 +20,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/Heartbeat.msg"
     "msg/ObstacleCounter.msg"
     "msg/ObstacleCounterArray.msg"
+    "msg/KeyboardButton.msg"
     DEPENDENCIES
     geometry_msgs
 )

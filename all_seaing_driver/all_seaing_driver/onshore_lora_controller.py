@@ -22,6 +22,10 @@ heartbeat_msg = {
     "e_stopped": False,
 }
 
+keyboard_msg = {
+    "key": "0",
+}
+
 def calculate_checksum(data):
     return sum(data) % 256
 
@@ -35,6 +39,10 @@ while running:
                 heartbeat_msg["e_stopped"] = not heartbeat_msg["e_stopped"]
             elif event.key == pygame.K_RETURN:
                 heartbeat_msg["in_teleop"] = not heartbeat_msg["in_teleop"]
+            if event.key == pygame.K_p:
+                keyboard_msg["key"] = "p"
+            else:
+                keyboard_msg["key"] = "0"
 
     keys = pygame.key.get_pressed()
     
@@ -71,6 +79,7 @@ while running:
         control_msg["angular"],
         heartbeat_msg["in_teleop"],
         heartbeat_msg["e_stopped"],
+        keyboard_msg["key"],
     )
     
     checksum = calculate_checksum(serialized_msg)
