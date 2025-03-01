@@ -20,9 +20,12 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/Heartbeat.msg"
     "msg/ObstacleCounter.msg"
     "msg/ObstacleCounterArray.msg"
+    "msg/LabeledObjectPointCloud.msg"
+    "msg/LabeledObjectPointCloudArray.msg"
     "msg/KeyboardButton.msg"
     DEPENDENCIES
     geometry_msgs
+    sensor_msgs
 )
 
 ament_auto_package()

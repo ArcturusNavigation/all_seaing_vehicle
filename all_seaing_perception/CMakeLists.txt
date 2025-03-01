@@ -10,6 +10,10 @@ ament_auto_find_build_dependencies()
 
 find_package(yaml-cpp REQUIRED)
 
+find_package(PCL 1.12 REQUIRED COMPONENTS common visualization io)
+
+find_package(Eigen3 3.4 REQUIRED)
+
 ament_auto_add_executable(
     obstacle_detector
     ${PROJECT_NAME}/obstacle_detector.cpp
@@ -31,15 +35,35 @@ ament_auto_add_executable(
     obstacle_bbox_visualizer
     ${PROJECT_NAME}/obstacle_bbox_visualizer.cpp
 )
+ament_auto_add_executable(
+    bbox_project_pcloud
+    ${PROJECT_NAME}/bbox_project_pcloud.cpp
+)
+ament_auto_add_executable(
+    object_tracking_map
+    ${PROJECT_NAME}/object_tracking_map.cpp
+    ${PROJECT_NAME}/obstacle.cpp
+)
+ament_auto_add_executable(
+    object_tracking_map_euclidean
+    ${PROJECT_NAME}/object_tracking_map_euclidean.cpp
+    ${PROJECT_NAME}/obstacle.cpp
+)
 
 target_link_libraries(obstacle_bbox_visualizer yaml-cpp)
+target_link_libraries(bbox_project_pcloud yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+target_link_libraries(object_tracking_map yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+target_link_libraries(object_tracking_map_euclidean yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 
 install(TARGETS
     obstacle_detector
     obstacle_bbox_overlay
     point_cloud_filter
     point_cloud_image_overlay
-    obstacle_bbox_visualizer  
+    obstacle_bbox_visualizer
+    bbox_project_pcloud
+    object_tracking_map
+    object_tracking_map_euclidean
     DESTINATION lib/${PROJECT_NAME}
 )
 
