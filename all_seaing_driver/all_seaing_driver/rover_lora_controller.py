@@ -20,7 +20,7 @@ class RoverLoraController(Node):
         self.serial_port = serial.Serial('/dev/ttyUSB0', 57600, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
         
-        self.data_size = struct.calcsize('BdddBBB')
+        self.data_size = struct.calcsize('BdddBBBB')
 
         # Create ROS 2 publisher for ControlOption
         self.control_publisher = self.create_publisher(ControlOption, 'control_options', 10)
@@ -44,7 +44,7 @@ class RoverLoraController(Node):
             if len(serialized_data) != self.data_size:
                 return
         
-            priority, x, y, angular, in_teleop, e_stopped, received_checksum, key = struct.unpack('BdddBBB', serialized_data)
+            priority, x, y, angular, in_teleop, e_stopped, key, received_checksum = struct.unpack('BdddBBBB', serialized_data)
             
             # Verify checksum
             data_without_checksum = serialized_data[:-1]
@@ -67,7 +67,7 @@ class RoverLoraController(Node):
             self.heartbeat_publisher.publish(heartbeat_message)
 
             keyboard_msg = KeyboardButton()
-            keyboard_msg.key = key
+            keyboard_msg.key = chr(key)
             self.keyboard_publisher.publish(keyboard_msg)
 
 
