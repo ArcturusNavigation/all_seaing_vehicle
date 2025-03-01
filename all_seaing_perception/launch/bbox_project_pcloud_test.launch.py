@@ -36,9 +36,11 @@ def generate_launch_description():
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
             {"matching_weights_file": matching_weights},
-            {"contour_matching_color_ranges_file": contour_matching_color_ranges}
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": True}
         ]
     )
+
     return LaunchDescription([
         bbox_project_pcloud_node
     ])

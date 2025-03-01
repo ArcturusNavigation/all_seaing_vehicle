@@ -455,17 +455,12 @@ class FollowBuoyPath(ActionServerBase):
         ind = 0
         while ind < len(self.buoy_pairs):
             next_pair = self.next_pair(self.buoy_pairs[ind], red_buoys, green_buoys)
-            if next_pair is not None:
-                self.get_logger().info(f"POTENTIAL TRANSITION: {((self.ob_coords(self.buoy_pairs[ind].left), self.ob_coords(self.buoy_pairs[ind].right)), (self.ob_coords(next_pair.left), self.ob_coords(next_pair.right)))}, WITH DISTANCE: {self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair)}")
             if next_pair is not None and ((ind == (len(self.buoy_pairs)-1) and self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair) > self.buoy_pair_dist_thres) or (ind < (len(self.buoy_pairs)-1) and self.better_buoy_pair_transition(self.buoy_pairs[ind+1],next_pair,self.buoy_pairs[ind]))):
-                self.get_logger().info(f"UPDATING BUOY PAIR {ind+1}, TRANSITION: {((self.ob_coords(self.buoy_pairs[ind].left), self.ob_coords(self.buoy_pairs[ind].right)), (self.ob_coords(next_pair.left), self.ob_coords(next_pair.right)))} WITH NEW DISTANCE: {self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair, mode='min')} AND ANGLE: {self.buoy_pairs_angle(self.buoy_pairs[ind], next_pair)}")
-                self.get_logger().info(f"OLD BUOY PAIR LIST SIZE: {len(self.buoy_pairs)}")
                 self.buoy_pairs = self.buoy_pairs[:ind+1]
                 self.waypoints = self.waypoints[:ind+1]
                 self.buoy_pairs.append(next_pair)
                 self.waypoints.append(self.midpoint_pair(next_pair))
-                self.get_logger().info(f"NEW BUOY PAIR LIST SIZE: {len(self.buoy_pairs)}")
-            ind = ind+1
+            ind += 1
 
         passed_previous = False
         # Check if we passed that pair of buoys (the robot is in front of the pair), then move on to the next one
@@ -491,13 +486,10 @@ class FollowBuoyPath(ActionServerBase):
             #     return
 
         if self.first_buoy_pair:
-            self.get_logger().info("FIRST BUOY PAIR")
             self.buoy_pairs = [self.pair_to]
             self.waypoints = [self.midpoint_pair(self.pair_to)]
         elif passed_previous:
-            self.get_logger().info("PASSED PREVIOUS BUOY PAIR")
             if len(self.buoy_pairs)>=2:
-                self.get_logger().info("GOING INTO NEXT STORED BUOY PAIR")
                 self.buoy_pairs = self.buoy_pairs[1:]
                 self.waypoints = self.waypoints[1:]
                 self.time_last_seen_buoys = time.time()
@@ -570,7 +562,6 @@ class FollowBuoyPath(ActionServerBase):
 
             # if not passed_waypoint:
             if passed_previous or self.first_buoy_pair:
-                self.get_logger().info(f"sending waypoint {waypoint} to action server")
                 self.follow_path_client.wait_for_server()
                 goal_msg = FollowPath.Goal()
                 goal_msg.planner = self.get_parameter("planner").value
@@ -601,19 +592,15 @@ class FollowBuoyPath(ActionServerBase):
         self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
 
     def execute_callback(self, goal_handle):
-        self.get_logger().info("FollowBuoyPath request received.")
 
-        self.start_process("Follow buoy path (task 1/2) started.")
+        self.start_process("Follow buoy path started!")
 
         while rclpy.ok() and self.obstacles is None:
-            self.get_logger().info("No obstacle map yet; waiting...")
-            time.sleep(1.0) # maybe change this
+            time.sleep(1.0) # TODO: maybe change this
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 return Task.Result()
         
-        self.get_logger().info("received first map")
-
         success = False
         while not success:
             success = self.setup_buoys()
@@ -623,7 +610,6 @@ class FollowBuoyPath(ActionServerBase):
                 return Task.Result()
 
         self.get_logger().info("Setup buoys succeeded!")
-
 
         while not self.result:
             # Check if we should abort/cancel if a new goal arrived
@@ -641,7 +627,7 @@ class FollowBuoyPath(ActionServerBase):
 
             time.sleep(self.timer_period)
 
-        self.end_process("Completed FollowBuoyPath request.")
+        self.end_process("Follow buoy path completed!")
         goal_handle.succeed()
         return Task.Result(success=True)
 

@@ -2,16 +2,11 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    IncludeLaunchDescription,
     OpaqueFunction,
 )
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 import launch_ros
 import os
-import subprocess
-import yaml
 
 
 def launch_setup(context, *args, **kwargs):
@@ -85,12 +80,10 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="object_tracking_map",
         output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
         parameters=[
-            {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 2.0},
             {"range_uncertainty": 1.0},
             {"bearing_uncertainty": 0.1},
@@ -106,7 +99,6 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="object_tracking_map_euclidean",
         output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
