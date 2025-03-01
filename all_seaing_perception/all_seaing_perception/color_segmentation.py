@@ -8,8 +8,7 @@ from sensor_msgs.msg import Image
 from all_seaing_interfaces.msg import LabeledBoundingBox2D, LabeledBoundingBox2DArray
 import numpy as np
 import yaml
-from ament_index_python.packages import get_package_share_directory
-import os
+
 
 class ColorSegmentation(Node):
 
@@ -25,17 +24,13 @@ class ColorSegmentation(Node):
         self.img_pub = self.create_publisher(Image, "image/segmented", 5)
         self.img_sub = self.create_subscription(
             Image,
-            "/webcam_image",
+            "image",
             self.img_callback,
             qos_profile_sensor_data,
         )
-        bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-        color_label_mappings = os.path.join(bringup_prefix, "config", "perception", "color_label_mappings.yaml")
-        color_ranges = os.path.join(bringup_prefix, "config", "perception", "color_ranges.yaml")
-
-        self.declare_parameter('color_ranges_file', '/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_bringup/config/perception/color_ranges.yaml')
-        self.declare_parameter('color_label_mappings_file', '/home/arcturus/arcturus/dev_ws/src/all_seaing_vehicle/all_seaing_bringup/config/perception/color_label_mappings.yaml')
+        self.declare_parameter('color_ranges_file', '')
+        self.declare_parameter('color_label_mappings_file', '')
 
         color_ranges_file = self.get_parameter('color_ranges_file').value
         color_label_mappings_file = self.get_parameter('color_label_mappings_file').value
@@ -80,13 +75,11 @@ class ColorSegmentation(Node):
                 upper_limit = np.array([h_max, s_max, v_max])
                 mask = mask + cv2.inRange(hsv_img, lower_limit, upper_limit)
 
-            # erode and dilate mask
-            # kernel = np.ones((5, 5), np.uint8)
-            # mask = cv2.erode(mask, kernel, iterations=1)
+            # Erode and dilate mask
             kernel2 = np.ones((30, 30), np.uint8)
             mask = cv2.dilate(mask, kernel2, iterations=1)
 
-            contours, hierarchy = cv2.findContours(
+            contours, _ = cv2.findContours(
                 mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
             )
             for contour in contours:
@@ -100,7 +93,7 @@ class ColorSegmentation(Node):
 
                 bboxes.boxes.append(bbox)
 
-                # draw a rectangle on the image that is the bounding box
+                # Draw a rectangle on the image that is the bounding box
                 cv2.rectangle(
                     img,
                     (bbox.min_x, bbox.min_y),
