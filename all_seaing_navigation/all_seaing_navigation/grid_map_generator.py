@@ -27,15 +27,21 @@ class GridMapGenerator(Node):
             .get_parameter_value()
             .double_value
         )
-
+        
         default_lidar_range = (
             self.declare_parameter("default_lidar_range", 130.0)
             .get_parameter_value()
             .double_value
         )
 
-        self.default_obstacle_radius = (
-            self.declare_parameter("default_obstacle_radius", 3.0)
+        self.obstacle_radius_sigma = (
+            self.declare_parameter("obstacle_radius_sigma", 3.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.search_radius_sigma = (
+            self.declare_parameter("search_radius_sigma", 5.0)
             .get_parameter_value()
             .double_value
         )
@@ -126,8 +132,8 @@ class GridMapGenerator(Node):
             radius = math.sqrt((bbox_width/2)**2+(bbox_length/2)**2)
 
             # Convert radius to grid cells (3 sigma)
-            sigma = radius / (3 * self.grid_resolution)
-            search_radius = int(5 * sigma)
+            sigma = radius / (self.obstacle_radius_sigma * self.grid_resolution)
+            search_radius = int(self.search_radius_sigma * sigma)
 
             # Calculate bounding box
             minx = max(0, center_x - search_radius)
