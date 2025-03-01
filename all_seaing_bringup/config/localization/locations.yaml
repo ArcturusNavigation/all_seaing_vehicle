@@ -5,8 +5,8 @@ seagrant:
 
 boathouse:
   indoors: false
-  lat: 42.3551
-  lon: -71.0972
+  lat: 42.355
+  lon: -71.0975
 
 conference:
   indoors: true

@@ -5,9 +5,10 @@ from launch.actions import (
     IncludeLaunchDescription,
     OpaqueFunction,
 )
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
+
 import launch_ros
 import os
 import subprocess
@@ -21,7 +22,7 @@ def launch_setup(context, *args, **kwargs):
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
     launch_rviz = LaunchConfiguration("launch_rviz")
-    use_lora = LaunchConfiguration("use_lora")
+    comms = LaunchConfiguration("comms")
 
     rviz_node = launch_ros.actions.Node(
         package="rviz2",
@@ -42,30 +43,24 @@ def launch_setup(context, *args, **kwargs):
             {"joy_ang_scale": -0.3},
         ],
         output="screen",
-        condition=UnlessCondition(use_lora),
+        condition=IfCondition(PythonExpression(["'", comms, "' == 'wifi'"])),
     )
 
     onshore_lora_controller = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="onshore_lora_controller.py",
         output="screen",
-        condition=IfCondition(use_lora),
-    )
-
-    onshore_lora_controller = launch_ros.actions.Node(
-        package="all_seaing_driver",
-        executable="onshore_lore_controller.py",
-        output="screen",
         parameters=[
             {"y": 1.0},
-            {"x": 1.0},
-            {"angular": 1.0},
+            {"x": 0.8},
+            {"angular": 0.3},
         ],
+        condition=IfCondition(PythonExpression(["'", comms, "' == 'lora'"])),
     )
 
     keyboard_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
-        condition=UnlessCondition(use_lora),
+        condition=IfCondition(PythonExpression(["'", comms, "' == 'wifi'"])),
     )
 
     return [
@@ -82,7 +77,7 @@ def generate_launch_description():
                 "launch_rviz", default_value="false", choices=["true", "false"]
             ),
             DeclareLaunchArgument(
-                "use_lora", default_value="false", choices=["true", "false"]
+                "comms", default_value="wifi", choices=["wifi", "lora", "custom"]
             ),
             OpaqueFunction(function=launch_setup),
         ]

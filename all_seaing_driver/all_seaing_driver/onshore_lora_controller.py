@@ -17,12 +17,13 @@ class OnshoreLoraController(Node):
         self.font = pygame.font.Font(None, 36)
 
         # Serial setup
-        '''
         self.serial_port = serial.Serial("/dev/ttyUSB0", 57600, timeout=1)
-        time.sleep(2)  # Allow serial port to stabilize
-        '''
+        time.sleep(0.5)
 
-        # Initialize Heartbeat Message
+        # Initialize messages
+        self.keyboard_msg = {
+            "key": ord("0"),
+        }
         self.heartbeat_msg = {
             "in_teleop": True,
             "e_stopped": False,
@@ -35,7 +36,6 @@ class OnshoreLoraController(Node):
         self.declare_parameter("y", 0.8)
         self.declare_parameter("x", 1.0)
         self.declare_parameter("angular", 0.3)
-
         self.y = self.get_parameter("y").value
         self.x = self.get_parameter("x").value
         self.angular = self.get_parameter("angular").value
@@ -43,14 +43,16 @@ class OnshoreLoraController(Node):
     def read_keyboard_data(self):
         # Handle events
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                rclpy.shutdown()
-                return
-            elif event.type == pygame.KEYDOWN:
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     self.heartbeat_msg["e_stopped"] = not self.heartbeat_msg["e_stopped"]
                 elif event.key == pygame.K_RETURN:
                     self.heartbeat_msg["in_teleop"] = not self.heartbeat_msg["in_teleop"]
+
+                if event.key == pygame.K_p:
+                    self.keyboard_msg["key"] = ord("p")
+                else:
+                    self.keyboard_msg["key"] = ord("0")
 
         keys = pygame.key.get_pressed()
 
@@ -86,20 +88,21 @@ class OnshoreLoraController(Node):
 
         # Serialize to binary format (matching original: BdddBB)
         serialized_msg = struct.pack(
-            "BdddBB",
+            "BdddBBB",
             control_msg["priority"],
             control_msg["x"],
             control_msg["y"],
             control_msg["angular"],
-            int(self.heartbeat_msg["in_teleop"]),
-            int(self.heartbeat_msg["e_stopped"]),
+            self.heartbeat_msg["in_teleop"],
+            self.heartbeat_msg["e_stopped"],
+            self.keyboard_msg["key"],
         )
 
-        checksum = calculate_checksum(serialized_msg)
+        checksum = self.calculate_checksum(serialized_msg)
         serialized_msg_with_checksum = serialized_msg + struct.pack("B", checksum)
 
         # Send over serial
-        # self.serial_port.write(serialized_msg_with_checksum)
+        self.serial_port.write(serialized_msg_with_checksum)
 
         # Clear the screen
         self.screen.fill((0, 0, 0))
@@ -116,27 +119,26 @@ class OnshoreLoraController(Node):
         pygame.display.flip()
 
     def close(self):
-        """Close resources."""
+        """Close resources"""
         self.serial_port.close()
         pygame.quit()
 
-def calculate_checksum(data):
-    """Calculate checksum for data integrity."""
-    return sum(data) % 256
+    def calculate_checksum(self, data):
+        """Calculate checksum for data integrity"""
+        return sum(data) % 256
+
 
 def main(args=None):
     rclpy.init(args=args)
     node = OnshoreLoraController()
-
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.close()
     finally:
-        node.close()  # Ensures cleanup happens no matter what
+        node.destroy_node()
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
