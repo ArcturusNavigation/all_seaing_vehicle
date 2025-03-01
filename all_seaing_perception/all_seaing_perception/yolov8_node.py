@@ -46,7 +46,7 @@ class Yolov8Node(Node):
         with open(yaml_file_path,"r") as f:
             self.label_dict = yaml.safe_load(f)
 
-        # Get the model"s path
+        # Get the model's path
         engine_path = os.path.join(perception_prefix, "models", model_name + ".engine")
         pt_path = os.path.join(perception_prefix, "models", model_name + ".pt")
 
@@ -73,7 +73,7 @@ class Yolov8Node(Node):
         # Publisher and Subscriber
         self._pub = self.create_publisher(LabeledBoundingBox2DArray, "bounding_boxes", 10)
         self._image_pub = self.create_publisher(Image, "annotated_image", 10)
-        self._sub = self.create_subscription(Image, self.image_topic_name, self.image_cb, image_qos_profile)
+        self._sub = self.create_subscription(Image, "image", self.image_cb, image_qos_profile)
 
     def image_cb(self, msg: Image) -> None:
 

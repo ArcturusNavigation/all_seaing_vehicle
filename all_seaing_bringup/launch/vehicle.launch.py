@@ -248,7 +248,7 @@ def launch_setup(context, *args, **kwargs):
             {"conf": 0.6},
         ],
         remappings=[
-            ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
             ("annotated_image", "annotated_image/buoy"),
         ],
         output="screen",
@@ -262,7 +262,7 @@ def launch_setup(context, *args, **kwargs):
             {"conf": 0.4},
         ],
         remappings=[
-            ("image_raw", "turret_image"),
+            ("image", "turret_image"),
             ("annotated_image", "annotated_image/shape"),
             ("bounding_boxes", "shape_boxes"),
         ],
