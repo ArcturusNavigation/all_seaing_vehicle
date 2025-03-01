@@ -126,7 +126,7 @@ class GridMapGenerator(Node):
 
             # Convert radius to grid cells (3 sigma)
             sigma = radius / (3 * self.grid_resolution)
-            search_radius = int(6 * sigma)
+            search_radius = int(5 * sigma)
 
             # Calculate bounding box
             minx = max(0, center_x - search_radius)
@@ -161,7 +161,7 @@ class GridMapGenerator(Node):
 
             # Convert radius to grid cells (3 sigma)
             sigma = radius / (3 * self.grid_resolution)
-            search_radius = int(6 * sigma)
+            search_radius = int(5 * sigma)
 
             # Calculate bounding box
             minx = max(0, center_x - search_radius)
