@@ -60,6 +60,8 @@ class DeliveryServer(ActionServerBase):
         )
 
         # --------------- SERIAL PORTS ---------------#
+
+        # TODO: Check this and only connect to one serial port
         if DeliveryServer.serial_instance is None:
             try:
                 DeliveryServer.serial_instance = serial.Serial(port, 115200, timeout=1)
