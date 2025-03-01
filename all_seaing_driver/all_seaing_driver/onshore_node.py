@@ -6,7 +6,6 @@ from rclpy.node import Node
 from sensor_msgs.msg import Joy
 
 from all_seaing_interfaces.msg import ControlOption
-from geometry_msgs.msg import Twist
 from all_seaing_interfaces.msg import Heartbeat
 
 HEART_RATE = 1
