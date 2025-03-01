@@ -126,7 +126,7 @@ class GridMapGenerator(Node):
 
             # Convert radius to grid cells (3 sigma)
             sigma = radius / (3 * self.grid_resolution)
-            search_radius = int(5 * sigma)
+            search_radius = int(6 * sigma)
 
             # Calculate bounding box
             minx = max(0, center_x - search_radius)
@@ -147,7 +147,6 @@ class GridMapGenerator(Node):
                         prob = int(100 * math.exp(-0.5 * dist_sq / (sigma * sigma)))
                         idx = x + y * self.grid.info.width
                         self.active_cells[idx] = True
-                        # self.grid.data[idx] = max(prob, self.grid.data[idx])
 
         self.modify_probability()
 
@@ -162,7 +161,7 @@ class GridMapGenerator(Node):
 
             # Convert radius to grid cells (3 sigma)
             sigma = radius / (3 * self.grid_resolution)
-            search_radius = int(5 * sigma)
+            search_radius = int(6 * sigma)
 
             # Calculate bounding box
             minx = max(0, center_x - search_radius)
@@ -205,7 +204,8 @@ class GridMapGenerator(Node):
                     curVal *= 5
                     curVal = min(100, curVal)
                 else:
-                    curVal //= 2
+                    curVal /= 1.2 # decrease probability by some small amount
+                    curVal = math.floor(curVal)
                 self.grid.data[x + y * self.grid.info.width] = curVal
 
     def timer_callback(self):
