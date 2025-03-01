@@ -54,12 +54,13 @@ int ObstacleBboxOverlay::get_matching_obstacle_iou(
             cv::Point camera_bbox_max(bbox.max_x, bbox.max_y);
 
             // Calculate intersection over union
-            // TODO: parameterize these margins (also make the variable names more clear)
+            // TODO: parameterize these margins (also make the variable names more clear), or remove them?
             cv::Rect2d bbox1(bbox_min_2d.x - 1, bbox_min_2d.y - 1, bbox_max_2d.x - bbox_min_2d.x + 2,
-                             bbox_max_2d.y - bbox_min_2d.y + 2);
+                             bbox_max_2d.y - bbox_min_2d.y + 2); // LiDAR cluster bbox (what are those margins?)
+            // TODO: Add padding to camera bounding box before checking the IoU
             cv::Rect2d bbox2(camera_bbox_min.x, camera_bbox_min.y,
                              camera_bbox_max.x - camera_bbox_min.x,
-                             camera_bbox_max.y - camera_bbox_min.y);
+                             camera_bbox_max.y - camera_bbox_min.y); // Camera detection bbox
 
             cv::Rect2d intersection = bbox1 & bbox2;
             cv::Rect2d union_rect = bbox1 | bbox2;
@@ -92,6 +93,7 @@ void ObstacleBboxOverlay::obstacle_bbox_fusion_cb(
     new_map.header = in_map_msg->header;
     new_map.is_labeled = true;
     std::unordered_set<int> chosen_indices;
+
     for (const all_seaing_interfaces::msg::Obstacle &obstacle : in_map_msg->obstacles) {
         int best_match = get_matching_obstacle_iou(obstacle, chosen_indices, in_bbox_msg);
 

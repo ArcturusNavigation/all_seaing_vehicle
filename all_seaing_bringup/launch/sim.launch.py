@@ -184,6 +184,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
             {"Kpid_x": [1.0, 0.0, 0.0]},
             {"Kpid_y": [1.0, 0.0, 0.0]},
             {"Kpid_theta": [1.0, 0.0, 0.0]},
@@ -195,6 +196,9 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
+        parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ],
         output="screen",
     )
 
@@ -220,14 +224,25 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    waypoint_finder = launch_ros.actions.Node(
+    follow_buoy_path = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="waypoint_finder.py",
+        executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
+    )
+
+    run_tasks = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="run_tasks.py",
+    )
+
+    task_init_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_init.py",
+        parameters=[{"is_sim": True}],
     )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
@@ -284,7 +299,9 @@ def launch_setup(context, *args, **kwargs):
         navigation_server,
         grid_map_generator,
         onshore_node,
-        waypoint_finder,
+        run_tasks,
+        task_init_server,
+        follow_buoy_path,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,

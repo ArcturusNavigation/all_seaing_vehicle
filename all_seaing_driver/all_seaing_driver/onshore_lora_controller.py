@@ -22,6 +22,10 @@ heartbeat_msg = {
     "e_stopped": False,
 }
 
+keyboard_msg = {
+    "key": ord("0"),
+}
+
 def calculate_checksum(data):
     return sum(data) % 256
 
@@ -35,6 +39,10 @@ while running:
                 heartbeat_msg["e_stopped"] = not heartbeat_msg["e_stopped"]
             elif event.key == pygame.K_RETURN:
                 heartbeat_msg["in_teleop"] = not heartbeat_msg["in_teleop"]
+            if event.key == pygame.K_p:
+                keyboard_msg["key"] = ord("p")
+            else:
+                keyboard_msg["key"] = ord("0")
 
     keys = pygame.key.get_pressed()
     
@@ -48,9 +56,9 @@ while running:
     
     # Adjust control message based on arrow keys
     if keys[pygame.K_a]:
-        control_msg["y"] = 0.8  # Move left
+        control_msg["y"] = 0.6  # Move left
     elif keys[pygame.K_d]:
-        control_msg["y"] = -0.8  # Move right
+        control_msg["y"] = -0.6  # Move right
     
     if keys[pygame.K_w]:
         control_msg["x"] = 1.0  # Move forward
@@ -64,13 +72,14 @@ while running:
 
     # Serialize to binary format
     serialized_msg = struct.pack(
-        "BdddBB",
+        "BdddBBB",
         control_msg["priority"],
         control_msg["x"],
         control_msg["y"],
         control_msg["angular"],
         heartbeat_msg["in_teleop"],
         heartbeat_msg["e_stopped"],
+        keyboard_msg["key"],
     )
     
     checksum = calculate_checksum(serialized_msg)

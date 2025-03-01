@@ -33,7 +33,7 @@ def launch_setup(context, *args, **kwargs):
         locations = yaml.safe_load(f)
 
     location = context.perform_substitution(LaunchConfiguration("location"))
-    use_lora = LaunchConfiguration("use_lora")
+    comms = LaunchConfiguration("comms")
     use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
 
@@ -95,10 +95,16 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(use_bag),
     )
 
-    waypoint_finder = launch_ros.actions.Node(
+    run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="waypoint_finder.py",
+        executable="run_tasks.py",
+    )
+
+    follow_buoy_path = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_path.py",
         parameters=[
+            {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
@@ -113,6 +119,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
             {"Kpid_x": [0.3, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
@@ -151,8 +158,8 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"obstacle_size_min": 10},
-            {"obstacle_size_max": 800},
+            {"obstacle_size_min": 5},
+            {"obstacle_size_max": 300},
             {"clustering_distance": 0.1},
         ],
     )
@@ -190,10 +197,36 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_lora_controller.py",
         condition=IfCondition(
             PythonExpression([
-                "'", use_lora, "' == 'true' and '", use_bag, "' == 'false'",
+                "'", comms, "' == 'lora' and '", use_bag, "' == 'false'",
             ]),
         ),
         output="screen",
+    )
+
+    rover_custom_controller = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="rover_custom_controller.py",
+        parameters=[
+            {"joy_x_scale": 2.0},
+            {"joy_ang_scale": 0.8},
+            {"serial_port": "/dev/ttyACM0"},
+        ],
+        condition=IfCondition(
+            PythonExpression([
+                "'", comms, "' == 'custom' and '", use_bag, "' == 'false'",
+            ]),
+        ),
+    )
+
+    webcam_publisher = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="webcam_publisher.py",
+        parameters=[
+            {"video_index": 0},
+        ],
+        remappings=[
+            ("webcam_image", "turret_image"),
+        ]
     )
 
     grid_map_generator = launch_ros.actions.Node(
@@ -207,20 +240,50 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    yolov8_node = launch_ros.actions.Node(
+    buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
-        output="screen",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"conf": 0.6},
+        ],
         remappings=[
-            ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
-        ]
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
+    shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "turret_image"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "shape_boxes"),
+        ],
+        output="screen",
     )
 
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
+        parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ],
         output="screen",
     )
+
+    task_init_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_init.py",
+        parameters=[{"is_sim": False}],
+    )
+
 
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -240,7 +303,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -292,21 +355,26 @@ def launch_setup(context, *args, **kwargs):
         ekf_node,
         navsat_node,
         navigation_server,
-        rviz_waypoint_sender,
-        rover_lora_controller,
-        thrust_commander_node,
-        lidar_ld,
-        point_cloud_filter_node,
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
-        waypoint_finder,
+        point_cloud_filter_node,
+        rover_custom_controller,
+        rover_lora_controller,
+        rviz_waypoint_sender,
+        thrust_commander_node,
+        webcam_publisher,
+        buoy_yolo_node,
+        shape_yolo_node,
+        run_tasks,
+        task_init_server, 
+        follow_buoy_path,
         grid_map_generator,
         amcl_ld,
+        lidar_ld,
         mavros_ld,
-        yolov8_node,
-        zed_ld,
         static_transforms_ld,
+        zed_ld,
     ]
 
 
@@ -315,7 +383,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("location", default_value="boathouse"),
             DeclareLaunchArgument(
-                "use_lora", default_value="false", choices=["true", "false"]
+                "comms", default_value="wifi", choices=["wifi", "lora", "custom"]
             ),
             DeclareLaunchArgument(
                 "use_bag", default_value="false", choices=["true", "false"]
