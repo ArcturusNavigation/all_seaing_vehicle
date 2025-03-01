@@ -126,7 +126,7 @@ class GridMapGenerator(Node):
 
             # Convert radius to grid cells (3 sigma)
             sigma = radius / (3 * self.grid_resolution)
-            search_radius = int(3 * sigma)
+            search_radius = int(5 * sigma)
 
             # Calculate bounding box
             minx = max(0, center_x - search_radius)
@@ -150,6 +150,37 @@ class GridMapGenerator(Node):
                         # self.grid.data[idx] = max(prob, self.grid.data[idx])
 
         self.modify_probability()
+
+        for obstacle in self.obstacle_map.obstacles:
+            # Get obstacle center in grid coordinates
+            center_x, center_y = self.world_to_grid(
+                obstacle.global_point.point.x, obstacle.global_point.point.y
+            )
+
+            # Use default radius if not set or is zero
+            radius = obstacle.radius if hasattr(obstacle, 'radius') and obstacle.radius > 0 else self.default_obstacle_radius
+
+            # Convert radius to grid cells (3 sigma)
+            sigma = radius / (3 * self.grid_resolution)
+            search_radius = int(5 * sigma)
+
+            # Calculate bounding box
+            minx = max(0, center_x - search_radius)
+            miny = max(0, center_y - search_radius)
+            maxx = min(self.grid.info.width, center_x + search_radius + 1)
+            maxy = min(self.grid.info.height, center_y + search_radius + 1)
+
+            # Create Gaussian distribution
+            for x in range(minx, maxx):
+                for y in range(miny, maxy):
+                    # Calculate squared distance from center
+                    dx = x - center_x
+                    dy = y - center_y
+                    dist_sq = dx * dx + dy * dy
+
+                    if dist_sq <= search_radius * search_radius:
+                        idx = x + y * self.grid.info.width
+                        self.active_cells[idx] = False
 
     def modify_probability(self):
         """Decay or increase probability of obstacle in active cells based on sensor observations"""
