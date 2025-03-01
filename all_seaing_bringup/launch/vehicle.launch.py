@@ -244,11 +244,11 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "yolov8m_roboboat_current_model"},
+            {"model": "roboboat_2025"},
             {"conf": 0.6},
         ],
         remappings=[
-            ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
             ("annotated_image", "annotated_image/buoy"),
         ],
         output="screen",
@@ -258,11 +258,11 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "YoloV8s-Shape-Detector"},
+            {"model": "roboboat_shape_2025"},
             {"conf": 0.4},
         ],
         remappings=[
-            ("image_raw", "turret_image"),
+            ("image", "turret_image"),
             ("annotated_image", "annotated_image/shape"),
             ("bounding_boxes", "shape_boxes"),
         ],
