@@ -84,7 +84,8 @@ class DockingTask(ActionServerBase):
         self._odometry_sub = self.node.create_subscription(Odometry, "odometry", self.receive_odometry, 10)
         self.dock_position = DOCK_POSITION
 
-        self._tf_listener = tf2_ros.TransformListener(tfBuffer)
+        self._tf_buffer = tf2_ros.Buffer()
+        self._tf_listener = tf2_ros.TransformListener(self._tfBuffer)
 
     def get_name(self):
         return "Docking"
@@ -264,6 +265,21 @@ class DockingTask(ActionServerBase):
     def check_finished(self):
         return self.state == DockingState.DONE
     
+    def dock_position_callback(self, msg):
+        pt = msg.point # TODO fix perception to return valid pose so we get orientation as well
+        pose = PoseStamped()
+        pose.pose.position.x = pt.x
+        pose.pose.position.y = pt.y
+        pose.pose.position.z = pt.z
+        
+        trans_pose = self._tf_buffer.transform(pose, 'map', rospy.Time())
+        self.dock_position = (
+            pose.pose.position.x,
+            pose.pose.position.y,
+            self.euler_from_quaternion(pose.pose.orientation)[2
+        )
+        DOCK_POSITION = self.dock_position
+
     def receive_odometry(self, msg):
         self.current_position = msg.pose.pose.position
         self.current_rotation = msg.pose.pose.orientation
