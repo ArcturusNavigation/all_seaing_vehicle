@@ -5,7 +5,7 @@
 #include "geometry_msgs/msg/point.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
-// check if a point is in bounds
+// Check if a point is in bounds
 bool in_bounds(const cv::Point2d &point, sensor_msgs::msg::CameraInfo camera_info) {
     return point.x >= 0 && point.x < camera_info.width && point.y >= 0 &&
            point.y < camera_info.height;
@@ -20,18 +20,25 @@ int ObstacleBboxOverlay::get_matching_obstacle_iou(
     tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_min, bbox_min_cam, m_pc_cam_tf);
     tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_max, bbox_max_cam, m_pc_cam_tf);
 
-    cv::Point2d bbox1_xy =
-        m_cam_model.project3dToPixel(cv::Point3d(bbox_min_cam.y, bbox_min_cam.z, -bbox_min_cam.x));
-    cv::Point2d bbox2_xy =
-        m_cam_model.project3dToPixel(cv::Point3d(bbox_max_cam.y, bbox_max_cam.z, -bbox_max_cam.x));
+    cv::Point2d bbox1_xy = m_is_sim
+                               ? m_cam_model.project3dToPixel(
+                                     cv::Point3d(bbox_min_cam.y, bbox_min_cam.z, -bbox_min_cam.x))
+                               : m_cam_model.project3dToPixel(
+                                     cv::Point3d(bbox_min_cam.x, bbox_min_cam.y, bbox_min_cam.z));
+    cv::Point2d bbox2_xy = m_is_sim
+                               ? m_cam_model.project3dToPixel(
+                                     cv::Point3d(bbox_max_cam.y, bbox_max_cam.z, -bbox_max_cam.x))
+                               : m_cam_model.project3dToPixel(
+                                     cv::Point3d(bbox_max_cam.x, bbox_max_cam.y, bbox_max_cam.z));
 
     // mins / max become strange due to coordinate system. need to recalculate
     cv::Point bbox_min_2d(std::min(bbox1_xy.x, bbox2_xy.x), std::min(bbox1_xy.y, bbox2_xy.y));
     cv::Point bbox_max_2d(std::max(bbox1_xy.x, bbox2_xy.x), std::max(bbox1_xy.y, bbox2_xy.y));
 
     // Match clusters if within bounds and in front of the boat
-    if (in_bounds(bbox_min_2d, m_cam_model.cameraInfo()) &&
-        in_bounds(bbox_max_2d, m_cam_model.cameraInfo()) && obstacle.local_point.point.x >= 0) {
+    if (in_bounds(bbox_min_2d, m_cam_model.cameraInfo()) && 
+        in_bounds(bbox_max_2d, m_cam_model.cameraInfo()) &&
+        (m_is_sim ? bbox_min_cam.x >= 0 : bbox_min_cam.z >= 0)) {
 
         // Iterate through bounding boxes
         double best_iou = 0;
@@ -47,81 +54,22 @@ int ObstacleBboxOverlay::get_matching_obstacle_iou(
             cv::Point camera_bbox_max(bbox.max_x, bbox.max_y);
 
             // Calculate intersection over union
-            // TODO: add checks for if this is a line or a point and fallback to centroid matching
-            // if so.
-
-            cv::Rect2d bbox1(bbox_min_2d.x, bbox_min_2d.y, bbox_max_2d.x - bbox_min_2d.x,
-                             bbox_max_2d.y - bbox_min_2d.y);
+            // TODO: parameterize these margins (also make the variable names more clear), or remove them?
+            cv::Rect2d bbox1(bbox_min_2d.x - 1, bbox_min_2d.y - 1, bbox_max_2d.x - bbox_min_2d.x + 2,
+                             bbox_max_2d.y - bbox_min_2d.y + 2); // LiDAR cluster bbox (what are those margins?)
+            // TODO: Add padding to camera bounding box before checking the IoU
             cv::Rect2d bbox2(camera_bbox_min.x, camera_bbox_min.y,
                              camera_bbox_max.x - camera_bbox_min.x,
-                             camera_bbox_max.y - camera_bbox_min.y);
-
-            // RCLCPP_INFO(this->get_logger(), "bbox1 minxy,maxxy: %d, %d, %d, %d\n", bbox_min_2d.x,
-            // bbox_min_2d.y, bbox_max_2d.x, bbox_max_2d.y); RCLCPP_INFO(this->get_logger(), "bbox2
-            // minxy,maxxy: %d, %d, %d, %d\n", camera_bbox_min.x, camera_bbox_min.y,
-            // camera_bbox_max.x, camera_bbox_max.y);
-
-            // RCLCPP_INFO(this->get_logger(), "bbox1: %f, %f, %f, %f\n", bbox1.x, bbox1.y,
-            // bbox1.width, bbox1.height); RCLCPP_INFO(this->get_logger(), "bbox2: %f, %f, %f,
-            // %f\n", bbox2.x, bbox2.y, bbox2.width, bbox2.height);
+                             camera_bbox_max.y - camera_bbox_min.y); // Camera detection bbox
 
             cv::Rect2d intersection = bbox1 & bbox2;
             cv::Rect2d union_rect = bbox1 | bbox2;
+
             double iou = intersection.area() / union_rect.area();
 
             if (iou > best_iou) {
                 best_match = i;
                 best_iou = iou;
-            }
-        }
-
-        return best_match;
-    }
-    return -1;
-}
-
-int ObstacleBboxOverlay::get_matching_obstacle_centroid(
-    const all_seaing_interfaces::msg::Obstacle &obstacle,
-    const std::unordered_set<int> &chosen_indices,
-    const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg) {
-    // Transform from LiDAR to camera coordinate systems
-    geometry_msgs::msg::Point lidar_point;
-    lidar_point.x = obstacle.local_point.point.x;
-    lidar_point.y = obstacle.local_point.point.y;
-    lidar_point.z = obstacle.local_point.point.z;
-    geometry_msgs::msg::Point camera_point;
-    tf2::doTransform<geometry_msgs::msg::Point>(lidar_point, camera_point, m_pc_cam_tf);
-
-    // Project 3D point onto the image plane using the intrinsic matrix.
-    // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-    cv::Point2d xy_rect = m_is_sim
-                              ? m_cam_model.project3dToPixel(
-                                    cv::Point3d(camera_point.y, camera_point.z, -camera_point.x))
-                              : m_cam_model.project3dToPixel(
-                                    cv::Point3d(camera_point.x, camera_point.y, camera_point.z));
-
-    // Match clusters if within bounds and in front of the boat
-    if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-        (xy_rect.y < m_cam_model.cameraInfo().height) &&
-        (m_is_sim ? obstacle.local_point.point.x >= 0 : obstacle.local_point.point.z >= 0)) {
-
-        // Iterate through bounding boxes
-        double best_dist = 1e9;
-        int best_match = -1;
-        for (unsigned long i = 0; i < in_bbox_msg->boxes.size(); i++) {
-            // Skip indices already chosen
-            if (chosen_indices.find(i) != chosen_indices.end())
-                continue;
-
-            const all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = in_bbox_msg->boxes[i];
-
-            double center_x = (bbox.max_x + bbox.min_x) / 2;
-            double center_y = (bbox.max_y + bbox.min_y) / 2;
-
-            double curr_dist = std::hypot(center_x - xy_rect.x, center_y - xy_rect.y);
-            if (curr_dist < best_dist) {
-                best_match = i;
-                best_dist = curr_dist;
             }
         }
 
@@ -145,17 +93,11 @@ void ObstacleBboxOverlay::obstacle_bbox_fusion_cb(
     new_map.header = in_map_msg->header;
     new_map.is_labeled = true;
     std::unordered_set<int> chosen_indices;
+
     for (const all_seaing_interfaces::msg::Obstacle &obstacle : in_map_msg->obstacles) {
-        int best_match_centroid =
-            get_matching_obstacle_centroid(obstacle, chosen_indices, in_bbox_msg);
-        int best_match_iou = get_matching_obstacle_iou(obstacle, chosen_indices, in_bbox_msg);
+        int best_match = get_matching_obstacle_iou(obstacle, chosen_indices, in_bbox_msg);
 
-        // prioritize iou match over centroid match
-        int best_match = best_match_iou;
-        if (best_match == -1)
-            best_match = best_match_centroid;
-
-        // If best_match was never assigned, then skip (both centroid and iou gave -1)
+        // If best_match was never assigned, then skip
         if (best_match == -1)
             continue;
 
