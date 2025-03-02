@@ -20,7 +20,7 @@ ament_auto_add_executable(
     ${PROJECT_NAME}/obstacle.cpp
 )
 ament_auto_add_executable(
-    obstacle_bbox_overlay 
+    obstacle_bbox_overlay
     ${PROJECT_NAME}/obstacle_bbox_overlay.cpp
 )
 ament_auto_add_executable(
