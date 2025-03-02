@@ -20,6 +20,7 @@ class RunTasks(Node):
         self.task_list = [
             ActionClient(self, Task, "task_init"),
             ActionClient(self, Task, "follow_buoy_path"),
+            ActionClient(self, Task, "docking_task"),
         ]
         self.current_task = None
         self.idle_index = 0
