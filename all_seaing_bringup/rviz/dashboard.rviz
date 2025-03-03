@@ -316,90 +316,90 @@ Visualization Manager:
       Enabled: true
       Frame Timeout: 15
       Frames:
-        All Enabled: true
+        All Enabled: false
         map:
           Value: true
         odom:
           Value: true
         wamv/wamv/back_left_engine_link:
-          Value: true
+          Value: false
         wamv/wamv/back_left_propeller_link:
-          Value: true
+          Value: false
         wamv/wamv/back_right_engine_link:
-          Value: true
+          Value: false
         wamv/wamv/back_right_propeller_link:
-          Value: true
+          Value: false
         wamv/wamv/ball_shooter_base_link:
-          Value: true
+          Value: false
         wamv/wamv/ball_shooter_launcher_link:
-          Value: true
+          Value: false
         wamv/wamv/base_link:
-          Value: true
+          Value: false
         wamv/wamv/base_link/contact_sensor:
-          Value: true
+          Value: false
         wamv/wamv/base_link/far_left_camera_sensor:
-          Value: true
+          Value: false
         wamv/wamv/base_link/front_left_camera_sensor:
-          Value: true
+          Value: false
         wamv/wamv/base_link/front_right_camera_sensor:
-          Value: true
+          Value: false
         wamv/wamv/base_link/lidar_wamv_sensor:
-          Value: true
+          Value: false
         wamv/wamv/cpu_cases_link:
-          Value: true
+          Value: false
         wamv/wamv/far_left_camera_link:
-          Value: true
+          Value: false
         wamv/wamv/far_left_camera_link_optical:
-          Value: true
+          Value: false
         wamv/wamv/far_left_camera_post_arm_link:
-          Value: true
+          Value: false
         wamv/wamv/far_left_camera_post_link:
-          Value: true
+          Value: false
         wamv/wamv/front_left_camera_link:
-          Value: true
+          Value: false
         wamv/wamv/front_left_camera_link_optical:
-          Value: true
+          Value: false
         wamv/wamv/front_left_camera_post_arm_link:
-          Value: true
+          Value: false
         wamv/wamv/front_left_camera_post_link:
-          Value: true
+          Value: false
         wamv/wamv/front_left_engine_link:
-          Value: true
+          Value: false
         wamv/wamv/front_left_propeller_link:
-          Value: true
+          Value: false
         wamv/wamv/front_right_camera_link:
-          Value: true
+          Value: false
         wamv/wamv/front_right_camera_link_optical:
-          Value: true
+          Value: false
         wamv/wamv/front_right_camera_post_arm_link:
-          Value: true
+          Value: false
         wamv/wamv/front_right_camera_post_link:
-          Value: true
+          Value: false
         wamv/wamv/front_right_engine_link:
-          Value: true
+          Value: false
         wamv/wamv/front_right_propeller_link:
-          Value: true
+          Value: false
         wamv/wamv/gps_wamv_link:
-          Value: true
+          Value: false
         wamv/wamv/gps_wamv_link/navsat:
-          Value: true
+          Value: false
         wamv/wamv/imu_wamv_link:
-          Value: true
+          Value: false
         wamv/wamv/imu_wamv_link/imu_wamv_sensor:
-          Value: true
+          Value: false
         wamv/wamv/left_battery_link:
-          Value: true
+          Value: false
         wamv/wamv/lidar_wamv_link:
-          Value: true
+          Value: false
         wamv/wamv/lidar_wamv_post_arm_link:
-          Value: true
+          Value: false
         wamv/wamv/lidar_wamv_post_link:
-          Value: true
+          Value: false
         wamv/wamv/receiver:
           Value: true
         wamv/wamv/right_battery_link:
-          Value: true
-      Marker Scale: 1
+          Value: false
+      Marker Scale: 10
       Name: TF
       Show Arrows: true
       Show Axes: true
@@ -600,22 +600,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 124.43250274658203
+      Distance: 90.9822006225586
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 28.367631912231445
-        Y: 41.88360595703125
-        Z: -2.3456363677978516
+        X: 35.6006965637207
+        Y: 35.73330307006836
+        Z: -11.905444145202637
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6147964000701904
+      Pitch: 0.7797962427139282
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
       Yaw: 4.793565273284912

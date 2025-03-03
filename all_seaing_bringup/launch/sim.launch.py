@@ -198,6 +198,7 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
         ],
         parameters=[
+            {"global_frame_id": "map"},
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 2.0},
             {"range_uncertainty": 1.0},
@@ -206,6 +207,23 @@ def launch_setup(context, *args, **kwargs):
             {"init_new_cov": 10.0},
             {"track_robot": True},
             {"is_sim": True}
+        ]
+    )
+
+    object_tracking_map_euclidean_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_euclidean",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"check_fov": False},
+            {"is_sim": True},
         ]
     )
 
@@ -338,11 +356,12 @@ def launch_setup(context, *args, **kwargs):
         controller_server,
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
-        bbox_project_pcloud_node,
-        object_tracking_map_node,
         obstacle_detector_node,
         color_segmentation_node,
         point_cloud_filter_node,
+        bbox_project_pcloud_node,
+        object_tracking_map_node,
+        # object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,
         navigation_server,
