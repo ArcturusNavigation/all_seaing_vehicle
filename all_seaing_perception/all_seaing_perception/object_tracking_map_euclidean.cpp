@@ -77,8 +77,8 @@ void ObjectTrackingMapEuclidean::odom_callback() {
 
     //update odometry transforms
     //TODO: add a flag for each one that says if they succedeed, to know to continue or not
-    m_lidar_map_tf = get_tf(m_global_frame_id, m_local_frame_id);
-    m_map_lidar_tf = get_tf(m_local_frame_id, m_global_frame_id);
+    m_map_lidar_tf = get_tf(m_global_frame_id, m_local_frame_id);
+    m_lidar_map_tf = get_tf(m_local_frame_id, m_global_frame_id);
 }
 
 void ObjectTrackingMapEuclidean::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {

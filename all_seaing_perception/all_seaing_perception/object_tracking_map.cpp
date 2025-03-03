@@ -113,8 +113,8 @@ void ObjectTrackingMap::odom_callback() {
     //update odometry transforms
     //TODO: add a flag for each one that says if they succedeed, to know to continue or not
     // RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
-    m_lidar_map_tf = get_tf(m_global_frame_id, m_local_frame_id);
-    m_map_lidar_tf = get_tf(m_local_frame_id, m_global_frame_id);
+    m_map_lidar_tf = get_tf(m_global_frame_id, m_local_frame_id);
+    m_lidar_map_tf = get_tf(m_local_frame_id, m_global_frame_id);
 
     // RCLCPP_INFO(this->get_logger(), "GOT ODOM");
     m_nav_x = m_map_lidar_tf.transform.translation.x;
@@ -127,6 +127,7 @@ void ObjectTrackingMap::odom_callback() {
     double r, p, y;
     m.getRPY(r, p, y);
     m_nav_heading = y;
+    // RCLCPP_INFO(this->get_logger(), "ROBOT TRANSFORM ODOM: (%lf, %lf), %lf", m_nav_x, m_nav_y, m_nav_heading);
 
     if (m_track_robot) {
         if (m_first_state) {
@@ -260,6 +261,7 @@ void ObjectTrackingMap::visualize_predictions() {
     if (m_track_robot) {
         Eigen::Vector2f robot_mean = m_state.segment(0, 2);
         Eigen::Matrix2f robot_cov = m_cov.block(0, 0, 2, 2);
+        // RCLCPP_INFO(this->get_logger(), "ROBOT PREDICTED POSE: (%lf, %lf)", robot_mean(0), robot_mean(1));
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(robot_cov);
         double a_x = eigen_solver.eigenvalues()(0);
         double a_y = eigen_solver.eigenvalues()(1);
@@ -280,7 +282,7 @@ void ObjectTrackingMap::visualize_predictions() {
         ellipse.scale.z = 0.5;
         ellipse.color.a = 1;
         ellipse.color.g = 1;
-        ellipse.header.frame_id = m_global_frame_id;
+        ellipse.header = m_global_header;
         ellipse.id = m_num_obj + 1;
         ellipse_arr.markers.push_back(ellipse);
 
@@ -296,7 +298,7 @@ void ObjectTrackingMap::visualize_predictions() {
         angle_marker.scale.y = 0.2;
         angle_marker.scale.z = 0.2;
         angle_marker.color.a = 1;
-        angle_marker.header.frame_id = m_global_frame_id;
+        angle_marker.header = m_global_header;
         angle_marker.id = m_num_obj + 2;
         ellipse_arr.markers.push_back(angle_marker);
     }
@@ -338,7 +340,7 @@ void ObjectTrackingMap::visualize_predictions() {
         ellipse.scale.z = 1;
         ellipse.color.a = 1;
         ellipse.color.r = 1;
-        ellipse.header.frame_id = m_global_frame_id;
+        ellipse.header = m_global_header;
         ellipse.id = i;
         ellipse_arr.markers.push_back(ellipse);
     }
