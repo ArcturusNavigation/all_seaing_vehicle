@@ -33,12 +33,7 @@ def launch_setup(context, *args, **kwargs):
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
-    matching_weights = os.path.join(
-        bringup_prefix, "config", "perception", "matching_weights.yaml"
-    )
-    contour_matching_color_ranges = os.path.join(
-        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
-    )
+
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
     launch_rviz = LaunchConfiguration("launch_rviz")
@@ -275,6 +270,8 @@ def launch_setup(context, *args, **kwargs):
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"grid_resolution": 0.3},
+            {"obstacle_radius_sigma": 3.0},
+            {"search_radius_sigma": 15.0}
         ],
     )
 
@@ -292,7 +289,6 @@ def launch_setup(context, *args, **kwargs):
     follow_buoy_path = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_path.py",
-        # remappings=[("/obstacle_map/labeled","obstacle_map/refined_tracked")],
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
@@ -305,9 +301,10 @@ def launch_setup(context, *args, **kwargs):
         executable="run_tasks.py",
     )
 
-    task_1_server = launch_ros.actions.Node(
+    task_init_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="task_1.py",
+        executable="task_init.py",
+        parameters=[{"is_sim": True}],
     )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
@@ -368,7 +365,7 @@ def launch_setup(context, *args, **kwargs):
         grid_map_generator,
         onshore_node,
         run_tasks,
-        #task_1_server,
+        task_init_server,
         follow_buoy_path,
         rviz_waypoint_sender,
         map_to_odom,

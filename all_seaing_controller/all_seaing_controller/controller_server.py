@@ -14,6 +14,7 @@ from all_seaing_interfaces.msg import ControlOption
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
+TIMER_PERIOD = 1 / 60
 
 class ControllerServer(ActionServerBase):
     def __init__(self):
@@ -62,9 +63,6 @@ class ControllerServer(ActionServerBase):
         self.theta_pid.set_effort_max(self.max_vel[2])
         self.prev_update_time = self.get_clock().now()
 
-        # --------------- MEMBER VARIABLES ---------------#
-
-        self.timer_period = 1 / 60
 
     def visualize_waypoint(self, x, y):
         marker_msg = Marker()
@@ -162,7 +160,7 @@ class ControllerServer(ActionServerBase):
 
             nav_x, nav_y, heading = self.get_robot_pose()
             self.control_loop(nav_x, nav_y, heading)
-            time.sleep(self.timer_period)
+            time.sleep(TIMER_PERIOD)
 
         self.end_process("Waypoint following completed!")
         goal_handle.succeed()

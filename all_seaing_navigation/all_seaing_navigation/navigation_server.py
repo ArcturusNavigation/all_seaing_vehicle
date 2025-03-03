@@ -16,6 +16,7 @@ from threading import Semaphore, Event
 import math
 import time
 
+TIMER_PERIOD = 1 / 60
 
 class NavigationServer(ActionServerBase):
     def __init__(self):
@@ -38,8 +39,6 @@ class NavigationServer(ActionServerBase):
 
         self.stop_plan_semaphore = Semaphore(1)
         self.stop_plan_evt = Event()
-
-        self.timer_period = 1 / 60
 
     def start_plan(self):
         self.stop_plan_evt.set()
@@ -167,7 +166,7 @@ class NavigationServer(ActionServerBase):
                     goal_handle.canceled()
                     return FollowPath.Result()
 
-                time.sleep(self.timer_period)
+                time.sleep(TIMER_PERIOD)
 
         self.end_process("Path following completed!")
         goal_handle.succeed()

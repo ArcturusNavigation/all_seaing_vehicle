@@ -75,13 +75,11 @@ class ColorSegmentation(Node):
                 upper_limit = np.array([h_max, s_max, v_max])
                 mask = mask + cv2.inRange(hsv_img, lower_limit, upper_limit)
 
-            # erode and dilate mask
-            kernel = np.ones((5, 5), np.uint8)
-            mask = cv2.erode(mask, kernel, iterations=1)
-            kernel2 = np.ones((7, 7), np.uint8)
+            # Erode and dilate mask
+            kernel2 = np.ones((30, 30), np.uint8)
             mask = cv2.dilate(mask, kernel2, iterations=1)
 
-            contours, hierarchy = cv2.findContours(
+            contours, _ = cv2.findContours(
                 mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
             )
             for contour in contours:
@@ -95,7 +93,7 @@ class ColorSegmentation(Node):
 
                 bboxes.boxes.append(bbox)
 
-                # draw a rectangle on the image that is the bounding box
+                # Draw a rectangle on the image that is the bounding box
                 cv2.rectangle(
                     img,
                     (bbox.min_x, bbox.min_y),
