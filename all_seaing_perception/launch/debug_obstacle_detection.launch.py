@@ -3,6 +3,7 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     OpaqueFunction,
+    IncludeLaunchDescription
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition, UnlessCondition
@@ -142,6 +143,7 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
         parameters=[
+            {"global_frame_id": "map"},
             {"obstacle_drop_thresh": 2.0},
             {"range_uncertainty": 1.0},
             {"bearing_uncertainty": 0.1},
@@ -161,6 +163,7 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
         parameters=[
+            {"global_frame_id": "map"},
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
             {"check_fov": False},
@@ -196,13 +199,13 @@ def launch_setup(context, *args, **kwargs):
         # set_use_sim_time,
         ekf_node,
         navsat_node,
-        keyboard_ld,
-        run_tasks,
-        task_init_server, 
+        # keyboard_ld,
+        # run_tasks,
+        # task_init_server, 
         follow_buoy_path,
         bbox_project_pcloud_node,
-        # object_tracking_map_node,
-        object_tracking_map_euclidean_node,
+        object_tracking_map_node,
+        # object_tracking_map_euclidean_node,
         # obstacle_detector_node,
         color_segmentation_node,
         obstacle_bbox_overlay_node

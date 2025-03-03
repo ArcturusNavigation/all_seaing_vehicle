@@ -33,6 +33,12 @@ def launch_setup(context, *args, **kwargs):
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
+    matching_weights = os.path.join(
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
+    )
+    contour_matching_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
 
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
