@@ -1,21 +1,19 @@
-#include "all_seaing_perception/object_tracking_map.hpp"
+#include "all_seaing_perception/object_tracking_map_euclidean.hpp"
 
-ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map_euclidean") {
+ObjectTrackingMapEuclidean::ObjectTrackingMapEuclidean() : Node("object_tracking_map_euclidean") {
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "map");
     this->declare_parameter<double>("obstacle_seg_thresh", 1.0);
     this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
+    this->declare_parameter<double>("odom_refresh_rate", 1000);
 
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
     m_obstacle_seg_thresh = this->get_parameter("obstacle_seg_thresh").as_double();
     m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
+    m_odom_refresh_rate = this->get_parameter("odom_refresh_rate").as_double();
     RCLCPP_DEBUG(this->get_logger(), "OBSTACLE SEG THRESHOLD: %lf, DROP THRESHOLD: %lf",
                  m_obstacle_seg_thresh, m_obstacle_drop_thresh);
-    // Initialize navigation variables to 0
-    m_nav_x = 0;
-    m_nav_y = 0;
-    m_nav_heading = 0;
 
     this->declare_parameter<bool>("is_sim", false);
     m_is_sim = this->get_parameter("is_sim").as_bool();
@@ -31,17 +29,19 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map_euclidean") {
     m_object_sub =
         this->create_subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>(
             "refined_object_point_clouds_segments", rclcpp::SensorDataQoS(),
-            std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
-    m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
-        "odometry/filtered", 10,
-        std::bind(&ObjectTrackingMap::odom_callback, this, std::placeholders::_1));
+            std::bind(&ObjectTrackingMapEuclidean::object_track_map_publish, this, std::placeholders::_1));
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
         "camera_info_topic", 10,
-        std::bind(&ObjectTrackingMap::intrinsics_cb, this, std::placeholders::_1));
+        std::bind(&ObjectTrackingMapEuclidean::intrinsics_cb, this, std::placeholders::_1));
 
     // Initialize tf_listener pointer
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
+
+    odom_timer = this->create_wall_timer(
+      std::chrono::duration<float>(((float)1.0)/m_odom_refresh_rate), std::bind(&ObjectTrackingMapEuclidean::odom_callback, this));
+
+    m_got_local_frame = false;
 }
 
 ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc,
@@ -72,28 +72,21 @@ void ObjectCloud::update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc) 
     }
 }
 
-void ObjectTrackingMap::odom_callback(const nav_msgs::msg::Odometry &msg) {
-    m_nav_x = msg.pose.pose.position.x;
-    m_nav_y = msg.pose.pose.position.y;
-    tf2::Quaternion q;
-    q.setW(msg.pose.pose.orientation.w);
-    q.setX(msg.pose.pose.orientation.x);
-    q.setY(msg.pose.pose.orientation.y);
-    q.setZ(msg.pose.pose.orientation.z);
-    tf2::Matrix3x3 m(q);
-    double r, p, y;
-    m.getRPY(r, p, y);
-    m_nav_heading = y;
+void ObjectTrackingMapEuclidean::odom_callback() {
+    if(!m_got_local_frame) return;
 
-    m_nav_pose = msg.pose.pose;
+    //update odometry transforms
+    //TODO: add a flag for each one that says if they succedeed, to know to continue or not
+    m_map_lidar_tf = get_tf(m_global_frame_id, m_local_frame_id);
+    m_lidar_map_tf = get_tf(m_local_frame_id, m_global_frame_id);
 }
 
-void ObjectTrackingMap::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
+void ObjectTrackingMapEuclidean::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
     RCLCPP_DEBUG(this->get_logger(), "GOT CAMERA INFO");
     m_cam_model.fromCameraInfo(info_msg);
 }
 
-geometry_msgs::msg::TransformStamped ObjectTrackingMap::get_tf(const std::string &in_target_frame,
+geometry_msgs::msg::TransformStamped ObjectTrackingMapEuclidean::get_tf(const std::string &in_target_frame,
                                                                const std::string &in_src_frame) {
     geometry_msgs::msg::TransformStamped tf;
     try {
@@ -105,31 +98,36 @@ geometry_msgs::msg::TransformStamped ObjectTrackingMap::get_tf(const std::string
 }
 
 template <typename T>
-T ObjectTrackingMap::convert_to_global(double nav_x, double nav_y, double nav_heading, T point) {
+T ObjectTrackingMapEuclidean::convert_to_global(T point) {
     T new_point = point; // to keep color-related data
-    double magnitude = std::hypot(point.x, point.y);
-    double point_angle = std::atan2(point.y, point.x);
-    new_point.x = nav_x + std::cos(nav_heading + point_angle) * magnitude;
-    new_point.y = nav_y + std::sin(nav_heading + point_angle) * magnitude;
-    new_point.z = 0;
+    geometry_msgs::msg::Point lc_pt_msg;
+    lc_pt_msg.x = point.x;
+    lc_pt_msg.y = point.y;
+    lc_pt_msg.z = point.z;
+    geometry_msgs::msg::Point gb_pt_msg;
+    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_lidar_map_tf);
+    new_point.x = gb_pt_msg.x;
+    new_point.y = gb_pt_msg.y;
+    new_point.z = gb_pt_msg.z;
     return new_point;
 }
 
-// TODO: Check it actually works, individually from the other parts
 template <typename T>
-T ObjectTrackingMap::convert_to_local(double nav_x, double nav_y, double nav_heading, T point) {
+T ObjectTrackingMapEuclidean::convert_to_local(T point) {
     T new_point = point; // to keep color-related data
-    double diff_x = point.x - nav_x;
-    double diff_y = point.y - nav_y;
-    double magnitude = std::hypot(diff_x, diff_y);
-    double point_angle = std::atan2(diff_y, diff_x);
-    new_point.x = std::cos(point_angle - nav_heading) * magnitude;
-    new_point.y = std::sin(point_angle - nav_heading) * magnitude;
-    new_point.z = 0;
+    geometry_msgs::msg::Point gb_pt_msg;
+    gb_pt_msg.x = point.x;
+    gb_pt_msg.y = point.y;
+    gb_pt_msg.z = point.z;
+    geometry_msgs::msg::Point lc_pt_msg;
+    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_lidar_tf);
+    new_point.x = lc_pt_msg.x;
+    new_point.y = lc_pt_msg.y;
+    new_point.z = lc_pt_msg.z;
     return new_point;
 }
 
-void ObjectTrackingMap::object_track_map_publish(
+void ObjectTrackingMapEuclidean::object_track_map_publish(
     const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg) {
     if (msg->objects.size() == 0)
         return;
@@ -139,8 +137,11 @@ void ObjectTrackingMap::object_track_map_publish(
     m_local_header = msg->objects[0].cloud.header;
     m_global_header.frame_id = m_global_frame_id;
     m_global_header.stamp = m_local_header.stamp;
+    m_local_frame_id = m_local_header.frame_id;
+    m_got_local_frame = true;
 
     m_lidar_map_tf = get_tf(m_global_frame_id, m_local_header.frame_id);
+    m_map_lidar_tf = get_tf(m_local_frame_id, m_global_frame_id);
 
     std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles;
     for (all_seaing_interfaces::msg::LabeledObjectPointCloud obj : msg->objects) {
@@ -151,7 +152,7 @@ void ObjectTrackingMap::object_track_map_publish(
         pcl::fromROSMsg(obj.cloud, *local_obj_pcloud);
         for (pcl::PointXYZHSV &pt : local_obj_pcloud->points) {
             pcl::PointXYZHSV global_pt =
-                this->convert_to_global(m_nav_x, m_nav_y, m_nav_heading, pt);
+                this->convert_to_global(pt);
             global_obj_pcloud->push_back(global_pt);
         }
         // RCLCPP_DEBUG(this->get_logger(), "BEFORE OBSTACLE CREATION");
@@ -199,14 +200,7 @@ void ObjectTrackingMap::object_track_map_publish(
     --For unmatched obstacles that have been undetected in FoV for > some time threshold, remove
     them
     */
-    // RCLCPP_DEBUG(this->get_logger(), "BEFORE LIDAR->CAMERA TF");
-    // LIDAR -> Camera transform
-    // if (!m_pc_cam_tf_ok)
-    //     RCLCPP_DEBUG(this->get_logger(), "CAMERA FRAME ID: %s",
-    //     msg->objects[0].segment.header.frame_id.c_str()); RCLCPP_DEBUG(this->get_logger(), "LIDAR
-    //     FRAME ID: %s", msg->objects[0].cloud.header.frame_id.c_str()); m_pc_cam_tf =
-    //     get_tf(msg->objects[0].segment.header.frame_id, msg->objects[0].cloud.header.frame_id);
-    // RCLCPP_DEBUG(this->get_logger(), "AFTER LIDAR->CAMERA TF");
+
     // Match new obstacles with old ones, update them, and add new ones
     std::unordered_set<int> chosen_indices;
     for (std::shared_ptr<ObjectCloud> det_obs : detected_obstacles) {
@@ -243,7 +237,7 @@ void ObjectTrackingMap::object_track_map_publish(
         for (pcl::PointXYZHSV &global_pt :
              m_tracked_obstacles[tracked_id]->global_pcloud_ptr->points) {
             upd_local_obj_pcloud->push_back(
-                this->convert_to_local(m_nav_x, m_nav_y, m_nav_heading, global_pt));
+                this->convert_to_local(global_pt));
         }
         m_tracked_obstacles[tracked_id]->update_loc_pcloud(upd_local_obj_pcloud);
         // Check if in FoV (which'll mean it's dead, at least temporarily)
@@ -324,7 +318,7 @@ void ObjectTrackingMap::object_track_map_publish(
     RCLCPP_DEBUG(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
 }
 
-void ObjectTrackingMap::publish_map(
+void ObjectTrackingMapEuclidean::publish_map(
     std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
     const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub,
@@ -351,11 +345,11 @@ void ObjectTrackingMap::publish_map(
     pub->publish(map_msg);
 }
 
-ObjectTrackingMap::~ObjectTrackingMap() {}
+ObjectTrackingMapEuclidean::~ObjectTrackingMapEuclidean() {}
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<ObjectTrackingMap>());
+    rclcpp::spin(std::make_shared<ObjectTrackingMapEuclidean>());
     rclcpp::shutdown();
     return 0;
 }

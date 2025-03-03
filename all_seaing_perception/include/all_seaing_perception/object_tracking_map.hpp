@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <tuple>
+#include <chrono>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -20,6 +21,7 @@
 #include "message_filters/subscriber.h"
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "geometry_msgs/msg/point.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -79,14 +81,14 @@ struct ObjectCloud{
 class ObjectTrackingMap : public rclcpp::Node{
 private:
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
-    void odom_callback(const nav_msgs::msg::Odometry &msg);
+    void odom_callback();
     void publish_map(std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
                      const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
                      rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub, std::vector<int> labels);
     template <typename T>
-    T convert_to_global(double nav_x, double nav_y, double nav_heading, T point);
+    T convert_to_global(T point);
     template <typename T>
-    T convert_to_local(double nav_x, double nav_y, double nav_heading, T point);
+    T convert_to_local(T point);
 
     void visualize_predictions();
 
@@ -103,7 +105,7 @@ private:
     
     // Member variables
     std::vector<std::shared_ptr<ObjectCloud>> m_tracked_obstacles;
-    std::string m_global_frame_id;
+    std::string m_global_frame_id, m_local_frame_id;
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header;
     int m_obstacle_id;
@@ -112,24 +114,23 @@ private:
     double m_init_new_cov;
     bool m_track_robot;
     double m_normalize_drop_dist;
+    double m_odom_refresh_rate;
 
-    float m_nav_x, m_nav_y, m_nav_heading, m_nav_omega;
+    float m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega;
     rclcpp::Time m_last_odom_time;
-
-    geometry_msgs::msg::Pose m_nav_pose;
 
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_untracked_map_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_map_cov_viz_pub;
     rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_sub;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
-    geometry_msgs::msg::TransformStamped m_lidar_map_tf;
+    geometry_msgs::msg::TransformStamped m_lidar_map_tf, m_map_lidar_tf;
+    rclcpp::TimerBase::SharedPtr odom_timer;
 
     // Intrinsics callback camera model variables
     image_geometry::PinholeCameraModel m_cam_model;
@@ -140,7 +141,7 @@ private:
     int m_num_obj;
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
-    bool m_first_state;
+    bool m_first_state, m_got_local_frame;
 
     bool m_is_sim;
     bool m_check_fov;
