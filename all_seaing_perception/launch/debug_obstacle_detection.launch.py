@@ -114,6 +114,21 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    buoy_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"conf": 0.6},
+            {"label_config": "buoy_label_mappings.yaml"},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
     bbox_project_pcloud_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="bbox_project_pcloud",
@@ -150,7 +165,7 @@ def launch_setup(context, *args, **kwargs):
             {"new_object_slam_threshold": 2.0},
             {"check_fov": False},
             {"init_new_cov": 10.0},
-            {"track_robot": True},
+            {"track_robot": False},
             {"is_sim": False},
         ]
     )
@@ -166,7 +181,7 @@ def launch_setup(context, *args, **kwargs):
             {"global_frame_id": "map"},
             {"obstacle_seg_thresh": 10.0},
             {"obstacle_drop_thresh": 1.0},
-            {"check_fov": False},
+            {"check_fov": True},
             {"is_sim": False},
         ]
     )
@@ -199,15 +214,16 @@ def launch_setup(context, *args, **kwargs):
         # set_use_sim_time,
         ekf_node,
         navsat_node,
-        # keyboard_ld,
-        # run_tasks,
-        # task_init_server, 
+        keyboard_ld,
+        run_tasks,
+        task_init_server, 
         follow_buoy_path,
+        buoy_yolo_node,
         bbox_project_pcloud_node,
-        object_tracking_map_node,
-        # object_tracking_map_euclidean_node,
-        # obstacle_detector_node,
-        color_segmentation_node,
+        # object_tracking_map_node,
+        object_tracking_map_euclidean_node,
+        obstacle_detector_node,
+        # color_segmentation_node,
         obstacle_bbox_overlay_node
     ]
 

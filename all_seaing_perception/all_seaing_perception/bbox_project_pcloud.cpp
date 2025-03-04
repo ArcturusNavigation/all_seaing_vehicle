@@ -143,6 +143,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg,
     const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg) {
     RCLCPP_DEBUG(this->get_logger(), "GOT DATA");
+
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
     if (!m_pc_cam_tf_ok)
         m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id);
@@ -187,6 +188,9 @@ void BBoxProjectPCloud::bb_pcl_project(
     // cv::waitKey();
     std::vector<std::pair<all_seaing_interfaces::msg::LabeledBoundingBox2D, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>> bbox_pcloud_objects;
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
+        RCLCPP_DEBUG(this->get_logger(), "BBOX LABEL: %d", bbox.label);
+        if(!label_color_map.count(bbox.label)) continue; //ignore objects that are not registered buoy types
+
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         labeled_pcl.time = in_cloud_msg->header.stamp;
