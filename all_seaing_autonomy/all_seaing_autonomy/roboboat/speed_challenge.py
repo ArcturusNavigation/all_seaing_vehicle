@@ -71,6 +71,8 @@ class SpeedChange(ActionServerBase):
         self.buoy_pair_dist_thres = self.get_parameter("buoy_pair_dist_thres").get_parameter_value().double_value
 
         self.robot_pos = (0, 0)
+        self.home_pos = (0, 0)
+        self.runnerActivated = False
 
         self.declare_parameter("safe_margin", 0.2)
 
@@ -96,10 +98,26 @@ class SpeedChange(ActionServerBase):
         self.buoy_pairs = []
         self.obstacles = []
 
-    def bbox_cb():
+    def bbox_cb(self):
         '''
         Handles when an color segmented image gets published
         '''
+        if self.runnerActivated:
+            return
+
+        ###### checks if the color segmented image depicts the LED changing from red to green
+        ###### if so, make self.runnerActivated to be true.
+
+        if self.runnerActivated:
+            self.home_pos = self.robot_pos # keep track of where the home position is
+            self.circle_blue_buoy()
+    
+    def circle_blue_buoy(self):
+        '''
+        Function to circle the blue buoy
+        '''
+
+           
 
     # def norm_squared(self, vec, ref=(0, 0)):
     #     return vec[0] ** 2 + vec[1] ** 2
@@ -583,8 +601,8 @@ class SpeedChange(ActionServerBase):
     #     """
     #     self.obstacles = msg.obstacles
 
-    # def odometry_cb(self, msg):
-    #     self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+    def odometry_cb(self, msg):
+        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
 
     # def execute_callback(self, goal_handle):
 
