@@ -73,9 +73,9 @@ class ColorSegmentation(Node):
         for color in colors:
             # if color == "red2":
             #     continue
-            r_min, r_max, g_min, g_max, b_min, b_max = colors[color]
-            lower_limit = np.array([r_min, g_min, b_min])
-            upper_limit = np.array([r_max, g_max, b_max])
+            y_min, y_max, cr_min, cr_max, cb_min, cb_max = colors[color]
+            lower_limit = np.array([y_min, cr_min, cb_min])
+            upper_limit = np.array([y_max, cr_max, cb_max])
             mask = cv2.inRange(ycrcb_img, lower_limit, upper_limit)
             # if color == "red":
             #     r_min, r_max, g_min, g_max, b_min, b_max = colors["red2"]
