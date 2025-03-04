@@ -21,11 +21,9 @@ public:
     PointCloudFilter() : Node("point_cloud_filter") {
         // Initialize parameters
         this->declare_parameter<std::string>("global_frame_id", "map");
+        this->declare_parameter<std::vector<double>>("quad_vertices", {});
         this->declare_parameter<std::vector<double>>("range_radius", {0.0, 100000.0});
         this->declare_parameter<std::vector<double>>("range_intensity", {0.0, 100000.0});
-        this->declare_parameter<std::vector<double>>("range_x", {-100000.0, 100000.0});
-        this->declare_parameter<std::vector<double>>("range_y", {-100000.0, 100000.0});
-        this->declare_parameter<std::vector<double>>("range_z", {-100000.0, 100000.0});
         this->declare_parameter<double>("leaf_size", 0.0);
 
         // Initialize tf_listener pointer
@@ -43,12 +41,14 @@ public:
 
         // Get values from parameter server
         m_global_frame_id = this->get_parameter("global_frame_id").as_string();
+        m_quad_vertices = this->get_parameter("quad_vertices").as_double_array();
         m_range_radius = this->get_parameter("range_radius").as_double_array();
         m_range_intensity = this->get_parameter("range_intensity").as_double_array();
-        m_range_x = this->get_parameter("range_x").as_double_array();
-        m_range_y = this->get_parameter("range_y").as_double_array();
-        m_range_z = this->get_parameter("range_z").as_double_array();
         m_leaf_size = this->get_parameter("leaf_size").as_double();
+
+        if (m_quad_vertices.size() != 8) {
+            RCLCPP_ERROR(this->get_logger(), "quad_vertices must contain exactly 8 values (4 pairs of x, y)");
+        }
     }
 
 private:
@@ -71,6 +71,28 @@ private:
         vg.filter(*out_cloud_ptr);
     }
 
+    bool is_inside_quadrilateral(double x, double y) {
+        if (m_quad_vertices.size() != 8) return false;
+        
+        std::vector<std::pair<double, double>> polygon = {
+            {m_quad_vertices[0], m_quad_vertices[1]},
+            {m_quad_vertices[2], m_quad_vertices[3]},
+            {m_quad_vertices[4], m_quad_vertices[5]},
+            {m_quad_vertices[6], m_quad_vertices[7]}
+        };
+
+        // implement ray tracing algorithm that determines if point is inside quadrilateral or not
+        int count = 0;
+        for (size_t i = 0; i < polygon.size(); i++) {
+            size_t j = (i + 1) % polygon.size();
+            if ((polygon[i].second > y) != (polygon[j].second > y) &&
+                x < (polygon[j].first - polygon[i].first) * (y - polygon[i].second) / (polygon[j].second - polygon[i].second) + polygon[i].first) {
+                count++;
+            }
+        }
+        return count % 2 == 1;
+    }
+
     void filter_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr,
                       pcl::PointCloud<pcl::PointXYZI>::Ptr &out_cloud_ptr) {
         // Keep point if in radius thresholds, intensity threshold, and is finite
@@ -85,9 +107,7 @@ private:
             point_msg.z = point.z;
             tf2::doTransform<geometry_msgs::msg::Point>(point_msg, point_tf, m_lidar_map_tf);
 
-            if (m_range_x[0] <= point_tf.x && point_tf.x <= m_range_x[1] &&
-                m_range_y[0] <= point_tf.y && point_tf.y <= m_range_y[1] &&
-                m_range_z[0] <= point_tf.z && point_tf.z <= m_range_z[1] &&
+            if (is_inside_quadrilateral(point_tf.x, point_tf.y) &&
                 m_range_radius[0] <= radius && radius <= m_range_radius[1] &&
                 m_range_intensity[0] <= point.intensity &&
                 point.intensity <= m_range_intensity[1] && 
@@ -135,11 +155,9 @@ private:
 
     // Member variables
     std::string m_global_frame_id;
+    std::vector<double> m_quad_vertices;
     std::vector<double> m_range_radius;
     std::vector<double> m_range_intensity;
-    std::vector<double> m_range_x;
-    std::vector<double> m_range_y;
-    std::vector<double> m_range_z;
     double m_leaf_size;
 };
 
