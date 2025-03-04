@@ -20,7 +20,7 @@ class ColorSegmentation(Node):
 
         # Subscribers and publishers
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "bounding_boxes", 10
+            LabeledBoundingBox2DArray, "bounding_boxes_ycrcb", 10
         )
         self.img_pub = self.create_publisher(Image, "image/segmented", 5)
         self.img_sub = self.create_subscription(
