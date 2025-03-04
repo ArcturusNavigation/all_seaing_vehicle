@@ -40,7 +40,7 @@ class Yolov8Node(Node):
         if self.device == "default":
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        label_config = self.get_parameter("label_config").get_parameter_value().string_value
+        label_config = self.declare_parameter("label_config").get_parameter_value().string_value
         yaml_file_path = os.path.join(bringup_prefix, "config","perception", label_config)
         
         with open(yaml_file_path,"r") as f:

@@ -33,6 +33,12 @@ def launch_setup(context, *args, **kwargs):
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
+    matching_weights = os.path.join(
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
+    )
+    contour_matching_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
 
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
@@ -160,6 +166,66 @@ def launch_setup(context, *args, **kwargs):
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
         ],
+    )
+
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            ("camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("lidar_topic", "point_cloud/filtered")
+        ],
+        parameters=[
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": color_label_mappings},
+            {"color_ranges_file": color_ranges},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": True}
+        ]
+    )
+
+    object_tracking_map_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 2.0},
+            {"range_uncertainty": 1.0},
+            {"bearing_uncertainty": 0.1},
+            {"new_object_slam_threshold": 2.0},
+            {"init_new_cov": 10.0},
+            {"track_robot": True},
+            {"is_sim": True}
+        ]
+    )
+
+    object_tracking_map_euclidean_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_euclidean",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"check_fov": False},
+            {"is_sim": True},
+        ]
     )
 
     rviz_node = launch_ros.actions.Node(
@@ -296,6 +362,9 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_node,
         color_segmentation_node,
         point_cloud_filter_node,
+        bbox_project_pcloud_node,
+        # object_tracking_map_node,
+        object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,
         navigation_server,
