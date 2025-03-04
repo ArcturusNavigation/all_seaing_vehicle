@@ -10,7 +10,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "port",
-                default_value='/dev/ttyACM0',
+                default_value='/dev/ttyACM1',
             ),
             launch_ros.actions.Node(
                 package="mavros",
