@@ -111,7 +111,7 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
 }
 
 void BBoxProjectPCloud::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
-    RCLCPP_DEBUG(this->get_logger(), "GOT CAMERA INFO");
+    RCLCPP_INFO(this->get_logger(), "GOT CAMERA INFO");
     m_cam_model.fromCameraInfo(info_msg);
 }
 
@@ -155,7 +155,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
 
     RCLCPP_INFO(this->get_logger(), "%d POINTS, %d OBJECTS", in_cloud_tf_ptr->points.size(), in_bbox_msg->boxes.size());
-    RCLCPP_INFO(this->get_logger(), "FRAME_ID BEFORE SELECTION, AFTER TRANSFORM TO CAMERA FRAME: %s", in_cloud_tf_ptr->header.frame_id);
+    RCLCPP_INFO(this->get_logger(), "FRAME_ID BEFORE SELECTION, AFTER TRANSFORM TO CAMERA FRAME: %s", in_cloud_tf_ptr->header.frame_id.c_str());
 
     auto object_pcls = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
     std::vector<pcl::PointCloud<pcl::PointXYZHSV>> obj_cloud_vec;
@@ -165,10 +165,18 @@ void BBoxProjectPCloud::bb_pcl_project(
     for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
         // Project 3D point onto the image plane using the intrinsic matrix.
         // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-        RCLCPP_DEBUG(this->get_logger(), "3D POINT: (%lf, %lf, %lf)", point_tf.x, point_tf.y, point_tf.z);
-        cv::Point2d xy_rect = m_is_sim? m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
+	if (!pcl::isFinite(point_tf)) return;
+
+        RCLCPP_INFO(this->get_logger(), "3D POINT: (%lf, %lf, %lf)", point_tf.x, point_tf.y, point_tf.z);
+	try {
+        cv::Point2d xy_rect = m_is_sim ?
+            m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) :
+	    m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
+       	    RCLCPP_INFO(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
+	} catch (cv_bridge::Exception &e) {
+	    RCLCPP_INFO(this->get_logger(), "SAD: (%s)", e.what());
+	}
         // Check if within bounds & in front of the boat
-        RCLCPP_DEBUG(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
     }
     // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
     cv_bridge::CvImagePtr cv_ptr;
