@@ -1,3 +1,4 @@
+from ast import Num
 #!/usr/bin/env python3
 import rclpy
 from rclpy.action import ActionClient, ActionServer
@@ -111,13 +112,142 @@ class SpeedChange(ActionServerBase):
         if self.runnerActivated:
             self.home_pos = self.robot_pos # keep track of where the home position is
             self.circle_blue_buoy()
-    
+
     def circle_blue_buoy(self):
         '''
         Function to circle the blue buoy
         '''
 
-           
+    # robust realtime visual signal processing
+    def go(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+        '''
+        beforeRed :: [[Bbox]] | len(beforeRed) > 0
+        frames with red bounding boxes before signal event
+
+        afterRed :: [[Bbox]] | len(afterRed) > 0
+        frames with red bounding boxes after signal event
+
+        beforeGreen :: [[Bbox]] | len(beforeGreen) = len(beforeRed) > 0
+        same as `beforeRed` but for green bounding boxes
+
+        afterGreen :: [[Bbox]] | len(afterGreen) = len(afterRed) > 0
+        same as `afterRed` but for green bounding boxes
+
+        epsilon :: Num
+        maximum distance at which two bounding boxes are considered the same;
+        also minimum distance needed to identify bounding boxes as unique
+
+        lmda :: Num
+        maximum deviation in position of a bounding box across frames
+
+        p :: Int
+        number of frames to sample from full list to determine main bounding boxes;
+        should be small for performance reasons
+
+        limit :: Prob
+        threshold probability of existence required to detect a change in bounding box color
+
+        → Bool
+        whether signal has changed
+
+        ---
+
+        Bbox := {
+            x :: Num
+            y :: Num
+            w :: Num | w > 0
+            h :: Num | h > 0
+        }
+
+        Prob := Num a | 0 <= a <= 1
+        '''
+        id = lambda x: x  # A → A
+        map = lambda f, l: [f(x) for x in l]  # (A → B) → [A] → [B]
+        flatten = lambda l: l[0] + flatten(l[1:]) if len(l) > 0 else []  # [[A]] → [A]
+        filter = lambda p, l: [x for x in l if p(x)]  # (A → Bool) → [A] → [A]
+        product = lambda a, b: flatten([[(alpha, beta) for alpha in a] for beta in b])  # [A] → [B] → [(A, B)]
+        access = lambda l1, l2: [l1[i] for i in l2]  # [A] → [Int] → [A]
+        distinguishable = lambda dist: dist > epsilon  # Num → Bool
+        matching = lambda dist: dist < lmbda  # Num → Bool
+        changed = lambda prob: prob >= limit  # Prob → Bool
+        multiply = lambda x: x[0] * x[1]  # (Num, Num) → Num
+        norm = lambda b1: lambda b2: (b1.x - b2.x) ** 2 + (b1.y - b2.y) ** 2  # Num → (Num → Num)
+        estimator = lambda trials: len(filter(id, trials)) / len(trials)  # [Bool] → Num
+
+        # [Bbox] → (Bbox → Bool)
+        # whether the bounding box is distinguishable from all bounding boxes in a list of bounding boxes
+        distinct = lambda boxes: lambda box: all(map(distinguishable, map(norm(box), boxes)))
+
+        # [[Bbox]] → [[Bbox]]
+        # remove red bounding boxes that are indistinguishable from green ones
+        beforeCandidatesRed = filter(distinct(beforeGreen), beforeRed)
+
+        # Int | nBefore > 0
+        # number of "before" frames
+        nBefore = len(beforeRed)
+
+        # Int | nAfter > 0
+        # number of "after" frames
+        nAfter = len(afterRed)
+
+        # Int → Int → Int | n > 0 → [Int]
+        # generate `n` evenly spaced elements from an arbitrary discrete range
+        linspace = lambda a, b, n: [a] + linspace(a + (b-a)/(n-1), b, n-1) if n > 1 else [a]
+
+        # [Int]
+        # indices of "before" frames to sample
+        beforeSampleIndices = linspace(0, nBefore-1, p)
+
+        # [[Bbox]]
+        # bounding box data for red before frames
+        beforeSampleRed = access(beforeCandidatesRed, beforeSampleIndices)
+
+        # [Bbox]
+        # list of identified red bounding boxes from sample frames
+        redBboxes = flatten(beforeSampleRed)
+
+        # Bbox → ([Bbox] → Bool)
+        # detect whether a particular bounding box exists in a different frame
+        bboxExists = lambda bbox: lambda frame: any(map(matching, map(norm(bbox), frame)))
+
+        # Bbox → [[Bbox]] → Prob
+        # determine probability that a given bounding box exists in time series
+        probExistence = lambda box, series: estimator(map(bboxExists(box), series))
+
+        # [Int]
+        # indices of "after" frames to sample
+        afterSampleIndices = linspace(0, nAfter-1, p)
+
+        # [[Bbox]]
+        # bounding box data for green after frames
+        afterSampleGreen = access(afterGreen, afterSampleIndices)
+
+        # [Bbox]
+        # list of identified green bounding boxes from sample frames
+        greenBoxes = flatten(afterSampleGreen)
+
+        # (Bbox, Bbox) → Bool
+        # check for overlap between bounding box set and a single bounding box
+        overlapping = lambda boxes: matching(norm(boxes[0])(boxes[1]))
+
+        # [(Bbox, Bbox)]
+        # list of potential candidates for a signal switch
+        signalCandidates = filter(overlapping, product(redBboxes, greenBoxes))
+
+        # (Bbox, Bbox) → Prob
+        # probability of specific candidate pair existing
+        candidateProbability = lambda boxes: (probExistence(boxes[0], beforeRed), probExistence(boxes[1], afterGreen))
+
+        # [(Prob, Prob)]
+        # probability of existence of each bounding box in signal candidates
+        probabilities = map(candidateProbability, signalCandidates)
+
+        # [Prob]
+        # probability of existence of each bounding box pair in signal candidates
+        pairProbabilities = map(multiply, probabilities)
+
+        # check for any probability exceeding confidence threshold
+        return any(map(changed, pairProbabilities))
 
     # def norm_squared(self, vec, ref=(0, 0)):
     #     return vec[0] ** 2 + vec[1] ** 2
@@ -144,7 +274,7 @@ class SpeedChange(ActionServerBase):
     #     left_coords = self.ob_coords(pair.left)
     #     right_coords = self.ob_coords(pair.right)
     #     midpoint = self.midpoint(left_coords, right_coords)
-        
+
     #     scale = 1 # number of meters to translate forward. TODO: parametrize.
     #     dy = right_coords[1] - left_coords[1]
     #     dx = right_coords[0] - left_coords[0]
@@ -382,7 +512,7 @@ class SpeedChange(ActionServerBase):
 
     # def pair_to_pose(self, pair):
     #     return Pose(position=Point(x=pair[0], y=pair[1]))
-    
+
     # def quaternion_from_euler(self, roll, pitch, yaw):
     #     """
     #     Converts euler roll, pitch, yaw to quaternion (w in last place)
@@ -403,14 +533,14 @@ class SpeedChange(ActionServerBase):
     #     q[3] = sy * cp * cr - cy * sp * sr
 
     #     return q
-    
+
     # def pair_angle_to_pose(self, pair, angle):
     #     quat = self.quaternion_from_euler(0, angle, 0)
     #     return Pose(
     #         position=Point(x=pair[0], y=pair[1]),
     #         orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
     #     )
-    
+
     # def buoy_pairs_angle(self, p1, p2, loc=False):
     #     p1_left, p1_right = (self.ob_coords(p1.left, local=loc), self.ob_coords(p1.right, local=loc))
     #     p2_left, p2_right = (self.ob_coords(p2.left, local=loc), self.ob_coords(p2.right, local=loc))
@@ -418,7 +548,7 @@ class SpeedChange(ActionServerBase):
     #     p2_diff = (p2_right[0]-p2_left[0], p2_right[1]-p2_left[1])
     #     angle = math.acos((p1_diff[0]*p2_diff[0]+p1_diff[1]*p2_diff[1])/(self.norm(p1_diff)*self.norm(p2_diff)))
     #     return angle
-    
+
     # def buoy_pairs_distance(self, p1, p2, mode="min", loc=False):
     #     p1_left, p1_right = self.ob_coords(p1.left, local=loc), self.ob_coords(p1.right, local=loc)
     #     p2_left, p2_right = self.ob_coords(p2.left, local=loc), self.ob_coords(p2.right, local=loc)
@@ -431,9 +561,9 @@ class SpeedChange(ActionServerBase):
     #         right_diff = (p2_right[0]-p1_right[0], p2_right[1]-p1_right[1])
     #         dist = min(self.norm(left_diff), self.norm(right_diff))
     #     return dist
-    
+
     # def better_buoy_pair_transition(self, p_old, p_new, p_ref):
-    #     # return ((self.buoy_pairs_distance(p_ref, p_new) <= self.buoy_pair_dist_thres and 
+    #     # return ((self.buoy_pairs_distance(p_ref, p_new) <= self.buoy_pair_dist_thres and
     #     #         self.buoy_pairs_distance(p_ref, p_new, mode="min") > self.buoy_pairs_distance(p_ref, p_old, mode="min")) or
     #     return (self.buoy_pairs_distance(p_ref, p_new) > self.buoy_pair_dist_thres and
     #             (self.buoy_pairs_distance(p_ref, p_old) <= self.buoy_pair_dist_thres or
@@ -459,9 +589,9 @@ class SpeedChange(ActionServerBase):
     #     if self.pair_to is None:
     #         self.get_logger().debug("No pair to go to.")
     #         return
-        
+
     #     # TODO: Match the previous pair of buoys to the new obstacle map (in terms of global position) to eliminate any big drift that may mess up the selection of the next pair
-        
+
     #     """
     #     Update the current sequence if better transitions are found
     #     """
@@ -564,13 +694,13 @@ class SpeedChange(ActionServerBase):
     #         # for sent_waypoint in self.sent_waypoints:
     #         #     if math.dist(waypoint, sent_waypoint) < check_dist:
     #         #         passed_waypoint = True
-            
+
     #         # buoy_pair = buoy_pairs[0]
     #         # left_coords = self.ob_coords(buoy_pair.left)
     #         # right_coords = self.ob_coords(buoy_pair.right)
     #         # # get the perp forward direction
     #         # forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
-            
+
 
 
     #         # if not passed_waypoint:
@@ -613,7 +743,7 @@ class SpeedChange(ActionServerBase):
     #         if goal_handle.is_cancel_requested:
     #             goal_handle.canceled()
     #             return Task.Result()
-        
+
     #     success = False
     #     while not success:
     #         success = self.setup_buoys()
@@ -635,7 +765,7 @@ class SpeedChange(ActionServerBase):
     #             self.end_process("Cancel requested. Aborting path following.")
     #             goal_handle.canceled()
     #             return Task.Result()
-            
+
     #         self.generate_waypoints()
 
     #         time.sleep(self.timer_period)
