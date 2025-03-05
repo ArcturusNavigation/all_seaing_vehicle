@@ -140,6 +140,21 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    buoy_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"conf": 0.6},
+            {"label_config": "buoy_label_mappings.yaml"},
+        ],
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
     point_cloud_filter_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -360,7 +375,8 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
-        color_segmentation_node,
+        buoy_yolo_node,
+        # color_segmentation_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         # object_tracking_map_node,
