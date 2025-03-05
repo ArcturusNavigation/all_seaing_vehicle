@@ -28,6 +28,12 @@ def launch_setup(context, *args, **kwargs):
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
+    matching_weights = os.path.join(
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
+    )
+    contour_matching_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
 
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
@@ -209,7 +215,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"joy_x_scale": -1.0},
             {"joy_ang_scale": 0.3},
-            {"serial_port": "/dev/ttyACM1"},
+            {"serial_port": "/dev/ttyACM0"},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -289,7 +295,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM1"}],
+        parameters=[{"port": "/dev/ttyACM0"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -310,7 +316,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -354,6 +360,64 @@ def launch_setup(context, *args, **kwargs):
             ]),
         ),
     )
+
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+            ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
+            ("lidar_topic", "/point_cloud/filtered")
+        ],
+        parameters=[
+            {"bbox_object_margin": 1.0},
+            {"color_label_mappings_file": color_label_mappings},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": False},
+        ]
+    )
+
+    object_tracking_map_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_drop_thresh": 2.0},
+            {"range_uncertainty": 1.0},
+            {"bearing_uncertainty": 0.1},
+            {"new_object_slam_threshold": 2.0},
+            {"check_fov": False},
+            {"init_new_cov": 10.0},
+            {"track_robot": True},
+            {"is_sim": False},
+        ]
+    )
+
+    object_tracking_map_euclidean_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_euclidean",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"check_fov": False},
+            {"is_sim": False},
+        ]
+    )
+
     
     return [
         control_mux,
@@ -383,6 +447,9 @@ def launch_setup(context, *args, **kwargs):
         lidar_ld,
         mavros_ld,
         zed_ld,
+        bbox_project_pcloud_node,
+        object_tracking_map_node,
+        object_tracking_map_euclidean_node,
     ]
 
 

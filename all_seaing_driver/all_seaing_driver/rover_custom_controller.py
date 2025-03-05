@@ -5,7 +5,7 @@ from rclpy.node import Node
 from all_seaing_driver.central_hub import ESTOP
 import serial
 
-from all_seaing_interfaces.msg import ControlOption, Heartbeat
+from all_seaing_interfaces.msg import ControlOption, Heartbeat, KeyboardButton
 
 HEART_RATE = 1
 CONTROL_RATE = 1 / 30
@@ -34,17 +34,27 @@ class RoverCustomController(Node):
 
         self.heartbeat_timer = self.create_timer(HEART_RATE, self.heart_timer_callback)
         self.controls_timer = self.create_timer(CONTROL_RATE, self.controls_timer_callback)
+        self.keyboard_publisher = self.create_publisher(KeyboardButton, "keyboard_button", 10)
+        self.prev_mode = 1
 
     def heart_timer_callback(self):
         new_mode = bool(self.estop.mode())
+        if new_mode != self.prev_mode and new_mode == 0:
+            keyboard_msg = KeyboardButton()
+            keyboard_msg.key = 'p'
+            self.keyboard_publisher.publish(keyboard_msg)       
+        else:
+            keyboard_msg = KeyboardButton()
+            keyboard_msg.key = '0'
+            self.keyboard_publisher.publish(keyboard_msg)       
+
         if new_mode != self.heartbeat_message.in_teleop:
             self.get_logger().info(f"Toggled teleop (now {self.heartbeat_message.in_teleop})")
 
         self.heartbeat_message.in_teleop = new_mode
         self.heartbeat_message.e_stopped = bool(self.estop.estop())
-
-        if self.heartbeat_message.in_teleop and not self.heartbeat_message.e_stopped:
-            self.heartbeat_publisher.publish(self.heartbeat_message)
+        self.heartbeat_publisher.publish(self.heartbeat_message)
+        self.prev_mode = new_mode
 
     def controls_timer_callback(self):
         if not self.heartbeat_message.e_stopped:

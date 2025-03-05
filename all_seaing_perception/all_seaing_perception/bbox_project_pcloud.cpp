@@ -154,8 +154,8 @@ void BBoxProjectPCloud::bb_pcl_project(
     pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
 
-    RCLCPP_DEBUG(this->get_logger(), "%d POINTS, %d OBJECTS", in_cloud_tf_ptr->points.size(), in_bbox_msg->boxes.size());
-    RCLCPP_DEBUG(this->get_logger(), "FRAME_ID BEFORE SELECTION, AFTER TRANSFORM TO CAMERA FRAME: %s", in_cloud_tf_ptr->header.frame_id);
+    RCLCPP_INFO(this->get_logger(), "%d POINTS, %d OBJECTS", in_cloud_tf_ptr->points.size(), in_bbox_msg->boxes.size());
+    RCLCPP_INFO(this->get_logger(), "FRAME_ID BEFORE SELECTION, AFTER TRANSFORM TO CAMERA FRAME: %s", in_cloud_tf_ptr->header.frame_id);
 
     auto object_pcls = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
     std::vector<pcl::PointCloud<pcl::PointXYZHSV>> obj_cloud_vec;
@@ -188,7 +188,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     // cv::waitKey();
     std::vector<std::pair<all_seaing_interfaces::msg::LabeledBoundingBox2D, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>> bbox_pcloud_objects;
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
-        RCLCPP_DEBUG(this->get_logger(), "BBOX LABEL: %d", bbox.label);
+        RCLCPP_INFO(this->get_logger(), "BBOX LABEL: %d", bbox.label);
         if(!label_color_map.count(bbox.label)) continue; //ignore objects that are not registered buoy types
 
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
@@ -231,7 +231,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         obj_cloud_vec.push_back(*obj_cloud_ptr);
         bbox_pcloud_objects.push_back(std::make_pair(bbox, obj_cloud_ptr));
         obj++;
-        RCLCPP_DEBUG(this->get_logger(), "%d POINTS IN OBJECT %d", obj_cloud_ptr->size(), obj);
+        RCLCPP_INFO(this->get_logger(), "%d POINTS IN OBJECT %d", obj_cloud_ptr->size(), obj);
         // max_len = std::max(max_len, (int)obj_cloud_ptr->size());
     }
     RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND OBJECT POINT CLOUDS");
@@ -263,7 +263,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     std::vector<std::pair<pcl::PointCloud<pcl::PointXYZHSV>, std::vector<cv::Point>>> refined_cloud_contour_vec;
     // int max_refined_len = 0;
 
-    RCLCPP_DEBUG(this->get_logger(), "# OF FOUND BBOXES: %d", bbox_pcloud_objects.size());
+    RCLCPP_INFO(this->get_logger(), "# OF FOUND BBOXES: %d", bbox_pcloud_objects.size());
     for(auto bbox_pcloud_pair : bbox_pcloud_objects){
         all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = bbox_pcloud_pair.first;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
@@ -317,7 +317,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func = std::bind(&hsv_diff_condition, m_clustering_color_weights, m_clustering_color_thres, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
         cec.setConditionFunction(cond_func);
         cec.segment(clusters_indices);
-        RCLCPP_DEBUG(this->get_logger(), "# OF EXTRACTED CLUSTERS: %d", clusters_indices.size());
+        RCLCPP_INFO(this->get_logger(), "# OF EXTRACTED CLUSTERS: %d", clusters_indices.size());
         int clust_id = 0;
         for(auto ind_set : clusters_indices){
             RCLCPP_DEBUG(this->get_logger(), "SIZE OF CLUSTER %d: %d", clust_id, ind_set.indices.size());
