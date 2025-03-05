@@ -59,8 +59,10 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     if (label_yaml.is_open()) {
         label_config_yaml = YAML::Load(label_yaml);  
         for (YAML::const_iterator it = label_config_yaml.begin(); it != label_config_yaml.end(); ++it) {
-            label_color_map[it->second.as<int>()] = it->first.as<std::string>();
-            RCLCPP_DEBUG(this->get_logger(), "%d -> %s", it->second.as<int>(), it->first.as<std::string>().c_str());
+            for(int label : it->second.as<std::vector<int>>()){
+                label_color_map[label] = it->first.as<std::string>();
+                RCLCPP_DEBUG(this->get_logger(), "%d -> %s", label, it->first.as<std::string>().c_str());
+            }
         }
     } 
     else {
@@ -74,7 +76,6 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     if (matching_yaml.is_open()) {
         matching_weights_config_yaml = YAML::Load(matching_yaml);
 
-        m_clustering_distance_weight = matching_weights_config_yaml["clustering_distance_weight"].as<double>();
         m_clustering_color_weights = matching_weights_config_yaml["clustering_color_weights"].as<std::vector<double>>();
         m_clustering_color_thres = matching_weights_config_yaml["clustering_color_thres"].as<double>();
         m_cluster_contour_distance_weight = matching_weights_config_yaml["cluster_contour_distance_weight"].as<double>();
@@ -82,7 +83,6 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
         m_contour_detection_color_weights = matching_weights_config_yaml["contour_detection_color_weights"].as<std::vector<double>>();
         m_cluster_contour_size_weight = matching_weights_config_yaml["cluster_contour_size_weight"].as<double>();
     
-        RCLCPP_DEBUG(this->get_logger(), "clustering_distance_weight: %lf", m_clustering_distance_weight);
         RCLCPP_DEBUG(this->get_logger(), "clustering_color_weights: [%lf, %lf, %lf]", m_clustering_color_weights[0], m_clustering_color_weights[1], m_clustering_color_weights[2]);
         RCLCPP_DEBUG(this->get_logger(), "clustering_color_thres: %lf", m_clustering_color_thres);
         RCLCPP_DEBUG(this->get_logger(), "cluster_contour_distance_weight: %lf", m_cluster_contour_distance_weight);
