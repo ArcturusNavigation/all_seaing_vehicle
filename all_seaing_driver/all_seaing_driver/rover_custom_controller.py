@@ -8,7 +8,7 @@ import serial
 from all_seaing_interfaces.msg import ControlOption, Heartbeat
 
 HEART_RATE = 1
-CONTROL_RATE = 1 / 60
+CONTROL_RATE = 1 / 30
 
 class RoverCustomController(Node):
     def __init__(self):
@@ -42,9 +42,9 @@ class RoverCustomController(Node):
 
         self.heartbeat_message.in_teleop = new_mode
         self.heartbeat_message.e_stopped = bool(self.estop.estop())
-        self.heartbeat_publisher.publish(self.heartbeat_message)
-        if self.heartbeat_message.e_stopped:
-            self.get_logger().fatal("E-STOP ACTIVATED :<")
+
+        if self.heartbeat_message.in_teleop and not self.heartbeat_message.e_stopped:
+            self.heartbeat_publisher.publish(self.heartbeat_message)
 
     def controls_timer_callback(self):
         if not self.heartbeat_message.e_stopped:

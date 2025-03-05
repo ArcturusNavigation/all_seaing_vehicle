@@ -88,8 +88,8 @@ def launch_setup(context, *args, **kwargs):
             {
                 "front_right_port": 2,
                 "front_left_port": 3,
-                "back_right_port": 4,
-                "back_left_port": 5,
+                "back_left_port": 4,
+                "back_right_port": 5,
             }
         ],
         condition=UnlessCondition(use_bag),
@@ -207,8 +207,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
         parameters=[
-            {"joy_x_scale": 2.0},
-            {"joy_ang_scale": 0.8},
+            {"joy_x_scale": -1.0},
+            {"joy_ang_scale": 0.3},
             {"serial_port": "/dev/ttyACM0"},
         ],
         condition=IfCondition(
@@ -245,6 +245,7 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_2025"},
+            {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
         ],
         remappings=[
@@ -259,6 +260,7 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
             {"conf": 0.4},
         ],
         remappings=[
@@ -284,6 +286,11 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{"is_sim": False}],
     )
 
+    central_hub = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="central_hub_ros.py",
+        parameters=[{"port": "/dev/ttyACM0"}],
+    )
 
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -363,17 +370,18 @@ def launch_setup(context, *args, **kwargs):
         rover_lora_controller,
         rviz_waypoint_sender,
         thrust_commander_node,
-        webcam_publisher,
         buoy_yolo_node,
         shape_yolo_node,
         run_tasks,
         task_init_server, 
         follow_buoy_path,
         grid_map_generator,
+        central_hub,
         amcl_ld,
+        static_transforms_ld,
+        #webcam_publisher,
         lidar_ld,
         mavros_ld,
-        static_transforms_ld,
         zed_ld,
     ]
 

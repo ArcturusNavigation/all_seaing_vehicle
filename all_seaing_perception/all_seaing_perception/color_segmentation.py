@@ -76,7 +76,9 @@ class ColorSegmentation(Node):
                 mask = mask + cv2.inRange(hsv_img, lower_limit, upper_limit)
 
             # Erode and dilate mask
-            kernel2 = np.ones((30, 30), np.uint8)
+            kernel = np.ones((5, 5), np.uint8)
+            mask = cv2.erode(mask, kernel, iterations=1)
+            kernel2 = np.ones((7, 7), np.uint8)
             mask = cv2.dilate(mask, kernel2, iterations=1)
 
             contours, _ = cv2.findContours(
