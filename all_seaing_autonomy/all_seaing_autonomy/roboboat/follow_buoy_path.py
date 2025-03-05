@@ -75,24 +75,50 @@ class FollowBuoyPath(ActionServerBase):
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-        self.declare_parameter(
-            "color_label_mappings_file",
-            os.path.join(
-                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
-            ),
-        )
-
         self.first_buoy_pair = True
 
         self.safe_margin = (
             self.get_parameter("safe_margin").get_parameter_value().double_value
         )
 
-        color_label_mappings_file = self.get_parameter(
-            "color_label_mappings_file"
-        ).value
-        with open(color_label_mappings_file, "r") as f:
-            self.color_label_mappings = yaml.safe_load(f)
+        self.green_labels = set()
+        self.red_labels = set()
+
+        if self.is_sim:
+            # TODO: change the param to be the same between is_sim and not
+            # too sleepy, dont want to break things.
+            self.declare_parameter(
+                "color_label_mappings_file", 
+                os.path.join(
+                    bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+                ),
+            )
+
+            color_label_mappings_file = self.get_parameter(
+                "color_label_mappings_file"
+            ).value
+            with open(color_label_mappings_file, "r") as f:
+                label_mappings = yaml.safe_load(f)
+            # hardcoded from reading YAML
+            self.green_labels.add(label_mappings["green"])
+            self.red_labels.add(label_mappings["red"])
+        else:
+            self.declare_parameter(
+                "buoy_label_mappings_file",
+                os.path.join(
+                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+                ),
+            )
+
+            buoy_label_mappings_file = self.get_parameter(
+                "buoy_label_mappings_file"
+            ).value
+            with open(buoy_label_mappings_file, "r") as f:
+                label_mappings = yaml.safe_load(f)
+            for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
+                self.green_labels.add(label_mappings[buoy_label])
+            for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
+                self.red_labels.add(label_mappings[buoy_label])
 
         self.sent_waypoints = set()
 
@@ -151,9 +177,9 @@ class FollowBuoyPath(ActionServerBase):
         green_bouy_points = []
         red_bouy_points = []
         for obstacle in obstacles:
-            if obstacle.label == self.color_label_mappings["green"]:
+            if obstacle.label in self.green_labels:
                 green_bouy_points.append(obstacle)
-            elif obstacle.label == self.color_label_mappings["red"]:
+            elif obstacle.label in self.red_labels:
                 red_bouy_points.append(obstacle)
         return green_bouy_points, red_bouy_points
 
