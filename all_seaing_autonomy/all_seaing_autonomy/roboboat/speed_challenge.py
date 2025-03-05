@@ -79,20 +79,41 @@ class SpeedChange(ActionServerBase):
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-        self.declare_parameter(
-            "color_label_mappings_file",
-            os.path.join(
-                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
-            ),
-        )
+        self.blue_labels = set()
 
-        color_label_mappings_file = self.get_parameter(
-            "color_label_mappings_file"
-        ).value
-        with open(color_label_mappings_file, "r") as f:
-            self.color_label_mappings = yaml.safe_load(f)
+        if self.is_sim:
+            # TODO: change the param to be the same between is_sim and not
+            # too sleepy, dont want to break things.
+            # CODE IS COPIED FROM FOLLOW_BUOY_PATH,SUBJECT TO CHANGES
+            self.declare_parameter(
+                "color_label_mappings_file", 
+                os.path.join(
+                    bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+                ),
+            )
 
-        self.buoy_pairs = []
+            color_label_mappings_file = self.get_parameter(
+                "color_label_mappings_file"
+            ).value
+            with open(color_label_mappings_file, "r") as f:
+                label_mappings = yaml.safe_load(f)
+            # hardcoded from reading YAML
+            self.blue_labels.add(label_mappings["blue"])
+        else:
+            self.declare_parameter(
+                "buoy_label_mappings_file",
+                os.path.join(
+                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+                ),
+            )
+            buoy_label_mappings_file = self.get_parameter(
+                "buoy_label_mappings_file"
+            ).value
+            with open(buoy_label_mappings_file, "r") as f:
+                label_mappings = yaml.safe_load(f)
+            for buoy_label in ["blue_buoy", " blue_circle", "blue_racquet_ball"]:
+                self.blue_labels.add(label_mappings[buoy_label])
+
         self.obstacles = []
 
 
@@ -239,10 +260,12 @@ class SpeedChange(ActionServerBase):
         Check if the blue buoy for turning is detected (returns boolean).
         Also sets the position of the blue buoy if it is found.
         '''
-        for bounding_box in self.buoy_bounding_boxes:
-            #TODO: figure out what labels go here, and make self.buoy_found true when necessary
-            pass
-
+        for obstacle in self.obstacles:
+            if obstacle.label in self.blue_labels: 
+                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
+                self.buoy_found = True
+                self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                break
 
         return self.buoy_found
 
