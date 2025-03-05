@@ -1,3 +1,4 @@
+from ast import Num
 #!/usr/bin/env python3
 import rclpy
 from rclpy.action import ActionClient, ActionServer
@@ -167,53 +168,137 @@ class SpeedChange(ActionServerBase):
         '''
         self.obstacles = msg.obstacles
 
-    def odometry_cb(self, msg):
-        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+    # robust realtime visual signal processing
+    def go(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+        '''
+        beforeRed :: [[Bbox]] | len(beforeRed) > 0
+        frames with red bounding boxes before signal event
 
-    def probe_blue_buoy(self):
-        '''
-        Function to find the blue buoy by moving near it (general direction).
-        Keeps on appending waypoints to the north/south until it finds 
-        '''
-        max_guide_d = 30
-        guide_point = (max_guide_d*self.buoy_direction[0], max_guide_d*self.buoy_direction[1])
-        self.cond_move_to_point(guide_point, self.blue_buoy_detected)
-        return self.circle_blue_buoy()
-    
-    def circle_blue_buoy(self):
-        '''
-        Function to circle the blue buoy.
-        '''
-        if not self.blue_buoy_detected():
-            self.get_logger().info("task 4 blue buoy probing exited without finding blue buoy")
-            return Task(success=False)
-        
-        #circle the blue buoy like a baseball diamond
-        # a better way to do this might be to have the astar run to original cell, 
-        # but require the path to go around buoy
+        afterRed :: [[Bbox]] | len(afterRed) > 0
+        frames with red bounding boxes after signal event
 
-        t_o = self.turn_offset
-        first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
-        second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
-        third_dir = (-first_dir[0]*t_o, -first_dir[1]*t_o)
-        
-        first_base = self.add_tuple(self.blue_buoy_pos, first_dir)
-        second_base = self.add_tuple(self.blue_buoy_pos, second_dir)
-        third_base = self.add_tuple(self.blue_buoy_pos, third_dir)
-        
-        self.move_to_point(first_base)
-        self.move_to_point(second_base)
-        self.move_to_point(third_base)
+        beforeGreen :: [[Bbox]] | len(beforeGreen) = len(beforeRed) > 0
+        same as `beforeRed` but for green bounding boxes
 
-        return self.return_to_start()
+        afterGreen :: [[Bbox]] | len(afterGreen) = len(afterRed) > 0
+        same as `afterRed` but for green bounding boxes
 
-    def return_to_start(self):
+        epsilon :: Num
+        maximum distance at which two bounding boxes are considered the same;
+        also minimum distance needed to identify bounding boxes as unique
+
+        lmda :: Num
+        maximum deviation in position of a bounding box across frames
+
+        p :: Int
+        number of frames to sample from full list to determine main bounding boxes;
+        should be small for performance reasons
+
+        limit :: Prob
+        threshold probability of existence required to detect a change in bounding box color
+
+        → Bool
+        whether signal has changed
+
+        ---
+
+        Bbox := {
+            x :: Num
+            y :: Num
+            w :: Num | w > 0
+            h :: Num | h > 0
+        }
+
+        Prob := Num a | 0 <= a <= 1
         '''
-        After circling the buoy, return to the starting position.
-        '''
-        self.move_to_point(self.home_pos)
-        return Task(success=True)
+        id = lambda x: x  # A → A
+        map = lambda f, l: [f(x) for x in l]  # (A → B) → [A] → [B]
+        flatten = lambda l: l[0] + flatten(l[1:]) if len(l) > 0 else []  # [[A]] → [A]
+        filter = lambda p, l: [x for x in l if p(x)]  # (A → Bool) → [A] → [A]
+        product = lambda a, b: flatten([[(alpha, beta) for alpha in a] for beta in b])  # [A] → [B] → [(A, B)]
+        access = lambda l1, l2: [l1[i] for i in l2]  # [A] → [Int] → [A]
+        distinguishable = lambda dist: dist > epsilon  # Num → Bool
+        matching = lambda dist: dist < lmbda  # Num → Bool
+        changed = lambda prob: prob >= limit  # Prob → Bool
+        multiply = lambda x: x[0] * x[1]  # (Num, Num) → Num
+        norm = lambda b1: lambda b2: (b1.x - b2.x) ** 2 + (b1.y - b2.y) ** 2  # Num → (Num → Num)
+        estimator = lambda trials: len(filter(id, trials)) / len(trials)  # [Bool] → Num
 
+        # [Bbox] → (Bbox → Bool)
+        # whether the bounding box is distinguishable from all bounding boxes in a list of bounding boxes
+        distinct = lambda boxes: lambda box: all(map(distinguishable, map(norm(box), boxes)))
+
+        # [[Bbox]] → [[Bbox]]
+        # remove red bounding boxes that are indistinguishable from green ones
+        beforeCandidatesRed = filter(distinct(beforeGreen), beforeRed)
+
+        # Int | nBefore > 0
+        # number of "before" frames
+        nBefore = len(beforeRed)
+
+        # Int | nAfter > 0
+        # number of "after" frames
+        nAfter = len(afterRed)
+
+        # Int → Int → Int | n > 0 → [Int]
+        # generate `n` evenly spaced elements from an arbitrary discrete range
+        linspace = lambda a, b, n: [a] + linspace(a + (b-a)/(n-1), b, n-1) if n > 1 else [a]
+
+        # [Int]
+        # indices of "before" frames to sample
+        beforeSampleIndices = linspace(0, nBefore-1, p)
+
+        # [[Bbox]]
+        # bounding box data for red before frames
+        beforeSampleRed = access(beforeCandidatesRed, beforeSampleIndices)
+
+        # [Bbox]
+        # list of identified red bounding boxes from sample frames
+        redBboxes = flatten(beforeSampleRed)
+
+        # Bbox → ([Bbox] → Bool)
+        # detect whether a particular bounding box exists in a different frame
+        bboxExists = lambda bbox: lambda frame: any(map(matching, map(norm(bbox), frame)))
+
+        # Bbox → [[Bbox]] → Prob
+        # determine probability that a given bounding box exists in time series
+        probExistence = lambda box, series: estimator(map(bboxExists(box), series))
+
+        # [Int]
+        # indices of "after" frames to sample
+        afterSampleIndices = linspace(0, nAfter-1, p)
+
+        # [[Bbox]]
+        # bounding box data for green after frames
+        afterSampleGreen = access(afterGreen, afterSampleIndices)
+
+        # [Bbox]
+        # list of identified green bounding boxes from sample frames
+        greenBoxes = flatten(afterSampleGreen)
+
+        # (Bbox, Bbox) → Bool
+        # check for overlap between bounding box set and a single bounding box
+        overlapping = lambda boxes: matching(norm(boxes[0])(boxes[1]))
+
+        # [(Bbox, Bbox)]
+        # list of potential candidates for a signal switch
+        signalCandidates = filter(overlapping, product(redBboxes, greenBoxes))
+
+        # (Bbox, Bbox) → Prob
+        # probability of specific candidate pair existing
+        candidateProbability = lambda boxes: (probExistence(boxes[0], beforeRed), probExistence(boxes[1], afterGreen))
+
+        # [(Prob, Prob)]
+        # probability of existence of each bounding box in signal candidates
+        probabilities = map(candidateProbability, signalCandidates)
+
+        # [Prob]
+        # probability of existence of each bounding box pair in signal candidates
+        pairProbabilities = map(multiply, probabilities)
+
+        # check for any probability exceeding confidence threshold
+        return any(map(changed, pairProbabilities))
+  
     def move_to_point(self, point):
         '''
         Moves the boat to the specified position using the follow path action server.
