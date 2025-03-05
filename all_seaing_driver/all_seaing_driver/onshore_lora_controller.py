@@ -70,23 +70,30 @@ while running:
     elif keys[pygame.K_e]:
         control_msg["angular"] = -0.3
 
-    # Serialize to binary format
-    serialized_msg = struct.pack(
-        "BdddBBB",
-        control_msg["priority"],
-        control_msg["x"],
-        control_msg["y"],
-        control_msg["angular"],
+   # # Serialize to binary format
+   # serialized_msg = struct.pack(
+   #     "BdddBBB",
+   #     control_msg["priority"],
+   #     control_msg["x"],
+   #     control_msg["y"],
+   #     control_msg["angular"],
+   #     heartbeat_msg["in_teleop"],
+   #     heartbeat_msg["e_stopped"],
+   #     keyboard_msg["key"],
+   # )
+   # 
+   # checksum = calculate_checksum(serialized_msg)
+   # serialized_msg_with_checksum = serialized_msg + struct.pack("B", checksum)
+
+   # # Send over serial
+   # serial_port.write(serialized_msg_with_checksum)
+	serialized_msg = struct.pack(
+        "BB",
         heartbeat_msg["in_teleop"],
         heartbeat_msg["e_stopped"],
-        keyboard_msg["key"],
     )
+	serialized_port.write(serialized_msg)
     
-    checksum = calculate_checksum(serialized_msg)
-    serialized_msg_with_checksum = serialized_msg + struct.pack("B", checksum)
-
-    # Send over serial
-    serial_port.write(serialized_msg_with_checksum)
 
     # Clear the screen
     screen.fill((0, 0, 0))
