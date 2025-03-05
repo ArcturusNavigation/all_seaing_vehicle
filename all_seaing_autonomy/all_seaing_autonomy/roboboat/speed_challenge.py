@@ -91,13 +91,13 @@ class SpeedChange(ActionServerBase):
         self.blue_buoy_pos = (0, 0)
         self.runnerActivated = False
         # TODO: determine the direction of the blue buoy somewhere in the code.
-        # perhaps in qualifying rounds we can enter from the correct direction, 
+        # perhaps in qualifying rounds we can enter from the correct direction,
         # so we just take that direction?
 
 
         # unit vector in the direction of the blue buoy
-        # ex: (0, -1) for south (-y), (0,1) for north (+y) 
-        self.buoy_direction = (0,0) 
+        # ex: (0, -1) for south (-y), (0,1) for north (+y)
+        self.buoy_direction = (0,0)
         self.buoy_found = False
 
         self.obstacles = None
@@ -160,10 +160,10 @@ class SpeedChange(ActionServerBase):
         self.buoy_found = False
         self.runnerActivated = False
 
-    
+
     def execute_callback(self, goal_handle):
         self.start_process("Speed challenge task started!")
-            
+
         self.reset_challenge()
         self.get_logger().info("Speed challenge setup completed.")
 
@@ -173,7 +173,7 @@ class SpeedChange(ActionServerBase):
                 self.get_logger().info("Cancel requested. Aborting task initialization.")
                 goal_handle.canceled()
                 return Task.Result(success=False)
-            
+
             if self.runnerActivated:
                 self.home_pos = self.robot_pos # keep track of home position
                 task_result = self.probe_blue_buoy()
@@ -298,10 +298,6 @@ class SpeedChange(ActionServerBase):
         # whether the bounding box is distinguishable from all bounding boxes in a list of bounding boxes
         distinct = lambda boxes: lambda box: all(map(distinguishable, map(norm(box), boxes)))
 
-        # [[Bbox]] → [[Bbox]]
-        # remove red bounding boxes that are indistinguishable from green ones
-        beforeCandidatesRed = filter(distinct(beforeGreen), beforeRed)
-
         # Int | nBefore > 0
         # number of "before" frames
         nBefore = len(beforeRed)
@@ -318,9 +314,17 @@ class SpeedChange(ActionServerBase):
         # indices of "before" frames to sample
         beforeSampleIndices = linspace(0, nBefore-1, p)
 
+        # ([Bbox], [Bbox]) → [Bbox]
+        # remove first bounding boxes that are indistinguishable from second ones in the same frame
+        filterFrame = lambda colors: filter(distinct(colors[1]), colors[0])
+
+        # [[Bbox]] → [[Bbox]]
+        # remove red bounding boxes that are indistinguishable from green ones for each frame
+        beforeRedCandidates = map(filterFrame, zip(beforeRed, beforeGreen))
+
         # [[Bbox]]
         # bounding box data for red before frames
-        beforeSampleRed = access(beforeCandidatesRed, beforeSampleIndices)
+        beforeSampleRed = access(beforeRedCandidates, beforeSampleIndices)
 
         # [Bbox]
         # list of identified red bounding boxes from sample frames
@@ -368,7 +372,7 @@ class SpeedChange(ActionServerBase):
 
         # check for any probability exceeding confidence threshold
         return any(map(changed, pairProbabilities))
-  
+
     def move_to_point(self, point):
         '''
         Moves the boat to the specified position using the follow path action server.
@@ -400,21 +404,21 @@ class SpeedChange(ActionServerBase):
         '''
         future = self.move_to_point(point)
         while not future.done():
-            if cancel_cond(): 
+            if cancel_cond():
                 goal_msg = FollowPath.Goal()
                 goal_msg.is_cancel_requested = True
                 self.follow_path_client.send_goal_async(goal_msg)
 
             time.sleep(TIMER_PERIOD)
         return future
-    
+
     def blue_buoy_detected(self):
         '''
         Check if the blue buoy for turning is detected (returns boolean).
         Also sets the position of the blue buoy if it is found.
         '''
         for obstacle in self.obstacles:
-            if obstacle.label in self.blue_labels: 
+            if obstacle.label in self.blue_labels:
                 # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
                 self.buoy_found = True
                 self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
