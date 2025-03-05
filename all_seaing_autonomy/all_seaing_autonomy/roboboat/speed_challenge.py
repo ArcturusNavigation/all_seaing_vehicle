@@ -105,7 +105,7 @@ class SpeedChange(ActionServerBase):
         self.seg_bboxes = deque()
         self.max_seg_bboxes = 10 # guarantee this is even
 
-        
+
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
@@ -113,12 +113,12 @@ class SpeedChange(ActionServerBase):
         self.red_labels = set()
         self.green_labels = set()
 
-        
+
         # TODO: change the param to be the same between is_sim and not
         # too sleepy, dont want to break things.
         # CODE IS COPIED FROM FOLLOW_BUOY_PATH,SUBJECT TO CHANGES
         self.declare_parameter(
-            "color_label_mappings_file", 
+            "color_label_mappings_file",
             os.path.join(
                 bringup_prefix, "config", "perception", "color_label_mappings.yaml"
             ),
@@ -201,7 +201,7 @@ class SpeedChange(ActionServerBase):
             self.seg_bboxes.popleft()
         if self.runnerActivated:
             return
-        
+
         all_seg_bboxes = list(self.seg_bboxes)
 
         redBboxes = []
@@ -214,7 +214,7 @@ class SpeedChange(ActionServerBase):
                     redBboxes[-1].append(Bbox(box))
                 if box.label in self.green_labels:
                     greenBboxes[-1].append(Bbox(box))
-    
+
         cutoff = len(all_seg_bboxes.length/2)
         beforeRed = redBboxes[:cutoff]
         afterRed = redBboxes[cutoff:]
@@ -229,7 +229,7 @@ class SpeedChange(ActionServerBase):
 
         if self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
             self.runnerActivated = True
-    
+
     def map_cb(self, msg):
         '''
         Gets the labeled map from all_seaing_perception.
@@ -247,9 +247,6 @@ class SpeedChange(ActionServerBase):
         '''
         beforeRed :: [[Bbox]] | len(beforeRed) > 0
         frames with red bounding boxes before signal event
-
-        afterRed :: [[Bbox]] | len(afterRed) > 0
-        frames with red bounding boxes after signal event
 
         beforeGreen :: [[Bbox]] | len(beforeGreen) = len(beforeRed) > 0
         same as `beforeRed` but for green bounding boxes
@@ -285,6 +282,7 @@ class SpeedChange(ActionServerBase):
 
         Prob := Num a | 0 <= a <= 1
         '''
+        fmap = lambda f, l: [f(x) for x in l]  # A → B → [A] → [B]
         flatten = lambda l: l[0] + flatten(l[1:]) if len(l) > 0 else []  # [[A]] → [A]
         filter = lambda p, l: [x for x in l if p(x)]  # (A → Bool) → [A] → [A]
         product = lambda a, b: flatten([[(alpha, beta) for alpha in a] for beta in b])  # [A] → [B] → [(A, B)]
@@ -294,11 +292,11 @@ class SpeedChange(ActionServerBase):
         changed = lambda prob: prob >= limit  # Prob → Bool
         multiply = lambda x: x[0] * x[1]  # (Num, Num) → Num
         norm = lambda b1: lambda b2: math.sqrt((b1.x - b2.x) ** 2 + (b1.y - b2.y) ** 2)  # Num → (Num → Num)
-        estimator = lambda trials: len(sum(trials)) / len(trials)  # [Bool] → Num
+        estimator = lambda trials: sum(trials) / len(trials)  # [Bool] → Num
 
         # [Bbox] → (Bbox → Bool)
         # whether the bounding box is distinguishable from all bounding boxes in a list of bounding boxes
-        distinct = lambda boxes: lambda box: all(map(distinguishable, map(norm(box), boxes)))
+        distinct = lambda boxes: lambda box: all(fmap(distinguishable, fmap(norm(box), boxes)))
 
         # Int | nBefore > 0
         # number of "before" frames
@@ -306,7 +304,7 @@ class SpeedChange(ActionServerBase):
 
         # Int | nAfter > 0
         # number of "after" frames
-        nAfter = len(afterRed)
+        nAfter = len(afterGreen)
 
         # Int → Int → Int | n > 0 → [Int]
         # generate `n` evenly spaced elements from an arbitrary discrete range
@@ -314,7 +312,7 @@ class SpeedChange(ActionServerBase):
 
         # [Int]
         # indices of "before" frames to sample
-        beforeSampleIndices = linspace(0, nBefore-1, p)
+        beforeSampleIndices = fmap(int, linspace(0, nBefore-1, p))
 
         # ([Bbox], [Bbox]) → [Bbox]
         # remove first bounding boxes that are indistinguishable from second ones in the same frame
@@ -322,7 +320,7 @@ class SpeedChange(ActionServerBase):
 
         # [[Bbox]] → [[Bbox]]
         # remove red bounding boxes that are indistinguishable from green ones for each frame
-        beforeRedCandidates = map(filterFrame, zip(beforeRed, beforeGreen))
+        beforeRedCandidates = fmap(filterFrame, zip(beforeRed, beforeGreen))
 
         # [[Bbox]]
         # bounding box data for red before frames
@@ -334,15 +332,15 @@ class SpeedChange(ActionServerBase):
 
         # Bbox → ([Bbox] → Bool)
         # detect whether a particular bounding box exists in a different frame
-        bboxExists = lambda bbox: lambda frame: any(map(matching, map(norm(bbox), frame)))
+        bboxExists = lambda bbox: lambda frame: any(fmap(matching, fmap(norm(bbox), frame)))
 
         # Bbox → [[Bbox]] → Prob
         # determine probability that a given bounding box exists in time series
-        probExistence = lambda box, series: estimator(map(bboxExists(box), series))
+        probExistence = lambda box, series: estimator(fmap(bboxExists(box), series))
 
         # [Int]
         # indices of "after" frames to sample
-        afterSampleIndices = linspace(0, nAfter-1, p)
+        afterSampleIndices = fmap(int, linspace(0, nAfter-1, p))
 
         # [[Bbox]]
         # bounding box data for green after frames
@@ -366,14 +364,14 @@ class SpeedChange(ActionServerBase):
 
         # [(Prob, Prob)]
         # probability of existence of each bounding box in signal candidates
-        probabilities = map(candidateProbability, signalCandidates)
+        probabilities = fmap(candidateProbability, signalCandidates)
 
         # [Prob]
         # probability of existence of each bounding box pair in signal candidates
-        pairProbabilities = map(multiply, probabilities)
+        pairProbabilities = fmap(multiply, probabilities)
 
         # check for any probability exceeding confidence threshold
-        return any(map(changed, pairProbabilities))
+        return any(fmap(changed, pairProbabilities))
 
     def move_to_point(self, point):
         '''
