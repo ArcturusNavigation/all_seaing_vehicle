@@ -311,6 +311,16 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    speed_challenge = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+            {"turn_offset": 1.0}
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
@@ -383,6 +393,7 @@ def launch_setup(context, *args, **kwargs):
         run_tasks,
         task_init_server,
         follow_buoy_path,
+        speed_challenge,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,
