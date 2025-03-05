@@ -179,7 +179,11 @@ class SpeedChange(ActionServerBase):
                 task_result = self.probe_blue_buoy()
                 self.end_process("Speed challenge task ended.")
                 return task_result
-
+            else:
+                # station keep logic
+                goal_msg = FollowPath.Goal()
+                goal_msg.is_stationary = True
+                self.follow_path_client.send_goal_async(goal_msg)
 
             time.sleep(self.timer_period)
 
