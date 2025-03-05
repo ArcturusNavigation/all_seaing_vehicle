@@ -13,6 +13,7 @@ from std_msgs.msg import Header, ColorRGBA
 from sensor_msgs.msg import CameraInfo
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
+from tf_transformations import euler_from_quaternion
 
 import os
 import yaml
@@ -87,12 +88,12 @@ class SpeedChange(ActionServerBase):
         self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
 
         self.robot_pos = (0, 0)
+        self.robot_dir = (0, 0)
         self.home_pos = (0, 0)
         self.blue_buoy_pos = (0, 0)
         self.runnerActivated = False
-        # TODO: determine the direction of the blue buoy somewhere in the code.
-        # perhaps in qualifying rounds we can enter from the correct direction,
-        # so we just take that direction?
+        
+        # NOTE: in qualifying round we assume we enter from the correct direction.
 
 
         # unit vector in the direction of the blue buoy
@@ -176,6 +177,7 @@ class SpeedChange(ActionServerBase):
 
             if self.runnerActivated:
                 self.home_pos = self.robot_pos # keep track of home position
+                self.buoy_direction = self.robot_dir
                 task_result = self.probe_blue_buoy()
                 self.end_process("Speed challenge task ended.")
                 return task_result
@@ -235,6 +237,11 @@ class SpeedChange(ActionServerBase):
         Gets the labeled map from all_seaing_perception.
         '''
         self.obstacles = msg.obstacles
+
+    def odometry_cb(self, msg):
+        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        (row, pitch, yaw) = euler_from_quaternion(msg.pose.pose.orientation)
+        self.robot_dir = (math.cos(-yaw), math.sin(-yaw))
 
     def camera_info_cb(self, msg):
         '''
