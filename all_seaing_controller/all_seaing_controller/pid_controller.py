@@ -14,6 +14,9 @@ class PIDController:
     
     def set_setpoint(self, setpoint):
         self.setpoint = setpoint
+
+    def get_setpoint(self):
+        return self.setpoint
     
     def set_integral_min(self, val):
         self.integral_min = val
