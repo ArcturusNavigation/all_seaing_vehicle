@@ -10,14 +10,37 @@ from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
+from sensor_msgs.msg import CameraInfo
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
 
 import os
 import yaml
+import math
 import time
+from collections import deque
 
 TIMER_PERIOD = 1 / 60
+
+class Bbox:
+    def __init__(self, bbox_msg):
+        self.x = bbox_msg.xmin
+        self.y = bbox_msg.ymin
+        self.w = bbox_msg.xmax-bbox_msg.xmin
+        self.h = bbox_msg.ymax-bbox_msg.ymin
+
+
+class InternalBuoyPair:
+    def __init__(self, left_buoy=None, right_buoy=None):
+        if left_buoy is None:
+            self.left = Obstacle()
+        else:
+            self.left = left_buoy
+
+        if right_buoy is None:
+            self.right = Obstacle()
+        else:
+            self.right = right_buoy
 
 class SpeedChange(ActionServerBase):
     def __init__(self):
@@ -34,13 +57,17 @@ class SpeedChange(ActionServerBase):
         self.seg_image_bbox_sub = self.create_subscription(
             LabeledBoundingBox2D, "bounding_boxes_ycrcb", self.seg_bbox_cb, 10
         )
-
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
         )
         self.odometry_sub = self.create_subscription(
             Odometry, "/odometry/filtered", self.odometry_cb, 10
         )
+        self.camera_info_sub = self.create_subscription(
+            CameraInfo, "camera_info", self.camera_info_cb, 10
+        )
+
+
         self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
@@ -74,28 +101,38 @@ class SpeedChange(ActionServerBase):
         self.buoy_found = False
 
         self.obstacles = None
-        self.seg_bboxes = None
+        self.image_size = None
+        self.seg_bboxes = deque()
+        self.max_seg_bboxes = 10 # guarantee this is even
+
+        
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
         self.blue_labels = set()
+        self.red_labels = set()
+        self.green_labels = set()
+
+        
+        # TODO: change the param to be the same between is_sim and not
+        # too sleepy, dont want to break things.
+        # CODE IS COPIED FROM FOLLOW_BUOY_PATH,SUBJECT TO CHANGES
+        self.declare_parameter(
+            "color_label_mappings_file", 
+            os.path.join(
+                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+            ),
+        )
+
+        color_label_mappings_file = self.get_parameter(
+            "color_label_mappings_file"
+        ).value
+        with open(color_label_mappings_file, "r") as f:
+            label_mappings = yaml.safe_load(f)
+        self.red_labels.add(label_mappings["red"])
+        self.green_labels.add(label_mappings["green"])
 
         if self.is_sim:
-            # TODO: change the param to be the same between is_sim and not
-            # too sleepy, dont want to break things.
-            # CODE IS COPIED FROM FOLLOW_BUOY_PATH,SUBJECT TO CHANGES
-            self.declare_parameter(
-                "color_label_mappings_file", 
-                os.path.join(
-                    bringup_prefix, "config", "perception", "color_label_mappings.yaml"
-                ),
-            )
-
-            color_label_mappings_file = self.get_parameter(
-                "color_label_mappings_file"
-            ).value
-            with open(color_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
             # hardcoded from reading YAML
             self.blue_labels.add(label_mappings["blue"])
         else:
@@ -155,12 +192,39 @@ class SpeedChange(ActionServerBase):
         '''
         Handles when an color segmented image gets published
         '''
-        self.seg_bboxes = msg.boxes
+        self.seg_bboxes.append(msg.boxes)
+        if len(self.seg_bboxes) > self.max_seg_bboxes:
+            self.seg_bboxes.popleft()
         if self.runnerActivated:
             return
+        
+        all_seg_bboxes = list(self.seg_bboxes)
 
-        ###### checks if the color segmented image depicts the LED changing from red to green
-        ###### if so, make self.runnerActivated to be true.
+        redBboxes = []
+        greenBboxes = []
+        for frame in self.all_seg_bboxes: #fixed time, frame= LabeledBoundingBox2D[]
+            redBboxes.append([])
+            greenBboxes.append([])
+            for box in frame:
+                if box.label in self.red_labels:
+                    redBboxes[-1].append(Bbox(box))
+                if box.label in self.green_labels:
+                    greenBboxes[-1].append(Bbox(box))
+    
+        cutoff = len(all_seg_bboxes.length/2)
+        beforeRed = redBboxes[:cutoff]
+        afterRed = redBboxes[cutoff:]
+        beforeGreen = greenBboxes[:cutoff]
+        afterGreen = greenBboxes[cutoff:]
+
+        # TODO: FIX MAGIC NUMBER TERRITORY
+        epsilon = 0.05*math.sqrt(self.image_size[0]**2 + self.image_size[1]**2)
+        lmbda = epsilon
+        p = 10
+        limit = 0.5
+
+        if self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+            self.runnerActivated = True
     
     def map_cb(self, msg):
         '''
@@ -168,8 +232,14 @@ class SpeedChange(ActionServerBase):
         '''
         self.obstacles = msg.obstacles
 
+    def camera_info_cb(self, msg):
+        '''
+        Gets camera image info from all_seaing_perception.
+        '''
+        self.image_size = (msg.width, msg.height)
+
     # robust realtime visual signal processing
-    def go(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+    def led_changed(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
         '''
         beforeRed :: [[Bbox]] | len(beforeRed) > 0
         frames with red bounding boxes before signal event

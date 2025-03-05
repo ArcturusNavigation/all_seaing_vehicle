@@ -33,6 +33,9 @@ def launch_setup(context, *args, **kwargs):
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
+    ycrcb_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "ycrcb_color_ranges.yaml"
+    )
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
@@ -128,14 +131,14 @@ def launch_setup(context, *args, **kwargs):
 
     color_segmentation_node = launch_ros.actions.Node(
         package="all_seaing_perception",
-        executable="color_segmentation.py",
+        executable="color_segmentation_ycrcb.py",
         remappings=[
-            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("/webcam_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ],
         parameters=[
             {
                 "color_label_mappings_file": color_label_mappings,
-                "color_ranges_file": color_ranges,
+                "color_ranges_file": ycrcb_color_ranges,
             }
         ],
     )
