@@ -34,6 +34,7 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
 
+
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
     launch_rviz = LaunchConfiguration("launch_rviz")
@@ -134,6 +135,15 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ]
+    )
+
     point_cloud_filter_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -159,7 +169,30 @@ def launch_setup(context, *args, **kwargs):
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"polygon_area_thresh": 100000.0},
         ],
+    )
+
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        parameters=[
+            {"bbox_object_margin": 0.0},
+            {"camera_topic": "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"},
+            {"camera_info_topic": "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"},
+        ]
+    )
+
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        parameters=[
+            {"bbox_object_margin": 0.0},
+            {"camera_topic": "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"},
+            {"camera_info_topic": "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"},
+        ]
     )
 
     rviz_node = launch_ros.actions.Node(
@@ -295,7 +328,9 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
+        # yolov8_node,
         point_cloud_filter_node,
+        bbox_project_pcloud_node,
         rviz_node,
         control_mux,
         navigation_server,
