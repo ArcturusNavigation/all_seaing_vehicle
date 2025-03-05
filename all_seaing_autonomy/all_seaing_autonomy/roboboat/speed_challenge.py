@@ -281,8 +281,6 @@ class SpeedChange(ActionServerBase):
 
         Prob := Num a | 0 <= a <= 1
         '''
-        id = lambda x: x  # A → A
-        map = lambda f, l: [f(x) for x in l]  # (A → B) → [A] → [B]
         flatten = lambda l: l[0] + flatten(l[1:]) if len(l) > 0 else []  # [[A]] → [A]
         filter = lambda p, l: [x for x in l if p(x)]  # (A → Bool) → [A] → [A]
         product = lambda a, b: flatten([[(alpha, beta) for alpha in a] for beta in b])  # [A] → [B] → [(A, B)]
@@ -291,8 +289,8 @@ class SpeedChange(ActionServerBase):
         matching = lambda dist: dist < lmbda  # Num → Bool
         changed = lambda prob: prob >= limit  # Prob → Bool
         multiply = lambda x: x[0] * x[1]  # (Num, Num) → Num
-        norm = lambda b1: lambda b2: (b1.x - b2.x) ** 2 + (b1.y - b2.y) ** 2  # Num → (Num → Num)
-        estimator = lambda trials: len(filter(id, trials)) / len(trials)  # [Bool] → Num
+        norm = lambda b1: lambda b2: math.sqrt((b1.x - b2.x) ** 2 + (b1.y - b2.y) ** 2)  # Num → (Num → Num)
+        estimator = lambda trials: len(sum(trials)) / len(trials)  # [Bool] → Num
 
         # [Bbox] → (Bbox → Bool)
         # whether the bounding box is distinguishable from all bounding boxes in a list of bounding boxes
