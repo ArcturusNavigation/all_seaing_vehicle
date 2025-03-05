@@ -75,24 +75,50 @@ class FollowBuoyPath(ActionServerBase):
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-        self.declare_parameter(
-            "color_label_mappings_file",
-            os.path.join(
-                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
-            ),
-        )
-
         self.first_buoy_pair = True
 
         self.safe_margin = (
             self.get_parameter("safe_margin").get_parameter_value().double_value
         )
 
-        color_label_mappings_file = self.get_parameter(
-            "color_label_mappings_file"
-        ).value
-        with open(color_label_mappings_file, "r") as f:
-            self.color_label_mappings = yaml.safe_load(f)
+        self.green_labels = set()
+        self.red_labels = set()
+
+        if self.is_sim:
+            # TODO: change the param to be the same between is_sim and not
+            # too sleepy, dont want to break things.
+            self.declare_parameter(
+                "color_label_mappings_file", 
+                os.path.join(
+                    bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+                ),
+            )
+
+            color_label_mappings_file = self.get_parameter(
+                "color_label_mappings_file"
+            ).value
+            with open(color_label_mappings_file, "r") as f:
+                label_mappings = yaml.safe_load(f)
+            # hardcoded from reading YAML
+            self.green_labels.add(label_mappings["green"])
+            self.red_labels.add(label_mappings["red"])
+        else:
+            self.declare_parameter(
+                "buoy_label_mappings_file",
+                os.path.join(
+                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+                ),
+            )
+
+            buoy_label_mappings_file = self.get_parameter(
+                "buoy_label_mappings_file"
+            ).value
+            with open(buoy_label_mappings_file, "r") as f:
+                label_mappings = yaml.safe_load(f)
+            for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
+                self.green_labels.add(label_mappings[buoy_label])
+            for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
+                self.red_labels.add(label_mappings[buoy_label])
 
         self.sent_waypoints = set()
 
@@ -151,9 +177,9 @@ class FollowBuoyPath(ActionServerBase):
         green_bouy_points = []
         red_bouy_points = []
         for obstacle in obstacles:
-            if obstacle.label == self.color_label_mappings["green"]:
+            if obstacle.label in self.green_labels:
                 green_bouy_points.append(obstacle)
-            elif obstacle.label == self.color_label_mappings["red"]:
+            elif obstacle.label in self.red_labels:
                 red_bouy_points.append(obstacle)
         return green_bouy_points, red_bouy_points
 
@@ -427,22 +453,6 @@ class FollowBuoyPath(ActionServerBase):
         return (self.buoy_pairs_distance(p_ref, p_new) > self.buoy_pair_dist_thres and
                 (self.buoy_pairs_distance(p_ref, p_old) <= self.buoy_pair_dist_thres or
                  self.buoy_pairs_angle(p_ref, p_old) > self.buoy_pairs_angle(p_ref, p_new)))
-    
-    # def select_next_waypoint(self):
-    #     """
-    #     self.waypoints should not be empty
-    #     """
-    #     if len(self.waypoints) == 1:
-    #         return self.waypoints[0]
-    #     else:
-    #         wx, wy = self.waypoints[0]
-    #         rx, ry = self.robot_pos
-    #         if (rx - wx) ** 2 + (ry - wy) ** 2 <= self.thresh_dist:
-    #             self.get_logger().info(f"Close to current waypoint, passing {self.waypoints[1]}. Old waypoint {self.waypoints[0]}")
-    #             self.get_logger().info(f"distance: {(rx - wx) ** 2 + (ry - wy) ** 2}")
-    #             return self.waypoints[1]
-    #     return self.waypoints[0]
-        
 
     def generate_waypoints(self):
         """
@@ -516,6 +526,26 @@ class FollowBuoyPath(ActionServerBase):
                 self.waypoints = self.waypoints[1:]
                 self.time_last_seen_buoys = time.time()
                 self.pair_to = self.buoy_pairs[0]
+            elif len(self.buoy_pairs) == 1:
+                if time.time() - self.time_last_seen_buoys > 1:
+                    self.get_logger().debug("No next buoy pair to go to")
+                    buoy_pair = self.buoy_pairs[0]
+                    left_coords = self.ob_coords(buoy_pair.left)
+                    right_coords = self.ob_coords(buoy_pair.right)
+                    # get the perp forward direction
+                    forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
+                    midpt = self.midpoint_pair(buoy_pair)
+                    scale = self.thresh_dist
+                    wpt = (midpt[0] + scale * forward_dir[0], midpt[1] + scale * forward_dir[1])
+
+                    self.send_waypoint_to_server(wpt)
+                    
+            # buoy_pair = buoy_pairs[0]
+            # left_coords = self.ob_coords(buoy_pair.left)
+            # right_coords = self.ob_coords(buoy_pair.right)
+            # # get the perp forward direction
+            # forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
+
             else:
                 # below is equivalent to the previous case as we update the sequence before we go to the next buoy pair
                 # if self.next_pair(self.pair_to, red_buoys, green_buoys) != None:
@@ -560,12 +590,8 @@ class FollowBuoyPath(ActionServerBase):
             ) + (math.pi / 2),
         ), self.norm(self.ob_coords(pair.left), self.ob_coords(pair.right))/2 - self.safe_margin) for wpt, pair in zip(self.waypoints, self.buoy_pairs)]))
 
-
-
         if self.waypoints:
-            # waypoint = self.select_next_waypoint()
             waypoint = self.waypoints[0]
-            # self.get_logger().info(f"sending waypoint{waypoint}")
             self.get_logger().debug(
                 f"cur_waypoint: {waypoint}, sent_waypoints: {self.sent_waypoints}"
             )
@@ -578,35 +604,31 @@ class FollowBuoyPath(ActionServerBase):
             #     if math.dist(waypoint, sent_waypoint) < check_dist:
             #         passed_waypoint = True
             
-            # buoy_pair = buoy_pairs[0]
-            # left_coords = self.ob_coords(buoy_pair.left)
-            # right_coords = self.ob_coords(buoy_pair.right)
-            # # get the perp forward direction
-            # forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
             
 
 
             # if not passed_waypoint:
-
-            # removing check for passing prev waypoint
             if passed_previous or self.first_buoy_pair:
-                self.follow_path_client.wait_for_server()
-                goal_msg = FollowPath.Goal()
-                goal_msg.planner = self.get_parameter("planner").value
-                goal_msg.x = waypoint[0]
-                goal_msg.y = waypoint[1]
-                goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-                goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-                goal_msg.goal_tol = self.get_parameter("goal_tol").value
-                goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
-                goal_msg.choose_every = self.get_parameter("choose_every").value
-                goal_msg.is_stationary = True
-                self.follow_path_client.wait_for_server()
-                self.send_goal_future = self.follow_path_client.send_goal_async(
-                    goal_msg
-                )
+                self.send_waypoint_to_server(waypoint)
                 self.sent_waypoints.add(waypoint)
                 self.first_buoy_pair = False
+    
+    def send_waypoint_to_server(self, waypoint):
+        self.follow_path_client.wait_for_server()
+        goal_msg = FollowPath.Goal()
+        goal_msg.planner = self.get_parameter("planner").value
+        goal_msg.x = waypoint[0]
+        goal_msg.y = waypoint[1]
+        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
+        goal_msg.goal_tol = self.get_parameter("goal_tol").value
+        goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
+        goal_msg.choose_every = self.get_parameter("choose_every").value
+        goal_msg.is_stationary = True
+        self.follow_path_client.wait_for_server()
+        self.send_goal_future = self.follow_path_client.send_goal_async(
+            goal_msg
+        )
 
     def map_cb(self, msg):
         """

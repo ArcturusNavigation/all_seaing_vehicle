@@ -140,6 +140,15 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ]
+    )
+
     point_cloud_filter_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -361,6 +370,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
+        # yolov8_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         # object_tracking_map_node,
