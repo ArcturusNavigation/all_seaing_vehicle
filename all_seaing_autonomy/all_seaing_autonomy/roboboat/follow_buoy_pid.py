@@ -86,9 +86,12 @@ class FollowBuoyPID(ActionServerBase):
 
         self.green_labels = set()
         self.red_labels = set()
+        self.yellow_labels = set()
 
         self.result = False
         self.seen_first_buoy = False
+
+        self.scale_right = 1.3
 
         
         if self.is_sim:
@@ -107,6 +110,7 @@ class FollowBuoyPID(ActionServerBase):
             # hardcoded from reading YAML
             self.green_labels.add(label_mappings["green"])
             self.red_labels.add(label_mappings["red"])
+            self.yellow_labels.add(label_mappings["yellow"])
         else:
             self.declare_parameter(
                 "buoy_label_mappings_file",
@@ -144,6 +148,9 @@ class FollowBuoyPID(ActionServerBase):
         green_center_x = None
         green_area = 0
 
+        yellow_center_x = None
+        yellow_area = 0
+
         # handle balancing box sizes later ?
         # ex. same size but offset should be y shift
         # but diff size should be a rotation and probably 
@@ -158,6 +165,9 @@ class FollowBuoyPID(ActionServerBase):
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
                 red_center_x = midpt
+            elif box.label in self.yellow_labels and area > yellow_area:
+                yellow_area = area
+                yellow_center_x = midpt
                 
         # if we only see one of red / green, rotate
         # if we see neither, log + kill
@@ -185,12 +195,28 @@ class FollowBuoyPID(ActionServerBase):
 
         gate_ctr = (left_x + right_x) / 2.0
 
+        if yellow_area > green_area*0.8 or yellow_area < green_area*2:
+            if yellow_center_x > left_x and yellow_center_x < right_x:
+                if gate_ctr > yellow_center_x:
+                    ctr = (right_x + yellow_center_x) / 2.0
+                    offset = ctr - self.width / 2.0
+                elif gate_ctr <= yellow_center_x:
+                    ctr = (left_x + yellow_center_x) / 2.0
+                    offset = ctr - self.width / 2.0
+            else:
+                 # self.width / 2.0 is img ctr
+                offset = gate_ctr - self.width / 2.0
+        else:
+            offset = gate_ctr - self.width / 2.0
+
         # self.width / 2.0 is img ctr
-        offset = gate_ctr - self.width / 2.0
+        # offset = gate_ctr - self.width / 2.0
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
         yaw_rate = self.pid.get_effort()
+        if yaw_rate < 0.0: # 3/6: if turning rihgt, make turn larger
+            yaw_rate = max(yaw_rate * self.scale_right, -self.max_yaw_rate)
         self.prev_update_time = self.get_clock().now()
 
         control_msg = ControlOption()
