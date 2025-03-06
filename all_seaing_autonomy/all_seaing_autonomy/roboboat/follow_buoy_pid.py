@@ -203,29 +203,29 @@ class FollowBuoyPID(ActionServerBase):
         left_ctr_thresh = img_ctr * 0.40
         right_ctr_thresh = img_ctr * 0.60
 
-        # yellow buoy exists
-        if yellow_left is not None:
-            # if yellow_left <= right_ctr_thresh and yellow_right >= right_ctr_thresh:
+        # # yellow buoy exists
+        # if yellow_left is not None:
+        #     # if yellow_left <= right_ctr_thresh and yellow_right >= right_ctr_thresh:
 
-            if yellow_left <= img_ctr and yellow_right >= img_ctr:
-                # yellow buoy is in the middle (on both sides of camera)
-                left_diff = img_ctr - yellow_left
-                right_diff = yellow_right - img_ctr
-                if left_diff < right_diff:
-                    # yellow buoy is on the right side
-                    # want to turn left
-                    # goal is to get yellow_left to align with right_ctr_thresh 
-                    # should overshoot a bit ?
-                    # bc this would stop running once its past the center. 
-                    self.get_logger().info("yellow buoy on the right side. turning left. ")
-                    offset = yellow_left - right_ctr_thresh
+        #     if yellow_left <= img_ctr and yellow_right >= img_ctr:
+        #         # yellow buoy is in the middle (on both sides of camera)
+        #         left_diff = img_ctr - yellow_left
+        #         right_diff = yellow_right - img_ctr
+        #         if left_diff < right_diff:
+        #             # yellow buoy is on the right side
+        #             # want to turn left
+        #             # goal is to get yellow_left to align with right_ctr_thresh 
+        #             # should overshoot a bit ?
+        #             # bc this would stop running once its past the center. 
+        #             self.get_logger().info("yellow buoy on the right side. turning left. ")
+        #             offset = yellow_left - right_ctr_thresh
 
-                else:
-                    self.get_logger().info("yellow buoy is on the left side. turning right.")
-                    offset = yellow_right - left_ctr_thresh
-                    # yellow buoy is on the left side
-                    # want to turn right
-                    # goal is to get yellow_right to align with left_ctr_thresh
+        #         else:
+        #             self.get_logger().info("yellow buoy is on the left side. turning right.")
+        #             offset = yellow_right - left_ctr_thresh
+        #             # yellow buoy is on the left side
+        #             # want to turn right
+        #             # goal is to get yellow_right to align with left_ctr_thresh
 
 
         #     if yellow_left > img_ctr and yellow_right > img_ctr:
@@ -245,12 +245,12 @@ class FollowBuoyPID(ActionServerBase):
                 # else:
                 #     # self.width / 2.0 is img ctr
                 #     offset = gate_ctr - self.width / 2.0
-        else:
-            self.get_logger().info("sending center")
-            offset = gate_ctr - self.width / 2.0
+        # else:
+        #     self.get_logger().info("sending center")
+        #     offset = gate_ctr - self.width / 2.0
 
         # self.width / 2.0 is img ctr
-        # offset = gate_ctr - self.width / 2.0
+        offset = gate_ctr - self.width / 2.0
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
