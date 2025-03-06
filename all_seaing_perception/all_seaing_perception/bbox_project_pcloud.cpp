@@ -162,14 +162,6 @@ void BBoxProjectPCloud::bb_pcl_project(
     // int max_len = 0;
     // Just use the same pcloud to image projection, but check if it's within some binding box and assign it to that detection
     int obj = 0;
-    for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
-        // Project 3D point onto the image plane using the intrinsic matrix.
-        // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-        RCLCPP_DEBUG(this->get_logger(), "3D POINT: (%lf, %lf, %lf)", point_tf.x, point_tf.y, point_tf.z);
-        cv::Point2d xy_rect = m_is_sim? m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
-        // Check if within bounds & in front of the boat
-        RCLCPP_DEBUG(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
-    }
     // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
     cv_bridge::CvImagePtr cv_ptr;
     try {
