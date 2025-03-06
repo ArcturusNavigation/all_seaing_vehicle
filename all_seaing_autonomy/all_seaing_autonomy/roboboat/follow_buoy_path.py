@@ -84,42 +84,25 @@ class FollowBuoyPath(ActionServerBase):
         self.green_labels = set()
         self.red_labels = set()
 
-        if self.is_sim:
-            # TODO: change the param to be the same between is_sim and not
-            # too sleepy, dont want to break things.
-            self.declare_parameter(
-                "color_label_mappings_file", 
-                os.path.join(
-                    bringup_prefix, "config", "perception", "color_label_mappings.yaml"
-                ),
-            )
+        # TODO: change the param to be the same between is_sim and not
+        # too sleepy, dont want to break things.
+        self.declare_parameter(
+            "color_label_mappings_file", 
+            os.path.join(
+                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+            ),
+        )
 
-            color_label_mappings_file = self.get_parameter(
-                "color_label_mappings_file"
-            ).value
-            with open(color_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
-            # hardcoded from reading YAML
-            self.green_labels.add(label_mappings["green"])
-            self.red_labels.add(label_mappings["red"])
-        else:
-            self.declare_parameter(
-                "buoy_label_mappings_file",
-                os.path.join(
-                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
-                ),
-            )
+        color_label_mappings_file = self.get_parameter(
+            "color_label_mappings_file"
+        ).value
+        with open(color_label_mappings_file, "r") as f:
+            label_mappings = yaml.safe_load(f)
+        # hardcoded from reading YAML
+        self.green_labels.add(label_mappings["green"])
+        self.red_labels.add(label_mappings["red"])
 
-            buoy_label_mappings_file = self.get_parameter(
-                "buoy_label_mappings_file"
-            ).value
-            with open(buoy_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
-            for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
-                self.green_labels.add(label_mappings[buoy_label])
-            for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
-                self.red_labels.add(label_mappings[buoy_label])
-
+        
         self.sent_waypoints = set()
 
         self.red_left = True
