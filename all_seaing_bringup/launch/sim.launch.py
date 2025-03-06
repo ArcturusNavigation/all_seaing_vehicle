@@ -30,6 +30,9 @@ def launch_setup(context, *args, **kwargs):
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
+    color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
+    )
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
@@ -188,7 +191,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"bbox_object_margin": 0.0},
-            {"color_label_mappings_file": color_label_mappings},
+            {"color_label_mappings_file": color_buoy_label_mappings},
             {"color_ranges_file": color_ranges},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
@@ -373,7 +376,7 @@ def launch_setup(context, *args, **kwargs):
         # yolov8_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
-        # object_tracking_map_node,
+        object_tracking_map_node,
         object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,
