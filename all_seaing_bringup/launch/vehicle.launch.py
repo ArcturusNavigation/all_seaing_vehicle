@@ -110,6 +110,18 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": color_label_mappings},
+            {"forward_speed": 1.8},
+            {"max_yaw": 0.2},
+            {"pid_vals": [0.0006, 0.0, 0.0]},
+        ],
+    )
+
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="control_mux.py",
@@ -373,7 +385,8 @@ def launch_setup(context, *args, **kwargs):
         shape_yolo_node,
         run_tasks,
         task_init_server, 
-        follow_buoy_path,
+        # follow_buoy_path,
+        follow_buoy_pid,
         grid_map_generator,
         central_hub,
         amcl_ld,
