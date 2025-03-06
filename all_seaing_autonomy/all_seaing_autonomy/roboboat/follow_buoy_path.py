@@ -84,8 +84,6 @@ class FollowBuoyPath(ActionServerBase):
         self.green_labels = set()
         self.red_labels = set()
 
-        # TODO: change the param to be the same between is_sim and not
-        # too sleepy, dont want to break things.
         self.declare_parameter(
             "color_label_mappings_file", 
             os.path.join(
@@ -101,7 +99,6 @@ class FollowBuoyPath(ActionServerBase):
         # hardcoded from reading YAML
         self.green_labels.add(label_mappings["green"])
         self.red_labels.add(label_mappings["red"])
-
         
         self.sent_waypoints = set()
 
