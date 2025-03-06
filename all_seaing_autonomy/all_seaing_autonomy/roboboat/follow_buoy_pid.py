@@ -81,9 +81,12 @@ class FollowBuoyPID(ActionServerBase):
 
         self.green_labels = set()
         self.red_labels = set()
+        self.yellow_labels = set()
 
         self.result = False
         self.seen_first_buoy = False
+
+        self.scale_right = 1.3
 
         
         self.declare_parameter(
@@ -139,6 +142,11 @@ class FollowBuoyPID(ActionServerBase):
         green_center_x = None
         green_area = 0
 
+        # yellow_center_x = None
+        yellow_area = 0
+        yellow_left = None
+        yellow_right = None
+
         # handle balancing box sizes later ?
         # ex. same size but offset should be y shift
         # but diff size should be a rotation and probably 
@@ -153,6 +161,10 @@ class FollowBuoyPID(ActionServerBase):
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
                 red_center_x = midpt
+            elif box.label in self.yellow_labels and area > yellow_area:
+                yellow_area = area
+                yellow_left = box.min_x
+                yellow_right = box.max_x
                 
         # if we only see one of red / green, rotate
         # if we see neither, log + kill
@@ -162,8 +174,9 @@ class FollowBuoyPID(ActionServerBase):
         #         self.result = True
         #     return
 
-        
+        nothing_flag = False
         if red_center_x is None and green_center_x is None:
+            nothing_flag = True
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
                 self.get_logger().info("no more buoys killing")
                 self.result = True
@@ -175,10 +188,63 @@ class FollowBuoyPID(ActionServerBase):
         left_x = red_center_x
         right_x = green_center_x
 
-        if left_x is None: left_x = 0
-        if right_x is None: right_x = self.width - 1
+        if left_x is None: 
+            left_x = 0
+        if right_x is None: 
+            right_x = self.width - 1
 
         gate_ctr = (left_x + right_x) / 2.0
+        img_ctr = self.width / 2.0
+        left_ctr_thresh = img_ctr * 0.40
+        right_ctr_thresh = img_ctr * 0.60
+
+        # # yellow buoy exists
+        # if yellow_left is not None:
+        #     # if yellow_left <= right_ctr_thresh and yellow_right >= right_ctr_thresh:
+
+        #     if yellow_left <= img_ctr and yellow_right >= img_ctr:
+        #         # yellow buoy is in the middle (on both sides of camera)
+        #         left_diff = img_ctr - yellow_left
+        #         right_diff = yellow_right - img_ctr
+        #         if left_diff < right_diff:
+        #             # yellow buoy is on the right side
+        #             # want to turn left
+        #             # goal is to get yellow_left to align with right_ctr_thresh 
+        #             # should overshoot a bit ?
+        #             # bc this would stop running once its past the center. 
+        #             self.get_logger().info("yellow buoy on the right side. turning left. ")
+        #             offset = yellow_left - right_ctr_thresh
+
+        #         else:
+        #             self.get_logger().info("yellow buoy is on the left side. turning right.")
+        #             offset = yellow_right - left_ctr_thresh
+        #             # yellow buoy is on the left side
+        #             # want to turn right
+        #             # goal is to get yellow_right to align with left_ctr_thresh
+
+
+        #     if yellow_left > img_ctr and yellow_right > img_ctr:
+        #         # both vals are on the right of center
+
+        #     elif yellow_left <= img_ctr and yellow_right <= img_ctr:
+        #         # both vals are on the left of center
+        # if yellow_center_x is not None:
+        #     if yellow_area > green_area*0.8 or yellow_area < green_area*2:
+        #         if yellow_center_x > left_x and yellow_center_x < right_x:
+        #             if gate_ctr > yellow_center_x:
+        #                 ctr = (right_x + yellow_center_x) / 2.0
+        #                 offset = ctr - self.width / 2.0
+        #             elif gate_ctr <= yellow_center_x:
+        #                 ctr = (left_x + yellow_center_x) / 2.0
+        #                 offset = ctr - self.width / 2.0
+                # else:
+                #     # self.width / 2.0 is img ctr
+                #     offset = gate_ctr - self.width / 2.0
+
+
+        # else:
+        #     self.get_logger().info("sending center")
+        #     offset = gate_ctr - self.width / 2.0
 
         # self.width / 2.0 is img ctr
         offset = gate_ctr - self.width / 2.0
@@ -186,6 +252,10 @@ class FollowBuoyPID(ActionServerBase):
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
         yaw_rate = self.pid.get_effort()
+        if yaw_rate < 0.0: # 3/6: if turning rihgt, make turn larger
+            yaw_rate = max(yaw_rate * self.scale_right, -self.max_yaw_rate)
+        if nothing_flag:
+            yaw_rate = 0.0
         self.prev_update_time = self.get_clock().now()
 
         control_msg = ControlOption()
