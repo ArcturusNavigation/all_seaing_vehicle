@@ -33,22 +33,22 @@ class FollowBuoyPID(ActionServerBase):
         )
 
         self.bbox_sub = self.create_subscription(
-            LabeledBoundingBox2DArray, 
-            "bounding_boxes", 
-            self.bbox_callback, 
+            LabeledBoundingBox2DArray,
+            "bounding_boxes",
+            self.bbox_callback,
             10
         )
 
         self.intrinsics_sub = self.create_subscription(
-            CameraInfo, 
+            CameraInfo,
             "camera_info",
             self.intrinsics_callback,
             10
         )
 
         self.control_pub = self.create_publisher(
-            ControlOption, 
-            "control_options", 
+            ControlOption,
+            "control_options",
             10
         )
 
@@ -74,7 +74,7 @@ class FollowBuoyPID(ActionServerBase):
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
-        
+
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         # update from subs
@@ -86,14 +86,15 @@ class FollowBuoyPID(ActionServerBase):
 
         self.green_labels = set()
         self.red_labels = set()
+        self.yellow_labels = set()
 
         self.result = False
         self.seen_first_buoy = False
 
-        
+
         if self.is_sim:
             self.declare_parameter(
-                "color_label_mappings_file", 
+                "color_label_mappings_file",
                 os.path.join(
                     bringup_prefix, "config", "perception", "color_label_mappings.yaml"
                 ),
@@ -107,6 +108,7 @@ class FollowBuoyPID(ActionServerBase):
             # hardcoded from reading YAML
             self.green_labels.add(label_mappings["green"])
             self.red_labels.add(label_mappings["red"])
+            self.yellow_labels.add(label_mappings["yellow"])
         else:
             self.declare_parameter(
                 "buoy_label_mappings_file",
@@ -124,6 +126,8 @@ class FollowBuoyPID(ActionServerBase):
                 self.green_labels.add(label_mappings[buoy_label])
             for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
                 self.red_labels.add(label_mappings[buoy_label])
+            for buoy_label in ["yellow_buoy"]:
+                self.yellow_labels.add(label_mappings[buoy_label])
 
 
     def intrinsics_callback(self, msg):
@@ -136,7 +140,7 @@ class FollowBuoyPID(ActionServerBase):
     def control_loop(self):
         if self.width is None or len(self.bboxes) == 0:
             return
-        
+
 
         red_center_x = None
         red_area = 0
@@ -144,21 +148,29 @@ class FollowBuoyPID(ActionServerBase):
         green_center_x = None
         green_area = 0
 
+        yellow_center_x = None
+        yellow_area = 0
+
         # handle balancing box sizes later ?
         # ex. same size but offset should be y shift
-        # but diff size should be a rotation and probably 
+        # but diff size should be a rotation and probably
         # a bit of a y shift too?
 
         for box in self.bboxes:
             area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
             midpt = (box.max_x + box.min_x) / 2.0
+            # finds the box with the greatest area and its midpoint
             if box.label in self.green_labels and area > green_area:
                 green_area = area
                 green_center_x = midpt
+            # same for red
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
                 red_center_x = midpt
-                
+            elif box.label in self.yellow_labels and area > yellow_area:
+                yellow_area = area
+                yellow_center_x = midpt
+
         # if we only see one of red / green, rotate
         # if we see neither, log + kill
         # if red_center_x is None or green_center_x is None:
@@ -167,7 +179,7 @@ class FollowBuoyPID(ActionServerBase):
         #         self.result = True
         #     return
 
-        
+        # keeps track of time since last buoy seen and kills if no more
         if red_center_x is None and green_center_x is None:
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
                 self.get_logger().info("no more buoys killing")
@@ -180,16 +192,32 @@ class FollowBuoyPID(ActionServerBase):
         left_x = red_center_x
         right_x = green_center_x
 
+        # sets to just drive forward? bc midpoint is center of the screen
         if left_x is None: left_x = 0
         if right_x is None: right_x = self.width - 1
 
         gate_ctr = (left_x + right_x) / 2.0
 
+        if yellow_area > green_area*0.8 or yellow_area < green_area*2:
+            if yellow_center_x > left_x and yellow_center_x < right_x:
+                if gate_ctr > yellow_center_x:
+                    ctr = (right_x + yellow_center_x) / 2.0
+                    offset = ctr - self.width / 2.0
+                elif gate_ctr <= yellow_center_x:
+                    ctr = (left_x + yellow_center_x) / 2.0
+                    offset = ctr - self.width / 2.0
+            else:
+                 # self.width / 2.0 is img ctr
+                offset = gate_ctr - self.width / 2.0
+        else:
+            offset = gate_ctr - self.width / 2.0
+
+
         # self.width / 2.0 is img ctr
-        offset = gate_ctr - self.width / 2.0
+        # offset = gate_ctr - self.width / 2.0
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.pid.update(offset, dt)            
+        self.pid.update(offset, dt)
         yaw_rate = self.pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 
@@ -218,7 +246,7 @@ class FollowBuoyPID(ActionServerBase):
 
             self.control_loop()
             time.sleep(self.timer_period)
-        
+
         self.end_process("follow buoy pid completed!")
         goal_handle.succeed()
         return Task.Result(success=True)
@@ -237,5 +265,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-
-    
