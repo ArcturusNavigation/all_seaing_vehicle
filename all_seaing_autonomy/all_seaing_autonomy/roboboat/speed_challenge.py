@@ -247,6 +247,50 @@ class SpeedChange(ActionServerBase):
         '''
         self.image_size = (msg.width, msg.height)
 
+    def probe_blue_buoy(self):
+        '''
+        Function to find the blue buoy by moving near it (general direction).
+        Keeps on appending waypoints to the north/south until it finds 
+        '''
+        max_guide_d = 30
+        guide_point = (max_guide_d*self.buoy_direction[0], max_guide_d*self.buoy_direction[1])
+        self.cond_move_to_point(guide_point, self.blue_buoy_detected)
+        return self.circle_blue_buoy()
+
+    def circle_blue_buoy(self):
+        '''
+        Function to circle the blue buoy.
+        '''
+        if not self.blue_buoy_detected():
+            self.get_logger().info("task 4 blue buoy probing exited without finding blue buoy")
+            return Task(success=False)
+        
+        #circle the blue buoy like a baseball diamond
+        # a better way to do this might be to have the astar run to original cell, 
+        # but require the path to go around buoy
+
+        t_o = self.turn_offset
+        first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
+        second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
+        third_dir = (-first_dir[0]*t_o, -first_dir[1]*t_o)
+        
+        first_base = self.add_tuple(self.blue_buoy_pos, first_dir)
+        second_base = self.add_tuple(self.blue_buoy_pos, second_dir)
+        third_base = self.add_tuple(self.blue_buoy_pos, third_dir)
+        
+        self.move_to_point(first_base)
+        self.move_to_point(second_base)
+        self.move_to_point(third_base)
+
+        return self.return_to_start()
+    
+    def return_to_start(self):
+        '''
+        After circling the buoy, return to the starting position.
+        '''
+        self.move_to_point(self.home_pos)
+        return Task(success=True)
+
     # robust realtime visual signal processing
     def led_changed(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
         '''
