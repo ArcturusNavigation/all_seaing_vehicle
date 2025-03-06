@@ -314,9 +314,25 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
+            ),
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
+        # parameters=[{"is_sim": True}],
     )
 
     task_init_server = launch_ros.actions.Node(
@@ -385,7 +401,8 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         run_tasks,
         task_init_server,
-        follow_buoy_path,
+        # follow_buoy_path,
+        follow_buoy_pid,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,

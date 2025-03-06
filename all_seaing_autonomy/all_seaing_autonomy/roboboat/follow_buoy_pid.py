@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.action import ActionClient, ActionServer
+from rclpy.executors import MultiThreadedExecutor
+
+
+from all_seaing_interfaces.msg import ObstacleMap, Obstacle
+from all_seaing_interfaces.action import FollowPath, Task
+from all_seaing_controller.pid_controller import PIDController
+from ament_index_python.packages import get_package_share_directory
+from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Header, ColorRGBA
+from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption
+from all_seaing_common.action_server_base import ActionServerBase
+from sensor_msgs.msg import CameraInfo
+
+import math
+import os
+import yaml
+import time
+
+class FollowBuoyPID(ActionServerBase):
+    def __init__(self):
+        super().__init__("follow_path_pid_server")
+
+        self._action_server = ActionServer(
+            self,
+            Task,
+            "follow_buoy_pid",
+            execute_callback=self.execute_callback,
+            cancel_callback=self.default_cancel_callback,
+        )
+
+        self.bbox_sub = self.create_subscription(
+            LabeledBoundingBox2DArray, 
+            "bounding_boxes", 
+            self.bbox_callback, 
+            10
+        )
+
+        self.intrinsics_sub = self.create_subscription(
+            CameraInfo, 
+            "camera_info",
+            self.intrinsics_callback,
+            10
+        )
+
+        self.control_pub = self.create_publisher(
+            ControlOption, 
+            "control_options", 
+            10
+        )
+
+
+        pid_vals = (
+            self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+
+
+        self.declare_parameter("forward_speed", 5.0)
+        self.declare_parameter("max_yaw", 1.0)
+        self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
+        self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
+
+        self.pid = PIDController(*pid_vals)
+        self.pid.set_effort_min(-self.max_yaw_rate)
+        self.pid.set_effort_max(self.max_yaw_rate)
+        self.prev_update_time = self.get_clock().now()
+        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
+
+
+        bringup_prefix = get_package_share_directory("all_seaing_bringup")
+        self.declare_parameter("is_sim", False)
+        
+        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+
+        # update from subs
+        self.height = None
+        self.width = None
+        self.bboxes = []
+
+        self.timer_period = 1 / 30.0
+
+        self.green_labels = set()
+        self.red_labels = set()
+
+        self.result = False
+        self.seen_first_buoy = False
+
+        
+        if self.is_sim:
+            self.declare_parameter(
+                "color_label_mappings_file", 
+                os.path.join(
+                    bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+                ),
+            )
+
+            color_label_mappings_file = self.get_parameter(
+                "color_label_mappings_file"
+            ).value
+            with open(color_label_mappings_file, "r") as f:
+                label_mappings = yaml.safe_load(f)
+            # hardcoded from reading YAML
+            self.green_labels.add(label_mappings["green"])
+            self.red_labels.add(label_mappings["red"])
+        else:
+            self.declare_parameter(
+                "buoy_label_mappings_file",
+                os.path.join(
+                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+                ),
+            )
+
+            buoy_label_mappings_file = self.get_parameter(
+                "buoy_label_mappings_file"
+            ).value
+            with open(buoy_label_mappings_file, "r") as f:
+                label_mappings = yaml.safe_load(f)
+            for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
+                self.green_labels.add(label_mappings[buoy_label])
+            for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
+                self.red_labels.add(label_mappings[buoy_label])
+
+
+    def intrinsics_callback(self, msg):
+        self.height = msg.height
+        self.width = msg.width
+
+    def bbox_callback(self, msg):
+        self.bboxes = msg.boxes
+
+    def control_loop(self):
+        if self.width is None or len(self.bboxes) == 0:
+            return
+        
+
+        red_center_x = None
+        red_area = 0
+
+        green_center_x = None
+        green_area = 0
+
+        # handle balancing box sizes later ?
+        # ex. same size but offset should be y shift
+        # but diff size should be a rotation and probably 
+        # a bit of a y shift too?
+
+        for box in self.bboxes:
+            area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
+            midpt = (box.max_x + box.min_x) / 2.0
+            if box.label in self.green_labels and area > green_area:
+                green_area = area
+                green_center_x = midpt
+            elif box.label in self.red_labels and area > red_area:
+                red_area = area
+                red_center_x = midpt
+                
+        # if we only see one of red / green, rotate
+        # if we see neither, log + kill
+        # if red_center_x is None or green_center_x is None:
+        #     if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
+        #         self.get_logger().info("no more buoys killing")
+        #         self.result = True
+        #     return
+
+        
+        if red_center_x is None and green_center_x is None:
+            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
+                self.get_logger().info("no more buoys killing")
+                self.result = True
+            return
+        else:
+            self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
+
+        # can update, not impt rn
+        left_x = red_center_x
+        right_x = green_center_x
+
+        if left_x is None: left_x = 0
+        if right_x is None: right_x = self.width - 1
+
+        gate_ctr = (left_x + right_x) / 2.0
+
+        # self.width / 2.0 is img ctr
+        offset = gate_ctr - self.width / 2.0
+
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        self.pid.update(offset, dt)            
+        yaw_rate = self.pid.get_effort()
+        self.prev_update_time = self.get_clock().now()
+
+        control_msg = ControlOption()
+        control_msg.priority = 1
+        control_msg.twist.linear.x = float(self.forward_speed)
+        control_msg.twist.linear.y = 0.0
+        control_msg.twist.angular.z = float(yaw_rate)
+        self.control_pub.publish(control_msg)
+
+    def execute_callback(self, goal_handle):
+        self.start_process("follow buoy pid starting")
+        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
+
+        while not self.result:
+
+            if self.should_abort():
+                self.end_process("aborting follow buoy pid")
+                goal_handle.abort()
+                return Task.Result()
+
+            if goal_handle.is_cancel_requested:
+                self.end_process("cancelling follow buoy pid")
+                goal_handle.canceled()
+                return Task.Result()
+
+            self.control_loop()
+            time.sleep(self.timer_period)
+        
+        self.end_process("follow buoy pid completed!")
+        goal_handle.succeed()
+        return Task.Result(success=True)
+
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = FollowBuoyPID()
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
+    executor.spin()
+    node.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
+
+    
