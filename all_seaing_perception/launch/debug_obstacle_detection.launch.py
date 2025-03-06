@@ -136,11 +136,6 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="bbox_project_pcloud",
         output="screen",
-        # arguments=[
-        #     "--ros-args",
-        #     "--log-level",
-        #     "bbox_project_pcloud:=debug",
-        # ],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
