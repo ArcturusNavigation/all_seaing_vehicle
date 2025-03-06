@@ -36,8 +36,8 @@ def main(args=None):
         rclpy.spin(webcam_publisher)
     except KeyboardInterrupt:
         webcam_publisher.close()
-        webcam_publisher.destroy_node()
     finally:
+        webcam_publisher.destroy_node()
         rclpy.shutdown()
 
 

@@ -50,6 +50,11 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="onshore_lora_controller.py",
         output="screen",
+        parameters=[
+            {"y": 1.0},
+            {"x": 0.8},
+            {"angular": 0.3},
+        ],
         condition=IfCondition(PythonExpression(["'", comms, "' == 'lora'"])),
     )
 
