@@ -380,48 +380,25 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
-    return [
-        ekf_node,
-        navsat_node,
-        controller_node,
-        controller_server,
-        obstacle_bbox_overlay_node,
-        obstacle_bbox_visualizer_node,
-        obstacle_detector_node,
-        color_segmentation_node,
-        # yolov8_node,
-        point_cloud_filter_node,
-        bbox_project_pcloud_node,
-        object_tracking_map_node,
-        object_tracking_map_euclidean_node,
-        rviz_node,
-        control_mux,
-        navigation_server,
-        grid_map_generator,
-        onshore_node,
-        run_tasks,
-        task_init_server,
-        # follow_buoy_path,
-        follow_buoy_pid,
-        rviz_waypoint_sender,
-        map_to_odom,
-        keyboard_ld,
-        sim_ld,
-        perception_eval_node,
-    ]
-
-def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument(
-                "launch_rviz", default_value="true", choices=["true", "false"]
-            ),
-            DeclareLaunchArgument(
-                "no_gui", default_value="false", choices=["true", "false"]
-            ),
-            DeclareLaunchArgument(
-                "use_waypoint_client", default_value="false", choices=["true", "false"]
-            ),
-            OpaqueFunction(function=launch_setup),
+            launch_rviz_launch_arg,
+            ekf_node,
+            navsat_node,
+            controller_node,
+            obstacle_bbox_overlay_node,
+            obstacle_bbox_visualizer_node,
+            color_segmentation_node,
+            point_cloud_filter_node,
+            obstacle_detector_node,
+            rviz_node,
+            control_mux,
+            controller_server,
+            onshore_node,
+            waypoint_finder,
+            rviz_waypoint_sender,
+            keyboard_ld,
+            sim_ld,
+            perception_eval_node,
         ]
     )
