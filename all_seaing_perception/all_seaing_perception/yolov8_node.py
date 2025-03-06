@@ -136,7 +136,7 @@ class Yolov8Node(Node):
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
                     self.get_logger().debug(f"Detected: {class_name} Msg Label is {box_msg.label}")
                 else: 
-                    box_msg.label = -1 # for misc things
+                    box_msg.label = -1
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
                     self.get_logger().debug(f"Detected: {class_name} Item not in label_dict")
 

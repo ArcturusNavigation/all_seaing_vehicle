@@ -225,9 +225,9 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node,
         # object_tracking_map_node,
         object_tracking_map_euclidean_node,
-        obstacle_detector_node,
+        # obstacle_detector_node,
         # color_segmentation_node,
-        obstacle_bbox_overlay_node
+        # obstacle_bbox_overlay_node
     ]
 
 def generate_launch_description():
