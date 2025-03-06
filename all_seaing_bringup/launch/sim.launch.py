@@ -143,19 +143,13 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    buoy_yolo_node = launch_ros.actions.Node(
+    yolov8_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
-        parameters=[
-            {"model": "roboboat_2025"},
-            {"conf": 0.6},
-            {"label_config": "buoy_label_mappings"},
-        ],
-        remappings=[
-            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
-            ("annotated_image", "annotated_image/buoy"),
-        ],
         output="screen",
+        remappings=[
+            ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ]
     )
 
     point_cloud_filter_node = launch_ros.actions.Node(
@@ -320,9 +314,25 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
+            ),
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
+        # parameters=[{"is_sim": True}],
     )
 
     task_init_server = launch_ros.actions.Node(
@@ -378,8 +388,8 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
-        buoy_yolo_node,
         color_segmentation_node,
+        # yolov8_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
@@ -391,7 +401,8 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         run_tasks,
         task_init_server,
-        follow_buoy_path,
+        # follow_buoy_path,
+        follow_buoy_pid,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,

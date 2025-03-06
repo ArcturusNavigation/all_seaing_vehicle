@@ -49,4 +49,4 @@ bag/
 \#*\#
 
 # Vim related
-*\.swp
+.swp

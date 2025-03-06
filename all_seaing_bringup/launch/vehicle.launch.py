@@ -110,6 +110,18 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": color_label_mappings},
+            {"forward_speed": 1.8},
+            {"max_yaw": 0.2},
+            {"pid_vals": [0.0006, 0.0, 0.0]},
+        ],
+    )
+
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="control_mux.py",
@@ -135,7 +147,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            {"range_radius": [0.5, 100000.0]},
+            {"range_radius": [0.5, 60.0]},
         ],
         condition=UnlessCondition(use_bag),
     )
@@ -207,9 +219,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
         parameters=[
-            {"joy_x_scale": -1.0},
-            {"joy_ang_scale": 0.3},
-            {"serial_port": "/dev/ttyACM0"},
+            {"joy_x_scale": -1.8},
+            {"joy_ang_scale": 0.2},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -222,7 +233,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 0},
+            {"video_index": 1},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -245,7 +256,7 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_2025"},
-            {"label_config": "buoy_label_mappings"},
+            {"label_config": "color_label_mappings"},
             {"conf": 0.6},
         ],
         remappings=[
@@ -374,7 +385,8 @@ def launch_setup(context, *args, **kwargs):
         shape_yolo_node,
         run_tasks,
         task_init_server, 
-        follow_buoy_path,
+        # follow_buoy_path,
+        follow_buoy_pid,
         grid_map_generator,
         central_hub,
         amcl_ld,

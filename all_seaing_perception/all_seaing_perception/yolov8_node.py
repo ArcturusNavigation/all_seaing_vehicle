@@ -37,7 +37,7 @@ class Yolov8Node(Node):
         self.conf = self.declare_parameter(
             "conf", 0.6).get_parameter_value().double_value
         label_config = self.declare_parameter(
-            "label_config", "buoy_label_mappings").get_parameter_value().string_value
+            "label_config", "color_label_mappings").get_parameter_value().string_value
 
         if self.device == "default":
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -108,7 +108,7 @@ class Yolov8Node(Node):
                 box_msg.min_y = int(center_y - height / 2)
                 box_msg.max_y = int(center_y + height / 2)
                 label_name = self.model.names[int(box_data.cls)]
-                box_msg.label = int(box_data.cls)
+                # box_msg.label = int(box_data.cls)
                 labeled_bounding_box_msgs.boxes.append(box_msg)
 
                 class_name = f"{label_name}_{str(int(box_data.cls))}"
@@ -131,10 +131,12 @@ class Yolov8Node(Node):
                 else: 
                     color = (128,128,128)
 
-                if label_name in self.label_dict:
+                if color_name in self.label_dict:
+                    box_msg.label = self.label_dict[color_name]
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
                     self.get_logger().debug(f"Detected: {class_name} Msg Label is {box_msg.label}")
                 else: 
+                    box_msg.label = -1
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
                     self.get_logger().debug(f"Detected: {class_name} Item not in label_dict")
 
