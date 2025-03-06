@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.action import ActionClient, ActionServer
+from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
 
 
-from all_seaing_interfaces.msg import ObstacleMap, Obstacle
-from all_seaing_interfaces.action import FollowPath, Task
+from all_seaing_interfaces.action import Task
 from all_seaing_controller.pid_controller import PIDController
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
-from nav_msgs.msg import Odometry
-from std_msgs.msg import Header, ColorRGBA
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption
 from all_seaing_common.action_server_base import ActionServerBase
 from sensor_msgs.msg import CameraInfo
 
-import math
 import os
 import yaml
 import time
@@ -91,39 +86,39 @@ class FollowBuoyPID(ActionServerBase):
         self.seen_first_buoy = False
 
         
-        if self.is_sim:
-            self.declare_parameter(
-                "color_label_mappings_file", 
-                os.path.join(
-                    bringup_prefix, "config", "perception", "color_label_mappings.yaml"
-                ),
-            )
+        self.declare_parameter(
+            "color_label_mappings_file", 
+            os.path.join(
+                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+            ),
+        )
 
-            color_label_mappings_file = self.get_parameter(
-                "color_label_mappings_file"
-            ).value
-            with open(color_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
-            # hardcoded from reading YAML
-            self.green_labels.add(label_mappings["green"])
-            self.red_labels.add(label_mappings["red"])
-        else:
-            self.declare_parameter(
-                "buoy_label_mappings_file",
-                os.path.join(
-                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
-                ),
-            )
+        color_label_mappings_file = self.get_parameter(
+            "color_label_mappings_file"
+        ).value
+        with open(color_label_mappings_file, "r") as f:
+            label_mappings = yaml.safe_load(f)
+        # hardcoded from reading YAML
+        self.green_labels.add(label_mappings["green"])
+        self.red_labels.add(label_mappings["red"])
+        
+        # else:
+        #     self.declare_parameter(
+        #         "buoy_label_mappings_file",
+        #         os.path.join(
+        #             bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+        #         ),
+        #     )
 
-            buoy_label_mappings_file = self.get_parameter(
-                "buoy_label_mappings_file"
-            ).value
-            with open(buoy_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
-            for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
-                self.green_labels.add(label_mappings[buoy_label])
-            for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
-                self.red_labels.add(label_mappings[buoy_label])
+        #     buoy_label_mappings_file = self.get_parameter(
+        #         "buoy_label_mappings_file"
+        #     ).value
+        #     with open(buoy_label_mappings_file, "r") as f:
+        #         label_mappings = yaml.safe_load(f)
+        #     for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
+        #         self.green_labels.add(label_mappings[buoy_label])
+        #     for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
+        #         self.red_labels.add(label_mappings[buoy_label])
 
 
     def intrinsics_callback(self, msg):
