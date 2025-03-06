@@ -99,6 +99,7 @@ class DeliveryServer(ActionServerBase):
 
         self.target_x = self.camera_width / 2
         self.is_aiming = False
+        self.bboxes = []
 
 
     def timer_callback(self):
