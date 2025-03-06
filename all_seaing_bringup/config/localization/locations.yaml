@@ -15,8 +15,8 @@ conference:
 
 nbpark:
   indoors: false
-  lat: 0.0
-  lon: 0.0
+  lat: 27.3729
+  lon: -82.4537
 
 sydney:
   indoors: false

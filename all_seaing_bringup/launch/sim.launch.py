@@ -146,7 +146,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "roboboat_2025"},
             {"conf": 0.6},
-            {"label_config": "buoy_label_mappings.yaml"},
+            {"label_config": "buoy_label_mappings"},
         ],
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
@@ -376,7 +376,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         buoy_yolo_node,
-        # color_segmentation_node,
+        color_segmentation_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         # object_tracking_map_node,
