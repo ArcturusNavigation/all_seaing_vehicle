@@ -90,7 +90,7 @@ class SpeedChange(ActionServerBase):
         self.following_guide = False
 
         self.obstacles = None
-        self.image_size = None
+        self.image_size = (400,400)
         self.seg_bboxes = deque()
         self.max_seg_bboxes = 10 # guarantee this is even
 
@@ -139,7 +139,7 @@ class SpeedChange(ActionServerBase):
             ).value
             with open(buoy_label_mappings_file, "r") as f:
                 label_mappings = yaml.safe_load(f)
-            for buoy_label in ["blue_buoy", " blue_circle", "blue_racquet_ball"]:
+            for buoy_label in ["blue_buoy", "blue_circle", "blue_racquet_ball"]:
                 self.blue_labels.add(label_mappings[buoy_label])
 
         self.obstacles = []
@@ -192,6 +192,12 @@ class SpeedChange(ActionServerBase):
         '''
         Handles when an color segmented image gets published
         '''
+
+        '''
+        For sim
+        '''
+        self.runnerActivated = True
+
         self.seg_bboxes.append(msg.boxes)
         if len(self.seg_bboxes) > self.max_seg_bboxes:
             self.seg_bboxes.popleft()
@@ -224,7 +230,10 @@ class SpeedChange(ActionServerBase):
         limit = 0.5
 
         if self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+            self.get_logger().info("LED detection: color changed")
             self.runnerActivated = True
+        else:
+            self.get_logger().info("LED detection: no change")
 
     def map_cb(self, msg):
         '''
@@ -256,7 +265,7 @@ class SpeedChange(ActionServerBase):
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
 
         future = self.move_to_point(guide_point)
-        future.add_done_callback(self.future_done())
+        future.add_done_callback(self.future_done)
         while self.following_guide:
             if self.blue_buoy_detected():
                 self.move_to_point(self.robot_pos,is_stationary=False)
