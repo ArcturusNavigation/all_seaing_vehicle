@@ -24,183 +24,54 @@ from collections import deque
 TIMER_PERIOD = 1 / 60
 
 
-
-class LEDTest(Node):
-    
-
 class Bbox:
     def __init__(self, bbox_msg):
-        self.x = bbox_msg.xmin
-        self.y = bbox_msg.ymin
-        self.w = bbox_msg.xmax-bbox_msg.xmin
-        self.h = bbox_msg.ymax-bbox_msg.ymin
+        self.x = bbox_msg.min_x
+        self.y = bbox_msg.min_y
+        self.w = bbox_msg.max_x-bbox_msg.min_x
+        self.h = bbox_msg.max_y-bbox_msg.min_y
 
-class SpeedChange(ActionServerBase):
+
+class LEDTest(Node):
     def __init__(self):
-        super().__init__("speed_challenge_server")
+        super().__init__("LEDTest")
 
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "speed_challenge",
-            execute_callback=self.execute_callback,
-            cancel_callback=self.default_cancel_callback,
-        )
-
+        # Subscribers and publishers
         self.seg_image_bbox_sub = self.create_subscription(
             LabeledBoundingBox2DArray, "bounding_boxes_ycrcb", self.seg_bbox_cb, 10
         )
-        self.map_sub = self.create_subscription(
-            ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
-        )
-        self.odometry_sub = self.create_subscription(
-            Odometry, "/odometry/filtered", self.odometry_cb, 10
-        )
+
         self.camera_info_sub = self.create_subscription(
             CameraInfo, "camera_info", self.camera_info_cb, 10
         )
 
-
-        self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
-        self.waypoint_marker_pub = self.create_publisher(
-            MarkerArray, "waypoint_markers", 10
-        )
-
-        self.declare_parameter("xy_threshold", 2.0)
-        self.declare_parameter("theta_threshold", 180.0)
-        self.declare_parameter("goal_tol", 0.5)
-        self.declare_parameter("obstacle_tol", 50)
-        self.declare_parameter("choose_every", 5)
-        self.declare_parameter("use_waypoint_client", False)
-        self.declare_parameter("planner", "astar")
-
-        self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
-        self.declare_parameter("turn_offset", 1.0)
-        self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
-
-        self.robot_pos = (0, 0)
-        self.robot_dir = (0, 0)
-        self.home_pos = (0, 0)
-        self.blue_buoy_pos = (0, 0)
-        self.runnerActivated = False
-        
-        # NOTE: in qualifying round we assume we enter from the correct direction.
-
-
-        # unit vector in the direction of the blue buoy
-        # ex: (0, -1) for south (-y), (0,1) for north (+y)
-        self.buoy_direction = (0,0)
-        self.buoy_found = False
-        self.following_guide = False
-
-        self.obstacles = None
         self.image_size = (400,400)
         self.seg_bboxes = deque()
         self.max_seg_bboxes = 10 # guarantee this is even
 
-
-
-        bringup_prefix = get_package_share_directory("all_seaing_bringup")
-
-        self.blue_labels = set()
         self.red_labels = set()
         self.green_labels = set()
 
+        self.changed = False
 
-        # TODO: change the param to be the same between is_sim and not
-        # too sleepy, dont want to break things.
-        # CODE IS COPIED FROM FOLLOW_BUOY_PATH,SUBJECT TO CHANGES
-        self.declare_parameter(
-            "color_label_mappings_file",
-            os.path.join(
-                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
-            ),
-        )
+        self.red_labels.add(17)
+        self.green_labels.add(11)
 
-        color_label_mappings_file = self.get_parameter(
-            "color_label_mappings_file"
-        ).value
-        with open(color_label_mappings_file, "r") as f:
-            label_mappings = yaml.safe_load(f)
-        self.red_labels.add(label_mappings["red"])
-        self.green_labels.add(label_mappings["green"])
-
-
-        if self.is_sim:
-            # hardcoded from reading YAML
-            # self.blue_labels.add(label_mappings["blue"])
-            # TODO: for SIM ONLY (no blue buoy)
-            self.blue_labels.add(label_mappings["red"])
-        else:
-            self.declare_parameter(
-                "buoy_label_mappings_file",
-                os.path.join(
-                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
-                ),
-            )
-            buoy_label_mappings_file = self.get_parameter(
-                "buoy_label_mappings_file"
-            ).value
-            with open(buoy_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
-            for buoy_label in ["blue_buoy", "blue_circle", "blue_racquet_ball"]:
-                self.blue_labels.add(label_mappings[buoy_label])
-
-        self.obstacles = []
-
-
-    def reset_challenge(self):
+    def camera_info_cb(self, msg):
         '''
-        Readies the server for the upcoming speed challenge.
+        Gets camera image info from all_seaing_perception.
         '''
-        self.buoy_found = False
-        self.runnerActivated = False
-        self.following_guide = True
-
-    def execute_callback(self, goal_handle):
-        self.start_process("Speed challenge task started!")
-
-        self.reset_challenge()
-        self.get_logger().info("Speed challenge setup completed.")
-
-        # station keep logic
-        self.move_to_point(self.robot_pos)
-
-
-        # TODO: GET RID OF THIS, FOR TESTING IN SIM ONLY
-        # assumes LED has already shifted color
-        self.runnerActivated = True
-
-        while rclpy.ok():
-            # Check if the action client requested cancel
-            if goal_handle.is_cancel_requested:
-                self.get_logger().info("Cancel requested. Aborting task initialization.")
-                goal_handle.canceled()
-                return Task.Result(success=False)
-
-            if self.runnerActivated:
-                self.home_pos = self.robot_pos # keep track of home position
-                self.buoy_direction = self.robot_dir
-                task_result = self.probe_blue_buoy()
-                self.end_process("Speed challenge task ended.")
-                return task_result
-                
-            time.sleep(TIMER_PERIOD)
-
-        # If we exit the `while rclpy.ok()` loop somehow
-        self.get_logger().info("ROS shutdown detected or loop ended unexpectedly.")
-        goal_handle.abort()
-        return Task.Result(success=False)
+        self.image_size = (msg.width, msg.height)
 
     def seg_bbox_cb(self, msg):
         '''
         Handles when an color segmented image gets published
         '''
+
         self.seg_bboxes.append(msg.boxes)
         if len(self.seg_bboxes) > self.max_seg_bboxes:
             self.seg_bboxes.popleft()
-        if self.runnerActivated:
+        else:
             return
 
         all_seg_bboxes = list(self.seg_bboxes)
@@ -223,30 +94,17 @@ class SpeedChange(ActionServerBase):
         afterGreen = greenBboxes[cutoff:len(greenBboxes)]
 
         # TODO: FIX MAGIC NUMBER TERRITORY
-        epsilon = 0.05*math.sqrt(self.image_size[0]**2 + self.image_size[1]**2)
+        epsilon = 0.02*math.sqrt(self.image_size[0]**2 + self.image_size[1]**2)
         lmbda = epsilon
-        p = 10
+        p = 5
         limit = 0.5
 
-        if self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+        if self.changed or self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
             self.get_logger().info("LED detection: color changed")
-            self.runnerActivated = True
+            self.changed = True
         else:
             self.get_logger().info("LED detection: no change")
-
-
-    def odometry_cb(self, msg):
-        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
-        quat = msg.pose.pose.orientation
-        (row, pitch, yaw) = euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
-        self.robot_dir = (math.cos(yaw), math.sin(yaw))
-
-    def camera_info_cb(self, msg):
-        '''
-        Gets camera image info from all_seaing_perception.
-        '''
-        self.image_size = (msg.width, msg.height)
-
+    
     # robust realtime visual signal processing
     def led_changed(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
         '''
@@ -313,7 +171,7 @@ class SpeedChange(ActionServerBase):
 
         # Int → Int → Int | n > 0 → [Int]
         # generate `n` evenly spaced elements from an arbitrary discrete range
-        linspace = lambda a, b, n: [a] + linspace(a + (b-a)/(n-1), b, n-1) if n > 1 else [a]
+        linspace = lambda a, b, n: [a] + linspace(a + (b-a)//(n-1), b, n-1) if n > 1 else [a]
 
         # [Int]
         # indices of "before" frames to sample
@@ -326,7 +184,6 @@ class SpeedChange(ActionServerBase):
         # [[Bbox]] → [[Bbox]]
         # remove red bounding boxes that are indistinguishable from green ones for each frame
         beforeRedCandidates = fmap(filterFrame, zip(beforeRed, beforeGreen))
-
         # [[Bbox]]
         # bounding box data for red before frames
         beforeSampleRed = access(beforeRedCandidates, beforeSampleIndices)

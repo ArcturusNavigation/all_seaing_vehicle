@@ -25,7 +25,7 @@ class ColorSegmentation(Node):
         self.img_pub = self.create_publisher(Image, "image/segmented_ycrcb", 5)
         self.img_sub = self.create_subscription(
             Image,
-            "/webcam_image",
+            "/zed/zed_node/rgb/image_rect_color",
             self.img_callback,
             qos_profile_sensor_data,
         )
