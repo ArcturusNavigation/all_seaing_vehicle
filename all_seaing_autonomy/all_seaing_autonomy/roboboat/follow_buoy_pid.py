@@ -174,8 +174,9 @@ class FollowBuoyPID(ActionServerBase):
         #         self.result = True
         #     return
 
-        
+        nothing_flag = False
         if red_center_x is None and green_center_x is None:
+            nothing_flag = True
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
                 self.get_logger().info("no more buoys killing")
                 self.result = True
@@ -239,6 +240,8 @@ class FollowBuoyPID(ActionServerBase):
                 # else:
                 #     # self.width / 2.0 is img ctr
                 #     offset = gate_ctr - self.width / 2.0
+
+
         # else:
         #     self.get_logger().info("sending center")
         #     offset = gate_ctr - self.width / 2.0
@@ -251,6 +254,8 @@ class FollowBuoyPID(ActionServerBase):
         yaw_rate = self.pid.get_effort()
         if yaw_rate < 0.0: # 3/6: if turning rihgt, make turn larger
             yaw_rate = max(yaw_rate * self.scale_right, -self.max_yaw_rate)
+        if nothing_flag:
+            yaw_rate = 0.0
         self.prev_update_time = self.get_clock().now()
 
         control_msg = ControlOption()
