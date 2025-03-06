@@ -36,6 +36,9 @@ def launch_setup(context, *args, **kwargs):
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
+    ycrcb_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "color_ranges_LED_ycrcb.yaml"
+    )
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
@@ -126,6 +129,20 @@ def launch_setup(context, *args, **kwargs):
             {
                 "is_sim": True,
             },
+        ],
+    )
+
+    ycrcb_color_segmentation_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="color_segmentation_ycrcb.py",
+        remappings=[
+            ("/webcam_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+                "color_ranges_file": ycrcb_color_ranges,
+            }
         ],
     )
 
@@ -314,6 +331,16 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    speed_challenge = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+            {"turn_offset": 1.0}
+        ],
+    )
+
     follow_buoy_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_pid.py",
@@ -374,7 +401,7 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             # "world": "rb2025/rb2025_task1_task2.sdf",
-            "world": "follow_path_task",
+            "world": "speed_course_world",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -389,6 +416,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
+        ycrcb_color_segmentation_node,
         # yolov8_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
@@ -403,6 +431,7 @@ def launch_setup(context, *args, **kwargs):
         task_init_server,
         # follow_buoy_path,
         follow_buoy_pid,
+        speed_challenge,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,
