@@ -232,14 +232,8 @@ class SpeedChange(ActionServerBase):
         limit = 0.5
 
         if self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
-<<<<<<< HEAD
             self.get_logger().info("Detected LED color change!")
-=======
-            self.get_logger().info("LED detection: color changed")
->>>>>>> ce875802d45504da85e5f382dd402207b413035e
             self.runnerActivated = True
-        else:
-            self.get_logger().info("LED detection: no change")
 
     def map_cb(self, msg):
         '''
