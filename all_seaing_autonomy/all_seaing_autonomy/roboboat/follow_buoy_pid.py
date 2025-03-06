@@ -54,13 +54,13 @@ class FollowBuoyPID(ActionServerBase):
 
 
         pid_vals = (
-            self.declare_parameter("pid_vals", [0.005, 0.0, 0.0])
+            self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
 
 
-        self.declare_parameter("forward_speed", 1.0)
+        self.declare_parameter("forward_speed", 5.0)
         self.declare_parameter("max_yaw", 1.0)
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
         self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
@@ -69,7 +69,7 @@ class FollowBuoyPID(ActionServerBase):
         self.pid.set_effort_min(-self.max_yaw_rate)
         self.pid.set_effort_max(self.max_yaw_rate)
         self.prev_update_time = self.get_clock().now()
-        self.time_last_seen_buoys = self.get_clock().now()
+        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
@@ -88,6 +88,7 @@ class FollowBuoyPID(ActionServerBase):
         self.red_labels = set()
 
         self.result = False
+        self.seen_first_buoy = False
 
         
         if self.is_sim:
@@ -160,17 +161,20 @@ class FollowBuoyPID(ActionServerBase):
                 
         # if we only see one of red / green, rotate
         # if we see neither, log + kill
-        if red_center_x is None or green_center_x is None:
-            if self.get_clock().now() - self.time_last_seen_buoys > 1.0:
+        # if red_center_x is None or green_center_x is None:
+        #     if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
+        #         self.get_logger().info("no more buoys killing")
+        #         self.result = True
+        #     return
+
+        
+        if red_center_x is None and green_center_x is None:
+            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
                 self.get_logger().info("no more buoys killing")
                 self.result = True
             return
-        
-        if red_center_x is None and green_center_x is None:
-            self.result = True
-            return
         else:
-            self.time_last_seen_buoys = self.get_clock().now()
+            self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
         # can update, not impt rn
         left_x = red_center_x
@@ -185,7 +189,8 @@ class FollowBuoyPID(ActionServerBase):
         offset = gate_ctr - self.width / 2.0
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        yaw_rate = self.pid.update(offset, dt)               
+        self.pid.update(offset, dt)            
+        yaw_rate = self.pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 
         control_msg = ControlOption()
@@ -197,6 +202,7 @@ class FollowBuoyPID(ActionServerBase):
 
     def execute_callback(self, goal_handle):
         self.start_process("follow buoy pid starting")
+        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
         while not self.result:
 

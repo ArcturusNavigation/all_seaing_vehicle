@@ -34,7 +34,8 @@ class TaskInitServer(ActionServerBase):
                 KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
             )
         self.p_pressed = False
-        self.timer_period = 1 / 10
+        # self.timer_period = 1 / 10
+        self.timer_period = 1.0
     
     def execute_callback(self, goal_handle):
         self.get_logger().info("Executing task initialization...")
@@ -42,6 +43,7 @@ class TaskInitServer(ActionServerBase):
         self.get_logger().info(f"Received goal: {goal}")
         
         while rclpy.ok():
+            self.get_logger().info("looping!!!!!!!")
             # Check if the action client requested cancel
             if goal_handle.is_cancel_requested:
                 self.get_logger().info("Cancel requested. Aborting task initialization.")
@@ -66,7 +68,9 @@ class TaskInitServer(ActionServerBase):
 
     
     def sim_keyboard_callback(self, msg):
+        # self.get_logger().info("sim keyboard cb")
         if msg.buttons[2]: 
+            # self.get_logger().info("hihihihi")
             self.p_pressed = True
     
     def real_keyboard_callback(self, msg):
