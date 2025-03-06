@@ -1,12 +1,5 @@
 #include "all_seaing_perception/bbox_project_pcloud.hpp"
 
-cv::Point2d custom_project(image_geometry::PinholeCameraModel cmodel, const cv::Point3d& xyz){
-    cv::Point2d uv_rect;
-    uv_rect.x = (cmodel.fx()*xyz.x + cmodel.Tx()) / xyz.z + cmodel.cx();
-    uv_rect.y = (cmodel.fy()*xyz.y + cmodel.Ty()) / xyz.z + cmodel.cy();
-    return uv_rect;
-}
-
 BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     // Initialize tf_listener pointer
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -66,10 +59,8 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     if (label_yaml.is_open()) {
         label_config_yaml = YAML::Load(label_yaml);  
         for (YAML::const_iterator it = label_config_yaml.begin(); it != label_config_yaml.end(); ++it) {
-            for(int label : it->second.as<std::vector<int>>()){
-                label_color_map[label] = it->first.as<std::string>();
-                RCLCPP_DEBUG(this->get_logger(), "%d -> %s", label, it->first.as<std::string>().c_str());
-            }
+            label_color_map[it->second.as<int>()] = it->first.as<std::string>();
+            RCLCPP_DEBUG(this->get_logger(), "%d -> %s", it->second.as<int>(), it->first.as<std::string>().c_str());
         }
     } 
     else {
@@ -83,6 +74,7 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     if (matching_yaml.is_open()) {
         matching_weights_config_yaml = YAML::Load(matching_yaml);
 
+        m_clustering_distance_weight = matching_weights_config_yaml["clustering_distance_weight"].as<double>();
         m_clustering_color_weights = matching_weights_config_yaml["clustering_color_weights"].as<std::vector<double>>();
         m_clustering_color_thres = matching_weights_config_yaml["clustering_color_thres"].as<double>();
         m_cluster_contour_distance_weight = matching_weights_config_yaml["cluster_contour_distance_weight"].as<double>();
@@ -90,6 +82,7 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
         m_contour_detection_color_weights = matching_weights_config_yaml["contour_detection_color_weights"].as<std::vector<double>>();
         m_cluster_contour_size_weight = matching_weights_config_yaml["cluster_contour_size_weight"].as<double>();
     
+        RCLCPP_DEBUG(this->get_logger(), "clustering_distance_weight: %lf", m_clustering_distance_weight);
         RCLCPP_DEBUG(this->get_logger(), "clustering_color_weights: [%lf, %lf, %lf]", m_clustering_color_weights[0], m_clustering_color_weights[1], m_clustering_color_weights[2]);
         RCLCPP_DEBUG(this->get_logger(), "clustering_color_thres: %lf", m_clustering_color_thres);
         RCLCPP_DEBUG(this->get_logger(), "cluster_contour_distance_weight: %lf", m_cluster_contour_distance_weight);
@@ -169,6 +162,14 @@ void BBoxProjectPCloud::bb_pcl_project(
     // int max_len = 0;
     // Just use the same pcloud to image projection, but check if it's within some binding box and assign it to that detection
     int obj = 0;
+    for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
+        // Project 3D point onto the image plane using the intrinsic matrix.
+        // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
+        RCLCPP_DEBUG(this->get_logger(), "3D POINT: (%lf, %lf, %lf)", point_tf.x, point_tf.y, point_tf.z);
+        cv::Point2d xy_rect = m_is_sim? m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
+        // Check if within bounds & in front of the boat
+        RCLCPP_DEBUG(this->get_logger(), "POINT PROJECTED ONTO IMAGE: (%lf, %lf)", xy_rect.x, xy_rect.y);
+    }
     // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
     cv_bridge::CvImagePtr cv_ptr;
     try {
@@ -208,12 +209,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
             // Project 3D point onto the image plane using the intrinsic matrix.
             // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-            cv::Point2d xy_rect;
-            try{    
-                xy_rect = m_is_sim? custom_project(m_cam_model,cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : custom_project(m_cam_model,cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
-            }catch(image_geometry::Exception &e){
-                RCLCPP_DEBUG(this->get_logger(), "Projection exception: %s", e.what());
-            }
+            cv::Point2d xy_rect = m_is_sim? m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
             // Check if within bounds & in front of the boat
             if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
                 (xy_rect.y < m_cam_model.cameraInfo().height) && (point_tf.x >= 0)) {          
@@ -226,7 +222,6 @@ void BBoxProjectPCloud::bb_pcl_project(
                     // obj_cloud_ptr->push_back(pcl::PointXYZRGB(point_tf.x, point_tf.y, point_tf.z, bgr[2], bgr[1], bgr[0]));
                     RCLCPP_DEBUG(this->get_logger(), "SELECTED HSV POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%d, %d, %d)", xy_rect.x, xy_rect.y, hsv[0], hsv[1], hsv[2]);
                     // RCLCPP_DEBUG(this->get_logger(), "SELECTED RGB POINT PROJECTED ONTO IMAGE: (%lf, %lf) -> (%d, %d, %d)", xy_rect.x, xy_rect.y, bgr[2], bgr[1], bgr[0]);
-                    
                 }
             }
         }
@@ -327,7 +322,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         for(auto ind_set : clusters_indices){
             RCLCPP_DEBUG(this->get_logger(), "SIZE OF CLUSTER %d: %d", clust_id, ind_set.indices.size());
             for(pcl::index_t ind : ind_set.indices){
-                cv::Point2d cloud_pt_xy = m_is_sim ? custom_project(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : custom_project(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
+                cv::Point2d cloud_pt_xy = m_is_sim ? m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
                 mat_clusters.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(clust_id, clusters_indices.size());
             }
             clust_id++;
@@ -421,7 +416,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 //transform to OpenCV HSV
                 std::vector<long long> cloud_pt_hsv = {pcloud_ptr->points[ind].h/2, pcloud_ptr->points[ind].s*((float)255.0), pcloud_ptr->points[ind].v*((float)255.0)};
                 RCLCPP_DEBUG(this->get_logger(), "CONVERTED CLUSTER POINT COLOR: (%d, %d, %d)", cloud_pt_hsv[0], cloud_pt_hsv[1], cloud_pt_hsv[2]);
-                cv::Point2d cloud_pt_xy = m_is_sim ? custom_project(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : custom_project(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
+                cv::Point2d cloud_pt_xy = m_is_sim ? m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : m_cam_model.project3dToPixel(cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
                 cluster_pts.push_back(std::make_pair(cloud_pt_xy, cloud_pt_hsv));
                 //store sums
                 cluster_qts.first.first.x+=cloud_pt_xy.x;
@@ -499,7 +494,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         for (pcl::index_t ind : clusters_indices[opt_cluster_id].indices){
             pcl::PointXYZHSV pt = pcloud_ptr->points[ind];
             refined_cloud_ptr->push_back(pt);
-            cv::Point2d cloud_pt_xy = m_is_sim ? custom_project(m_cam_model,cv::Point3d(pt.y, pt.z, -pt.x)) : custom_project(m_cam_model,cv::Point3d(pt.x, pt.y, pt.z));
+            cv::Point2d cloud_pt_xy = m_is_sim ? m_cam_model.project3dToPixel(cv::Point3d(pt.y, pt.z, -pt.x)) : m_cam_model.project3dToPixel(cv::Point3d(pt.x, pt.y, pt.z));
             mat_opt_cluster.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(opt_cluster_id, clusters_indices.size());
         }
         pcl::toROSMsg(*refined_cloud_ptr, refined_pcl_segments.cloud);
