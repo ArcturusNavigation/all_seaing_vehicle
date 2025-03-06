@@ -123,6 +123,8 @@ class ControllerServer(ActionServerBase):
         self.control_pub.publish(control_msg)
 
     def waypoint_callback(self, goal_handle):
+        print('got a callback')
+
         self.start_process("Waypoint following started!")
 
         xy_threshold = goal_handle.request.xy_threshold
