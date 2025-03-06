@@ -25,10 +25,10 @@ TIMER_PERIOD = 1 / 60
 
 class Bbox:
     def __init__(self, bbox_msg):
-        self.x = bbox_msg.xmin
-        self.y = bbox_msg.ymin
-        self.w = bbox_msg.xmax-bbox_msg.xmin
-        self.h = bbox_msg.ymax-bbox_msg.ymin
+        self.x = bbox_msg.min_x
+        self.y = bbox_msg.min_y
+        self.w = bbox_msg.max_x-bbox_msg.min_x
+        self.h = bbox_msg.max_y-bbox_msg.min_y
 
 class SpeedChange(ActionServerBase):
     def __init__(self):
@@ -195,6 +195,8 @@ class SpeedChange(ActionServerBase):
         self.seg_bboxes.append(msg.boxes)
         if len(self.seg_bboxes) > self.max_seg_bboxes:
             self.seg_bboxes.popleft()
+        else:
+            return
         if self.runnerActivated:
             return
 
@@ -218,12 +220,13 @@ class SpeedChange(ActionServerBase):
         afterGreen = greenBboxes[cutoff:len(greenBboxes)]
 
         # TODO: FIX MAGIC NUMBER TERRITORY
-        epsilon = 0.05*math.sqrt(self.image_size[0]**2 + self.image_size[1]**2)
+        epsilon = 0.02*math.sqrt(self.image_size[0]**2 + self.image_size[1]**2)
         lmbda = epsilon
-        p = 10
+        p = 5
         limit = 0.5
 
         if self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+            self.get_logger().info("Detected LED color change!")
             self.runnerActivated = True
 
     def map_cb(self, msg):
@@ -373,7 +376,7 @@ class SpeedChange(ActionServerBase):
 
         # Int → Int → Int | n > 0 → [Int]
         # generate `n` evenly spaced elements from an arbitrary discrete range
-        linspace = lambda a, b, n: [a] + linspace(a + (b-a)/(n-1), b, n-1) if n > 1 else [a]
+        linspace = lambda a, b, n: [a] + linspace(a + (b-a)//(n-1), b, n-1) if n > 1 else [a]
 
         # [Int]
         # indices of "before" frames to sample
