@@ -79,8 +79,6 @@ class SpeedChange(ActionServerBase):
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
         self.declare_parameter("turn_offset", 1.0)
         self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
-
-        self.runnerActivated = False
         
         # NOTE: in qualifying round we assume we enter from the correct direction.
 
@@ -95,7 +93,11 @@ class SpeedChange(ActionServerBase):
         self.red_labels = set()
         self.green_labels = set()
         self.loops = []
+        self.blue_x = 0
         self.current_loop_index = 0
+        self.prev_loop_index = 0
+
+        self.starting_yaw = 0
 
 
         # TODO: change the param to be the same between is_sim and not
@@ -175,25 +177,42 @@ class SpeedChange(ActionServerBase):
         '''
         Control which PID loop is being ran.
         '''
+        self.prev_loop_index = self.current_loop_index
         if self.current_loop_index == 0: #follow buoy
             self.follow_buoy_pid()
         elif self.current_loop_index == 1: #go straight
+            self.go_straight_pid()
             self.blue_trigger()
         elif self.current_loop_index == 2: #circle around
-            self.blue_trigger(False)
+            self.blue_buoy_pid()
+
+            yaw_diff = self.get_yaw()-self.starting_yaw
+            if yaw_diff > 180:
+                yaw_diff -= 180
+            elif yaw_diff < -180:
+                yaw_diff += 180
+            if (abs(yaw_diff) > 170):
+                self.current_loop_index += 1
+            # use imu rotation data to exit (a bit over 180 degrees?)
+            pass
         elif self.current_loop_index == 3: #go straight back
+            self.go_straight_pid()
             self.redgreen_trigger()
+            pass
         elif self.current_loop_index == 4: #
             self.follow_buoy_pid(False)
 
-    def blue_trigger(self, inv=False):
-        blue_bbox_exists = False
+
+        if self.current_loop_index != self.prev_loop_index:
+                self.starting_yaw = self.get_yaw()
+
+    def blue_trigger(self):
         for box in self.bboxes:
             if box.label in self.blue_labels:
-                blue_bbox_exists = True
-
-        if (not inv) and blue_bbox_exists:
-            self.current_loop_index += 1
+                self.current_loop_index += 1
+                midpt = (box.max_x + box.min_x) / 2.0
+                self.blue_x = midpt
+                return
 
     def redgreen_trigger(self):
         for box in self.bboxes:
@@ -203,6 +222,48 @@ class SpeedChange(ActionServerBase):
             if box.label in self.green_labels:
                 self.current_loop_index += 1
                 return
+            
+    def go_straight_pid(self):
+        yaw = self.get_yaw()
+
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        offset = yaw-self.starting_yaw
+        self.pid.update(offset, dt)            
+        yaw_rate = self.pid.get_effort()
+        self.prev_update_time = self.get_clock().now()
+
+        control_msg = ControlOption()
+        control_msg.priority = 1
+        control_msg.twist.linear.x = float(self.forward_speed)
+        control_msg.twist.linear.y = 0.0
+        control_msg.twist.angular.z = float(yaw_rate)
+        self.control_pub.publish(control_msg)
+    
+    def blue_buoy_pid(self):
+        blue_center_x = self.image_size[0]/2
+        blue_area = 0
+
+        for box in self.bboxes:
+            area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
+            midpt = (box.max_x + box.min_x) / 2.0
+            if box.label in self.blue_labels and area > blue_area:
+                blue_area = area
+                blue_center_x = midpt
+
+        offset = blue_center_x - self.blue_x
+
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        self.pid.update(offset, dt)            
+        yaw_rate = self.pid.get_effort()
+        self.prev_update_time = self.get_clock().now()
+
+        control_msg = ControlOption()
+        control_msg.priority = 1
+        control_msg.twist.linear.x = float(self.forward_speed)
+        control_msg.twist.linear.y = 0.0
+        control_msg.twist.angular.z = float(yaw_rate)
+        self.control_pub.publish(control_msg)
+        
 
     def follow_buoy_pid(self, greenRight=True):
         red_center_x = None
@@ -237,12 +298,12 @@ class SpeedChange(ActionServerBase):
         right_x = green_center_x
 
         if left_x is None: left_x = 0
-        if right_x is None: right_x = self.width - 1
+        if right_x is None: right_x = self.image_size[0] - 1
 
         gate_ctr = (left_x + right_x) / 2.0
 
-        # self.width / 2.0 is img ctr
-        offset = gate_ctr - self.width / 2.0
+        # self.image_size[0] / 2.0 is img ctr
+        offset = gate_ctr - self.image_size[0] / 2.0
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
@@ -257,6 +318,13 @@ class SpeedChange(ActionServerBase):
         if not greenRight:
             control_msg.twist.angular.z *= -1
         self.control_pub.publish(control_msg)
+
+    def get_euler(quat):
+        (row, pitch, yaw) = euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
+        return row, pitch, yaw
+    
+    def get_yaw(self):
+        return self.get_euler(self.imu_orientation)[2]
     
 
 
