@@ -183,11 +183,8 @@ class SpeedChange(ActionServerBase):
                 return task_result
             else:
                 # station keep logic
-                goal_msg = FollowPath.Goal()
-                goal_msg.is_stationary = True
-                self.follow_path_client.send_goal_async(goal_msg)
-
-            time.sleep(self.timer_period)
+                self.move_to_point(self.robot_pos)
+            time.sleep(TIMER_PERIOD)
 
         # If we exit the `while rclpy.ok()` loop somehow
         self.get_logger().info("ROS shutdown detected or loop ended unexpectedly.")
@@ -240,7 +237,8 @@ class SpeedChange(ActionServerBase):
 
     def odometry_cb(self, msg):
         self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
-        (row, pitch, yaw) = euler_from_quaternion(msg.pose.pose.orientation)
+        quat = msg.pose.pose.orientation
+        (row, pitch, yaw) = euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
         self.robot_dir = (math.cos(-yaw), math.sin(-yaw))
 
     def camera_info_cb(self, msg):
@@ -380,7 +378,7 @@ class SpeedChange(ActionServerBase):
         # check for any probability exceeding confidence threshold
         return any(fmap(changed, pairProbabilities))
 
-    def move_to_point(self, point):
+    def move_to_point(self, point, is_cancel_requested=False):
         '''
         Moves the boat to the specified position using the follow path action server.
         Returns the future of the server request.
@@ -396,6 +394,7 @@ class SpeedChange(ActionServerBase):
         goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
         goal_msg.choose_every = self.get_parameter("choose_every").value
         goal_msg.is_stationary = True
+        goal_msg.is_cancel_requested=is_cancel_requested
 
         self.follow_path_client.wait_for_server()
         self.send_goal_future = self.follow_path_client.send_goal_async(
@@ -412,10 +411,8 @@ class SpeedChange(ActionServerBase):
         future = self.move_to_point(point)
         while not future.done():
             if cancel_cond():
-                goal_msg = FollowPath.Goal()
-                goal_msg.is_cancel_requested = True
-                self.follow_path_client.send_goal_async(goal_msg)
-
+                self.move_to_point(point,is_cancel_requested=True)
+                break
             time.sleep(TIMER_PERIOD)
         return future
 

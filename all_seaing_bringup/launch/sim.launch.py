@@ -34,7 +34,7 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
     ycrcb_color_ranges = os.path.join(
-        bringup_prefix, "config", "perception", "ycrcb_color_ranges.yaml"
+        bringup_prefix, "config", "perception", "color_ranges_LED_ycrcb.yaml"
     )
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
@@ -368,7 +368,7 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             # "world": "rb2025/rb2025_task1_task2.sdf",
-            "world": "follow_path_task",
+            "world": "speed_course_world",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
