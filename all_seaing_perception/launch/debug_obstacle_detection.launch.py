@@ -120,7 +120,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "roboboat_2025"},
             {"conf": 0.6},
-            {"label_config": "buoy_label_mappings.yaml"},
+            {"label_config": "color_label_mappings"},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),

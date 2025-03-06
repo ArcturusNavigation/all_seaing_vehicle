@@ -245,7 +245,7 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_2025"},
-            {"label_config": "buoy_label_mappings"},
+            {"label_config": "color_label_mappings"},
             {"conf": 0.6},
         ],
         remappings=[
