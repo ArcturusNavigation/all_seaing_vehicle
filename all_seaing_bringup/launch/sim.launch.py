@@ -129,7 +129,7 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    color_segmentation_node = launch_ros.actions.Node(
+    ycrcb_color_segmentation_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="color_segmentation_ycrcb.py",
         remappings=[
@@ -139,6 +139,20 @@ def launch_setup(context, *args, **kwargs):
             {
                 "color_label_mappings_file": color_label_mappings,
                 "color_ranges_file": ycrcb_color_ranges,
+            }
+        ],
+    )
+
+    color_segmentation_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="color_segmentation.py",
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+                "color_ranges_file": color_ranges,
             }
         ],
     )
@@ -383,6 +397,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
+        ycrcb_color_segmentation_node,
         # yolov8_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,

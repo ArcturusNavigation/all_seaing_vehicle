@@ -30,19 +30,6 @@ class Bbox:
         self.w = bbox_msg.xmax-bbox_msg.xmin
         self.h = bbox_msg.ymax-bbox_msg.ymin
 
-
-class InternalBuoyPair:
-    def __init__(self, left_buoy=None, right_buoy=None):
-        if left_buoy is None:
-            self.left = Obstacle()
-        else:
-            self.left = left_buoy
-
-        if right_buoy is None:
-            self.right = Obstacle()
-        else:
-            self.right = right_buoy
-
 class SpeedChange(ActionServerBase):
     def __init__(self):
         super().__init__("speed_challenge_server")
@@ -56,7 +43,7 @@ class SpeedChange(ActionServerBase):
         )
 
         self.seg_image_bbox_sub = self.create_subscription(
-            LabeledBoundingBox2D, "bounding_boxes_ycrcb", self.seg_bbox_cb, 10
+            LabeledBoundingBox2DArray, "bounding_boxes_ycrcb", self.seg_bbox_cb, 10
         )
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
@@ -100,6 +87,7 @@ class SpeedChange(ActionServerBase):
         # ex: (0, -1) for south (-y), (0,1) for north (+y)
         self.buoy_direction = (0,0)
         self.buoy_found = False
+        self.following_guide = False
 
         self.obstacles = None
         self.image_size = None
@@ -133,9 +121,12 @@ class SpeedChange(ActionServerBase):
         self.red_labels.add(label_mappings["red"])
         self.green_labels.add(label_mappings["green"])
 
+
         if self.is_sim:
             # hardcoded from reading YAML
-            self.blue_labels.add(label_mappings["blue"])
+            # self.blue_labels.add(label_mappings["blue"])
+            # TODO: for SIM ONLY (no blue buoy)
+            self.blue_labels.add(label_mappings["red"])
         else:
             self.declare_parameter(
                 "buoy_label_mappings_file",
@@ -160,13 +151,21 @@ class SpeedChange(ActionServerBase):
         '''
         self.buoy_found = False
         self.runnerActivated = False
-
+        self.following_guide = True
 
     def execute_callback(self, goal_handle):
         self.start_process("Speed challenge task started!")
 
         self.reset_challenge()
         self.get_logger().info("Speed challenge setup completed.")
+
+        # station keep logic
+        self.move_to_point(self.robot_pos)
+
+
+        # TODO: GET RID OF THIS, FOR TESTING IN SIM ONLY
+        # assumes LED has already shifted color
+        self.runnerActivated = True
 
         while rclpy.ok():
             # Check if the action client requested cancel
@@ -181,9 +180,7 @@ class SpeedChange(ActionServerBase):
                 task_result = self.probe_blue_buoy()
                 self.end_process("Speed challenge task ended.")
                 return task_result
-            else:
-                # station keep logic
-                self.move_to_point(self.robot_pos)
+                
             time.sleep(TIMER_PERIOD)
 
         # If we exit the `while rclpy.ok()` loop somehow
@@ -205,7 +202,7 @@ class SpeedChange(ActionServerBase):
 
         redBboxes = []
         greenBboxes = []
-        for frame in self.all_seg_bboxes: #fixed time, frame= LabeledBoundingBox2D[]
+        for frame in all_seg_bboxes: #fixed time, frame= LabeledBoundingBox2D[]
             redBboxes.append([])
             greenBboxes.append([])
             for box in frame:
@@ -214,11 +211,11 @@ class SpeedChange(ActionServerBase):
                 if box.label in self.green_labels:
                     greenBboxes[-1].append(Bbox(box))
 
-        cutoff = len(all_seg_bboxes.length/2)
-        beforeRed = redBboxes[:cutoff]
-        afterRed = redBboxes[cutoff:]
-        beforeGreen = greenBboxes[:cutoff]
-        afterGreen = greenBboxes[cutoff:]
+        cutoff = len(all_seg_bboxes)//2
+        beforeRed = redBboxes[0:cutoff]
+        afterRed = redBboxes[cutoff:len(redBboxes)]
+        beforeGreen = greenBboxes[0:cutoff]
+        afterGreen = greenBboxes[cutoff:len(greenBboxes)]
 
         # TODO: FIX MAGIC NUMBER TERRITORY
         epsilon = 0.05*math.sqrt(self.image_size[0]**2 + self.image_size[1]**2)
@@ -239,7 +236,7 @@ class SpeedChange(ActionServerBase):
         self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
         quat = msg.pose.pose.orientation
         (row, pitch, yaw) = euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
-        self.robot_dir = (math.cos(-yaw), math.sin(-yaw))
+        self.robot_dir = (math.cos(yaw), math.sin(yaw))
 
     def camera_info_cb(self, msg):
         '''
@@ -252,18 +249,36 @@ class SpeedChange(ActionServerBase):
         Function to find the blue buoy by moving near it (general direction).
         Keeps on appending waypoints to the north/south until it finds 
         '''
+        self.get_logger().info("Probing for blue buoy")
         max_guide_d = 30
-        guide_point = (max_guide_d*self.buoy_direction[0], max_guide_d*self.buoy_direction[1])
-        self.cond_move_to_point(guide_point, self.blue_buoy_detected)
+        guide_point = (max_guide_d*self.buoy_direction[0] + self.robot_pos[0], 
+                        max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
+        self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
+
+        future = self.move_to_point(guide_point)
+        future.add_done_callback(self.future_done())
+        while self.following_guide:
+            if self.blue_buoy_detected():
+                self.move_to_point(self.robot_pos,is_stationary=False)
+                break
+            time.sleep(TIMER_PERIOD)
         return self.circle_blue_buoy()
+
+    def future_done(self, future):
+        '''
+        Set self.following_guide to False when the future is done.
+        '''
+        self.following_guide = False
+        pass
 
     def circle_blue_buoy(self):
         '''
         Function to circle the blue buoy.
         '''
+        self.get_logger().info("Circling blue buoy")
         if not self.blue_buoy_detected():
             self.get_logger().info("task 4 blue buoy probing exited without finding blue buoy")
-            return Task(success=False)
+            return Task.Result(success=False)
         
         #circle the blue buoy like a baseball diamond
         # a better way to do this might be to have the astar run to original cell, 
@@ -288,8 +303,9 @@ class SpeedChange(ActionServerBase):
         '''
         After circling the buoy, return to the starting position.
         '''
+        self.get_logger().info("Returning to start")
         self.move_to_point(self.home_pos)
-        return Task(success=True)
+        return Task.result(success=True)
 
     # robust realtime visual signal processing
     def led_changed(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
@@ -422,7 +438,7 @@ class SpeedChange(ActionServerBase):
         # check for any probability exceeding confidence threshold
         return any(fmap(changed, pairProbabilities))
 
-    def move_to_point(self, point, is_cancel_requested=False):
+    def move_to_point(self, point, is_stationary=True):
         '''
         Moves the boat to the specified position using the follow path action server.
         Returns the future of the server request.
@@ -430,35 +446,20 @@ class SpeedChange(ActionServerBase):
         self.follow_path_client.wait_for_server()
         goal_msg = FollowPath.Goal()
         goal_msg.planner = self.get_parameter("planner").value
-        goal_msg.x = point.x
-        goal_msg.y = point.y
+        goal_msg.x = point[0]
+        goal_msg.y = point[1]
         goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
         goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
         goal_msg.goal_tol = self.get_parameter("goal_tol").value
         goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
         goal_msg.choose_every = self.get_parameter("choose_every").value
-        goal_msg.is_stationary = True
-        goal_msg.is_cancel_requested=is_cancel_requested
+        goal_msg.is_stationary = is_stationary
 
         self.follow_path_client.wait_for_server()
         self.send_goal_future = self.follow_path_client.send_goal_async(
             goal_msg
         )
         return self.send_goal_future
-
-    def cond_move_to_point(self, point, cancel_cond):
-        '''
-        Moves the boat to the specified position using the follow path action server.
-        In the middle of the following, if some condition is met, the following action is cancelled
-        and the function is exited.
-        '''
-        future = self.move_to_point(point)
-        while not future.done():
-            if cancel_cond():
-                self.move_to_point(point,is_cancel_requested=True)
-                break
-            time.sleep(TIMER_PERIOD)
-        return future
 
     def blue_buoy_detected(self):
         '''
@@ -468,10 +469,11 @@ class SpeedChange(ActionServerBase):
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
                 # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
+                self.get_logger().info("Found blue buoy.")
                 self.buoy_found = True
                 self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
                 break
-
+        self.get_logger().info(f"blue buoy found: {self.buoy_found}.") 
         return self.buoy_found
 
     def add_tuple(self, a, b):
