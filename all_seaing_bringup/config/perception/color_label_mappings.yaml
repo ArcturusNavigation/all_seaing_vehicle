@@ -1,6 +1,7 @@
-black: [0, 1, 2, 3]
-blue: [4, 5, 6, 7, 8]
-green: [11, 12,13, 14, 15]
-red: [17,18,19,20,21,22,23]
-yellow: [25,26]
-misc: [9, 10, 16, 24]
+orange: 0
+red: 1
+green: 2
+black: 3
+white: 4
+yellow: 5
+blue: 6
