@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.action import ActionClient, ActionServer
+from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
 
 
-from all_seaing_interfaces.msg import ObstacleMap, Obstacle
-from all_seaing_interfaces.action import FollowPath, Task
+from all_seaing_interfaces.action import Task
 from all_seaing_controller.pid_controller import PIDController
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
-from nav_msgs.msg import Odometry
-from std_msgs.msg import Header, ColorRGBA
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption
 from all_seaing_common.action_server_base import ActionServerBase
 from sensor_msgs.msg import CameraInfo
 
-import math
 import os
 import yaml
 import time
@@ -94,40 +89,39 @@ class FollowBuoyPID(ActionServerBase):
         self.scale_right = 1.3
 
         
-        if self.is_sim:
-            self.declare_parameter(
-                "color_label_mappings_file", 
-                os.path.join(
-                    bringup_prefix, "config", "perception", "color_label_mappings.yaml"
-                ),
-            )
+        self.declare_parameter(
+            "color_label_mappings_file", 
+            os.path.join(
+                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+            ),
+        )
 
-            color_label_mappings_file = self.get_parameter(
-                "color_label_mappings_file"
-            ).value
-            with open(color_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
-            # hardcoded from reading YAML
-            self.green_labels.add(label_mappings["green"])
-            self.red_labels.add(label_mappings["red"])
-            self.yellow_labels.add(label_mappings["yellow"])
-        else:
-            self.declare_parameter(
-                "buoy_label_mappings_file",
-                os.path.join(
-                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
-                ),
-            )
+        color_label_mappings_file = self.get_parameter(
+            "color_label_mappings_file"
+        ).value
+        with open(color_label_mappings_file, "r") as f:
+            label_mappings = yaml.safe_load(f)
+        # hardcoded from reading YAML
+        self.green_labels.add(label_mappings["green"])
+        self.red_labels.add(label_mappings["red"])
+        
+        # else:
+        #     self.declare_parameter(
+        #         "buoy_label_mappings_file",
+        #         os.path.join(
+        #             bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+        #         ),
+        #     )
 
-            buoy_label_mappings_file = self.get_parameter(
-                "buoy_label_mappings_file"
-            ).value
-            with open(buoy_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
-            for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
-                self.green_labels.add(label_mappings[buoy_label])
-            for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
-                self.red_labels.add(label_mappings[buoy_label])
+        #     buoy_label_mappings_file = self.get_parameter(
+        #         "buoy_label_mappings_file"
+        #     ).value
+        #     with open(buoy_label_mappings_file, "r") as f:
+        #         label_mappings = yaml.safe_load(f)
+        #     for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
+        #         self.green_labels.add(label_mappings[buoy_label])
+        #     for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
+        #         self.red_labels.add(label_mappings[buoy_label])
 
 
     def intrinsics_callback(self, msg):
@@ -180,8 +174,9 @@ class FollowBuoyPID(ActionServerBase):
         #         self.result = True
         #     return
 
-        
+        nothing_flag = False
         if red_center_x is None and green_center_x is None:
+            nothing_flag = True
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
                 self.get_logger().info("no more buoys killing")
                 self.result = True
@@ -245,6 +240,8 @@ class FollowBuoyPID(ActionServerBase):
                 # else:
                 #     # self.width / 2.0 is img ctr
                 #     offset = gate_ctr - self.width / 2.0
+
+
         # else:
         #     self.get_logger().info("sending center")
         #     offset = gate_ctr - self.width / 2.0
@@ -257,6 +254,8 @@ class FollowBuoyPID(ActionServerBase):
         yaw_rate = self.pid.get_effort()
         if yaw_rate < 0.0: # 3/6: if turning rihgt, make turn larger
             yaw_rate = max(yaw_rate * self.scale_right, -self.max_yaw_rate)
+        if nothing_flag:
+            yaw_rate = 0.0
         self.prev_update_time = self.get_clock().now()
 
         control_msg = ControlOption()
