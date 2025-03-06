@@ -209,7 +209,6 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"joy_x_scale": -1.0},
             {"joy_ang_scale": 0.3},
-            {"serial_port": "/dev/ttyACM0"},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -222,7 +221,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 0},
+            {"video_index": 1},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
