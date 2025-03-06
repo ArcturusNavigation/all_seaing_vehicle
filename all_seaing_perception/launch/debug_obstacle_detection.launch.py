@@ -19,6 +19,9 @@ def launch_setup(context, *args, **kwargs):
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
+    color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
+    )
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
@@ -120,7 +123,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "roboboat_2025"},
             {"conf": 0.6},
-            {"label_config": "buoy_label_mappings.yaml"},
+            {"label_config": "color_label_mappings"},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
@@ -140,7 +143,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"bbox_object_margin": 1.0},
-            {"color_label_mappings_file": color_label_mappings},
+            {"color_label_mappings_file": color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
@@ -222,9 +225,9 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node,
         # object_tracking_map_node,
         object_tracking_map_euclidean_node,
-        obstacle_detector_node,
+        # obstacle_detector_node,
         # color_segmentation_node,
-        obstacle_bbox_overlay_node
+        # obstacle_bbox_overlay_node
     ]
 
 def generate_launch_description():

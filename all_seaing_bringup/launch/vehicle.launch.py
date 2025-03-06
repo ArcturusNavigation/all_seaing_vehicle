@@ -88,8 +88,8 @@ def launch_setup(context, *args, **kwargs):
             {
                 "front_right_port": 2,
                 "front_left_port": 3,
-                "back_right_port": 4,
-                "back_left_port": 5,
+                "back_left_port": 4,
+                "back_right_port": 5,
             }
         ],
         condition=UnlessCondition(use_bag),
@@ -107,6 +107,18 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
+        ],
+    )
+
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": color_label_mappings},
+            {"forward_speed": 1.8},
+            {"max_yaw": 0.2},
+            {"pid_vals": [0.0006, 0.0, 0.0]},
         ],
     )
 
@@ -135,7 +147,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            {"range_radius": [0.5, 100000.0]},
+            {"range_radius": [0.5, 60.0]},
         ],
         condition=UnlessCondition(use_bag),
     )
@@ -207,9 +219,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
         parameters=[
-            {"joy_x_scale": 2.0},
-            {"joy_ang_scale": 0.8},
-            {"serial_port": "/dev/ttyACM0"},
+            {"joy_x_scale": -1.8},
+            {"joy_ang_scale": 0.2},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -222,7 +233,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 0},
+            {"video_index": 1},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -245,6 +256,7 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_2025"},
+            {"label_config": "color_label_mappings"},
             {"conf": 0.6},
         ],
         remappings=[
@@ -259,6 +271,7 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
             {"conf": 0.4},
         ],
         remappings=[
@@ -284,6 +297,11 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{"is_sim": False}],
     )
 
+    central_hub = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="central_hub_ros.py",
+        parameters=[{"port": "/dev/ttyACM0"}],
+    )
 
     lidar_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -363,17 +381,19 @@ def launch_setup(context, *args, **kwargs):
         rover_lora_controller,
         rviz_waypoint_sender,
         thrust_commander_node,
-        webcam_publisher,
         buoy_yolo_node,
         shape_yolo_node,
         run_tasks,
         task_init_server, 
-        follow_buoy_path,
+        # follow_buoy_path,
+        follow_buoy_pid,
         grid_map_generator,
+        central_hub,
         amcl_ld,
+        static_transforms_ld,
+        #webcam_publisher,
         lidar_ld,
         mavros_ld,
-        static_transforms_ld,
         zed_ld,
     ]
 

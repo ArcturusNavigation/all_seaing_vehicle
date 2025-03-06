@@ -19,8 +19,12 @@ class RunTasks(Node):
         super().__init__("run_tasks")
         self.task_list = [
             ActionClient(self, Task, "task_init"),
+<<<<<<< HEAD
             ActionClient(self, Task, "follow_buoy_path"),
             ActionClient(self, Task, "docking_task"),
+=======
+            ActionClient(self, Task, "follow_buoy_pid"),
+>>>>>>> d1caccce8b6e42ea0885126fa61a8557e65b5e8c
         ]
         self.current_task = None
         self.idle_index = 0
@@ -34,7 +38,7 @@ class RunTasks(Node):
         self.current_task = self.task_list[self.next_task_index]
         self.get_logger().info("Starting Task Manager States...")
         self.current_task.wait_for_server()
-        self.get_logger().info(f"Starting task: {self.current_task._action_name}")
+        self.get_logger().info(f"Starting task: {self.current_task}")
         task_goal_msg = Task.Goal()
         self.get_logger().info(f"Sending goal: {task_goal_msg}")
         send_goal_future = self.current_task.send_goal_async(
@@ -46,7 +50,7 @@ class RunTasks(Node):
     def feedback_callback(self, feedback_msg):
         feedback = feedback_msg.feedback
         self.get_logger().info(f"Received feedback: {feedback.time_elapsed:.2f} seconds elapsed")
-        self.get_logger().info(f"Current task: {self.current_task._action_name}")
+        self.get_logger().info(f"Current task: {self.current_task}")
 
     def goal_response_callback(self, future):
         goal_handle = future.result()

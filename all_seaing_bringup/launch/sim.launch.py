@@ -30,6 +30,9 @@ def launch_setup(context, *args, **kwargs):
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
+    color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
+    )
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
@@ -140,6 +143,15 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ]
+    )
+
     point_cloud_filter_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -179,7 +191,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"bbox_object_margin": 0.0},
-            {"color_label_mappings_file": color_label_mappings},
+            {"color_label_mappings_file": color_buoy_label_mappings},
             {"color_ranges_file": color_ranges},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
@@ -302,9 +314,25 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
+            ),
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
+        # parameters=[{"is_sim": True}],
     )
 
     task_init_server = launch_ros.actions.Node(
@@ -361,9 +389,10 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
+        # yolov8_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
-        # object_tracking_map_node,
+        object_tracking_map_node,
         object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,
@@ -372,7 +401,8 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         run_tasks,
         task_init_server,
-        follow_buoy_path,
+        # follow_buoy_path,
+        follow_buoy_pid,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,
