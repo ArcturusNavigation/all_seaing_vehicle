@@ -123,7 +123,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "roboboat_2025"},
             {"conf": 0.6},
-            {"label_config": "color_label_mappings.yaml"},
+            {"label_config": "color_label_mappings"},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
@@ -230,9 +230,9 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node,
         # object_tracking_map_node,
         object_tracking_map_euclidean_node,
-        obstacle_detector_node,
+        # obstacle_detector_node,
         # color_segmentation_node,
-        obstacle_bbox_overlay_node
+        # obstacle_bbox_overlay_node
     ]
 
 def generate_launch_description():
