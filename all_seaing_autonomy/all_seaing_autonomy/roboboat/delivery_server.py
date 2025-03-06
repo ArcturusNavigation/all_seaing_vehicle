@@ -122,9 +122,16 @@ class DeliveryServer(ActionServerBase):
     def bbox_callback(self, msg):
         # TODO: this won't work since you're subscribing to 2d array
         #self.target_x = (msg.min_x + msg.max_x) / 2
-        pass
+        self.bboxes = msg.boxes
+
 
     def update_pid(self):
+        largest_bbox_area = 0
+        for bbox in self.bboxes:
+            area = (bbox.max_x - bbox.min_x) * (bbox.max_y - bbox.min_y)
+            if area > largest_bbox_area:
+                largest_bbox_area = area
+                self.target_x = (bbox.min_x + bbox.max_x) / 2
         self.aim_pid.set_setpoint(self.camera_width / 2)   # Want target in center
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.aim_pid.update(self.target_x, dt)
