@@ -213,7 +213,7 @@ void BBoxProjectPCloud::bb_pcl_project(
             try{    
                 xy_rect = m_is_sim? custom_project(m_cam_model,cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : custom_project(m_cam_model,cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
             }catch(image_geometry::Exception &e){
-                RCLCPP_INFO(this->get_logger(), "Projection exception: %s", e.what());
+                RCLCPP_DEBUG(this->get_logger(), "Projection exception: %s", e.what());
             }
             // Check if within bounds & in front of the boat
             if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
