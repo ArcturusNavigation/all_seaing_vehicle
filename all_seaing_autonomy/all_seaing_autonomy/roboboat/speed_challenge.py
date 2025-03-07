@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-from ast import Num
 import rclpy
 from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
 
-
-from all_seaing_interfaces.msg import ObstacleMap, Obstacle, LabeledBoundingBox2DArray, LabeledBoundingBox2D
+from all_seaing_interfaces.msg import ObstacleMap, LabeledBoundingBox2DArray
 from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Header, ColorRGBA
 from sensor_msgs.msg import CameraInfo
-from visualization_msgs.msg import Marker, MarkerArray
+from visualization_msgs.msg import MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
 from tf_transformations import euler_from_quaternion
 
@@ -25,8 +22,8 @@ TIMER_PERIOD = 1 / 60
 
 class Bbox:
     def __init__(self, bbox_msg):
-        self.x = bbox_msg.min_x
-        self.y = bbox_msg.min_y
+        self.x = (bbox_msg.max_x + bbox_msg.min_x) / 2
+        self.y = (bbox_msg.max_y + bbox_msg.min_y) / 2
         self.w = bbox_msg.max_x-bbox_msg.min_x
         self.h = bbox_msg.max_y-bbox_msg.min_y
 
@@ -79,9 +76,8 @@ class SpeedChange(ActionServerBase):
         self.home_pos = (0, 0)
         self.blue_buoy_pos = (0, 0)
         self.runnerActivated = False
-        
-        # NOTE: in qualifying round we assume we enter from the correct direction.
 
+        # NOTE: in qualifying round we assume we enter from the correct direction.
 
         # unit vector in the direction of the blue buoy
         # ex: (0, -1) for south (-y), (0,1) for north (+y)
@@ -94,18 +90,15 @@ class SpeedChange(ActionServerBase):
         self.seg_bboxes = deque()
         self.max_seg_bboxes = 10 # guarantee this is even
 
-
-
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
         self.blue_labels = set()
         self.red_labels = set()
         self.green_labels = set()
 
-
         # TODO: change the param to be the same between is_sim and not
         # too sleepy, dont want to break things.
-        # CODE IS COPIED FROM FOLLOW_BUOY_PATH,SUBJECT TO CHANGES
+        # CODE IS COPIED FROM FOLLOW_BUOY_PATH, SUBJECT TO CHANGES
         self.declare_parameter(
             "color_label_mappings_file",
             os.path.join(
@@ -116,15 +109,13 @@ class SpeedChange(ActionServerBase):
         color_label_mappings_file = self.get_parameter(
             "color_label_mappings_file"
         ).value
+
         with open(color_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
         self.red_labels.add(label_mappings["red"])
         self.green_labels.add(label_mappings["green"])
 
-
         if self.is_sim:
-            # hardcoded from reading YAML
-            # self.blue_labels.add(label_mappings["blue"])
             # TODO: for SIM ONLY (no blue buoy)
             self.blue_labels.add(label_mappings["red"])
         else:
@@ -134,16 +125,18 @@ class SpeedChange(ActionServerBase):
                     bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
                 ),
             )
+
             buoy_label_mappings_file = self.get_parameter(
                 "buoy_label_mappings_file"
             ).value
+
             with open(buoy_label_mappings_file, "r") as f:
                 label_mappings = yaml.safe_load(f)
+
             for buoy_label in ["blue_buoy", "blue_circle", "blue_racquet_ball"]:
                 self.blue_labels.add(label_mappings[buoy_label])
 
         self.obstacles = []
-
 
     def reset_challenge(self):
         '''
@@ -162,7 +155,6 @@ class SpeedChange(ActionServerBase):
         # station keep logic
         self.move_to_point(self.robot_pos)
 
-
         # TODO: GET RID OF THIS, FOR TESTING IN SIM ONLY
         # assumes LED has already shifted color
         self.runnerActivated = True
@@ -180,7 +172,7 @@ class SpeedChange(ActionServerBase):
                 task_result = self.probe_blue_buoy()
                 self.end_process("Speed challenge task ended.")
                 return task_result
-                
+
             time.sleep(TIMER_PERIOD)
 
         # If we exit the `while rclpy.ok()` loop somehow
@@ -191,26 +183,29 @@ class SpeedChange(ActionServerBase):
     def seg_bbox_cb(self, msg):
         '''
         Handles when an color segmented image gets published
-        '''
-
-        '''
         For sim
         '''
         self.runnerActivated = True
-
         self.seg_bboxes.append(msg.boxes)
+
+        # wait until bounding box frame buffer is long enough to detect a signal change
         if len(self.seg_bboxes) > self.max_seg_bboxes:
             self.seg_bboxes.popleft()
         else:
             return
+
+        # do not run if signal change has already been detected
         if self.runnerActivated:
             return
 
+        # frame buffer
         all_seg_bboxes = list(self.seg_bboxes)
 
+        # classify frame buffer
         redBboxes = []
         greenBboxes = []
-        for frame in all_seg_bboxes: #fixed time, frame= LabeledBoundingBox2D[]
+
+        for frame in all_seg_bboxes: # fixed time, frame :: LabeledBoundingBox2D[]
             redBboxes.append([])
             greenBboxes.append([])
             for box in frame:
@@ -221,7 +216,6 @@ class SpeedChange(ActionServerBase):
 
         cutoff = len(all_seg_bboxes)//2
         beforeRed = redBboxes[0:cutoff]
-        afterRed = redBboxes[cutoff:len(redBboxes)]
         beforeGreen = greenBboxes[0:cutoff]
         afterGreen = greenBboxes[cutoff:len(greenBboxes)]
 
@@ -229,9 +223,10 @@ class SpeedChange(ActionServerBase):
         epsilon = 0.02*math.sqrt(self.image_size[0]**2 + self.image_size[1]**2)
         lmbda = epsilon
         p = 5
-        limit = 0.5
+        limit = 0.25
 
-        if self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+        # run advanced signal processing algorithm
+        if self.led_changed(beforeRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
             self.get_logger().info("Detected LED color change!")
             self.runnerActivated = True
 
@@ -256,21 +251,26 @@ class SpeedChange(ActionServerBase):
     def probe_blue_buoy(self):
         '''
         Function to find the blue buoy by moving near it (general direction).
-        Keeps on appending waypoints to the north/south until it finds 
+        Keeps on appending waypoints to the north/south until it finds
         '''
         self.get_logger().info("Probing for blue buoy")
         max_guide_d = 30
-        guide_point = (max_guide_d*self.buoy_direction[0] + self.robot_pos[0], 
-                        max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
+        guide_point = (
+            max_guide_d*self.buoy_direction[0] + self.robot_pos[0],
+            max_guide_d*self.buoy_direction[1] + self.robot_pos[1]
+        )
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
 
         future = self.move_to_point(guide_point)
         future.add_done_callback(self.future_done)
+
         while self.following_guide:
             if self.blue_buoy_detected():
-                self.move_to_point(self.robot_pos,is_stationary=False)
+                self.move_to_point(self.robot_pos, is_stationary=False)
                 break
+
             time.sleep(TIMER_PERIOD)
+
         return self.circle_blue_buoy()
 
     def future_done(self, future):
@@ -288,26 +288,26 @@ class SpeedChange(ActionServerBase):
         if not self.blue_buoy_detected():
             self.get_logger().info("task 4 blue buoy probing exited without finding blue buoy")
             return Task.Result(success=False)
-        
-        #circle the blue buoy like a baseball diamond
-        # a better way to do this might be to have the astar run to original cell, 
+
+        # circle the blue buoy like a baseball diamond
+        # a better way to do this might be to have the A* run to original cell,
         # but require the path to go around buoy
 
         t_o = self.turn_offset
         first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
         second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
         third_dir = (-first_dir[0]*t_o, -first_dir[1]*t_o)
-        
+
         first_base = self.add_tuple(self.blue_buoy_pos, first_dir)
         second_base = self.add_tuple(self.blue_buoy_pos, second_dir)
         third_base = self.add_tuple(self.blue_buoy_pos, third_dir)
-        
+
         self.move_to_point(first_base)
         self.move_to_point(second_base)
         self.move_to_point(third_base)
 
         return self.return_to_start()
-    
+
     def return_to_start(self):
         '''
         After circling the buoy, return to the starting position.
@@ -317,7 +317,7 @@ class SpeedChange(ActionServerBase):
         return Task.result(success=True)
 
     # robust realtime visual signal processing
-    def led_changed(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
+    def led_changed(self, beforeRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
         '''
         beforeRed :: [[Bbox]] | len(beforeRed) > 0
         frames with red bounding boxes before signal event
@@ -475,6 +475,9 @@ class SpeedChange(ActionServerBase):
         Check if the blue buoy for turning is detected (returns boolean).
         Also sets the position of the blue buoy if it is found.
         '''
+        if self.obstacles is None:
+            return False
+
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
                 # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
@@ -482,13 +485,14 @@ class SpeedChange(ActionServerBase):
                 self.buoy_found = True
                 self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
                 break
-        self.get_logger().info(f"blue buoy found: {self.buoy_found}.") 
+
+        self.get_logger().info(f"blue buoy found: {self.buoy_found}.")
         return self.buoy_found
 
     def add_tuple(self, a, b):
         '''
         function to add two tuples
-        why is this here
+        functional programming at its finest
         '''
         return tuple(sum(x) for x in zip(a, b))
 
@@ -500,7 +504,6 @@ def main(args=None):
     executor.spin()
     node.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()
