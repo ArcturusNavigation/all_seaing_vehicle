@@ -228,7 +228,7 @@ class SpeedChange(ActionServerBase):
                 yaw_diff -= math.pi
             elif yaw_diff < -math.pi:
                 yaw_diff += math.pi
-            if (abs(yaw_diff) > math.pi * (8/9)):
+            if (abs(yaw_diff) > math.pi * (16/17)):
                 self.current_loop_index += 1
         
             #or exit when redgerentrigger
