@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.action import ActionServer
+from rclpy.action import ActionServer, ActionClient
 from rclpy.executors import MultiThreadedExecutor
 
 
@@ -52,6 +52,8 @@ class MovingDelivery(ActionServerBase):
             .get_parameter_value()
             .double_array_value
         )
+        self.water_client = ActionClient(self, Task, "water_delivery_server")
+        self.ball_client = ActionClient(self, Task, "ball_delivery_server")
 
         self.declare_parameter("forward_speed", 5.0)
         self.declare_parameter("max_yaw", 1.0)
@@ -101,6 +103,26 @@ class MovingDelivery(ActionServerBase):
     def bbox_callback(self, msg):
         self.bboxes = msg.boxes
 
+    def call_delivery_server(self, delivery_type="water"):
+        if delivery_type == "water":
+            client = self.water_client
+        elif delivery_type == "ball":
+            client = self.ball_client
+
+        goal = Task.Goal()
+        future = client.send_goal_async(goal)
+        rclpy.spin_until_future_complete(self, future)
+
+        if future.result() is None:
+            self.get_logger().info("didnt work for some reason")
+            return False
+        
+
+        if future.result().result.success:
+            self.get_logger().info(f"{delivery_type} delivery succeeded!")
+            return True
+
+    
     def control_loop(self):
         if self.width is None or self.bboxes is None:
             return
@@ -135,8 +157,10 @@ class MovingDelivery(ActionServerBase):
 
         if triangle_center_x is None:
             if cross_width > threshold_width:
-                # Call on ball delivery
-                random_variable = None
+                if self.call_delivery_server("ball"):
+                    self.result = True
+                    return
+
             else:
                 offset = cross_center_x - self.width / 2.0
                 dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
@@ -144,7 +168,9 @@ class MovingDelivery(ActionServerBase):
         elif cross_center_x is None:
             if triangle_width >= threshold_width:
                 # Call on water delivery
-                random_variable = None
+                if self.call_delivery_server("water"):
+                    self.result = True
+                    return
             else:
                 offset = triangle_center_x - self.width / 2.0
                 dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
@@ -153,7 +179,9 @@ class MovingDelivery(ActionServerBase):
             if triangle_width >= cross_width:
                 if triangle_width >= threshold_width:
                     # Call on water delivery
-                    random_variable = None
+                    if self.call_delivery_server("water"):
+                        self.result = True
+                        return
                 else:
                     offset = triangle_center_x - self.width / 2.0
                     dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
@@ -161,7 +189,10 @@ class MovingDelivery(ActionServerBase):
             else:
                 if cross_width > threshold_width:
                     # Call on ball delivery
-                    random_variable = None
+                    if self.call_delivery_server("ball"):
+                        self.result = True
+                        return
+                    
                 else:
                     offset = cross_center_x - self.width / 2.0
                     dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
