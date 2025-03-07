@@ -10,6 +10,7 @@ from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, LabeledBounding
 from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
 from std_msgs.msg import Header, ColorRGBA
+from geometry_msgs.msg import Quaternion, Vector3
 from sensor_msgs.msg import CameraInfo, Imu
 from all_seaing_common.action_server_base import ActionServerBase
 from tf_transformations import euler_from_quaternion
@@ -29,7 +30,7 @@ class SpeedChange(ActionServerBase):
         self._action_server = ActionServer(
             self,
             Task,
-            "speed_challenge",
+            "speed_challenge_pid",
             execute_callback=self.execute_callback,
             cancel_callback=self.default_cancel_callback,
         )
@@ -46,7 +47,7 @@ class SpeedChange(ActionServerBase):
         )
 
         self.imu_sub = self.create_subscription(
-            Imu, "/mavros/imu/data/", self.imu_cb, 10
+            Imu, "imu", self.imu_cb, 10
         )
 
         self.control_pub = self.create_publisher(
@@ -57,7 +58,12 @@ class SpeedChange(ActionServerBase):
 
 
         pid_vals = (
-            self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
+            self.declare_parameter("pid_vals", [0.003, 0.0, 0.002])
+            .get_parameter_value()
+            .double_array_value
+        )
+        straight_pid_vals = (
+            self.declare_parameter("straight_pid_vals", [2.0, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
@@ -66,19 +72,23 @@ class SpeedChange(ActionServerBase):
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
         self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
 
+        
+        self.prev_update_time = self.get_clock().now()
+        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
+
         self.pid = PIDController(*pid_vals)
         self.pid.set_effort_min(-self.max_yaw_rate)
         self.pid.set_effort_max(self.max_yaw_rate)
-        self.prev_update_time = self.get_clock().now()
-        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
+
+        self.straight_pid = PIDController(*straight_pid_vals)
+        self.straight_pid.set_effort_min(-self.max_yaw_rate)
+        self.straight_pid.set_effort_max(self.max_yaw_rate)
 
 
 
 
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
-        self.declare_parameter("turn_offset", 1.0)
-        self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
         
         # NOTE: in qualifying round we assume we enter from the correct direction.
 
@@ -92,12 +102,15 @@ class SpeedChange(ActionServerBase):
         self.blue_labels = set()
         self.red_labels = set()
         self.green_labels = set()
-        self.loops = []
-        self.blue_x = 0
+        self.start_blue_x = 0
         self.current_loop_index = 0
         self.prev_loop_index = 0
 
         self.starting_yaw = 0
+
+        self.imu_ang_vel = Vector3()
+        self.imu_orientation = Quaternion()
+        self.imu_lin_acc = Vector3()
 
 
         # TODO: change the param to be the same between is_sim and not
@@ -116,17 +129,23 @@ class SpeedChange(ActionServerBase):
         ).value
         with open(color_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
-        self.red_labels.add(label_mappings["red"])
-        self.green_labels.add(label_mappings["green"])
-        self.blue_labels.add(label_mappings["blue"])
+        if self.is_sim:
+            self.red_labels.add(label_mappings["red"])
+            self.green_labels.add(label_mappings["green"])
+            self.blue_labels.add(label_mappings["black"])
+            self.blue_labels.add(label_mappings["blue"])
+        else:
+            self.red_labels.add(label_mappings["red"])
+            self.green_labels.add(label_mappings["green"])
+            self.blue_labels.add(label_mappings["black"])
+            self.blue_labels.add(label_mappings["blue"])
 
     def reset_challenge(self):
         '''
         Readies the server for the upcoming speed challenge.
         '''
         self.current_loop_index = 0
-        self.loops
-        pass
+        self.blue_center_x = 0
 
     def camera_info_cb(self, msg):
         '''
@@ -147,9 +166,8 @@ class SpeedChange(ActionServerBase):
 
         self.reset_challenge()
         self.get_logger().info("Speed challenge setup completed.")
+        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
-
-        # FTB
         # Trace a long path and turn when blue buoy detected
         # trace a somewhat long path and run FTB when gates are detected
 
@@ -160,9 +178,8 @@ class SpeedChange(ActionServerBase):
                 goal_handle.canceled()
                 return Task.Result(success=False)
 
-
             self.run_loop()
-            if (self.current_loop_index == 5):
+            if (self.current_loop_index == 4):
                 self.get_logger().info("Speed challenge task successfully ended.")
                 return Task.Result(success=True)
                 
@@ -180,39 +197,54 @@ class SpeedChange(ActionServerBase):
         self.prev_loop_index = self.current_loop_index
         if self.current_loop_index == 0: #follow buoy
             self.follow_buoy_pid()
-        elif self.current_loop_index == 1: #go straight
-            self.go_straight_pid()
-            self.blue_trigger()
-        elif self.current_loop_index == 2: #circle around
+
+            for box in self.bboxes:
+                if box.label in self.blue_labels:
+                    midpt = (box.max_x + box.min_x) / 2.0
+                    self.blue_start_blue_x = max(self.start_blue_x, midpt)
+
+                    
+        # elif self.current_loop_index == 1: #go straight
+            # self.go_straight_pid()
+            # self.blue_trigger()
+        elif self.current_loop_index == 1: #circle around
             self.blue_buoy_pid()
 
             yaw_diff = self.get_yaw()-self.starting_yaw
-            if yaw_diff > 180:
-                yaw_diff -= 180
-            elif yaw_diff < -180:
-                yaw_diff += 180
-            if (abs(yaw_diff) > 170):
+            self.get_logger().info(f"start_blue_x: {self.start_blue_x}")
+            self.get_logger().info(f"{self.get_yaw()}, {self.starting_yaw}")
+
+            if yaw_diff > math.pi:
+                yaw_diff -= math.pi
+            elif yaw_diff < -math.pi:
+                yaw_diff += math.pi
+            if (abs(yaw_diff) > math.pi * (8/9)):
                 self.current_loop_index += 1
+        
+            #or exit when redgerentrigger
+            self.redgreen_trigger()
             # use imu rotation data to exit (a bit over 180 degrees?)
-            pass
-        elif self.current_loop_index == 3: #go straight back
+
+        elif self.current_loop_index == 2: #go straight back
             self.go_straight_pid()
             self.redgreen_trigger()
-            pass
-        elif self.current_loop_index == 4: #
+        elif self.current_loop_index == 3: #
             self.follow_buoy_pid(False)
 
 
         if self.current_loop_index != self.prev_loop_index:
-                self.starting_yaw = self.get_yaw()
+            self.get_logger().info(f"current loop index: {self.current_loop_index}")
+            if self.current_loop_index == 2:
+                self.get_logger().info(f"start_blue_x: {self.start_blue_x}")
+            self.starting_yaw = self.get_yaw()
 
-    def blue_trigger(self):
-        for box in self.bboxes:
-            if box.label in self.blue_labels:
-                self.current_loop_index += 1
-                midpt = (box.max_x + box.min_x) / 2.0
-                self.blue_x = midpt
-                return
+    # def blue_trigger(self):
+    #     for box in self.bboxes:
+    #         if box.label in self.blue_labels:
+    #             self.current_loop_index += 1
+    #             midpt = (box.max_x + box.min_x) / 2.0
+    #             self.blue_x = midpt
+    #             return
 
     def redgreen_trigger(self):
         for box in self.bboxes:
@@ -228,8 +260,9 @@ class SpeedChange(ActionServerBase):
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         offset = yaw-self.starting_yaw
-        self.pid.update(offset, dt)            
-        yaw_rate = self.pid.get_effort()
+        # self.get_logger().info(f"starting yaw/current yaw: {self.starting_yaw}, {yaw}")
+        self.straight_pid.update(offset, dt)            
+        yaw_rate = self.straight_pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 
         control_msg = ControlOption()
@@ -240,17 +273,16 @@ class SpeedChange(ActionServerBase):
         self.control_pub.publish(control_msg)
     
     def blue_buoy_pid(self):
-        blue_center_x = self.image_size[0]/2
-        blue_area = 0
+        cur_blue_x = 0
 
         for box in self.bboxes:
-            area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
             midpt = (box.max_x + box.min_x) / 2.0
-            if box.label in self.blue_labels and area > blue_area:
-                blue_area = area
-                blue_center_x = midpt
+            cur_blue_x = max(cur_blue_x, midpt)
 
-        offset = blue_center_x - self.blue_x
+        if cur_blue_x == 0:
+            self.get_logger().info("uh oh no blue labelled objects found")
+
+        offset = cur_blue_x - self.start_blue_x
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
@@ -261,7 +293,7 @@ class SpeedChange(ActionServerBase):
         control_msg.priority = 1
         control_msg.twist.linear.x = float(self.forward_speed)
         control_msg.twist.linear.y = 0.0
-        control_msg.twist.angular.z = float(yaw_rate)
+        control_msg.twist.angular.z = float(-yaw_rate)
         self.control_pub.publish(control_msg)
         
 
@@ -283,15 +315,16 @@ class SpeedChange(ActionServerBase):
                 red_center_x = midpt
         
         if red_center_x is None and green_center_x is None:
-            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
-                self.get_logger().info("no more buoys killing")
+            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 2.0:
+                self.get_logger().info("no more buoys killing 1")
                 self.current_loop_index += 1
             return
         else:
-            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 6.0:
-                self.get_logger().info("no more buoys killing")
-                self.current_loop_index += 1
-                return
+            # if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 6.0:
+            #     self.get_logger().info(f"{self.get_clock().now().nanoseconds}, {self.time_last_seen_buoys}")
+            #     self.get_logger().info("no more buoys killing 2")
+            #     self.current_loop_index += 1
+            #     return
             self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
         left_x = red_center_x
@@ -304,6 +337,7 @@ class SpeedChange(ActionServerBase):
 
         # self.image_size[0] / 2.0 is img ctr
         offset = gate_ctr - self.image_size[0] / 2.0
+        # self.get_logger().info(f"{offset}")
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
@@ -319,12 +353,13 @@ class SpeedChange(ActionServerBase):
             control_msg.twist.angular.z *= -1
         self.control_pub.publish(control_msg)
 
-    def get_euler(quat):
+    def get_euler(self, quat):
         (row, pitch, yaw) = euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
         return row, pitch, yaw
     
     def get_yaw(self):
-        return self.get_euler(self.imu_orientation)[2]
+        euler = self.get_euler(self.imu_orientation)
+        return euler[2]
     
 
 

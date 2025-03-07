@@ -331,13 +331,22 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    speed_challenge = launch_ros.actions.Node(
+    speed_challenge_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="speed_challenge.py",
+        executable="speed_challenge_pid.py",
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
-            {"turn_offset": 1.0}
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
+            ),
+            (
+                "imu",
+                "/wamv/sensors/imu/imu/data"
+            )
         ],
     )
 
@@ -351,8 +360,8 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             (
                 "camera_info",
-                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
-            ),
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
+            )
         ],
     )
 
@@ -431,7 +440,7 @@ def launch_setup(context, *args, **kwargs):
         task_init_server,
         # follow_buoy_path,
         follow_buoy_pid,
-        speed_challenge,
+        speed_challenge_pid,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,
