@@ -239,7 +239,7 @@ class MovingDelivery(ActionServerBase):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = FollowBuoyPID()
+    node = MovingDelivery()
     executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
     executor.spin()
