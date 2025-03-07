@@ -42,6 +42,9 @@ def launch_setup(context, *args, **kwargs):
     contour_matching_color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
+    buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+    )
 
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
@@ -150,6 +153,53 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
         ]
+    )
+
+    buoy_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"label_config": "color_label_mappings"},
+            {"conf": 0.6},
+        ],
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
+    shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "shape_boxes"),
+        ],
+        output="screen",
+    )
+
+    static_shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "static_shape_boxes"),
+        ],
+        output="screen",
     )
 
     point_cloud_filter_node = launch_ros.actions.Node(
@@ -329,6 +379,21 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": False},
+            {"buoy_label_mappings_file": buoy_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
@@ -389,7 +454,8 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
-        # yolov8_node,
+        buoy_yolo_node,
+        shape_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,

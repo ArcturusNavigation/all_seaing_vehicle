@@ -270,6 +270,22 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    static_shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "static_shape_boxes"),
+        ],
+        output="screen",
+    )
+
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
@@ -371,6 +387,7 @@ def launch_setup(context, *args, **kwargs):
         thrust_commander_node,
         buoy_yolo_node,
         shape_yolo_node,
+        static_shape_yolo_node,
         run_tasks,
         task_init_server, 
         follow_buoy_path,

@@ -22,6 +22,9 @@ def launch_setup(context, *args, **kwargs):
     color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
     )
+    buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+    )
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
@@ -122,12 +125,44 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_2025"},
-            {"conf": 0.6},
             {"label_config": "color_label_mappings"},
+            {"conf": 0.6},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
             ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
+    shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "turret_image"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "shape_boxes"),
+        ],
+        output="screen",
+    )
+
+    static_shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "shape_boxes"),
         ],
         output="screen",
     )
@@ -213,6 +248,21 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": False},
+            {"buoy_label_mappings_file": buoy_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
+        ],
+    )
+
     return [
         # set_use_sim_time,
         ekf_node,
@@ -220,11 +270,14 @@ def launch_setup(context, *args, **kwargs):
         keyboard_ld,
         run_tasks,
         task_init_server, 
-        follow_buoy_path,
+        # follow_buoy_path,
+        docking,
         buoy_yolo_node,
+        shape_yolo_node,
+        static_shape_yolo_node,
         bbox_project_pcloud_node,
         # object_tracking_map_node,
-        object_tracking_map_euclidean_node,
+        # object_tracking_map_euclidean_node,
         # obstacle_detector_node,
         # color_segmentation_node,
         # obstacle_bbox_overlay_node
