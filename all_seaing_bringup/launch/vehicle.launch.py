@@ -116,9 +116,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
-            {"forward_speed": 1.8},
+            {"forward_speed": 1.2},
             {"max_yaw": 0.2},
-            {"pid_vals": [0.0006, 0.0, 0.0]},
+            {"pid_vals": [0.0006, 0.0, 0.0001]},
+        ],
+        remappings=[
+            ("camera_info", "/zed/zed_node/rgb/camera_info"),
         ],
     )
 
@@ -258,6 +261,7 @@ def launch_setup(context, *args, **kwargs):
             {"model": "roboboat_2025"},
             {"label_config": "color_label_mappings"},
             {"conf": 0.6},
+            {"use_color_names": True},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
@@ -273,6 +277,7 @@ def launch_setup(context, *args, **kwargs):
             {"model": "roboboat_shape_2025"},
             {"label_config": "shape_label_mappings"},
             {"conf": 0.4},
+            {"use_color_names": False},
         ],
         remappings=[
             ("image", "turret_image"),
