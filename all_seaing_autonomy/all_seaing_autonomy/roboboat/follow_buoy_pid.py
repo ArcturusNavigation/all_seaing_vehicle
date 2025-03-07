@@ -142,15 +142,24 @@ class FollowBuoyPID(ActionServerBase):
         # but diff size should be a rotation and probably 
         # a bit of a y shift too?
 
+        forward = False
         for box in self.bboxes:
             area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
             midpt = (box.max_x + box.min_x) / 2.0
+            width = box.max_x - box.min_x
             if box.label in self.green_labels and area > green_area:
                 green_area = area
                 green_center_x = midpt
+                # sets flag if width large enough regardless of if sees anything
+                if width >= self.width * 0.15:
+                    forward = True
+                    self.forward_start = self.get_clock().now().nanoseconds / 1e9
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
                 red_center_x = midpt
+                if width >= self.width * 0.15:
+                    forward = True
+                    self.forward_start = self.get_clock().now().nanoseconds / 1e9
             elif box.label in self.yellow_labels and area > yellow_area:
                 yellow_area = area
                 yellow_left = box.min_x
@@ -169,6 +178,14 @@ class FollowBuoyPID(ActionServerBase):
             yaw0 = True
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
                 self.get_logger().info("no more buoys killing")
+                # wait 1 second, then send a stopping control msg (in case we haven't fully passed the buoys)
+                time.sleep(1)
+                control_msg = ControlOption()
+                control_msg.priority = 1
+                control_msg.twist.linear.x = 0.0
+                control_msg.twist.linear.y = 0.0
+                control_msg.twist.angular.z = 0.0
+                self.control_pub.publish(control_msg)
                 self.result = True
             return
         else:
@@ -187,12 +204,16 @@ class FollowBuoyPID(ActionServerBase):
         img_ctr = self.width / 2.0
 
         if left_x is None: 
-            if right_x < img_ctr:
+            if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
+                yaw0 = True
+            elif right_x < img_ctr:
                 left_x = right_x - (self.width * 0.75)
             else:
                 left_x = 0
         if right_x is None: 
-            if left_x >= img_ctr:
+            if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
+                yaw0 = True
+            elif left_x >= img_ctr:
                 right_x = left_x + (self.width * 0.75)
             else:
                 right_x = self.width - 1
