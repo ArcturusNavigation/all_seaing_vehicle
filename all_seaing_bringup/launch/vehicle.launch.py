@@ -28,6 +28,9 @@ def launch_setup(context, *args, **kwargs):
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
+    buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+    )
 
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
@@ -107,6 +110,21 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
+        ],
+    )
+    
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": False},
+            {"buoy_label_mappings_file": buoy_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
         ],
     )
 
@@ -391,6 +409,7 @@ def launch_setup(context, *args, **kwargs):
         run_tasks,
         task_init_server, 
         follow_buoy_path,
+
         grid_map_generator,
         central_hub,
         amcl_ld,
