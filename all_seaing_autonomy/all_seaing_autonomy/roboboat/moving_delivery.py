@@ -123,6 +123,15 @@ class MovingDelivery(ActionServerBase):
             return True
 
     
+    def send_control_msg(self, x, y, angular):
+        control_msg = ControlOption()
+        control_msg.priority = 1
+        control_msg.twist.linear.x = x
+        control_msg.twist.linear.y = y
+        control_msg.twist.angular.z = angular
+        self.control_pub.publish(control_msg)
+        return
+
     def control_loop(self):
         if self.width is None or self.bboxes is None:
             return
@@ -162,41 +171,39 @@ class MovingDelivery(ActionServerBase):
                     return
 
             else:
-                offset = cross_center_x - self.width / 2.0
-                dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-                self.pid.update(offset, dt)
+                self.send_control_msg(float(self.forward_speed * 0.2), 0, 0)
         elif cross_center_x is None:
             if triangle_width >= threshold_width:
+                self.send_control_msg(0, 0, 0)
                 # Call on water delivery
                 if self.call_delivery_server("water"):
                     self.result = True
                     return
             else:
-                offset = triangle_center_x - self.width / 2.0
-                dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-                self.pid.update(offset, dt)
+                self.send_control_msg(float(self.forward_speed * 0.2), 0, 0)
+
         else:
             if triangle_width >= cross_width:
                 if triangle_width >= threshold_width:
+                    self.send_control_msg(0, 0, 0)
                     # Call on water delivery
                     if self.call_delivery_server("water"):
                         self.result = True
                         return
                 else:
-                    offset = triangle_center_x - self.width / 2.0
-                    dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-                    self.pid.update(offset, dt)
+                    self.send_control_msg(float(self.forward_speed * 0.2), 0, 0)
+
             else:
                 if cross_width > threshold_width:
+                    self.send_control_msg(0, 0, 0)
                     # Call on ball delivery
                     if self.call_delivery_server("ball"):
                         self.result = True
                         return
                     
                 else:
-                    offset = cross_center_x - self.width / 2.0
-                    dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-                    self.pid.update(offset, dt)
+                    self.send_control_msg(float(self.forward_speed * 0.2), 0, 0)
+
 
         # publish control at the end
         control_msg = ControlOption()
