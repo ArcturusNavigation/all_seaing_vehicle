@@ -67,6 +67,11 @@ class SpeedChange(ActionServerBase):
             .get_parameter_value()
             .double_array_value
         )
+        blue_pid_vals = (
+            self.declare_parameter("blue_pid_vals", [0.0045, 0.0, 0.0002])
+            .get_parameter_value()
+            .double_array_value
+        )
         self.declare_parameter("forward_speed", 5.0)
         self.declare_parameter("max_yaw", 1.0)
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
@@ -83,6 +88,10 @@ class SpeedChange(ActionServerBase):
         self.straight_pid = PIDController(*straight_pid_vals)
         self.straight_pid.set_effort_min(-self.max_yaw_rate)
         self.straight_pid.set_effort_max(self.max_yaw_rate)
+
+        self.blue_pid = PIDController(*blue_pid_vals)
+        self.blue_pid.set_effort_min(-self.max_yaw_rate)
+        self.blue_pid.set_effort_max(self.max_yaw_rate)
 
 
 
@@ -103,6 +112,7 @@ class SpeedChange(ActionServerBase):
         self.red_labels = set()
         self.green_labels = set()
         self.start_blue_x = 0
+        self.cur_blue_x = 0
         self.current_loop_index = 0
         self.prev_loop_index = 0
 
@@ -195,13 +205,14 @@ class SpeedChange(ActionServerBase):
         Control which PID loop is being ran.
         '''
         self.prev_loop_index = self.current_loop_index
+        self.start_blue_x = 0.28 * self.image_size[0]
         if self.current_loop_index == 0: #follow buoy
             self.follow_buoy_pid()
 
             for box in self.bboxes:
                 if box.label in self.blue_labels:
                     midpt = (box.max_x + box.min_x) / 2.0
-                    self.blue_start_blue_x = max(self.start_blue_x, midpt)
+                    
 
                     
         # elif self.current_loop_index == 1: #go straight
@@ -211,8 +222,7 @@ class SpeedChange(ActionServerBase):
             self.blue_buoy_pid()
 
             yaw_diff = self.get_yaw()-self.starting_yaw
-            self.get_logger().info(f"start_blue_x: {self.start_blue_x}")
-            self.get_logger().info(f"{self.get_yaw()}, {self.starting_yaw}")
+            # self.get_logger().info(f"{self.get_yaw()}, {self.starting_yaw}")
 
             if yaw_diff > math.pi:
                 yaw_diff -= math.pi
@@ -222,7 +232,7 @@ class SpeedChange(ActionServerBase):
                 self.current_loop_index += 1
         
             #or exit when redgerentrigger
-            self.redgreen_trigger()
+            # self.redgreen_trigger()
             # use imu rotation data to exit (a bit over 180 degrees?)
 
         elif self.current_loop_index == 2: #go straight back
@@ -236,6 +246,11 @@ class SpeedChange(ActionServerBase):
             self.get_logger().info(f"current loop index: {self.current_loop_index}")
             if self.current_loop_index == 2:
                 self.get_logger().info(f"start_blue_x: {self.start_blue_x}")
+            if self.current_loop_index == 1:
+                for box in self.bboxes:
+                    if box.label in self.blue_labels:
+                        midpt = (box.max_x + box.min_x) / 2.0
+                        self.cur_blue_x = max(self.cur_blue_x, midpt)
             self.starting_yaw = self.get_yaw()
 
     # def blue_trigger(self):
@@ -273,27 +288,35 @@ class SpeedChange(ActionServerBase):
         self.control_pub.publish(control_msg)
     
     def blue_buoy_pid(self):
-        cur_blue_x = 0
+        self.prev_blue_x = self.cur_blue_x
+        self.cur_blue_x = 0
+
+        epsilon = 100
 
         for box in self.bboxes:
+            #some sort of filtering?
             midpt = (box.max_x + box.min_x) / 2.0
-            cur_blue_x = max(cur_blue_x, midpt)
+            if abs(midpt-self.prev_blue_x) > epsilon:
+                continue
+            self.cur_blue_x = max(self.cur_blue_x, midpt)
 
-        if cur_blue_x == 0:
+        if self.cur_blue_x == 0:
+            self.cur_blue_x = self.prev_blue_x
             self.get_logger().info("uh oh no blue labelled objects found")
 
-        offset = cur_blue_x - self.start_blue_x
+        offset = self.cur_blue_x - self.start_blue_x
+        self.get_logger().info(f"{offset}")
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.pid.update(offset, dt)            
-        yaw_rate = self.pid.get_effort()
+        self.blue_pid.update(offset, dt)            
+        yaw_rate = self.blue_pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 
         control_msg = ControlOption()
         control_msg.priority = 1
         control_msg.twist.linear.x = float(self.forward_speed)
         control_msg.twist.linear.y = 0.0
-        control_msg.twist.angular.z = float(-yaw_rate)
+        control_msg.twist.angular.z = float(yaw_rate)
         self.control_pub.publish(control_msg)
         
 
