@@ -112,7 +112,7 @@ private:
     double m_obstacle_seg_thresh;
     double m_obstacle_drop_thresh;
     double m_init_new_cov;
-    bool m_track_robot;
+    bool m_track_robot, m_only_imu;
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;
 

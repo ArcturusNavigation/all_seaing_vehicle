@@ -224,6 +224,7 @@ def launch_setup(context, *args, **kwargs):
             {"new_object_slam_threshold": 2.0},
             {"init_new_cov": 10.0},
             {"track_robot": True},
+            {"only_imu": True},
             {"is_sim": True}
         ]
     )
@@ -398,7 +399,7 @@ def launch_setup(context, *args, **kwargs):
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
-        object_tracking_map_euclidean_node,
+        # object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,
         navigation_server,

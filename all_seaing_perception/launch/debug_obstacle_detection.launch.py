@@ -203,7 +203,8 @@ def launch_setup(context, *args, **kwargs):
             {"new_object_slam_threshold": 2.0},
             {"check_fov": False},
             {"init_new_cov": 10.0},
-            {"track_robot": False},
+            {"track_robot": True},
+            {"only_imu": True},
             {"is_sim": False},
         ]
     )

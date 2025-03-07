@@ -12,6 +12,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
     this->declare_parameter<double>("init_new_cov", 10.0);
     this->declare_parameter<bool>("track_robot", false);
+    this->declare_parameter<bool>("only_imu", false);
     this->declare_parameter<double>("normalize_drop_dist", 1.0);
     this->declare_parameter<double>("odom_refresh_rate", 1000);
 
@@ -25,6 +26,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
     m_init_new_cov = this->get_parameter("init_new_cov").as_double();
     m_track_robot = this->get_parameter("track_robot").as_bool();
+    m_only_imu = this->get_parameter("only_imu").as_bool();
+    
     m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
     m_odom_refresh_rate = this->get_parameter("odom_refresh_rate").as_double();
 
@@ -132,7 +135,11 @@ void ObjectTrackingMap::odom_callback() {
     if (m_track_robot) {
         if (m_first_state) {
             // initialize mean and cov robot pose
-            m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+            if(m_only_imu){
+                m_state = Eigen::Vecto3f(0,0,0);
+            }else{
+                m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+            }
             Eigen::Matrix3f init_pose_noise{
                 {m_xy_noise, 0, 0},
                 {0, m_xy_noise, 0},
@@ -168,19 +175,34 @@ void ObjectTrackingMap::odom_callback() {
         gradients minus the identity matrix, so with this model it is the zero matrix
         */
 
-        mot_const =
+        if(m_only_imu){
+            mot_const =
             Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
-        // mot_grad is still zero
 
-        m_state += F.transpose() * mot_const;
-        Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
-                            F.transpose() * mot_grad * F;
-        // add a consistent amount of noise based on how much the robot moved since the last time
-        Eigen::Matrix3f motion_noise{
-            {m_xy_noise * abs(mot_const[0]), 0, 0},
-            {0, m_xy_noise * abs(mot_const[1]), 0},
-            {0, 0, m_theta_noise * abs(mot_const[2])},
-        };
+            m_state += F.transpose() * mot_const;
+            Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
+                                F.transpose() * mot_grad * F;
+            // add a consistent amount of noise based on how much the robot moved since the last time
+            Eigen::Matrix3f motion_noise{
+                {m_xy_noise * abs(mot_const[0]), 0, 0},
+                {0, m_xy_noise * abs(mot_const[1]), 0},
+                {0, 0, m_theta_noise * abs(mot_const[2])},
+            };
+        }else{
+            mot_const =
+            Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
+            // mot_grad is still zero
+
+            m_state += F.transpose() * mot_const;
+            Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
+                                F.transpose() * mot_grad * F;
+            // add a consistent amount of noise based on how much the robot moved since the last time
+            Eigen::Matrix3f motion_noise{
+                {m_xy_noise * abs(mot_const[0]), 0, 0},
+                {0, m_xy_noise * abs(mot_const[1]), 0},
+                {0, 0, m_theta_noise * abs(mot_const[2])},
+            };
+        }
         m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
         // to see the robot position prediction mean & uncertainty
         this->visualize_predictions();
@@ -453,10 +475,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         Eigen::MatrixXf Psi;
         for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
             if (m_track_robot) {
-                float d_x = m_state(3 + 2 * tracked_id) - m_nav_x;
-                float d_y = m_state(3 + 2 * tracked_id + 1) - m_nav_y;
+                float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
+                float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);
                 float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
+                z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_state(2));
                 Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, 3 + 2 * m_num_obj);
                 F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
                 F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
@@ -547,9 +569,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             };
             if (m_track_robot) {
                 m_state.conservativeResize(3 + 2 * m_num_obj);
-                m_state.tail(2) = Eigen::Vector2f(m_nav_x, m_nav_y) +
-                                  range * Eigen::Vector2f(std::cos(bearing + m_nav_heading),
-                                                          std::sin(bearing + m_nav_heading));
+                m_state.tail(2) = Eigen::Vector2f(m_state(0), m_state(1)) +
+                                  range * Eigen::Vector2f(std::cos(bearing + m_state(2)),
+                                                          std::sin(bearing + m_state(2)));
                 m_cov.conservativeResizeLike(
                     Eigen::MatrixXf::Zero(3 + 2 * m_num_obj, 3 + 2 * m_num_obj));
                 m_cov.bottomRightCorner(2, 2) = init_new_cov;
@@ -563,15 +585,15 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
         int tracked_id = match[i] > 0 ? match[i] : m_num_obj - 1;
         if (m_track_robot) {
-            float d_x = m_state(3 + 2 * tracked_id) - m_nav_x;
-            float d_y = m_state(3 + 2 * tracked_id + 1) - m_nav_y;
+            float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
+            float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);
             float q = d_x * d_x + d_y * d_y;
             Eigen::Matrix<float, 2, 5> h{
                 {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
                  std::sqrt(q) * d_y},
                 {d_y, -d_x, -1, -d_y, d_x},
             };
-            Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
+            Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_state(2));
             Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, 3 + 2 * m_num_obj);
             F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
             F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
