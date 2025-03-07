@@ -262,6 +262,7 @@ def launch_setup(context, *args, **kwargs):
             {"model": "roboboat_2025"},
             {"label_config": "color_label_mappings"},
             {"conf": 0.6},
+            {"use_color_names": True},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
@@ -277,6 +278,7 @@ def launch_setup(context, *args, **kwargs):
             {"model": "roboboat_shape_2025"},
             {"label_config": "shape_label_mappings"},
             {"conf": 0.4},
+            {"use_color_names": False},
         ],
         remappings=[
             ("image", "turret_image"),

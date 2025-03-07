@@ -149,6 +149,11 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         remappings=[
             ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "use_color_names": True,
+            }
         ]
     )
 
