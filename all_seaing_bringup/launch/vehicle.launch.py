@@ -116,9 +116,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
-            {"forward_speed": 1.8},
+            {"forward_speed": 1.2},
             {"max_yaw": 0.2},
-            {"pid_vals": [0.0006, 0.0, 0.0]},
+            {"pid_vals": [0.0009, 0.0, 0.0003]},
+        ],
+        remappings=[
+            ("camera_info", "/zed/zed_node/rgb/camera_info"),
         ],
     )
 

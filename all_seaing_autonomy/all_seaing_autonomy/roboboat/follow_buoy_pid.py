@@ -86,7 +86,7 @@ class FollowBuoyPID(ActionServerBase):
         self.result = False
         self.seen_first_buoy = False
 
-        self.scale_right = 1.3
+        self.scale_right = 1.0
 
         
         self.declare_parameter(
@@ -106,25 +106,12 @@ class FollowBuoyPID(ActionServerBase):
         # hardcoded from reading YAML
         self.green_labels.add(label_mappings["green"])
         self.red_labels.add(label_mappings["red"])
-        self.yellow_labels.add(label_mappings["black"])
-        
-        # else:
-        #     self.declare_parameter(
-        #         "buoy_label_mappings_file",
-        #         os.path.join(
-        #             bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
-        #         ),
-        #     )
+        if self.is_sim:
+            self.yellow_labels.add(label_mappings["black"])
+        else:
+            self.yellow_labels.add(label_mappings["yellow"])
 
-        #     buoy_label_mappings_file = self.get_parameter(
-        #         "buoy_label_mappings_file"
-        #     ).value
-        #     with open(buoy_label_mappings_file, "r") as f:
-        #         label_mappings = yaml.safe_load(f)
-        #     for buoy_label in ["green_buoy", "green_circle", "green_pole_buoy"]:
-        #         self.green_labels.add(label_mappings[buoy_label])
-        #     for buoy_label in ["red_buoy", "red_circle", "red_pole_buoy"]:
-        #         self.red_labels.add(label_mappings[buoy_label])
+        
 
 
     def intrinsics_callback(self, msg):
@@ -219,7 +206,8 @@ class FollowBuoyPID(ActionServerBase):
         if yellow_left is not None:
             # if yellow_left <= right_ctr_thresh and yellow_right >= right_ctr_thresh:
 
-            if yellow_left <= img_ctr and yellow_right >= img_ctr:
+            yellow_ctr = (yellow_left + yellow_right) / 2.0
+            if yellow_left <= img_ctr and yellow_right >= img_ctr and left_x <= yellow_ctr <= right_x:
                 # yellow buoy is in the middle (on both sides of camera)
                 left_diff = img_ctr - yellow_left
                 right_diff = yellow_right - img_ctr
