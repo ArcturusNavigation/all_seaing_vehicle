@@ -56,6 +56,7 @@ class FollowBuoyPID(ActionServerBase):
 
 
         self.declare_parameter("forward_speed", 5.0)
+        # Rotation around the vertical axis of an boat
         self.declare_parameter("max_yaw", 1.0)
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
         self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
@@ -159,15 +160,25 @@ class FollowBuoyPID(ActionServerBase):
         # but diff size should be a rotation and probably 
         # a bit of a y shift too?
 
+        forward = False
         for box in self.bboxes:
             area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
             midpt = (box.max_x + box.min_x) / 2.0
+            width = box.max_x - box.min_x
             if box.label in self.green_labels and area > green_area:
                 green_area = area
                 green_center_x = midpt
+                # sets flag if width large enough regardless of if sees anything
+                if width >= self.width * 0.15:
+                    forward = True
+                    self.forward_start = self.get_clock().now()
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
                 red_center_x = midpt
+                # sets flag if width large enough regardless of if sees anything
+                if width >= self.width * 0.15:
+                    forward = True
+                    self.forward_start = self.get_clock().now()
             elif box.label in self.yellow_labels and area > yellow_area:
                 yellow_area = area
                 yellow_left = box.min_x
@@ -182,7 +193,7 @@ class FollowBuoyPID(ActionServerBase):
         #     return
 
         yaw0 = False
-        if red_center_x is None and green_center_x is None:
+        if red_center_x is None and green_center_x is None: # change
             
             yaw0 = True
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
@@ -194,7 +205,7 @@ class FollowBuoyPID(ActionServerBase):
 
         if red_center_x is not None and green_center_x is not None:
             self.red_green_ratio = red_area / green_area
-        # keep going in the same direction if the ratio is too far off.
+        # keep going in the same direction if the ratio is too far off or big buoy was detected
         # if self.red_green_ratio is not None and (self.red_green_ratio > 0.5 or self.red_green_ratio < 0.5):
         #     yaw0 = True
         #     return
@@ -204,16 +215,22 @@ class FollowBuoyPID(ActionServerBase):
         right_x = green_center_x
         img_ctr = self.width / 2.0
 
-        if left_x is None: 
-            if right_x < img_ctr:
+        if left_x is None:
+            # if was large enough and too much time hasn't elapsed, goes straight 
+            if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
+                yaw0 = True
+            elif right_x < img_ctr:
                 left_x = right_x - (self.width * 0.75)
             else:
-                left_x = 0
+                left_x = 0 # sketchy
         if right_x is None: 
-            if left_x >= img_ctr:
+            # if was large enough and too much time hasn't elapsed, goes straight 
+            if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
+                yaw0 = True
+            elifif left_x >= img_ctr:
                 right_x = left_x + (self.width * 0.75)
             else:
-                right_x = self.width - 1
+                right_x = self.width - 1 # sketchy
 
         gate_ctr = (left_x + right_x) / 2.0
         left_ctr_thresh = img_ctr * 0.45
