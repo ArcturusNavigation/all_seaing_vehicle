@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-from ast import Num
 import rclpy
-from rclpy.action import ActionClient, ActionServer
+from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
 from all_seaing_controller.pid_controller import PIDController
 
-
-from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, LabeledBoundingBox2D, ControlOption
-from all_seaing_interfaces.action import FollowPath, Task
+from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption
+from all_seaing_interfaces.action import Task
 from ament_index_python.packages import get_package_share_directory
-from std_msgs.msg import Header, ColorRGBA
 from geometry_msgs.msg import Quaternion, Vector3
 from sensor_msgs.msg import CameraInfo, Imu
 from all_seaing_common.action_server_base import ActionServerBase
@@ -19,7 +16,6 @@ import os
 import yaml
 import math
 import time
-from collections import deque
 
 TIMER_PERIOD = 1 / 60
 
@@ -40,9 +36,9 @@ class SpeedChange(ActionServerBase):
         )
 
         self.bbox_sub = self.create_subscription(
-            LabeledBoundingBox2DArray, 
-            "bounding_boxes", 
-            self.bbox_callback, 
+            LabeledBoundingBox2DArray,
+            "bounding_boxes",
+            self.bbox_callback,
             10
         )
 
@@ -51,8 +47,8 @@ class SpeedChange(ActionServerBase):
         )
 
         self.control_pub = self.create_publisher(
-            ControlOption, 
-            "control_options", 
+            ControlOption,
+            "control_options",
             10
         )
 
@@ -72,7 +68,7 @@ class SpeedChange(ActionServerBase):
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
         self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
 
-        
+
         self.prev_update_time = self.get_clock().now()
         self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
@@ -84,20 +80,16 @@ class SpeedChange(ActionServerBase):
         self.straight_pid.set_effort_min(-self.max_yaw_rate)
         self.straight_pid.set_effort_max(self.max_yaw_rate)
 
-
-
-
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
-        
-        # NOTE: in qualifying round we assume we enter from the correct direction.
 
+        # NOTE: in qualifying round we assume we enter from the correct direction.
 
         # unit vector in the direction of the blue buoy
         # ex: (0, -1) for south (-y), (0,1) for north (+y)
 
-        self.image_size = (400,400)  
-        self.bboxes = []      
+        self.image_size = (400,400)
+        self.bboxes = []
 
         self.blue_labels = set()
         self.red_labels = set()
@@ -112,10 +104,9 @@ class SpeedChange(ActionServerBase):
         self.imu_orientation = Quaternion()
         self.imu_lin_acc = Vector3()
 
-
         # TODO: change the param to be the same between is_sim and not
         # too sleepy, dont want to break things.
-        # CODE IS COPIED FROM FOLLOW_BUOY_PATH,SUBJECT TO CHANGES
+        # CODE IS COPIED FROM FOLLOW_BUOY_PATH, SUBJECT TO CHANGES
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter(
             "color_label_mappings_file",
@@ -129,16 +120,11 @@ class SpeedChange(ActionServerBase):
         ).value
         with open(color_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
-        if self.is_sim:
-            self.red_labels.add(label_mappings["red"])
-            self.green_labels.add(label_mappings["green"])
-            self.blue_labels.add(label_mappings["black"])
-            self.blue_labels.add(label_mappings["blue"])
-        else:
-            self.red_labels.add(label_mappings["red"])
-            self.green_labels.add(label_mappings["green"])
-            self.blue_labels.add(label_mappings["black"])
-            self.blue_labels.add(label_mappings["blue"])
+
+        self.red_labels.add(label_mappings["red"])
+        self.green_labels.add(label_mappings["green"])
+        self.blue_labels.add(label_mappings["black"])
+        self.blue_labels.add(label_mappings["blue"])
 
     def reset_challenge(self):
         '''
@@ -152,7 +138,7 @@ class SpeedChange(ActionServerBase):
         Gets camera image info from all_seaing_perception.
         '''
         self.image_size = (msg.width, msg.height)
-    
+
     def imu_cb(self, msg):
         self.imu_ang_vel = msg.angular_velocity
         self.imu_orientation = msg.orientation
@@ -182,55 +168,51 @@ class SpeedChange(ActionServerBase):
             if (self.current_loop_index == 4):
                 self.get_logger().info("Speed challenge task successfully ended.")
                 return Task.Result(success=True)
-                
+
             time.sleep(TIMER_PERIOD)
 
         # If we exit the `while rclpy.ok()` loop somehow
         self.get_logger().info("ROS shutdown detected or loop ended unexpectedly.")
         goal_handle.abort()
         return Task.Result(success=False)
-    
+
     def run_loop(self):
         '''
-        Control which PID loop is being ran.
+        Control which PID loop is being run.
         '''
         self.prev_loop_index = self.current_loop_index
-        if self.current_loop_index == 0: #follow buoy
-            self.follow_buoy_pid()
 
-            for box in self.bboxes:
-                if box.label in self.blue_labels:
-                    midpt = (box.max_x + box.min_x) / 2.0
-                    self.blue_start_blue_x = max(self.start_blue_x, midpt)
+        match self.current_loop_index:
+            case 0: # follow buoy
+                self.follow_buoy_pid()
 
-                    
-        # elif self.current_loop_index == 1: #go straight
-            # self.go_straight_pid()
-            # self.blue_trigger()
-        elif self.current_loop_index == 1: #circle around
-            self.blue_buoy_pid()
+                for box in self.bboxes:
+                    if box.label in self.blue_labels:
+                        midpt = (box.max_x + box.min_x) / 2.0
+                        self.blue_start_blue_x = max(self.start_blue_x, midpt)
 
-            yaw_diff = self.get_yaw()-self.starting_yaw
-            self.get_logger().info(f"start_blue_x: {self.start_blue_x}")
-            self.get_logger().info(f"{self.get_yaw()}, {self.starting_yaw}")
+            case 1: # circle around
+                self.blue_buoy_pid()
 
-            if yaw_diff > math.pi:
-                yaw_diff -= math.pi
-            elif yaw_diff < -math.pi:
-                yaw_diff += math.pi
-            if (abs(yaw_diff) > math.pi * (8/9)):
-                self.current_loop_index += 1
-        
-            #or exit when redgerentrigger
-            self.redgreen_trigger()
-            # use imu rotation data to exit (a bit over 180 degrees?)
+                yaw_diff = self.get_yaw() - self.starting_yaw
+                self.get_logger().info(f"start_blue_x: {self.start_blue_x}")
+                self.get_logger().info(f"{self.get_yaw()}, {self.starting_yaw}")
 
-        elif self.current_loop_index == 2: #go straight back
-            self.go_straight_pid()
-            self.redgreen_trigger()
-        elif self.current_loop_index == 3: #
-            self.follow_buoy_pid(False)
+                if yaw_diff > math.pi:
+                    yaw_diff -= math.pi
+                elif yaw_diff < -math.pi:
+                    yaw_diff += math.pi
 
+                # use imu rotation data to exit (a bit over 180 degrees?)
+                if (abs(yaw_diff) > math.pi * (8/9)):
+                    self.current_loop_index += 1
+
+            case 2: # go straight back
+                self.go_straight_pid()
+                self.redgreen_trigger()
+
+            case 3:
+                self.follow_buoy_pid(False)
 
         if self.current_loop_index != self.prev_loop_index:
             self.get_logger().info(f"current loop index: {self.current_loop_index}")
@@ -238,30 +220,21 @@ class SpeedChange(ActionServerBase):
                 self.get_logger().info(f"start_blue_x: {self.start_blue_x}")
             self.starting_yaw = self.get_yaw()
 
-    # def blue_trigger(self):
-    #     for box in self.bboxes:
-    #         if box.label in self.blue_labels:
-    #             self.current_loop_index += 1
-    #             midpt = (box.max_x + box.min_x) / 2.0
-    #             self.blue_x = midpt
-    #             return
-
     def redgreen_trigger(self):
         for box in self.bboxes:
             if box.label in self.red_labels:
-                self.current_loop_index += 1
+                self.current_loop_index = 3
                 return
             if box.label in self.green_labels:
-                self.current_loop_index += 1
+                self.current_loop_index = 3
                 return
-            
+
     def go_straight_pid(self):
         yaw = self.get_yaw()
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         offset = yaw-self.starting_yaw
-        # self.get_logger().info(f"starting yaw/current yaw: {self.starting_yaw}, {yaw}")
-        self.straight_pid.update(offset, dt)            
+        self.straight_pid.update(offset, dt)
         yaw_rate = self.straight_pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 
@@ -271,7 +244,7 @@ class SpeedChange(ActionServerBase):
         control_msg.twist.linear.y = 0.0
         control_msg.twist.angular.z = float(yaw_rate)
         self.control_pub.publish(control_msg)
-    
+
     def blue_buoy_pid(self):
         cur_blue_x = 0
 
@@ -280,12 +253,11 @@ class SpeedChange(ActionServerBase):
             cur_blue_x = max(cur_blue_x, midpt)
 
         if cur_blue_x == 0:
-            self.get_logger().info("uh oh no blue labelled objects found")
-
+            self.get_logger().info("uh oh no blue labeled objects found")
         offset = cur_blue_x - self.start_blue_x
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.pid.update(offset, dt)            
+        self.pid.update(offset, dt)
         yaw_rate = self.pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 
@@ -295,7 +267,6 @@ class SpeedChange(ActionServerBase):
         control_msg.twist.linear.y = 0.0
         control_msg.twist.angular.z = float(-yaw_rate)
         self.control_pub.publish(control_msg)
-        
 
     def follow_buoy_pid(self, greenRight=True):
         red_center_x = None
@@ -313,18 +284,13 @@ class SpeedChange(ActionServerBase):
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
                 red_center_x = midpt
-        
+
         if red_center_x is None and green_center_x is None:
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 2.0:
-                self.get_logger().info("no more buoys killing 1")
+                self.get_logger().info("no more buoys; killing 1")
                 self.current_loop_index += 1
             return
         else:
-            # if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 6.0:
-            #     self.get_logger().info(f"{self.get_clock().now().nanoseconds}, {self.time_last_seen_buoys}")
-            #     self.get_logger().info("no more buoys killing 2")
-            #     self.current_loop_index += 1
-            #     return
             self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
         left_x = red_center_x
@@ -334,13 +300,14 @@ class SpeedChange(ActionServerBase):
         if right_x is None: right_x = self.image_size[0] - 1
 
         gate_ctr = (left_x + right_x) / 2.0
+        image_ctr = self.image_size[0] / 2.0
 
-        # self.image_size[0] / 2.0 is img ctr
-        offset = gate_ctr - self.image_size[0] / 2.0
-        # self.get_logger().info(f"{offset}")
+        # offset is effectively zero when no buoys are detected
+        offset = gate_ctr - image_ctr
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.pid.update(offset, dt)            
+        self.pid.update(offset, dt)
+
         yaw_rate = self.pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 
@@ -348,21 +315,16 @@ class SpeedChange(ActionServerBase):
         control_msg.priority = 1
         control_msg.twist.linear.x = float(self.forward_speed)
         control_msg.twist.linear.y = 0.0
-        control_msg.twist.angular.z = float(yaw_rate)
-        if not greenRight:
-            control_msg.twist.angular.z *= -1
+        control_msg.twist.angular.z = float(yaw_rate) if greenRight else float(-yaw_rate)
         self.control_pub.publish(control_msg)
 
     def get_euler(self, quat):
         (row, pitch, yaw) = euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
         return row, pitch, yaw
-    
+
     def get_yaw(self):
         euler = self.get_euler(self.imu_orientation)
         return euler[2]
-    
-
-
 
 def main(args=None):
     rclpy.init(args=args)
@@ -372,7 +334,6 @@ def main(args=None):
     executor.spin()
     node.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()
