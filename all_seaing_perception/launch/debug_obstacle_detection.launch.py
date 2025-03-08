@@ -196,7 +196,7 @@ def launch_setup(context, *args, **kwargs):
             ("bounding_boxes", "static_shape_boxes")
         ],
         parameters=[
-            {"bbox_object_margin": 1.0},
+            {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": shape_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},

@@ -119,10 +119,15 @@ class Docking(ActionServerBase):
             "shape_label_mappings_file"
         ).value
         with open(shape_label_mappings_file, "r") as f:
-            label_mappings = yaml.safe_load(f)
+            self.label_mappings = yaml.safe_load(f)
         
-        self.dock_labels = [label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
-        self.boat_labels = [label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
+        self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
+        self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
+        self.inv_label_mappings = {}
+        for key, value in self.label_mappings.items():
+            self.inv_label_mappings[value] = key
+        self.get_logger().info(' '.join([str(x) for x in self.dock_labels]))
+        self.get_logger().info(' '.join([str(x) for x in self.boat_labels]))
     
     def bbox_pcl_cb(self, msg):
         self.get_logger().info('GOT OBJECTS')
@@ -134,7 +139,9 @@ class Docking(ActionServerBase):
         marker_arr = MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)])
         mark_id = 1
         for bbox_pcl_msg in msg.objects:
+            self.get_logger().info(f"got label: {bbox_pcl_msg.label}, {self.inv_label_mappings[bbox_pcl_msg.label]}")
             lidar_point_cloud = pc2.read_points_numpy(bbox_pcl_msg.cloud) # list with shape [num_pts, 3], where second dimension is rgb
+            self.get_logger().info(' '.join([str(x) for x in lidar_point_cloud.shape]))
             points_2d = [(lidar_point_cloud[i,0], lidar_point_cloud[i,1]) for i in range(lidar_point_cloud.shape[0])] # project points into 2d plane because 3d ransac is hard and I'm def not doing it
             if(len(points_2d) == 0):
                 continue
@@ -143,12 +150,14 @@ class Docking(ActionServerBase):
                 wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
                 new_boat_banners.append((bbox_pcl_msg.label, wall_params, (pt_left, pt_right)))
                 marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (1.0, 0.0, 0.0)))
+                # marker_arr.markers.append(VisualizationTools.visualize_line(wall_params, mark_id, (1.0, 0.0, 0.0)))
                 mark_id = mark_id + 1
             elif(bbox_pcl_msg.label in self.dock_labels):
                 wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
                 new_dock_banners.append((bbox_pcl_msg.label, wall_params, (pt_left, pt_right)))
                 dock_banner_points = dock_banner_points + points_2d
                 marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 0.0, 1.0)))
+                # marker_arr.markers.append(VisualizationTools.visualize_line(wall_params, mark_id, (0.0, 0.0, 1.0)))
                 mark_id = mark_id + 1
         
         if(not (len(dock_banner_points) == 0)):
@@ -156,6 +165,7 @@ class Docking(ActionServerBase):
             new_dock_banner_line = (wall_params, (pt_left, pt_right))
             self.got_dock = True
             marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 1.0, 0.0)))
+            # marker_arr.markers.append(VisualizationTools.visualize_line(wall_params, mark_id, (0.0, 1.0, 0.0)))
             mark_id = mark_id + 1
             self.dock_banner_line = new_dock_banner_line # don't delete the dock between control updates
 
@@ -165,6 +175,8 @@ class Docking(ActionServerBase):
         self.labeled_pcl = new_labeled_pcl
         self.dock_banners = new_dock_banners
         self.boat_banners = new_boat_banners
+
+        self.get_logger().info(f'GOT {len(self.dock_banners)} SLOTS AND {len(self.boat_banners)} BOATS')
 
         if(not self.got_dock):
             return
@@ -185,7 +197,7 @@ class Docking(ActionServerBase):
                     taken = True
             if taken:
                 self.taken.append(dock_label)
-                if(self.selected_slot[0] == dock_label):
+                if(self.picked_slot and self.selected_slot[0] == dock_label):
                     # we're cooked
                     self.selected_slot = None
                     self.picked_slot = False
@@ -199,7 +211,6 @@ class Docking(ActionServerBase):
                 self.picked_slot = True
                 self.pid.reset()
 
-        self.get_logger().info(f'GOT {len(self.dock_banners)} SLOTS AND {len(self.boat_banners)} BOATS')
         if(self.picked_slot):
             self.get_logger().info(f'WILL DOCK INTO {dock_label}')
 
@@ -267,9 +278,9 @@ class Docking(ActionServerBase):
         x_right = y_right = None
         for x,y in best_inliers:
             x_proj, y_proj = self.project_point_line((x,y), wall_params)
-            if (x_left is None) or (x_proj < x_left) or (y_proj < y_left):
+            if (x_left is None) or (x_proj < x_left) or (x_proj == x_left and y_proj < y_left):
                 x_left, y_left = x_proj, y_proj
-            if (x_right is None) or (x_proj > x_right) or (y_proj > y_right):
+            if (x_right is None) or (x_proj > x_right) or (x_proj == x_right and y_proj > y_right):
                 x_right, y_right = x_proj, y_proj
 
         return (wall_params, ((x_left, y_left), (x_right, y_right)))
