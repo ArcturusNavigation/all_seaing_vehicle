@@ -54,7 +54,7 @@ class Docking(ActionServerBase):
         self.marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
 
         pid_vals = (
-            self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
+            self.declare_parameter("pid_vals", [0.003, 0.0, 0.001]) # TODO: fine-tune values (especially D term)
             .get_parameter_value()
             .double_array_value
         )
@@ -63,6 +63,14 @@ class Docking(ActionServerBase):
         self.declare_parameter("max_yaw", 1.0)
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
         self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
+
+        self.declare_parameter("dock_width", 1.0)
+        self.declare_parameter("dock_length", 3.0)
+        self.dock_width = self.get_parameter("dock_width").get_parameter_value().double_value
+        self.dock_length = self.get_parameter("dock_length").get_parameter_value().double_value
+
+        self.declare_parameter("boat_taken_angle_thres", 0.8) # angle of banner-boat to dock segment over pi/2
+        self.boat_taken_angle_thres = self.get_parameter("boat_taken_angle_thres").get_parameter_value().double_value
 
         # RANSAC PARAMS
         self.inlier_threshold = 0.001
@@ -85,6 +93,7 @@ class Docking(ActionServerBase):
         self.dock_banner_line = None
         self.boat_banners = []
         self.selected_slot = None
+        self.taken = []
 
         self.got_dock = False
         self.picked_slot = False
@@ -129,12 +138,12 @@ class Docking(ActionServerBase):
             new_labeled_pcl.append((points_2d, bbox_pcl_msg.label))
             if(bbox_pcl_msg.label in self.boat_labels):
                 wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
-                new_boat_banners.append((wall_params, (pt_left, pt_right)))
+                new_boat_banners.append((bbox_pcl_msg.label, wall_params, (pt_left, pt_right)))
                 marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (1.0, 0.0, 0.0)))
                 mark_id = mark_id + 1
             elif(bbox_pcl_msg.label in self.dock_labels):
                 wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
-                new_dock_banners.append(self.find_segment_ransac(points_2d))
+                new_dock_banners.append((bbox_pcl_msg.label, wall_params, (pt_left, pt_right)))
                 dock_banner_points = dock_banner_points + points_2d
                 marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 0.0, 1.0)))
                 mark_id = mark_id + 1
@@ -146,20 +155,81 @@ class Docking(ActionServerBase):
             marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 1.0, 0.0)))
             self.marker_pub.publish(marker_arr)
             mark_id = mark_id + 1
+            self.dock_banner_line = new_dock_banner_line # don't delete the dock between control updates
 
         # update global variables
         self.labeled_pcl = new_labeled_pcl
         self.dock_banners = new_dock_banners
         self.boat_banners = new_boat_banners
-        self.dock_banner_line = new_dock_banner_line
+
+        if(not self.got_dock):
+            return
+        
+        # check for taken docks and stuff
+        for dock_label, dock_params, (dock_left, dock_right) in self.dock_banners:
+            if (dock_label in self.taken):
+                continue # just ignore, since we saw that it was taken once it's always taken
+            # check if any boat is in that slot
+            taken = False
+            for boat_label, boat_params, (boat_left, boat_right) in self.boat_banners:
+                # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
+                mid_boat = self.midpoint(boat_left, boat_right)
+                mid_dock = self.midpoint(dock_left, dock_right)
+                _, dock_line = self.dock_banner_line
+                if (self.norm(mid_boat) < self.norm(mid_dock)) and (abs(self.angle_segments((mid_boat, mid_dock), dock_line)-math.pi/2.0) < self.boat_taken_angle_thres):
+                    # taken
+                    taken = True
+            if taken:
+                self.taken.append(dock_label)
+                if(self.selected_slot[0] == dock_label):
+                    # we're cooked
+                    self.selected_slot = None
+                    self.picked_slot = False
+                    self.pid.reset()
+                self.get_logger().info(f'DOCK {dock_label} IS TAKEN')
+                continue
+            # found empty docking slot
+            if(self.selected_slot is not None and (self.norm(self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])) > self.norm(mid_dock))):
+                # found an empty one closer
+                self.selected_slot = (dock_label, (dock_left, dock_right))
+                self.picked_slot = True
+                self.pid.reset()
 
         self.get_logger().info(f'GOT {len(self.dock_banners)} SLOTS AND {len(self.boat_banners)} BOATS')
+        if(self.picked_slot):
+            self.get_logger().info(f'WILL DOCK INTO {dock_label}')
 
     def project_point_line(self, point, line_params):
         x, y = point
         (a, b, c), _ = line_params
         return ((x*b**2-a*b*y-a*c)/(a**2+b**2), (-x*a*b+a**2*y-b*c)/(a**2+b**2))
+    
+    def distance(self, point, wall_params):
+        x, y = point
+        (a, b, c), _ = wall_params
+        return (a*x+b+y)/math.sqrt(a**2+b**2)
 
+    def midpoint(self, pt1, pt2):
+        x1, y1 = pt1
+        x2, y2 = pt2
+        return ((x1+x2)/2.0, (y1+y2)/2.0)
+
+    def difference(self, pt1, pt2):
+        x1, y1 = pt1
+        x2, y2 = pt2
+        return (x2-x1, y2-y1)
+    
+    def norm(self, pt):
+        x, y = pt
+        return math.sqrt(x**2+y**2)
+
+    def angle_segments(self, p1, p2):
+        p1left, p1right = p1
+        p2left, p2right = p2
+        x1, y1 = self.difference(p1left, p1right)
+        x2, y2 = self.difference(p2left, p2right)
+        return math.acos(abs(x1*x2+y1*y2)/(self.norm((x1,y1))*self.norm((x2,y2))))
+    
     def find_segment_ransac(self, sliced_scan):
         # RANSAC
         wall_params = ((0.0, 0.0, 0.0), 0.0)
@@ -234,12 +304,18 @@ class Docking(ActionServerBase):
         return (y1-y2, x2-x1, x1*y2-x2*y1), abs(x1*y2-x2*y1)/math.sqrt((y1-y2)**2+(x2-x1)**2)
     
     def control_loop(self):
-        if(not self.got_dock):
-            return
+        if(not self.picked_slot):
+            return # maybe stop the robot? or just go forward/steer to the left
         
-        return
-    
-        offset = 0
+        # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
+        slot_back_mid = self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])
+        (a, b, c), _ = self.dock_banner_line
+        perp_dock_line_params = (-b, a, 
+                                 b*slot_back_mid[0] - a*slot_back_mid[1])
+
+        # go to that line and forward (positive error if boat left of line, negative if right)
+        # TODO: check the signs
+        offset = -math.copysign(-perp_dock_line_params[0]*perp_dock_line_params[2])*abs(perp_dock_line_params[2]/math.sqrt(perp_dock_line_params[0]**2+perp_dock_line_params[1]**2))
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
@@ -253,6 +329,10 @@ class Docking(ActionServerBase):
         control_msg.twist.angular.z = float(yaw_rate)
         self.control_pub.publish(control_msg)
 
+        self.got_dock = False
+        self.dock_banner_line = None
+        self.picked_slot = False
+        self.selected_slot = None
 
     def execute_callback(self, goal_handle):
         self.start_process("docking starting")
