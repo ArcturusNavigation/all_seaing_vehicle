@@ -152,13 +152,14 @@ class Docking(ActionServerBase):
                 mark_id = mark_id + 1
         
         if(not (len(dock_banner_points) == 0)):
-            wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
-            new_dock_banner_line = self.find_segment_ransac(dock_banner_points)
+            wall_params, (pt_left, pt_right) = self.find_segment_ransac(dock_banner_points)
+            new_dock_banner_line = (wall_params, (pt_left, pt_right))
             self.got_dock = True
             marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 1.0, 0.0)))
-            self.marker_pub.publish(marker_arr)
             mark_id = mark_id + 1
             self.dock_banner_line = new_dock_banner_line # don't delete the dock between control updates
+
+        self.marker_pub.publish(marker_arr)
 
         # update global variables
         self.labeled_pcl = new_labeled_pcl
