@@ -334,6 +334,24 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    delivery_qual_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="delivery_qual.py",
+        parameters=[
+            {"is_sim": True},
+            {"shape_label_mappings_file": color_label_mappings},
+            {"forward_speed": 5.0},
+            {"max_yaw": 1.0},
+            {"pid_vals": [0.001, 0.0, 0.0]},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
+            ),
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
@@ -355,6 +373,8 @@ def launch_setup(context, *args, **kwargs):
             {"use_waypoint_client": use_waypoint_client},
         ],
     )
+
+
 
     map_to_odom = launch_ros.actions.Node(
         package="tf2_ros",
@@ -379,7 +399,7 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             # "world": "rb2025/rb2025_task1_task2.sdf",
-            "world": "speed_course_world.sdf",
+            "world": "sydney_regatta",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -394,7 +414,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
-        # yolov8_node,
+        yolov8_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
@@ -407,7 +427,8 @@ def launch_setup(context, *args, **kwargs):
         run_tasks,
         task_init_server,
         # follow_buoy_path,
-        follow_buoy_pid,
+        # follow_buoy_pid,
+        delivery_qual_server,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,
