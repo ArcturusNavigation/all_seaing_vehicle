@@ -28,6 +28,12 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     this->declare_parameter<bool>("is_sim", false);
     m_is_sim = this->get_parameter("is_sim").as_bool();
 
+    this->declare_parameter<bool>("label_list", false);
+    m_label_list = this->get_parameter("label_list").as_bool();
+
+    this->declare_parameter<bool>("only_project", false);
+    m_only_project = this->get_parameter("only_project").as_bool();
+
     // for color segmentation
     this->declare_parameter("color_label_mappings_file", "");
 
@@ -66,9 +72,14 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     if (label_yaml.is_open()) {
         label_config_yaml = YAML::Load(label_yaml);  
         for (YAML::const_iterator it = label_config_yaml.begin(); it != label_config_yaml.end(); ++it) {
-            for(int label : it->second.as<std::vector<int>>()){
-                label_color_map[label] = it->first.as<std::string>();
-                RCLCPP_DEBUG(this->get_logger(), "%d -> %s", label, it->first.as<std::string>().c_str());
+            if(m_label_list){
+                for(int label : it->second.as<std::vector<int>>()){
+                    label_color_map[label] = it->first.as<std::string>();
+                    RCLCPP_DEBUG(this->get_logger(), "%d -> %s", label, it->first.as<std::string>().c_str());
+                }
+            }else{
+                label_color_map[it->second.as<int>()] = it->first.as<std::string>();
+                RCLCPP_DEBUG(this->get_logger(), "%d -> %s", it->second.as<int>(), it->first.as<std::string>().c_str());
             }
         }
     } 
@@ -189,6 +200,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
         RCLCPP_DEBUG(this->get_logger(), "BBOX LABEL: %d", bbox.label);
         if(!label_color_map.count(bbox.label)) continue; //ignore objects that are not registered buoy types
+        RCLCPP_DEBUG(this->get_logger(), "LABEL PASSED");
 
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
@@ -262,6 +274,8 @@ void BBoxProjectPCloud::bb_pcl_project(
     pcl::toROSMsg(*all_obj_pcls_ptr, obj_pcls_msg);
     obj_pcls_msg.header.stamp = in_cloud_msg->header.stamp;
     m_object_pcl_viz_pub->publish(obj_pcls_msg);
+
+    if(m_only_project) return;
 
     // REFINE OBJECT POINT CLOUDS
     auto refined_objects_pub = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();

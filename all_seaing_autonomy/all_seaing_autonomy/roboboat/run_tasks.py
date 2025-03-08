@@ -19,7 +19,8 @@ class RunTasks(Node):
         super().__init__("run_tasks")
         self.task_list = [
             ActionClient(self, Task, "task_init"),
-            ActionClient(self, Task, "follow_buoy_pid"),
+            # ActionClient(self, Task, "follow_buoy_pid"),
+            ActionClient(self, Task, "docking"),
         ]
         self.current_task = None
         self.idle_index = 0

@@ -22,6 +22,12 @@ def launch_setup(context, *args, **kwargs):
     color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
     )
+    buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+    )
+    shape_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
+    )
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
@@ -88,6 +94,18 @@ def launch_setup(context, *args, **kwargs):
 
     keyboard_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
+    )
+
+    point_cloud_filter_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/velodyne_points"),
+        ],
+        parameters=[
+            {"range_radius": [0.5, 60.0]},
+        ],
+        # condition=UnlessCondition(use_bag),
     )
     
     color_segmentation_node = launch_ros.actions.Node(
@@ -174,17 +192,20 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
-            ("lidar_topic", "/point_cloud/filtered")
+            ("lidar_topic", "/point_cloud/filtered"),
+            ("bounding_boxes", "static_shape_boxes")
         ],
         parameters=[
-            {"bbox_object_margin": 1.0},
-            {"color_label_mappings_file": color_buoy_label_mappings},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": shape_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
             {"is_sim": False},
+            {"label_list": False},
+            {"only_project": True},
         ]
     )
 
@@ -248,20 +269,37 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": False},
+            {"buoy_label_mappings_file": shape_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
+        ],
+    )
+
     return [
         # set_use_sim_time,
-        ekf_node,
-        navsat_node,
+        # ekf_node,
+        # navsat_node,
         keyboard_ld,
         run_tasks,
         task_init_server, 
-        follow_buoy_path,
-        buoy_yolo_node,
-        shape_yolo_node,
+        # follow_buoy_path,
+        docking,
+        point_cloud_filter_node,
+        # buoy_yolo_node,
+        # shape_yolo_node,
         static_shape_yolo_node,
         bbox_project_pcloud_node,
         # object_tracking_map_node,
-        object_tracking_map_euclidean_node,
+        # object_tracking_map_euclidean_node,
         # obstacle_detector_node,
         # color_segmentation_node,
         # obstacle_bbox_overlay_node
