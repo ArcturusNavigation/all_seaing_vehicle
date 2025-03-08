@@ -23,7 +23,7 @@ class DeliveryServer(ActionServerBase):
         # --------------- PARAMETERS ---------------#
 
         Kpid = (
-            self.declare_parameter("Kpid", [1.0, 0.0, 0.0])
+            self.declare_parameter("Kpid", [0.1, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
@@ -48,7 +48,7 @@ class DeliveryServer(ActionServerBase):
             .double_value
         )
         self.object_delivery_time = (
-            self.declare_parameter("object_delivery_time", 10.0)
+            self.declare_parameter("object_delivery_time", 20.0)
             .get_parameter_value()
             .double_value
         )
@@ -83,7 +83,7 @@ class DeliveryServer(ActionServerBase):
             execute_callback=self.object_callback,
             cancel_callback=self.default_cancel_callback,
         )
-        self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "bounding_boxes", self.bbox_callback, 10)  # TODO: change topic name
+        self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "shape_boxes", self.bbox_callback, 10)
         self.timer = self.create_timer(TIMER_PERIOD, self.timer_callback)
 
         self.command_adj_cli = self.create_client(CommandAdj, "command_adj")
@@ -106,7 +106,7 @@ class DeliveryServer(ActionServerBase):
         if self.is_aiming:
             self.update_pid()
             effort = self.aim_pid.get_effort()
-            servo_output = effort + SERVO_HALF_RANGE
+            servo_output = SERVO_HALF_RANGE + effort
             req = CommandServo.Request()
             req.enable = True
             req.angle = int(servo_output)
@@ -115,23 +115,13 @@ class DeliveryServer(ActionServerBase):
         else:
             self.prev_update_time = self.get_clock().now()
             self.aim_pid.reset()
-            #req = CommandServo.Request()
-            #req.enable = False
-            #req.port = 2
-            #self.command_servo_cli.call_async(req)
-
-            req = CommandAdj.Request()
-            req.enable = True
-            req.port = 1
-            req.voltage = 12.0
-            self.command_adj_cli.call_async(req)
-
+            req = CommandServo.Request()
+            req.enable = False
+            req.port = 2
+            self.command_servo_cli.call_async(req)
 
     def bbox_callback(self, msg):
-        # TODO: this won't work since you're subscribing to 2d array
-        #self.target_x = (msg.min_x + msg.max_x) / 2
         self.bboxes = msg.boxes
-
 
     def update_pid(self):
         largest_bbox_area = 0
@@ -179,14 +169,14 @@ class DeliveryServer(ActionServerBase):
         req.enable = True
         req.port = 2
         req.voltage = 5.0
-        self.command_adj_cli.call_async(req)
+        #self.command_adj_cli.call_async(req)
 
         # Turn on ball shooter feeding servo
         req = CommandServo.Request()
         req.enable = True
         req.angle = 0
         req.port = 1
-        self.command_servo_cli.call_async(req)
+        #self.command_servo_cli.call_async(req)
         self.is_aiming = True
 
         # Aim until a ball is launched or timed out
@@ -200,13 +190,13 @@ class DeliveryServer(ActionServerBase):
         req = CommandAdj.Request()
         req.enable = False
         req.port = 2
-        self.command_adj_cli.call_async(req)
+        #self.command_adj_cli.call_async(req)
 
         # Turn off ball shooter feeding servo
         req = CommandServo.Request()
         req.enable = False
         req.port = 1
-        self.command_servo_cli.call_async(req)
+        #self.command_servo_cli.call_async(req)
         self.is_aiming = False
 
         self.end_process("Object delivery completed!")
