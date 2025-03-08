@@ -132,6 +132,28 @@ def launch_setup(context, *args, **kwargs):
             ("bounding_boxes", "shape_boxes"),
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
         ]
+    speed_challenge_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge_pid.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": color_label_mappings},
+            {"forward_speed": 1.2},
+            {"max_yaw": 0.25},
+            {"pid_vals": [0.0003, 0.0, 0.00005]},
+            {"straight_pid_vals": [0.001, 0.0, 0.0001]},
+            {"blue_pid_vals": [0.0008, 0.0, 0.0001]},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info"
+            ),
+            (
+                "imu",
+                "/mavros/imu/data",
+            )
+        ],
     )
 
     control_mux = launch_ros.actions.Node(
@@ -232,7 +254,7 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_custom_controller.py",
         parameters=[
             {"joy_x_scale": -1.8},
-            {"joy_ang_scale": 0.2},
+            {"joy_ang_scale": 0.25},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -384,29 +406,30 @@ def launch_setup(context, *args, **kwargs):
         control_mux,
         controller_node,
         controller_server,
-        ekf_node,
-        navsat_node,
-        navigation_server,
-        obstacle_bbox_overlay_node,
-        obstacle_bbox_visualizer_node,
-        obstacle_detector_node,
-        point_cloud_filter_node,
+        #ekf_node,
+        #navsat_node,
+        #navigation_server,
+        #obstacle_bbox_overlay_node,
+        #obstacle_bbox_visualizer_node,
+        #obstacle_detector_node,
+        #point_cloud_filter_node,
         rover_custom_controller,
         rover_lora_controller,
-        rviz_waypoint_sender,
+        #rviz_waypoint_sender,
         thrust_commander_node,
         buoy_yolo_node,
-        shape_yolo_node,
-        run_tasks,
-        task_init_server, 
-        # follow_buoy_path,
-        follow_buoy_pid,
-        grid_map_generator,
+        #shape_yolo_node,
+        #run_tasks,
+        #task_init_server, 
+        #follow_buoy_path,
+        #follow_buoy_pid,
+        #speed_challenge_pid,
+        #grid_map_generator,
         central_hub,
-        amcl_ld,
+        #amcl_ld,
         static_transforms_ld,
         #webcam_publisher,
-        lidar_ld,
+        #lidar_ld,
         mavros_ld,
         zed_ld,
     ]
