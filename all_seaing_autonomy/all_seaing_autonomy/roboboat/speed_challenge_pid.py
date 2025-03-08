@@ -3,6 +3,10 @@ from ast import Num
 import rclpy
 from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.qos import QoSProfile
+from rclpy.qos import QoSHistoryPolicy
+from rclpy.qos import QoSDurabilityPolicy
+from rclpy.qos import QoSReliabilityPolicy
 from all_seaing_controller.pid_controller import PIDController
 
 
@@ -36,7 +40,7 @@ class SpeedChange(ActionServerBase):
         )
 
         self.camera_info_sub = self.create_subscription(
-            CameraInfo, "camera_info", self.camera_info_cb, 10
+            CameraInfo, "/zed/zed_node/rgb/camera_info", self.camera_info_cb, 10
         )
 
         self.bbox_sub = self.create_subscription(
@@ -46,8 +50,16 @@ class SpeedChange(ActionServerBase):
             10
         )
 
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            depth=1
+        )
+
+
         self.imu_sub = self.create_subscription(
-            Imu, "imu", self.imu_cb, 10
+            Imu, "/mavros/imu/data", self.imu_cb, qos
         )
 
         self.control_pub = self.create_publisher(
@@ -58,22 +70,22 @@ class SpeedChange(ActionServerBase):
 
 
         pid_vals = (
-            self.declare_parameter("pid_vals", [0.003, 0.0, 0.002])
+            self.declare_parameter("pid_vals", [0.0009, 0.0, 0.00005])
             .get_parameter_value()
             .double_array_value
         )
         straight_pid_vals = (
-            self.declare_parameter("straight_pid_vals", [2.0, 0.0, 0.0])
+            self.declare_parameter("straight_pid_vals", [0.001, 0.0, 0.0001])
             .get_parameter_value()
             .double_array_value
         )
         blue_pid_vals = (
-            self.declare_parameter("blue_pid_vals", [0.0045, 0.0, 0.0002])
+            self.declare_parameter("blue_pid_vals", [0.0008, 0.0, 0.0001])
             .get_parameter_value()
             .double_array_value
         )
-        self.declare_parameter("forward_speed", 5.0)
-        self.declare_parameter("max_yaw", 1.0)
+        self.declare_parameter("forward_speed", 0.7)
+        self.declare_parameter("max_yaw", 0.25)
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
         self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
 
@@ -338,7 +350,7 @@ class SpeedChange(ActionServerBase):
                 red_center_x = midpt
         
         if red_center_x is None and green_center_x is None:
-            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 2.0:
+            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 10.0:
                 self.get_logger().info("no more buoys killing 1")
                 self.current_loop_index += 1
             return
@@ -359,9 +371,8 @@ class SpeedChange(ActionServerBase):
         gate_ctr = (left_x + right_x) / 2.0
 
         # self.image_size[0] / 2.0 is img ctr
-        offset = gate_ctr - self.image_size[0] / 2.0
-        # self.get_logger().info(f"{offset}")
-
+        offset = gate_ctr - (self.image_size[0] / 2.0)
+        
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
         yaw_rate = self.pid.get_effort()
@@ -372,6 +383,9 @@ class SpeedChange(ActionServerBase):
         control_msg.twist.linear.x = float(self.forward_speed)
         control_msg.twist.linear.y = 0.0
         control_msg.twist.angular.z = float(yaw_rate)
+        if left_x == 0 and right_x == self.image_size[0]-1:
+            control_msg.twist.angular.z = 0.0
+        self.get_logger().info(f"PID offset: {offset}, PID output: {float(yaw_rate)}")
         if not greenRight:
             control_msg.twist.angular.z *= -1
         self.control_pub.publish(control_msg)
