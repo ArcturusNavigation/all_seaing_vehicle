@@ -83,7 +83,7 @@ class DeliveryQual(ActionServerBase):
 
         # real values (not sim) are default
         pid_vals = (
-            self.declare_parameter("pid_vals", [0.002, 0.0, 0.0002])
+            self.declare_parameter("pid_vals", [0.0009, 0.0, 0.0002])
             .get_parameter_value()
             .double_array_value
         )
