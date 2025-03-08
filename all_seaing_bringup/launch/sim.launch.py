@@ -370,6 +370,24 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    delivery_qual_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="delivery_qual.py",
+        parameters=[
+            {"is_sim": True},
+            {"shape_label_mappings_file": color_label_mappings},
+            {"forward_speed": 5.0},
+            {"max_yaw": 1.0},
+            {"pid_vals": [0.001, 0.0, 0.0]},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
+            ),
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
@@ -391,6 +409,8 @@ def launch_setup(context, *args, **kwargs):
             {"use_waypoint_client": use_waypoint_client},
         ],
     )
+
+
 
     map_to_odom = launch_ros.actions.Node(
         package="tf2_ros",
@@ -443,7 +463,7 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         run_tasks,
         task_init_server,
-        # follow_buoy_path,
+        delivery_qual_server,
         follow_buoy_pid,
         speed_challenge_pid,
         rviz_waypoint_sender,
