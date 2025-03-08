@@ -20,9 +20,9 @@ class ColorSegmentation(Node):
 
         # Subscribers and publishers
         self.bbox_pub = self.create_publisher(
-            LabeledBoundingBox2DArray, "bounding_boxes", 10
+            LabeledBoundingBox2DArray, "bounding_boxes_ycrcb", 10
         )
-        self.img_pub = self.create_publisher(Image, "image/segmented", 5)
+        self.img_pub = self.create_publisher(Image, "image/segmented_ycrcb", 5)
         self.img_sub = self.create_subscription(
             Image,
             "/webcam_image",
@@ -73,9 +73,9 @@ class ColorSegmentation(Node):
         for color in colors:
             # if color == "red2":
             #     continue
-            r_min, r_max, g_min, g_max, b_min, b_max = colors[color]
-            lower_limit = np.array([r_min, g_min, b_min])
-            upper_limit = np.array([r_max, g_max, b_max])
+            y_min, y_max, cr_min, cr_max, cb_min, cb_max = colors[color]
+            lower_limit = np.array([y_min, cr_min, cb_min])
+            upper_limit = np.array([y_max, cr_max, cb_max])
             mask = cv2.inRange(ycrcb_img, lower_limit, upper_limit)
             # if color == "red":
             #     r_min, r_max, g_min, g_max, b_min, b_max = colors["red2"]
