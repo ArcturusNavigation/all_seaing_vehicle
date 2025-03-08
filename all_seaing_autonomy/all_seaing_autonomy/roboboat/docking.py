@@ -113,6 +113,7 @@ class Docking(ActionServerBase):
         self.boat_labels = [label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
     
     def bbox_pcl_cb(self, msg):
+        self.get_logger().info('GOT OBJECTS')
         dock_banner_points = []
         new_labeled_pcl = []
         new_dock_banners = []
@@ -123,6 +124,8 @@ class Docking(ActionServerBase):
         for bbox_pcl_msg in msg.objects:
             lidar_point_cloud = pc2.read_points_numpy(bbox_pcl_msg.cloud) # list with shape [num_pts, 3], where second dimension is rgb
             points_2d = [(lidar_point_cloud[i,0], lidar_point_cloud[i,1]) for i in range(lidar_point_cloud.shape[0])] # project points into 2d plane because 3d ransac is hard and I'm def not doing it
+            if(len(points_2d) == 0):
+                continue
             new_labeled_pcl.append((points_2d, bbox_pcl_msg.label))
             if(bbox_pcl_msg.label in self.boat_labels):
                 wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
@@ -135,20 +138,22 @@ class Docking(ActionServerBase):
                 dock_banner_points = dock_banner_points + points_2d
                 marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 0.0, 1.0)))
                 mark_id = mark_id + 1
-        if(len(dock_banner_points) == 0):
-            return
-        wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
-        new_dock_banner_line = self.find_segment_ransac(dock_banner_points)
-        self.got_dock = True
-        marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 1.0, 0.0)))
-        self.marker_pub.publish(marker_arr)
-        mark_id = mark_id + 1
+        
+        if(not (len(dock_banner_points) == 0)):
+            wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
+            new_dock_banner_line = self.find_segment_ransac(dock_banner_points)
+            self.got_dock = True
+            marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 1.0, 0.0)))
+            self.marker_pub.publish(marker_arr)
+            mark_id = mark_id + 1
 
         # update global variables
         self.labeled_pcl = new_labeled_pcl
         self.dock_banners = new_dock_banners
         self.boat_banners = new_boat_banners
         self.dock_banner_line = new_dock_banner_line
+
+        self.get_logger().info(f'GOT {len(self.dock_banners)} SLOTS AND {len(self.boat_banners)} BOATS')
 
     def project_point_line(self, point, line_params):
         x, y = point
