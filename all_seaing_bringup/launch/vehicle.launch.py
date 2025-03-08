@@ -125,6 +125,15 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    delivery_qual_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="delivery_qual.py",
+        remappings=[
+            ("bounding_boxes", "shape_boxes"),
+            ("camera_info", "/zed/zed_node/rgb/camera_info"),
+        ]
+    )
+
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="control_mux.py",
