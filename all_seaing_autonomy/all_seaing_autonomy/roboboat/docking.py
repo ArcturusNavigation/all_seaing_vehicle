@@ -12,7 +12,7 @@ from ament_index_python.packages import get_package_share_directory
 from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_controller.pid_controller import PIDController
 from all_seaing_interfaces.action import Task
-from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption
+from all_seaing_interfaces.msg import LabeledObjectPointCloudArray, LabeledObjectPointCloud, ControlOption
 from all_seaing_interfaces.srv import CommandAdj, CommandServo
 
 import time
@@ -38,13 +38,6 @@ class Docking(ActionServerBase):
             cancel_callback=self.default_cancel_callback,
         )
 
-        self.bbox_sub = self.create_subscription(
-            LabeledBoundingBox2DArray, 
-            "bounding_boxes", 
-            self.bbox_callback, 
-            10
-        )
-
         self.intrinsics_sub = self.create_subscription(
             CameraInfo, 
             "camera_info",
@@ -58,8 +51,8 @@ class Docking(ActionServerBase):
             10
         )
 
-        self.point_cloud_sub = self.create_subscription(
-            PointCloud2, "/point_cloud/filtered", self.point_cloud_cb, qos_profile_sensor_data
+        self.bbox_pcl_sub = self.create_subscription(
+            LabeledObjectPointCloudArray, "labeled_object_point_clouds", self.bbox_pcl_cb, qos_profile_sensor_data
         )
 
         self.timer = self.create_timer(TIMER_PERIOD, self.timer_callback)
@@ -87,8 +80,7 @@ class Docking(ActionServerBase):
         # update from subs
         self.height = None
         self.width = None
-        self.bboxes = []
-        self.points_2d = None
+        self.labeled_pcl = []
 
         self.timer_period = 1 / 30.0
 
@@ -113,13 +105,12 @@ class Docking(ActionServerBase):
     def intrinsics_callback(self, msg):
         self.height = msg.height
         self.width = msg.width
-
-    def bbox_callback(self, msg):
-        self.bboxes = msg.boxes
     
-    def point_cloud_cb(self, msg):
-        lidar_point_cloud = pc2.read_points_numpy(msg) # list with shape [num_pts, 3], where second dimension is rgb
-        self.points_2d = lidar_point_cloud[:,:2] # project points into 2d plane because 3d ransac is hard and I'm def not doing it
+    def bbox_pcl_cb(self, msg):
+        for bbox_pcl_msg in msg.objects:
+            lidar_point_cloud = pc2.read_points_numpy(bbox_pcl_msg.cloud) # list with shape [num_pts, 3], where second dimension is rgb
+            points_2d = [(lidar_point_cloud[i,0], lidar_point_cloud[i,1]) for i in range(lidar_point_cloud.shape[0])] # project points into 2d plane because 3d ransac is hard and I'm def not doing it
+            self.labeled_pcl.append((points_2d, bbox_pcl_msg.label))
 
     def find_wall_ransac(self, sliced_scan):
         # RANSAC

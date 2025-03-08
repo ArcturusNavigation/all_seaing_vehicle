@@ -253,7 +253,9 @@ def launch_setup(context, *args, **kwargs):
             {"clustering_distance": 1.0},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
-            {"is_sim": True}
+            {"is_sim": True},
+            {"label_list": True},
+            {"only_project": True},
         ]
     )
 

@@ -125,7 +125,7 @@ private:
     double m_cluster_contour_size_weight;
     std::map<std::string, std::vector<int>> contour_matching_color_range_map;
 
-    bool m_is_sim;
+    bool m_is_sim, m_label_list, m_only_project;
     double m_bbox_margin;
 
 public:
