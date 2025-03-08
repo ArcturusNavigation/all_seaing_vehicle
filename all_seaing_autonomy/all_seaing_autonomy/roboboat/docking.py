@@ -5,9 +5,14 @@ from rclpy.qos import qos_profile_sensor_data
 from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
 from sensor_msgs.msg import PointCloud2, PointField, CameraInfo
-from geometry_msgs.msg import Point, PointStamped
+from geometry_msgs.msg import Point, PointStamped, Pose, Vector3, TransformStamped
 from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import Header, ColorRGBA
 
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from tf2_ros import TransformException
+import tf2_geometry_msgs
 from ament_index_python.packages import get_package_share_directory
 
 from all_seaing_common.action_server_base import ActionServerBase
@@ -53,6 +58,12 @@ class Docking(ActionServerBase):
 
         self.marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
 
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
+        self.cam_base_link_tf = None
+        self.got_tf = False
+        
         pid_vals = (
             self.declare_parameter("pid_vals", [0.003, 0.0, 0.001]) # TODO: fine-tune values (especially D term)
             .get_parameter_value()
@@ -140,10 +151,24 @@ class Docking(ActionServerBase):
         mark_id = 1
         for bbox_pcl_msg in msg.objects:
             self.get_logger().info(f"got label: {bbox_pcl_msg.label}, {self.inv_label_mappings[bbox_pcl_msg.label]}")
+            if(not self.got_tf):
+                try:
+                    self.cam_base_link_tf = self.tf_buffer.lookup_transform("base_link", bbox_pcl_msg.cloud.header.frame_id, bbox_pcl_msg.cloud.header.stamp)
+                    self.got_tf = True
+                except TransformException as ex:
+                    self.get_logger().info(
+                        f'Transform error: {ex}')
+                    return
+            # IT'S THE CAMERA FRAME, SO Z IS FORWARD, X IS RIGHT, Y IS DOWN, NEED TO TRANSFORM TO BASE_LINK
             lidar_point_cloud = pc2.read_points_numpy(bbox_pcl_msg.cloud) # list with shape [num_pts, 3], where second dimension is rgb
-            self.get_logger().info(' '.join([str(x) for x in lidar_point_cloud.shape]))
-            points_2d = [(lidar_point_cloud[i,0], lidar_point_cloud[i,1]) for i in range(lidar_point_cloud.shape[0])] # project points into 2d plane because 3d ransac is hard and I'm def not doing it
-            if(len(points_2d) == 0):
+            # TRANSFORM THE POINTS TO BASE_LINK
+            lidar_point_cloud = [tf2_geometry_msgs.do_transform_point(PointStamped(point=Point(x=float(lidar_point_cloud[i][0]), y=float(lidar_point_cloud[i][1]), z=float(lidar_point_cloud[i][2])), header = bbox_pcl_msg.cloud.header), self.cam_base_link_tf) for i in range(lidar_point_cloud.shape[0])]
+            # self.get_logger().info(' '.join([str(x) for x in lidar_point_cloud.shape]))
+            points_2d = [(pt.point.x, pt.point.y) for pt in lidar_point_cloud] # project points into 2d plane because 3d ransac is hard and I'm def not doing it
+            # for x,y in points_2d:
+            #     marker_arr.markers.append(Marker(id=mark_id, type = Marker.SPHERE, header = Header(frame_id="base_link"), pose=Pose(position=Point(x=float(x),y=float(y))), color = ColorRGBA(r=1.0, a=1.0), scale=Vector3(x=0.1, y=0.1, z=0.1)))
+            #     mark_id = mark_id + 1
+            if(len(points_2d) <= 1):
                 continue
             new_labeled_pcl.append((points_2d, bbox_pcl_msg.label))
             if(bbox_pcl_msg.label in self.boat_labels):
@@ -152,6 +177,7 @@ class Docking(ActionServerBase):
                 marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (1.0, 0.0, 0.0)))
                 # marker_arr.markers.append(VisualizationTools.visualize_line(wall_params, mark_id, (1.0, 0.0, 0.0)))
                 mark_id = mark_id + 1
+                self.get_logger().info(f'BOAT: {self.inv_label_mappings[bbox_pcl_msg.label]} -> {(pt_left, pt_right).__str__()}')
             elif(bbox_pcl_msg.label in self.dock_labels):
                 wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
                 new_dock_banners.append((bbox_pcl_msg.label, wall_params, (pt_left, pt_right)))
@@ -159,6 +185,7 @@ class Docking(ActionServerBase):
                 marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 0.0, 1.0)))
                 # marker_arr.markers.append(VisualizationTools.visualize_line(wall_params, mark_id, (0.0, 0.0, 1.0)))
                 mark_id = mark_id + 1
+                self.get_logger().info(f'DOCK: {self.inv_label_mappings[bbox_pcl_msg.label]} -> {(pt_left, pt_right).__str__()}')
         
         if(not (len(dock_banner_points) == 0)):
             wall_params, (pt_left, pt_right) = self.find_segment_ransac(dock_banner_points)
@@ -277,6 +304,7 @@ class Docking(ActionServerBase):
         x_left = y_left = None
         x_right = y_right = None
         for x,y in best_inliers:
+            self.get_logger().info(f'{(x,y).__str__()}')
             x_proj, y_proj = self.project_point_line((x,y), wall_params)
             if (x_left is None) or (x_proj < x_left) or (x_proj == x_left and y_proj < y_left):
                 x_left, y_left = x_proj, y_proj
