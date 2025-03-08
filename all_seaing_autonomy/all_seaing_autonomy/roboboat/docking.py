@@ -72,6 +72,9 @@ class Docking(ActionServerBase):
         self.declare_parameter("boat_taken_angle_thres", 0.8) # angle of banner-boat to dock segment over pi/2
         self.boat_taken_angle_thres = self.get_parameter("boat_taken_angle_thres").get_parameter_value().double_value
 
+        self.declare_parameter("boat_angle_coeff", 0.8)
+        self.boat_angle_coeff = self.get_parameter("boat_angle_coeff").get_parameter_value().double_value
+
         # RANSAC PARAMS
         self.inlier_threshold = 0.001
         self.num_ransac_iters = 15
@@ -106,19 +109,19 @@ class Docking(ActionServerBase):
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         self.declare_parameter(
-            "buoy_label_mappings_file",
+            "shape_label_mappings_file",
             os.path.join(
-                bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+                bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
             ),
         )
 
-        buoy_label_mappings_file = self.get_parameter(
-            "buoy_label_mappings_file"
+        shape_label_mappings_file = self.get_parameter(
+            "shape_label_mappings_file"
         ).value
-        with open(buoy_label_mappings_file, "r") as f:
+        with open(shape_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
         
-        self.dock_labels = [label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
+        self.dock_labels = [label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
         self.boat_labels = [label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
     
     def bbox_pcl_cb(self, msg):
@@ -316,9 +319,12 @@ class Docking(ActionServerBase):
         # go to that line and forward (positive error if boat left of line, negative if right)
         # TODO: check the signs
         offset = -math.copysign(-perp_dock_line_params[0]*perp_dock_line_params[2])*abs(perp_dock_line_params[2]/math.sqrt(perp_dock_line_params[0]**2+perp_dock_line_params[1]**2))
-
+        if(abs(perp_dock_line_params[1]) < 0.0001):
+            approach_angle = np.pi/2.0
+        else:
+            approach_angle = math.atan(-perp_dock_line_params[0]/perp_dock_line_params[1])
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.pid.update(offset, dt)            
+        self.pid.update(offset + self.boat_angle_coeff*approach_angle, dt)            
         yaw_rate = self.pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 

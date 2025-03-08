@@ -25,6 +25,9 @@ def launch_setup(context, *args, **kwargs):
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
+    shape_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
+    )
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
     )
@@ -194,7 +197,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"bbox_object_margin": 1.0},
-            {"color_label_mappings_file": buoy_label_mappings},
+            {"color_label_mappings_file": shape_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
@@ -271,7 +274,7 @@ def launch_setup(context, *args, **kwargs):
         executable="docking.py",
         parameters=[
             {"is_sim": False},
-            {"buoy_label_mappings_file": buoy_label_mappings},
+            {"buoy_label_mappings_file": shape_label_mappings},
         ],
         remappings=[
             (

@@ -198,9 +198,9 @@ void BBoxProjectPCloud::bb_pcl_project(
     // cv::waitKey();
     std::vector<std::pair<all_seaing_interfaces::msg::LabeledBoundingBox2D, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>> bbox_pcloud_objects;
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : in_bbox_msg->boxes){
-        RCLCPP_DEBUG(this->get_logger(), "BBOX LABEL: %d", bbox.label);
+        RCLCPP_INFO(this->get_logger(), "BBOX LABEL: %d", bbox.label);
         if(!label_color_map.count(bbox.label)) continue; //ignore objects that are not registered buoy types
-        RCLCPP_DEBUG(this->get_logger(), "LABEL PASSED");
+        RCLCPP_INFO(this->get_logger(), "LABEL PASSED");
 
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
