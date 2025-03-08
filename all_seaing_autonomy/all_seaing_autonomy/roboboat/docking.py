@@ -65,7 +65,7 @@ class Docking(ActionServerBase):
         self.got_tf = False
         
         pid_vals = (
-            self.declare_parameter("pid_vals", [0.003, 0.0, 0.001]) # TODO: fine-tune values (especially D term)
+            self.declare_parameter("pid_vals", [0.003, 0.001, 0.001]) # TODO: fine-tune values (especially D term)
             .get_parameter_value()
             .double_array_value
         )
@@ -137,11 +137,11 @@ class Docking(ActionServerBase):
         self.inv_label_mappings = {}
         for key, value in self.label_mappings.items():
             self.inv_label_mappings[value] = key
-        self.get_logger().info(' '.join([str(x) for x in self.dock_labels]))
-        self.get_logger().info(' '.join([str(x) for x in self.boat_labels]))
+        # self.get_logger().info(' '.join([str(x) for x in self.dock_labels]))
+        # self.get_logger().info(' '.join([str(x) for x in self.boat_labels]))
     
     def bbox_pcl_cb(self, msg):
-        self.get_logger().info('GOT OBJECTS')
+        # self.get_logger().info('GOT OBJECTS')
         dock_banner_points = []
         new_labeled_pcl = []
         new_dock_banners = []
@@ -150,7 +150,7 @@ class Docking(ActionServerBase):
         marker_arr = MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)])
         mark_id = 1
         for bbox_pcl_msg in msg.objects:
-            self.get_logger().info(f"got label: {bbox_pcl_msg.label}, {self.inv_label_mappings[bbox_pcl_msg.label]}")
+            # self.get_logger().info(f"got label: {bbox_pcl_msg.label}, {self.inv_label_mappings[bbox_pcl_msg.label]}")
             if(not self.got_tf):
                 try:
                     self.cam_base_link_tf = self.tf_buffer.lookup_transform("base_link", bbox_pcl_msg.cloud.header.frame_id, bbox_pcl_msg.cloud.header.stamp)
@@ -214,10 +214,10 @@ class Docking(ActionServerBase):
                 continue # just ignore, since we saw that it was taken once it's always taken
             # check if any boat is in that slot
             taken = False
+            mid_dock = self.midpoint(dock_left, dock_right)
             for boat_label, boat_params, (boat_left, boat_right) in self.boat_banners:
                 # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
                 mid_boat = self.midpoint(boat_left, boat_right)
-                mid_dock = self.midpoint(dock_left, dock_right)
                 _, dock_line = self.dock_banner_line
                 if (self.norm(mid_boat) < self.norm(mid_dock)) and (abs(self.angle_segments((mid_boat, mid_dock), dock_line)-math.pi/2.0) < self.boat_taken_angle_thres):
                     # taken
@@ -229,17 +229,17 @@ class Docking(ActionServerBase):
                     self.selected_slot = None
                     self.picked_slot = False
                     self.pid.reset()
-                self.get_logger().info(f'DOCK {dock_label} IS TAKEN')
+                self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                 continue
             # found empty docking slot
-            if(self.selected_slot is not None and (self.norm(self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])) > self.norm(mid_dock))):
+            if(self.selected_slot is None or (self.norm(self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])) > self.norm(mid_dock))):
                 # found an empty one closer
                 self.selected_slot = (dock_label, (dock_left, dock_right))
                 self.picked_slot = True
                 self.pid.reset()
 
         if(self.picked_slot):
-            self.get_logger().info(f'WILL DOCK INTO {dock_label}')
+            self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[dock_label]}')
 
     def project_point_line(self, point, line_params):
         x, y = point
@@ -304,7 +304,7 @@ class Docking(ActionServerBase):
         x_left = y_left = None
         x_right = y_right = None
         for x,y in best_inliers:
-            self.get_logger().info(f'{(x,y).__str__()}')
+            # self.get_logger().info(f'{(x,y).__str__()}')
             x_proj, y_proj = self.project_point_line((x,y), wall_params)
             if (x_left is None) or (x_proj < x_left) or (x_proj == x_left and y_proj < y_left):
                 x_left, y_left = x_proj, y_proj
@@ -352,13 +352,13 @@ class Docking(ActionServerBase):
         
         # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
         slot_back_mid = self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])
-        (a, b, c), _ = self.dock_banner_line
+        ((a, b, c), _), _ = self.dock_banner_line
         perp_dock_line_params = (-b, a, 
                                  b*slot_back_mid[0] - a*slot_back_mid[1])
 
         # go to that line and forward (positive error if boat left of line, negative if right)
         # TODO: check the signs
-        offset = -math.copysign(-perp_dock_line_params[0]*perp_dock_line_params[2])*abs(perp_dock_line_params[2]/math.sqrt(perp_dock_line_params[0]**2+perp_dock_line_params[1]**2))
+        offset = -math.copysign(1.0, -perp_dock_line_params[0]*perp_dock_line_params[2])*abs(perp_dock_line_params[2]/math.sqrt(perp_dock_line_params[0]**2+perp_dock_line_params[1]**2))
         if(abs(perp_dock_line_params[1]) < 0.0001):
             approach_angle = np.pi/2.0
         else:
