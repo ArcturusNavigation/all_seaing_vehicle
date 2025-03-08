@@ -4,7 +4,7 @@ from visualization_msgs.msg import Marker
 class VisualizationTools:
 
     @staticmethod
-    def plot_line(x, y, color = (1., 0., 0.), frame = "/base_link"):
+    def plot_line(x, y, id = 0, color = (1., 0., 0.), frame = "/base_link"):
         """
         Publishes the points (x, y) to publisher
         so they can be visualized in rviz as
@@ -22,6 +22,7 @@ class VisualizationTools:
         line_strip = Marker()
         line_strip.type = Marker.LINE_STRIP
         line_strip.header.frame_id = frame
+        line_strip.id = id
 
         # Set the size and color
         line_strip.scale.x = 0.1
@@ -42,7 +43,7 @@ class VisualizationTools:
         return line_strip
     
     @staticmethod
-    def visualize_segment(pt_left, pt_right, color = (0.0, 0.0, 1.0), frame = '/base_link'):
+    def visualize_segment(pt_left, pt_right, id = 0, color = (0.0, 0.0, 1.0), frame = '/base_link'):
         x_left, y_left = pt_left
         x_right, y_right = pt_right
-        return VisualizationTools.plot_line([x_left,x_right],[y_left, y_right], color, frame)
+        return VisualizationTools.plot_line([x_left,x_right],[y_left, y_right], id, color, frame)

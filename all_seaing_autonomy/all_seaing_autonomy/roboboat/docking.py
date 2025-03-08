@@ -16,7 +16,7 @@ from all_seaing_interfaces.action import Task
 from all_seaing_interfaces.msg import LabeledObjectPointCloudArray, LabeledObjectPointCloud, ControlOption
 from all_seaing_interfaces.srv import CommandAdj, CommandServo
 
-from all_seaing_autonomy.visualization_tools import VisualizationTools
+from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
 
 import time
 import sensor_msgs_py.point_cloud2 as pc2
@@ -52,8 +52,6 @@ class Docking(ActionServerBase):
         )
 
         self.marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
-
-        self.timer = self.create_timer(TIMER_PERIOD, self.timer_callback)
 
         pid_vals = (
             self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
@@ -111,32 +109,46 @@ class Docking(ActionServerBase):
         with open(buoy_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
         
-        self.dock_labels = [label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "blue_square", "green_circle", "green_cross", "green_triangle", "green_square", "red_circle", "red_cross", "red_triangle", "red_square"]]
-        self.boat_labels = [label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle", "black_square"]]
+        self.dock_labels = [label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
+        self.boat_labels = [label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
     
     def bbox_pcl_cb(self, msg):
         dock_banner_points = []
+        new_labeled_pcl = []
+        new_dock_banners = []
+        new_dock_banner_line = None
+        new_boat_banners = []
         marker_arr = MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)])
+        mark_id = 1
         for bbox_pcl_msg in msg.objects:
             lidar_point_cloud = pc2.read_points_numpy(bbox_pcl_msg.cloud) # list with shape [num_pts, 3], where second dimension is rgb
             points_2d = [(lidar_point_cloud[i,0], lidar_point_cloud[i,1]) for i in range(lidar_point_cloud.shape[0])] # project points into 2d plane because 3d ransac is hard and I'm def not doing it
-            self.labeled_pcl.append((points_2d, bbox_pcl_msg.label))
+            new_labeled_pcl.append((points_2d, bbox_pcl_msg.label))
             if(bbox_pcl_msg.label in self.boat_labels):
                 wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
-                self.boat_banners.append((wall_params, (pt_left, pt_right)))
-                marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, (1.0, 0.0, 0.0)))
+                new_boat_banners.append((wall_params, (pt_left, pt_right)))
+                marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (1.0, 0.0, 0.0)))
+                mark_id = mark_id + 1
             elif(bbox_pcl_msg.label in self.dock_labels):
                 wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
-                self.dock_banners.append(self.find_segment_ransac(points_2d))
+                new_dock_banners.append(self.find_segment_ransac(points_2d))
                 dock_banner_points = dock_banner_points + points_2d
-                marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, (0.0, 0.0, 1.0)))
+                marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 0.0, 1.0)))
+                mark_id = mark_id + 1
         if(len(dock_banner_points) == 0):
             return
         wall_params, (pt_left, pt_right) = self.find_segment_ransac(points_2d)
-        self.dock_banner_line = self.find_segment_ransac(dock_banner_points)
+        new_dock_banner_line = self.find_segment_ransac(dock_banner_points)
         self.got_dock = True
-        marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, (0.0, 1.0, 0.0)))
+        marker_arr.markers.append(VisualizationTools.visualize_segment(pt_left, pt_right, mark_id, (0.0, 1.0, 0.0)))
         self.marker_pub.publish(marker_arr)
+        mark_id = mark_id + 1
+
+        # update global variables
+        self.labeled_pcl = new_labeled_pcl
+        self.dock_banners = new_dock_banners
+        self.boat_banners = new_boat_banners
+        self.dock_banner_line = new_dock_banner_line
 
     def project_point_line(self, point, line_params):
         x, y = point
@@ -219,7 +231,9 @@ class Docking(ActionServerBase):
     def control_loop(self):
         if(not self.got_dock):
             return
-
+        
+        return
+    
         offset = 0
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
