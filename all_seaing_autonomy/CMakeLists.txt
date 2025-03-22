@@ -11,6 +11,7 @@ ament_auto_find_build_dependencies()
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/roboboat/delivery_server.py
+    ${PROJECT_NAME}/roboboat/delivery_qual.py
     ${PROJECT_NAME}/roboboat/follow_buoy_path.py
     ${PROJECT_NAME}/roboboat/follow_buoy_pid.py
     ${PROJECT_NAME}/roboboat/run_tasks.py
