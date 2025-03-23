@@ -56,6 +56,7 @@ class ColorSegmentation(Node):
 
         rgbs = {
             "red": (255, 0, 0),
+            # "red": (0, 0, 255),
             "orange": (255, 165, 0),
             "green": (0, 255, 0),
             "black": (0, 0, 0),
