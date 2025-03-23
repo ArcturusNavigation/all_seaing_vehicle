@@ -28,6 +28,18 @@ def launch_setup(context, *args, **kwargs):
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
+    color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
+    )
+    buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+    )
+    matching_weights = os.path.join(
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
+    )
+    contour_matching_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
 
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
@@ -118,7 +130,7 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"forward_speed": 1.2},
             {"max_yaw": 0.2},
-            {"pid_vals": [0.0006, 0.0, 0.0001]},
+            {"pid_vals": [0.0009, 0.0, 0.0003]},
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
@@ -236,7 +248,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 1},
+            {"video_index": 0},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -287,6 +299,44 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    static_shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "static_shape_boxes"),
+        ],
+        output="screen",
+    )
+
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+            ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
+            ("lidar_topic", "/point_cloud/filtered"),
+            ("bounding_boxes", "static_shape_boxes")
+        ],
+        parameters=[
+            {"bbox_object_margin": 1.0},
+            {"color_label_mappings_file": buoy_label_mappings},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": False},
+        ]
+    )
+
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
@@ -305,7 +355,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM0"}],
+        parameters=[{"port": "/dev/ttyACM2"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -326,7 +376,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -388,6 +438,8 @@ def launch_setup(context, *args, **kwargs):
         thrust_commander_node,
         buoy_yolo_node,
         shape_yolo_node,
+        static_shape_yolo_node,
+        bbox_project_pcloud_node,
         run_tasks,
         task_init_server, 
         # follow_buoy_path,
