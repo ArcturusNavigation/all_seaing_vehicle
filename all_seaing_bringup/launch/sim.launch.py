@@ -256,7 +256,8 @@ def launch_setup(context, *args, **kwargs):
             {"clustering_distance": 1.0},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
-            {"is_sim": True}
+            {"is_sim": True},
+            {"label_list": True}
         ]
     )
 
@@ -431,8 +432,8 @@ def launch_setup(context, *args, **kwargs):
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            # "world": "rb2025/rb2025_task1_task2.sdf",
-            "world": "speed_course_world.sdf",
+            "world": "rb2025/rb2025_task1_task2.sdf",
+            # "world": "speed_course_world.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
