@@ -43,7 +43,7 @@ class TaskInitServer(ActionServerBase):
         self.get_logger().info(f"Received goal: {goal}")
         
         while rclpy.ok():
-            self.get_logger().info("looping!!!!!!!")
+            # self.get_logger().info("looping!!!!!!!")
             # Check if the action client requested cancel
             if goal_handle.is_cancel_requested:
                 self.get_logger().info("Cancel requested. Aborting task initialization.")

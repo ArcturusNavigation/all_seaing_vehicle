@@ -137,6 +137,11 @@ class Yolov8Node(Node):
                 color_label = -1
                 if color_name in self.label_dict:
                     color_label = self.label_dict[color_name]
+                    # if color_name in ["black", "blue", "red", "green"]:
+                    #     object_name = class_name_list[1]
+                    #     if "buoy" not in object_name:
+                    #         color_label = -1
+
                     annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
                     self.get_logger().debug(f"Detected: {class_name} Msg Label is {box_msg.label}")
                 else: 
