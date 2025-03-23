@@ -130,7 +130,7 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"forward_speed": 1.2},
             {"max_yaw": 0.2},
-            {"pid_vals": [0.0009, 0.0, 0.0003]},
+            {"pid_vals": [0.0006, 0.0, 0.0001]},
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
@@ -248,7 +248,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 0},
+            {"video_index": 1},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -355,7 +355,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM2"}],
+        parameters=[{"port": "/dev/ttyACM0"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -376,7 +376,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -442,13 +442,13 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node,
         run_tasks,
         task_init_server, 
-        # follow_buoy_path,
+        follow_buoy_path,
         follow_buoy_pid,
         grid_map_generator,
         central_hub,
         amcl_ld,
         static_transforms_ld,
-        #webcam_publisher,
+        webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,
