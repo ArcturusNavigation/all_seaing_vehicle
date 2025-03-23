@@ -85,8 +85,8 @@ class CentralHubROS(Node):
         response.mode = self.estop.mode()
         response.drive_x = self.estop.drive_x()
         response.drive_y = self.estop.drive_y()
-        response.is_connected = self.estop.connected()
-        response.is_estopped = self.estop.estop()
+        response.is_connected = bool(self.estop.connected())
+        response.is_estopped = bool(self.estop.estop())
         return response
 
 

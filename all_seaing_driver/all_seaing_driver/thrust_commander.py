@@ -7,6 +7,8 @@ from std_msgs.msg import Float64
 import rclpy
 from all_seaing_interfaces.msg import Heartbeat
 
+TIMER_PERIOD = 1 / 8
+
 class ThrustCommander(Node):
 
     def __init__(self):
@@ -41,7 +43,7 @@ class ThrustCommander(Node):
         self.back_left_command = 1500
 
         self.heartbeat_sub = self.create_subscription(Heartbeat, "heartbeat", self.receive_heartbeat, 10)
-        self.timer = self.create_timer(1 / 8, self.timer_callback)
+        self.timer = self.create_timer(TIMER_PERIOD, self.timer_callback)
         self.proxy = self.create_client(CommandLong, "/mavros/cmd/command")
 
     def front_right_cb(self, msg: Float64):

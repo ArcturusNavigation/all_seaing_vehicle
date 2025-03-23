@@ -149,6 +149,11 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         remappings=[
             ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "use_color_names": True,
+            }
         ]
     )
 
@@ -314,9 +319,25 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
+            ),
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
+        # parameters=[{"is_sim": True}],
     )
 
     task_init_server = launch_ros.actions.Node(
@@ -358,7 +379,7 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             # "world": "rb2025/rb2025_task1_task2.sdf",
-            "world": "follow_path_task",
+            "world": "speed_course_world.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -385,7 +406,8 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         run_tasks,
         task_init_server,
-        follow_buoy_path,
+        # follow_buoy_path,
+        follow_buoy_pid,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,
