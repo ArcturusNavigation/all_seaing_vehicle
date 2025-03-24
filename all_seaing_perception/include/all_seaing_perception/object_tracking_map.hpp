@@ -82,6 +82,7 @@ class ObjectTrackingMap : public rclcpp::Node{
 private:
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
     void odom_callback();
+    void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
     void publish_map(std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
                      const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
                      rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub, std::vector<int> labels);
@@ -102,6 +103,10 @@ private:
     // Get transform from source frame to target frame
     geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
                                                 const std::string &in_src_frame);
+                                                
+    std::tuple<double, double, double> compute_transform_from_to(double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta);
+    std::tuple<double, double, double> compose_transforms(std::tuple<double, double, double> t1, std::tuple<double, double, double> t2);
+    std::tuple<double, double, double> apply_transform_from_to(double x, double y, double theta, double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta);
     
     // Member variables
     std::vector<std::shared_ptr<ObjectCloud>> m_tracked_obstacles;
@@ -116,13 +121,14 @@ private:
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;
 
-    float m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega;
+    float m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
 
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_untracked_map_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_map_cov_viz_pub;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
     rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_sub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
 
@@ -141,7 +147,7 @@ private:
     int m_num_obj;
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
-    bool m_first_state, m_got_local_frame;
+    bool m_first_state, m_got_local_frame, m_got_nav;
 
     bool m_is_sim;
     bool m_check_fov;

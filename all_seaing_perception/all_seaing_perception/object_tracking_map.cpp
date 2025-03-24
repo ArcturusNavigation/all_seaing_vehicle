@@ -37,9 +37,14 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("check_fov", false);
     m_check_fov = this->get_parameter("check_fov").as_bool();
 
-    // Initialize navigation variables to 0
+    // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
+    m_nav_z = 0;
+    m_nav_vx = 0;
+    m_nav_vy = 0;
+    m_nav_vz = 0;
+    m_nav_omega = 0;
     m_nav_heading = 0;
 
     // Initialize publishers and subscribers
@@ -61,11 +66,22 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 
+    // update odometry based on transforms on timer click
     odom_timer = this->create_wall_timer(
-      std::chrono::duration<float>(((float)1.0)/m_odom_refresh_rate), std::bind(&ObjectTrackingMap::odom_callback, this));
+    std::chrono::duration<float>(((float)1.0)/m_odom_refresh_rate), std::bind(&ObjectTrackingMap::odom_callback, this));
+    
+    if(m_only_imu){
+        // update odometry based on IMU data by subscribing to the odometry message
+        // TODO: check if another message publishes raw IMU acceleration data
+        // and maybe add the option to use that with the appropriate model that also keeps track of the velocity of the robot
+        m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+            "odometry/filtered", 10,
+            std::bind(&ObjectTrackingMap::odom_msg_callback, this, std::placeholders::_1));
+    }
 
     m_first_state = true;
     m_got_local_frame = false;
+    m_got_nav = false;
 }
 
 ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc,
@@ -110,6 +126,89 @@ template <typename T_vector> std::string vector_to_string(T_vector v) {
     return ss.str();
 }
 
+std::tuple<double, double, double> ObjectTrackingMap::compute_transform_from_to(double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta){
+    double dx = cos(from_theta)*(to_x-from_x)+sin(from_theta)*(to_y-from_y);
+    double dy = -sin(from_theta)*(to_x-from_x)+cos(from_theta)*(to_y-from_y);
+    double dtheta = to_theta - from_theta;
+    return std::make_tuple(dx, dy, dtheta);
+}
+
+// multiply left to right
+std::tuple<double, double, double> ObjectTrackingMap::compose_transforms(std::tuple<double, double, double> t1, std::tuple<double, double, double> t2){
+    double t1_dx, t1_dy, t1_dtheta, t2_dx, t2_dy, t2_dtheta;
+    return std::make_tuple(t1_dx+cos(t1_dtheta)*t2_dx-sin(t1_dtheta)*t2_dy,
+                            t1_dx+sin(t1_dtheta)*t2_dx+cos(t1_dtheta)*t2_dy,
+                            t1_dtheta+t2_dtheta);
+}
+
+// given the starting and ending robot positions (wrt to world) and object pos wrt world given first robot position being true, compute world to object given second robot position being true (robot to object should be the same)
+// useful to overlay maps with two different robot positions
+std::tuple<double, double, double> ObjectTrackingMap::apply_transform_from_to(double x, double y, double theta, double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta){
+    std::tuple<double, double, double> local_rel = compute_transform_from_to(from_x, from_y, from_theta, x, y, theta);// from starting pos to object
+    return compose_transforms(std::make_tuple(to_x, to_y, to_theta), local_rel);
+}
+
+void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
+    // !!! THOSE ARE RELATIVE TO THE ROBOT AND DEPENDENT ON ITS HEADING, USE THE CORRECT MOTION MODEL
+    m_nav_vx = msg.twist.twist.angular.x;
+    m_nav_vy = msg.twist.twist.angular.y;
+    m_nav_vz = msg.twist.twist.angular.z;
+    m_nav_omega = msg.twist.twist.angular.z;
+
+    RCLCPP_INFO(this->get_logger(), "IMU MESSAGE ODOM: (%lf, %lf), %lf", m_nav_vx, m_nav_vy, m_nav_heading);
+
+    if (m_first_state) {
+        // initialize mean and cov robot pose
+        m_state = Eigen::Vector3f(0,0,0);
+        Eigen::Matrix3f init_pose_noise{
+            {m_xy_noise, 0, 0},
+            {0, m_xy_noise, 0},
+            {0, 0, m_theta_noise},
+        };
+        m_cov = init_pose_noise;
+        // m_cov = Eigen::Matrix3f::Zero();
+        m_first_state = false;
+        m_last_odom_time = rclcpp::Time(msg.header.stamp);
+        return;
+    }
+
+    rclcpp::Time curr_odom_time = rclcpp::Time(msg.header.stamp);
+    float dt = (curr_odom_time - m_last_odom_time).seconds();
+    m_last_odom_time = curr_odom_time;
+
+    Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
+    F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
+
+    /*
+    MOTION UPDATE MODEL:
+    (x_old, y_old, theta_old) -> (x_old+cos(theta_old)*v_x*dt-sin(theta_old)*v_y*dt, y_old+sin(theta_old)*d_x*dt+cos(theta_old)*v_y*dt, theta_old+omega*dt)
+    mot_grad: rows -> components of final state (actually difference with old state), columns -> components of old state wrt to which the gradient is taken
+    */
+
+    Eigen::Vector3f mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
+    // gradient - identity
+    Eigen::Matrix3f mot_grad{
+        {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
+        {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
+        {0, 0, 0},
+    };
+
+    m_state += F.transpose() * mot_const;
+    Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
+                        F.transpose() * mot_grad * F;
+    // add a consistent amount of noise based on how much the robot moved since the last time
+    Eigen::Matrix3f motion_noise{
+        {m_xy_noise * abs(mot_const[0]), 0, 0},
+        {0, m_xy_noise * abs(mot_const[1]), 0},
+        {0, 0, m_theta_noise * abs(mot_const[2])},
+    };
+    m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
+    // to see the robot position prediction mean & uncertainty
+    if(m_got_nav){
+        this->visualize_predictions();
+    }
+}
+
 void ObjectTrackingMap::odom_callback() {
     if(!m_got_local_frame) return;
 
@@ -132,14 +231,12 @@ void ObjectTrackingMap::odom_callback() {
     m_nav_heading = y;
     // RCLCPP_INFO(this->get_logger(), "ROBOT TRANSFORM ODOM: (%lf, %lf), %lf", m_nav_x, m_nav_y, m_nav_heading);
 
-    if (m_track_robot) {
+    m_got_nav = true;
+
+    if (m_track_robot && (!m_only_imu)) {
         if (m_first_state) {
             // initialize mean and cov robot pose
-            if(m_only_imu){
-                m_state = Eigen::Vecto3f(0,0,0);
-            }else{
-                m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
-            }
+            m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
             Eigen::Matrix3f init_pose_noise{
                 {m_xy_noise, 0, 0},
                 {0, m_xy_noise, 0},
@@ -163,10 +260,7 @@ void ObjectTrackingMap::odom_callback() {
 
         Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
         F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-
-        Eigen::Vector3f mot_const;
-        Eigen::Matrix3f mot_grad = Eigen::Matrix3f::Zero();
-
+        
         /*
         MOTION UPDATE MODEL:
         (x_old, y_old, theta_old) -> (x_old+v_comp_x*dt, y_old+v_comp_y*dt, theta_old+omega_comp*dt)
@@ -175,34 +269,18 @@ void ObjectTrackingMap::odom_callback() {
         gradients minus the identity matrix, so with this model it is the zero matrix
         */
 
-        if(m_only_imu){
-            mot_const =
-            Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
+        Eigen::Vector3f mot_const = Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
+        Eigen::Matrix3f mot_grad = Eigen::Matrix3f::Zero();
 
-            m_state += F.transpose() * mot_const;
-            Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
-                                F.transpose() * mot_grad * F;
-            // add a consistent amount of noise based on how much the robot moved since the last time
-            Eigen::Matrix3f motion_noise{
-                {m_xy_noise * abs(mot_const[0]), 0, 0},
-                {0, m_xy_noise * abs(mot_const[1]), 0},
-                {0, 0, m_theta_noise * abs(mot_const[2])},
-            };
-        }else{
-            mot_const =
-            Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
-            // mot_grad is still zero
-
-            m_state += F.transpose() * mot_const;
-            Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
-                                F.transpose() * mot_grad * F;
-            // add a consistent amount of noise based on how much the robot moved since the last time
-            Eigen::Matrix3f motion_noise{
-                {m_xy_noise * abs(mot_const[0]), 0, 0},
-                {0, m_xy_noise * abs(mot_const[1]), 0},
-                {0, 0, m_theta_noise * abs(mot_const[2])},
-            };
-        }
+        m_state += F.transpose() * mot_const;
+        Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
+                            F.transpose() * mot_grad * F;
+        // add a consistent amount of noise based on how much the robot moved since the last time
+        Eigen::Matrix3f motion_noise{
+            {m_xy_noise * abs(mot_const[0]), 0, 0},
+            {0, m_xy_noise * abs(mot_const[1]), 0},
+            {0, 0, m_theta_noise * abs(mot_const[2])},
+        };
         m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
         // to see the robot position prediction mean & uncertainty
         this->visualize_predictions();
@@ -295,8 +373,8 @@ void ObjectTrackingMap::visualize_predictions() {
         rot_mat.getRotation(quat_rot);
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
-        ellipse.pose.position.x = robot_mean(0);
-        ellipse.pose.position.y = robot_mean(1);
+        ellipse.pose.position.x = m_nav_x; // to overlay the map on top of the transform (GPS), especially in sim
+        ellipse.pose.position.y = m_nav_y;
         ellipse.pose.position.z = 0;
         ellipse.pose.orientation = tf2::toMsg(quat_rot);
         ellipse.scale.x = sqrt(a_x);
@@ -310,11 +388,11 @@ void ObjectTrackingMap::visualize_predictions() {
 
         visualization_msgs::msg::Marker angle_marker;
         angle_marker.type = visualization_msgs::msg::Marker::ARROW;
-        angle_marker.pose.position.x = robot_mean(0);
-        angle_marker.pose.position.y = robot_mean(1);
+        angle_marker.pose.position.x = m_nav_x;
+        angle_marker.pose.position.y = m_nav_y;
         angle_marker.pose.position.z = 0;
         tf2::Quaternion angle_quat;
-        angle_quat.setRPY(0, 0, m_state[2]);
+        angle_quat.setRPY(0, 0, m_nav_heading);
         angle_marker.pose.orientation = tf2::toMsg(angle_quat);
         angle_marker.scale.x = m_cov(2, 2);
         angle_marker.scale.y = 0.2;
@@ -346,17 +424,30 @@ void ObjectTrackingMap::visualize_predictions() {
         // a_y);
         Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
         Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
-        double cov_scale =
-            m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
+        double cov_scale = m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
         tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
         tf2::Quaternion quat_rot;
         rot_mat.getRotation(quat_rot);
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
-        ellipse.pose.position.x = obj_mean(0);
-        ellipse.pose.position.y = obj_mean(1);
+
+        if (m_track_robot){
+            double final_x, final_y, final_theta;
+            double r,p,init_theta;
+            rot_mat.getRPY(r,p,init_theta);
+            std::tie(final_x, final_y, final_theta) = ObjectTrackingMap::apply_transform_from_to(obj_mean(0), obj_mean(1), init_theta, m_state(0), m_state(1), m_state(2), m_nav_x, m_nav_y, m_nav_heading);
+            tf2::Quaternion final_quat_rot;
+            final_quat_rot.setRPY(0,0,final_theta);
+            ellipse.pose.position.x = final_x;
+            ellipse.pose.position.y = final_y;
+            ellipse.pose.orientation = tf2::toMsg(final_quat_rot);
+        }else{
+            ellipse.pose.position.x = obj_mean(0);
+            ellipse.pose.position.y = obj_mean(1);
+            ellipse.pose.orientation = tf2::toMsg(quat_rot);
+        }
+        
         ellipse.pose.position.z = 0;
-        ellipse.pose.orientation = tf2::toMsg(quat_rot);
         ellipse.scale.x = cov_scale * sqrt(a_x);
         ellipse.scale.y = cov_scale * sqrt(a_y);
         ellipse.scale.z = 1;

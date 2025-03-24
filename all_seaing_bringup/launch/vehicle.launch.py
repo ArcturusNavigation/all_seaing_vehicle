@@ -130,7 +130,7 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"forward_speed": 1.2},
             {"max_yaw": 0.2},
-            {"pid_vals": [0.0009, 0.0, 0.0003]},
+            {"pid_vals": [0.0006, 0.0, 0.0001]},
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
@@ -248,7 +248,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 0},
+            {"video_index": 1},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -338,6 +338,46 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    object_tracking_map_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 2.0},
+            {"range_uncertainty": 1.0},
+            {"bearing_uncertainty": 0.1},
+            {"new_object_slam_threshold": 2.0},
+            {"init_new_cov": 10.0},
+            {"check_fov": True},
+            {"track_robot": True},
+            {"only_imu": True},
+            {"is_sim": True}
+        ]
+    )
+
+    object_tracking_map_euclidean_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_euclidean",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"check_fov": False},
+            {"is_sim": True},
+        ]
+    )
+
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
@@ -377,7 +417,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -441,15 +481,16 @@ def launch_setup(context, *args, **kwargs):
         shape_yolo_node,
         static_shape_yolo_node,
         bbox_project_pcloud_node,
+        object_tracking_map_node,
         run_tasks,
         task_init_server, 
-        # follow_buoy_path,
+        follow_buoy_path,
         follow_buoy_pid,
         grid_map_generator,
         central_hub,
         amcl_ld,
         static_transforms_ld,
-        #webcam_publisher,
+        webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,

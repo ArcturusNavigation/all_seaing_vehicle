@@ -74,6 +74,8 @@ void Obstacle::to_ros_msg(all_seaing_interfaces::msg::Obstacle &out_obstacle_msg
     out_obstacle_msg.global_bbox_max.z = this->get_global_bbox_max().z;
 }
 
+// TODO: overload the below function to allow creating obstacles with global coordinates directly, with local coords being optional (e.g. for global map)
+
 Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
                    const pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr,
                    const std::vector<int> &in_cluster_indices, int in_id,
