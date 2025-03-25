@@ -13,6 +13,7 @@
 
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
+#include "tf2_ros/transform_broadcaster.h"
 
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
@@ -108,9 +109,11 @@ private:
     std::tuple<double, double, double> compose_transforms(std::tuple<double, double, double> t1, std::tuple<double, double, double> t2);
     std::tuple<double, double, double> apply_transform_from_to(double x, double y, double theta, double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta);
     
+    void publish_slam();
+
     // Member variables
     std::vector<std::shared_ptr<ObjectCloud>> m_tracked_obstacles;
-    std::string m_global_frame_id, m_local_frame_id;
+    std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header;
     int m_obstacle_id;
@@ -129,12 +132,14 @@ private:
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_map_cov_viz_pub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr m_slam_pub;
     rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_sub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+    std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
     geometry_msgs::msg::TransformStamped m_lidar_map_tf, m_map_lidar_tf;
     rclcpp::TimerBase::SharedPtr odom_timer;
 
@@ -143,14 +148,17 @@ private:
 
     //SLAM matrices & variables
     float m_range_std, m_bearing_std, m_new_obj_slam_thres;
-    float m_xy_noise, m_theta_noise;
+    float m_gps_xy_noise, m_gps_theta_noise;
+    float m_imu_xy_noise, m_imu_theta_noise;
     int m_num_obj;
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav;
+    nav_msgs::msg::Odometry m_last_odom_msg;
 
     bool m_is_sim;
     bool m_check_fov;
+    bool m_direct_tf;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();
