@@ -28,6 +28,7 @@ class NavigationServer(ActionServerBase):
             "follow_path",
             execute_callback=self.follow_path_callback,
             cancel_callback=self.default_cancel_callback,
+            #TODO: refactor cancel logic for navigation
         )
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
 

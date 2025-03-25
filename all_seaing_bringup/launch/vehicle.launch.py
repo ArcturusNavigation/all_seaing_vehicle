@@ -248,7 +248,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 1},
+            {"video_index": 0},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -348,16 +348,21 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"obstacle_seg_thresh": 10.0},
+            {"slam_frame_id": "slam_map"},
             {"obstacle_drop_thresh": 2.0},
-            {"range_uncertainty": 1.0},
+            {"motion_gps_xy_noise": 1.0},
+            {"motion_gps_theta_noise": 0.1},
+            {"range_uncertainty": 10.0},
             {"bearing_uncertainty": 0.1},
+            {"motion_imu_xy_noise": 10.0},
+            {"motion_imu_theta_noise": 0.01},
             {"new_object_slam_threshold": 2.0},
             {"init_new_cov": 10.0},
-            {"check_fov": True},
+            {"check_fov": False},
             {"track_robot": True},
             {"only_imu": True},
-            {"is_sim": True}
+            {"direct_tf": False},
+            {"is_sim": False},
         ]
     )
 
@@ -393,10 +398,15 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{"is_sim": False}],
     )
 
+    delivery_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="delivery_server.py",
+    )
+
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM0"}],
+        parameters=[{"port": "/dev/ttyACM2"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -417,7 +427,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -478,8 +488,8 @@ def launch_setup(context, *args, **kwargs):
         rviz_waypoint_sender,
         thrust_commander_node,
         buoy_yolo_node,
-        shape_yolo_node,
-        static_shape_yolo_node,
+        # shape_yolo_node,
+        # static_shape_yolo_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
         run_tasks,

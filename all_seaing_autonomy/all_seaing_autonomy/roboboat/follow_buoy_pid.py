@@ -153,13 +153,13 @@ class FollowBuoyPID(ActionServerBase):
                 # sets flag if width large enough regardless of if sees anything
                 if width >= self.width * 0.15:
                     forward = True
-                    self.forward_start = self.get_clock().now().nanoseconds / 1e9
+                    self.forward_start = self.get_clock().now()
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
                 red_center_x = midpt
                 if width >= self.width * 0.15:
                     forward = True
-                    self.forward_start = self.get_clock().now().nanoseconds / 1e9
+                    self.forward_start = self.get_clock().now()
             elif box.label in self.yellow_labels and area > yellow_area:
                 yellow_area = area
                 yellow_left = box.min_x
@@ -180,12 +180,7 @@ class FollowBuoyPID(ActionServerBase):
                 self.get_logger().info("no more buoys killing")
                 # wait 1 second, then send a stopping control msg (in case we haven't fully passed the buoys)
                 time.sleep(1)
-                control_msg = ControlOption()
-                control_msg.priority = 1
-                control_msg.twist.linear.x = 0.0
-                control_msg.twist.linear.y = 0.0
-                control_msg.twist.angular.z = 0.0
-                self.control_pub.publish(control_msg)
+        
                 self.result = True
             return
         else:
@@ -204,16 +199,18 @@ class FollowBuoyPID(ActionServerBase):
         img_ctr = self.width / 2.0
 
         if left_x is None: 
-            if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
-                yaw0 = True
-            elif right_x < img_ctr:
+ #           if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
+ #               yaw0 = True
+ #               left_x = 0 # this doesn't actually do anything, just to prevent erroring gate_ctr calculation
+            if right_x < img_ctr:
                 left_x = right_x - (self.width * 0.75)
             else:
                 left_x = 0
         if right_x is None: 
-            if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
-                yaw0 = True
-            elif left_x >= img_ctr:
+            # if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
+              #   yaw0 = True
+                # right_x = 0
+            if left_x >= img_ctr:
                 right_x = left_x + (self.width * 0.75)
             else:
                 right_x = self.width - 1
@@ -276,6 +273,7 @@ class FollowBuoyPID(ActionServerBase):
 
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.pid.update(offset, dt)            
+        self.get_logger().info(f"offset: {offset}")
         yaw_rate = self.pid.get_effort()
         if yaw_rate < 0.0: # 3/6: if turning rihgt, make turn larger
             yaw_rate = max(yaw_rate * self.scale_right, -self.max_yaw_rate)

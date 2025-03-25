@@ -211,19 +211,26 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="object_tracking_map",
         output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
         parameters=[
             {"global_frame_id": "map"},
+            {"slam_frame_id": "slam_map"},
             {"obstacle_drop_thresh": 2.0},
-            {"range_uncertainty": 1.0},
+            {"motion_gps_xy_noise": 1.0},
+            {"motion_gps_theta_noise": 0.1},
+            {"range_uncertainty": 10.0},
             {"bearing_uncertainty": 0.1},
+            {"motion_imu_xy_noise": 10.0},
+            {"motion_imu_theta_noise": 0.01},
             {"new_object_slam_threshold": 2.0},
-            {"check_fov": False},
             {"init_new_cov": 10.0},
+            {"check_fov": False},
             {"track_robot": True},
             {"only_imu": True},
+            {"direct_tf": False},
             {"is_sim": False},
         ]
     )
