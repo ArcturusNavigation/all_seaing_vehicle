@@ -83,9 +83,6 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
         m_slam_pub = this->create_publisher<nav_msgs::msg::Odometry>(
             "odometry/tracked", 10);
         m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-    }
-    
-    if(m_only_imu){
         // update odometry based on IMU data by subscribing to the odometry message
         // TODO: check if another message publishes raw IMU acceleration data
         // and maybe add the option to use that with the appropriate model that also keeps track of the velocity of the robot

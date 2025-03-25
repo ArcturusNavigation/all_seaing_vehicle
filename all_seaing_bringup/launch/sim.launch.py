@@ -297,7 +297,7 @@ def launch_setup(context, *args, **kwargs):
             {"init_new_cov": 10.0},
             {"check_fov": False},
             {"track_robot": True},
-            {"only_imu": True},
+            {"only_imu": False},
             {"direct_tf": False},
             {"is_sim": True},
         ]
