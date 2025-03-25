@@ -424,7 +424,6 @@ def launch_setup(context, *args, **kwargs):
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
-        # parameters=[{"is_sim": True}],
     )
 
     task_init_server = launch_ros.actions.Node(
@@ -458,10 +457,7 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
-    if no_gui == "true":
-        extra_gz_args = "-v -s 0"
-    else:
-        extra_gz_args = "-v 0"
+    extra_gz_args = "-v -s 0" if no_gui == "true" else "-v 0"
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
