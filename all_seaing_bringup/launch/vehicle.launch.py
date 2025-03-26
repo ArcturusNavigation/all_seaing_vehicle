@@ -22,6 +22,9 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
+    slam_params = os.path.join(
+        bringup_prefix, "config", "perception", "slam_real.yaml"
+    )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
     )
@@ -346,27 +349,7 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
-        parameters=[
-            {"global_frame_id": "map"},
-            {"slam_frame_id": "slam_map"},
-            {"obstacle_drop_thresh": 2.0},
-            {"normalize_drop_thresh": False},
-            {"range_uncertainty": 20.0},
-            {"bearing_uncertainty": 0.2},
-            {"motion_gps_xy_noise": 1.0},
-            {"motion_gps_theta_noise": 0.1},
-            {"motion_imu_xy_noise": 1.0},
-            {"motion_imu_theta_noise": 0.05},
-            {"update_gps_xy_uncertainty": 5000.0},
-            {"new_object_slam_threshold": 2.0},
-            {"init_new_cov": 10.0},
-            {"check_fov": False},
-            {"track_robot": True},
-            {"imu_predict": True},
-            {"gps_update": True},
-            {"direct_tf": False},
-            {"is_sim": False},
-        ]
+        parameters=[slam_params],
     )
 
     object_tracking_map_euclidean_node = launch_ros.actions.Node(
