@@ -12,13 +12,14 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<double>("motion_imu_xy_noise", 1.0);
     this->declare_parameter<double>("motion_imu_theta_noise", 1.0);
     this->declare_parameter<double>("update_gps_xy_uncertainty", 1.0);
+    this->declare_parameter<double>("update_odom_theta_uncertainty", 1.0);
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
     this->declare_parameter<double>("init_new_cov", 10.0);
     this->declare_parameter<bool>("track_robot", true);
     this->declare_parameter<bool>("imu_predict", true);
     this->declare_parameter<bool>("gps_update", true);
     this->declare_parameter<double>("normalize_drop_dist", 1.0);
-    this->declare_parameter<double>("odom_refresh_rate", 1000);
+    this->declare_parameter<double>("odom_refresh_rate", 40);
 
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
@@ -31,6 +32,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_imu_xy_noise = this->get_parameter("motion_imu_xy_noise").as_double();
     m_imu_theta_noise = this->get_parameter("motion_imu_theta_noise").as_double();
     m_update_gps_xy_uncertainty = this->get_parameter("update_gps_xy_uncertainty").as_double();
+    m_update_odom_theta_uncertainty = this->get_parameter("update_odom_theta_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
     m_init_new_cov = this->get_parameter("init_new_cov").as_double();
     m_track_robot = this->get_parameter("track_robot").as_bool();
@@ -51,6 +53,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
 
     this->declare_parameter<bool>("normalize_drop_thresh", false);
     m_normalize_drop_thresh = this->get_parameter("normalize_drop_thresh").as_bool();
+
+    this->declare_parameter<bool>("include_odom_theta", false);
+    m_include_odom_theta = this->get_parameter("include_odom_theta").as_bool();
 
     // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
@@ -220,9 +225,15 @@ void ObjectTrackingMap::publish_slam(){
 
 void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     // !!! THOSE ARE RELATIVE TO THE ROBOT AND DEPENDENT ON ITS HEADING, USE THE CORRECT MOTION MODEL
-    m_nav_vx = msg.twist.twist.angular.x;
-    m_nav_vy = msg.twist.twist.angular.y;
-    m_nav_vz = msg.twist.twist.angular.z;
+    if(m_is_sim){
+        m_nav_vx = msg.twist.twist.linear.x;
+        m_nav_vy = msg.twist.twist.linear.y;   
+    }else{
+        // Pixhawk rotated to the left, facing up, so need to rotate the acceleration vector accordingly
+        m_nav_vx = -msg.twist.twist.linear.y;
+        m_nav_vy = msg.twist.twist.linear.x;
+    }
+    m_nav_vz = msg.twist.twist.linear.z;
     m_nav_omega = msg.twist.twist.angular.z;
     m_last_odom_msg = msg;
 
@@ -237,7 +248,7 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     float dt = (curr_odom_time - m_last_odom_time).seconds();
     m_last_odom_time = curr_odom_time;
 
-    // RCLCPP_INFO(this->get_logger(), "IMU MESSAGE ODOM: (%lf, %lf), %lf", m_nav_vx, m_nav_vy, m_nav_heading);
+    // RCLCPP_INFO(this->get_logger(), "IMU MESSAGE ODOM: (%lf, %lf), %lf", m_nav_vx, m_nav_vy, m_nav_omega);
 
     if (!m_got_nav || !m_track_robot || !m_imu_predict || m_first_state) return;
 
@@ -259,6 +270,8 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     };
 
     m_state += F.transpose() * mot_const;
+
+    // RCLCPP_INFO(this->get_logger(), "ROBOT PREDICTED POSE AFTER IMU UPDATE: (%lf, %lf), %lf", m_state(0), m_state(1), m_state(2));
     Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
                         F.transpose() * mot_grad * F;
     // add a consistent amount of noise based on how much the robot moved since the last time
@@ -294,20 +307,26 @@ void ObjectTrackingMap::odom_callback() {
     m_map_lidar_tf = get_tf(m_global_frame_id, m_local_frame_id);
     m_lidar_map_tf = get_tf(m_local_frame_id, m_global_frame_id);
 
-    // RCLCPP_INFO(this->get_logger(), "GOT ODOM");
-    m_nav_x = m_map_lidar_tf.transform.translation.x;
-    m_nav_y = m_map_lidar_tf.transform.translation.y;
     m_nav_z = m_map_lidar_tf.transform.translation.z;
-
     tf2::Quaternion quat;
     tf2::fromMsg(m_map_lidar_tf.transform.rotation, quat);
     tf2::Matrix3x3 m(quat);
     double r, p, y;
     m.getRPY(r, p, y);
     m_nav_heading = y;
-    // RCLCPP_INFO(this->get_logger(), "ROBOT TRANSFORM ODOM: (%lf, %lf), %lf", m_nav_x, m_nav_y, m_nav_heading);
 
     m_got_nav = true;
+
+    // to ignore gps TFs that are the same thing 5000 times a second and cause SLAM to lock into the GPS
+    // RCLCPP_INFO(this->get_logger(), "COMPARE: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_lidar_tf.transform.translation.x, m_map_lidar_tf.transform.translation.y);
+    if((!m_first_state) && (m_nav_x == m_map_lidar_tf.transform.translation.x) && (m_nav_y == m_map_lidar_tf.transform.translation.y)) return;
+
+    // RCLCPP_INFO(this->get_logger(), "GOT ODOM");
+    m_nav_x = m_map_lidar_tf.transform.translation.x;
+    m_nav_y = m_map_lidar_tf.transform.translation.y;
+    // RCLCPP_INFO(this->get_logger(), "COMPARE NEW: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_lidar_tf.transform.translation.x, m_map_lidar_tf.transform.translation.y);
+
+    // RCLCPP_INFO(this->get_logger(), "NEW GPS: (%lf, %lf)", m_nav_x, m_nav_y);
 
     if(!m_track_robot) return;
 
@@ -362,24 +381,42 @@ void ObjectTrackingMap::odom_callback() {
         };
         m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
     }else if (m_gps_update){
-        // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
-        Eigen::Matrix2f Q{
-            {m_update_gps_xy_uncertainty, 0},
-            {0, m_update_gps_xy_uncertainty},
-        };
-        Eigen::Vector2f xy_actual(m_nav_x, m_nav_y);
-        Eigen::Vector2f xy_pred(m_state(0), m_state(1));
-        //gradient of measurement update model, identity since it's centered at the initial state
-        Eigen::MatrixXf H = Eigen::MatrixXf::Zero(2, 3 + 2 * m_num_obj);
-        H.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
-        // Eigen::Matrix2f h = Eigen::Matrix2f::Identity();
-        // Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 3 + 2 * m_num_obj);
-        // F.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
-        // Eigen::MatrixXf H = h * F;
-        Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
-        m_state += K * (xy_actual - xy_pred);
-        m_cov =
-            (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
+        if(!m_include_odom_theta){
+            // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
+            Eigen::Matrix2f Q{
+                {m_update_gps_xy_uncertainty, 0},
+                {0, m_update_gps_xy_uncertainty},
+            };
+            Eigen::Vector2f xy_actual(m_nav_x, m_nav_y);
+            Eigen::Vector2f xy_pred(m_state(0), m_state(1));
+            //gradient of measurement update model, identity since it's centered at the initial state
+            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(2, 3 + 2 * m_num_obj);
+            H.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
+            // Eigen::Matrix2f h = Eigen::Matrix2f::Identity();
+            // Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 3 + 2 * m_num_obj);
+            // F.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
+            // Eigen::MatrixXf H = h * F;
+            Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
+            m_state += K * (xy_actual - xy_pred);
+            m_cov =
+                (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;   
+        }else{
+            // Include theta, since that's provided by the IMU compass usually
+            Eigen::Matrix3f Q{
+                {m_update_gps_xy_uncertainty, 0, 0},
+                {0, m_update_gps_xy_uncertainty, 0},
+                {0, 0, m_update_odom_theta_uncertainty},
+            };
+            Eigen::Vector3f xyth_actual(m_nav_x, m_nav_y, m_nav_heading);
+            Eigen::Vector3f xyth_pred(m_state(0), m_state(1), m_state(2));
+            //gradient of measurement update model, identity since it's centered at the initial state
+            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
+            H.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
+            Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
+            m_state += K * (xyth_actual - xyth_pred);
+            m_cov =
+                (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
+        }
     }
 
     if(m_got_nav){

@@ -124,7 +124,7 @@ private:
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;
 
-    float m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
+    double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
 
     // Publishers and subscribers
@@ -150,7 +150,7 @@ private:
     float m_range_std, m_bearing_std, m_new_obj_slam_thres;
     float m_gps_xy_noise, m_gps_theta_noise;
     float m_imu_xy_noise, m_imu_theta_noise;
-    float m_update_gps_xy_uncertainty;
+    float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
     int m_num_obj;
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
@@ -161,6 +161,7 @@ private:
     bool m_check_fov;
     bool m_direct_tf;
     bool m_normalize_drop_thresh;
+    bool m_include_odom_theta;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();

@@ -24,6 +24,9 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
+    slam_params = os.path.join(
+        bringup_prefix, "config", "perception", "slam_sim.yaml"
+    )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
     )
@@ -283,27 +286,7 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
         ],
-        parameters=[
-            {"global_frame_id": "map"},
-            {"slam_frame_id": "slam_map"},
-            {"obstacle_drop_thresh": 2.0},
-            {"normalize_drop_thresh": False},
-            {"range_uncertainty": 100.0},
-            {"bearing_uncertainty": 0.2},
-            {"motion_gps_xy_noise": 1.0},
-            {"motion_gps_theta_noise": 0.1},
-            {"motion_imu_xy_noise": 10.0},
-            {"motion_imu_theta_noise": 0.01},
-            {"update_gps_xy_uncertainty": 500.0},
-            {"new_object_slam_threshold": 2.0},
-            {"init_new_cov": 10.0},
-            {"check_fov": False},
-            {"track_robot": True},
-            {"imu_predict": True},
-            {"gps_update": True},
-            {"direct_tf": False},
-            {"is_sim": True},
-        ]
+        parameters=[slam_params],
     )
 
     object_tracking_map_euclidean_node = launch_ros.actions.Node(
@@ -503,8 +486,8 @@ def launch_setup(context, *args, **kwargs):
         run_tasks,
         task_init_server,
         # follow_buoy_path,
-        follow_buoy_pid,
-        speed_challenge_pid,
+        # follow_buoy_pid,
+        # speed_challenge_pid,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,
