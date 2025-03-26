@@ -22,6 +22,11 @@ public:
              const std::vector<int> &in_cluster_indices, int in_id,
              geometry_msgs::msg::TransformStamped lidar_map_tf);
 
+    Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
+                    const typename pcl::PointCloud<pcl::PointXYZI>::Ptr local_pcloud,
+                    const typename pcl::PointCloud<pcl::PointXYZI>::Ptr global_pcloud,
+                    int in_id);
+
     virtual ~Obstacle();
 
     int get_id();

@@ -3,28 +3,40 @@
 ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "map");
-    this->declare_parameter<double>("obstacle_seg_thresh", 1.0);
+    this->declare_parameter<std::string>("slam_frame_id", "slam_map");
     this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
     this->declare_parameter<double>("range_uncertainty", 1.0);
     this->declare_parameter<double>("bearing_uncertainty", 1.0);
-    this->declare_parameter<double>("motion_xy_noise", 1.0);
-    this->declare_parameter<double>("motion_theta_noise", 1.0);
+    this->declare_parameter<double>("motion_gps_xy_noise", 1.0);
+    this->declare_parameter<double>("motion_gps_theta_noise", 1.0);
+    this->declare_parameter<double>("motion_imu_xy_noise", 1.0);
+    this->declare_parameter<double>("motion_imu_theta_noise", 1.0);
+    this->declare_parameter<double>("update_gps_xy_uncertainty", 1.0);
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
     this->declare_parameter<double>("init_new_cov", 10.0);
-    this->declare_parameter<bool>("track_robot", false);
+    this->declare_parameter<bool>("track_robot", true);
+    this->declare_parameter<bool>("imu_predict", true);
+    this->declare_parameter<bool>("gps_update", true);
     this->declare_parameter<double>("normalize_drop_dist", 1.0);
     this->declare_parameter<double>("odom_refresh_rate", 1000);
 
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
+    m_slam_frame_id = this->get_parameter("slam_frame_id").as_string();
     m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
     m_range_std = this->get_parameter("range_uncertainty").as_double();
     m_bearing_std = this->get_parameter("bearing_uncertainty").as_double();
-    m_xy_noise = this->get_parameter("motion_xy_noise").as_double();
-    m_theta_noise = this->get_parameter("motion_theta_noise").as_double();
+    m_gps_xy_noise = this->get_parameter("motion_gps_xy_noise").as_double();
+    m_gps_theta_noise = this->get_parameter("motion_gps_theta_noise").as_double();
+    m_imu_xy_noise = this->get_parameter("motion_imu_xy_noise").as_double();
+    m_imu_theta_noise = this->get_parameter("motion_imu_theta_noise").as_double();
+    m_update_gps_xy_uncertainty = this->get_parameter("update_gps_xy_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
     m_init_new_cov = this->get_parameter("init_new_cov").as_double();
     m_track_robot = this->get_parameter("track_robot").as_bool();
+    m_imu_predict = this->get_parameter("imu_predict").as_bool();
+    m_gps_update = this->get_parameter("gps_update").as_bool();
+    
     m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
     m_odom_refresh_rate = this->get_parameter("odom_refresh_rate").as_double();
 
@@ -34,9 +46,20 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("check_fov", false);
     m_check_fov = this->get_parameter("check_fov").as_bool();
 
-    // Initialize navigation variables to 0
+    this->declare_parameter<bool>("direct_tf", false);
+    m_direct_tf = this->get_parameter("direct_tf").as_bool();
+
+    this->declare_parameter<bool>("normalize_drop_thresh", false);
+    m_normalize_drop_thresh = this->get_parameter("normalize_drop_thresh").as_bool();
+
+    // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
+    m_nav_z = 0;
+    m_nav_vx = 0;
+    m_nav_vy = 0;
+    m_nav_vz = 0;
+    m_nav_omega = 0;
     m_nav_heading = 0;
 
     // Initialize publishers and subscribers
@@ -58,11 +81,27 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 
+    // update odometry based on transforms on timer click
     odom_timer = this->create_wall_timer(
-      std::chrono::duration<float>(((float)1.0)/m_odom_refresh_rate), std::bind(&ObjectTrackingMap::odom_callback, this));
+    std::chrono::duration<float>(((float)1.0)/m_odom_refresh_rate), std::bind(&ObjectTrackingMap::odom_callback, this));
+
+    if(m_track_robot){
+        // publish computed global robot position as a transform slam_map->map and a message with the pose of the robot wrt slam_map
+        m_slam_pub = this->create_publisher<nav_msgs::msg::Odometry>(
+            "odometry/tracked", 10);
+        m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+        // update odometry based on IMU data by subscribing to the odometry message
+        // TODO: check if another message publishes raw IMU acceleration data
+        // and maybe add the option to use that with the appropriate model that also keeps track of the velocity of the robot
+        m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+            "odometry/filtered", 10,
+            std::bind(&ObjectTrackingMap::odom_msg_callback, this, std::placeholders::_1));
+    }
 
     m_first_state = true;
     m_got_local_frame = false;
+    m_got_nav = false;
+    m_got_odom = false;
 }
 
 ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc,
@@ -107,6 +146,145 @@ template <typename T_vector> std::string vector_to_string(T_vector v) {
     return ss.str();
 }
 
+std::tuple<double, double, double> ObjectTrackingMap::compute_transform_from_to(double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta){
+    double dx = cos(from_theta)*(to_x-from_x)+sin(from_theta)*(to_y-from_y);
+    double dy = -sin(from_theta)*(to_x-from_x)+cos(from_theta)*(to_y-from_y);
+    double dtheta = to_theta - from_theta;
+    // RCLCPP_INFO(this->get_logger(), "(%lf, %lf, %lf) -> (%lf, %lf, %lf): (%lf, %lf, %lf)", from_x, from_y, from_theta, to_x, to_y, to_theta, dx, dy, dtheta);
+    return std::make_tuple(dx, dy, dtheta);
+}
+
+// multiply left to right
+std::tuple<double, double, double> ObjectTrackingMap::compose_transforms(std::tuple<double, double, double> t1, std::tuple<double, double, double> t2){
+    double t1_dx, t1_dy, t1_dtheta, t2_dx, t2_dy, t2_dtheta;
+    std::tie(t1_dx, t1_dy, t1_dtheta) = t1;
+    std::tie(t2_dx, t2_dy, t2_dtheta) = t2;
+    double t_dx = t1_dx+cos(t1_dtheta)*t2_dx-sin(t1_dtheta)*t2_dy;
+    double t_dy = t1_dy+sin(t1_dtheta)*t2_dx+cos(t1_dtheta)*t2_dy;
+    double t_dtheta = t1_dtheta+t2_dtheta;
+    // RCLCPP_INFO(this->get_logger(), "(%lf, %lf, %lf)@(%lf, %lf, %lf)=(%lf, %lf, %lf)", t1_dx, t1_dy, t1_dtheta, t2_dx, t2_dy, t2_dtheta, t_dx, t_dy, t_dtheta);
+    return std::make_tuple(t_dx, t_dy, t_dtheta);
+}
+
+// given the starting and ending robot positions (wrt to world) and object pos wrt world given first robot position being true, compute world to object given second robot position being true (robot to object should be the same)
+// useful to overlay maps with two different robot positions
+std::tuple<double, double, double> ObjectTrackingMap::apply_transform_from_to(double x, double y, double theta, double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta){
+    std::tuple<double, double, double> local_rel = compute_transform_from_to(from_x, from_y, from_theta, x, y, theta);// from starting pos to object
+    return compose_transforms(std::make_tuple(to_x, to_y, to_theta), local_rel);
+}
+
+void ObjectTrackingMap::publish_slam(){
+    geometry_msgs::msg::TransformStamped t;
+    t.header.stamp = m_last_odom_msg.header.stamp;
+    // t.header.stamp = this->get_clock()->now();
+    if(m_direct_tf){
+        // publish the transform from slam_map to the local frame (camera/lidar)
+        t.header.frame_id = m_slam_frame_id;
+        t.child_frame_id = m_local_frame_id;
+        t.transform.translation.x = m_state(0);
+        t.transform.translation.y = m_state(1);
+        t.transform.translation.z = m_nav_z;
+
+        tf2::Quaternion q;
+        q.setRPY(0, 0, m_state(2));
+        t.transform.rotation = tf2::toMsg(q);
+    }else{
+        // transform from slam_map to map, s.t. slam_map->robot is predicted pose
+        t.header.frame_id = m_slam_frame_id;
+        t.child_frame_id = m_global_frame_id;
+        double shift_x, shift_y, shift_theta;
+        // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
+        std::tie(shift_x, shift_y, shift_theta) = compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)), compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+        t.transform.translation.x = shift_x;
+        t.transform.translation.y = shift_y;
+        t.transform.translation.z = 0;
+
+        tf2::Quaternion q;
+        q.setRPY(0, 0, shift_theta);
+        t.transform.rotation = tf2::toMsg(q);
+    }
+    m_tf_broadcaster->sendTransform(t);
+
+    // message
+    nav_msgs::msg::Odometry odom_msg = m_last_odom_msg;
+    // odom_msg.header.stamp = this->get_clock()->now();
+    odom_msg.header.frame_id = m_slam_frame_id;
+    odom_msg.pose.pose.position.x = m_state(0);
+    odom_msg.pose.pose.position.y = m_state(1);
+    tf2::Quaternion q;
+    q.setRPY(0, 0, m_state(2));
+    odom_msg.pose.pose.orientation = tf2::toMsg(q);
+
+    m_slam_pub->publish(odom_msg);
+}
+
+void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
+    // !!! THOSE ARE RELATIVE TO THE ROBOT AND DEPENDENT ON ITS HEADING, USE THE CORRECT MOTION MODEL
+    m_nav_vx = msg.twist.twist.angular.x;
+    m_nav_vy = msg.twist.twist.angular.y;
+    m_nav_vz = msg.twist.twist.angular.z;
+    m_nav_omega = msg.twist.twist.angular.z;
+    m_last_odom_msg = msg;
+
+    rclcpp::Time curr_odom_time = rclcpp::Time(msg.header.stamp);
+
+    if(!m_got_odom){
+        m_last_odom_time = curr_odom_time;
+        m_got_odom = true;
+        return;
+    }
+
+    float dt = (curr_odom_time - m_last_odom_time).seconds();
+    m_last_odom_time = curr_odom_time;
+
+    // RCLCPP_INFO(this->get_logger(), "IMU MESSAGE ODOM: (%lf, %lf), %lf", m_nav_vx, m_nav_vy, m_nav_heading);
+
+    if (!m_got_nav || !m_track_robot || !m_imu_predict || m_first_state) return;
+
+    Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
+    F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
+
+    /*
+    IMU MOTION PREDICTION MODEL:
+    (x_old, y_old, theta_old) -> (x_old+cos(theta_old)*v_x*dt-sin(theta_old)*v_y*dt, y_old+sin(theta_old)*d_x*dt+cos(theta_old)*v_y*dt, theta_old+omega*dt)
+    mot_grad: rows -> components of final state (actually difference with old state), columns -> components of old state wrt to which the gradient is taken
+    */
+
+    Eigen::Vector3f mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
+    // gradient - identity
+    Eigen::Matrix3f mot_grad{
+        {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
+        {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
+        {0, 0, 0},
+    };
+
+    m_state += F.transpose() * mot_const;
+    Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
+                        F.transpose() * mot_grad * F;
+    // add a consistent amount of noise based on how much the robot moved since the last time
+    // Eigen::Matrix3f motion_noise{
+    //     {m_xy_noise * abs(mot_const[0]), 0, 0},
+    //     {0, m_xy_noise * abs(mot_const[1]), 0},
+    //     {0, 0, m_theta_noise * abs(mot_const[2])},
+    // };
+    Eigen::Matrix3f motion_noise{
+        {m_imu_xy_noise, 0, 0},
+        {0, m_imu_xy_noise, 0},
+        {0, 0, m_imu_theta_noise},
+    };
+    m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
+    
+    // to see the robot position prediction mean & uncertainty
+    if(m_got_nav){
+        this->visualize_predictions();
+    }
+    // publish robot pose predictions (here and after measurement update) as transforms from map to lidar/camera frame, possibly also as a message
+    // it should ultimately be a source of odometry that can be used by other nodes along with the global map
+    if(m_track_robot && m_got_nav && m_got_odom){
+        publish_slam();
+    }
+}
+
 void ObjectTrackingMap::odom_callback() {
     if(!m_got_local_frame) return;
 
@@ -129,21 +307,26 @@ void ObjectTrackingMap::odom_callback() {
     m_nav_heading = y;
     // RCLCPP_INFO(this->get_logger(), "ROBOT TRANSFORM ODOM: (%lf, %lf), %lf", m_nav_x, m_nav_y, m_nav_heading);
 
-    if (m_track_robot) {
-        if (m_first_state) {
-            // initialize mean and cov robot pose
-            m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
-            Eigen::Matrix3f init_pose_noise{
-                {m_xy_noise, 0, 0},
-                {0, m_xy_noise, 0},
-                {0, 0, m_theta_noise},
-            };
-            m_cov = init_pose_noise;
-            // m_cov = Eigen::Matrix3f::Zero();
-            m_first_state = false;
-            // m_last_odom_time = rclcpp::Time(msg.header.stamp);
-            return;
-        }
+    m_got_nav = true;
+
+    if(!m_track_robot) return;
+
+    if (m_first_state) {
+        // initialize mean and cov robot pose
+        m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+        Eigen::Matrix3f init_pose_noise{
+            {m_gps_xy_noise, 0, 0},
+            {0, m_gps_xy_noise, 0},
+            {0, 0, m_gps_theta_noise},
+        };
+        m_cov = init_pose_noise;
+        // m_cov = Eigen::Matrix3f::Zero();
+        m_first_state = false;
+        // m_last_odom_time = rclcpp::Time(msg.header.stamp);
+        return;
+    }
+
+    if (!m_imu_predict) {
 
         // rclcpp::Time curr_odom_time = rclcpp::Time(msg.header.stamp);
         // float dt = (curr_odom_time - m_last_odom_time).seconds();
@@ -156,34 +339,54 @@ void ObjectTrackingMap::odom_callback() {
 
         Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
         F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-
-        Eigen::Vector3f mot_const;
-        Eigen::Matrix3f mot_grad = Eigen::Matrix3f::Zero();
-
+        
         /*
-        MOTION UPDATE MODEL:
+        GPS MOTION PREDICTION MODEL:
         (x_old, y_old, theta_old) -> (x_old+v_comp_x*dt, y_old+v_comp_y*dt, theta_old+omega_comp*dt)
         -->gradient is identity matrix (that way we keep the correlations with the objects, if we
         set it to the new values it would be zero and delete them) remember that mot_grad is the
         gradients minus the identity matrix, so with this model it is the zero matrix
         */
 
-        mot_const =
-            Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
-        // mot_grad is still zero
+        Eigen::Vector3f mot_const = Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
+        Eigen::Matrix3f mot_grad = Eigen::Matrix3f::Zero();
 
         m_state += F.transpose() * mot_const;
         Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
                             F.transpose() * mot_grad * F;
         // add a consistent amount of noise based on how much the robot moved since the last time
         Eigen::Matrix3f motion_noise{
-            {m_xy_noise * abs(mot_const[0]), 0, 0},
-            {0, m_xy_noise * abs(mot_const[1]), 0},
-            {0, 0, m_theta_noise * abs(mot_const[2])},
+            {m_gps_xy_noise * abs(mot_const[0]), 0, 0},
+            {0, m_gps_xy_noise * abs(mot_const[1]), 0},
+            {0, 0, m_gps_theta_noise * abs(mot_const[2])},
         };
         m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
-        // to see the robot position prediction mean & uncertainty
+    }else if (m_gps_update){
+        // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
+        Eigen::Matrix2f Q{
+            {m_update_gps_xy_uncertainty, 0},
+            {0, m_update_gps_xy_uncertainty},
+        };
+        Eigen::Vector2f xy_actual(m_nav_x, m_nav_y);
+        Eigen::Vector2f xy_pred(m_state(0), m_state(1));
+        //gradient of measurement update model, identity since it's centered at the initial state
+        Eigen::MatrixXf H = Eigen::MatrixXf::Zero(2, 3 + 2 * m_num_obj);
+        H.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
+        // Eigen::Matrix2f h = Eigen::Matrix2f::Identity();
+        // Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 3 + 2 * m_num_obj);
+        // F.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
+        // Eigen::MatrixXf H = h * F;
+        Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
+        m_state += K * (xy_actual - xy_pred);
+        m_cov =
+            (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
+    }
+
+    if(m_got_nav){
         this->visualize_predictions();
+    }
+    if(m_track_robot && m_got_nav && m_got_odom){
+        publish_slam();
     }
 }
 
@@ -215,16 +418,34 @@ T ObjectTrackingMap::convert_to_global(T point) {
     new_point.x = gb_pt_msg.x;
     new_point.y = gb_pt_msg.y;
     new_point.z = gb_pt_msg.z;
-    return new_point;
+    T act_point = new_point;
+    if(m_track_robot){
+        // point initially in map frame
+        // want slam_map->map (then will compose it with slam->point)
+        // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
+        std::tuple<double, double, double> slam_to_map_transform = compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)), compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+        double th; //uselesss
+        std::tie(act_point.x, act_point.y, th) = compose_transforms(slam_to_map_transform, std::make_tuple(point.x, point.y, 0));
+    }
+    return act_point;
 }
 
 template <typename T>
 T ObjectTrackingMap::convert_to_local(T point) {
     T new_point = point; // to keep color-related data
+    T act_point = point;
+    if(m_track_robot){
+        // point initially in slam_map frame
+        // want map->slam_map (then will compose it with slam->point)
+        // (map->robot)@(robot->slam_map) = (map->robot)@inv(slam_map->robot)
+        std::tuple<double, double, double> map_to_slam_transform = compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading), compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0));
+        double th; //uselesss
+        std::tie(act_point.x, act_point.y, th) = compose_transforms(map_to_slam_transform, std::make_tuple(point.x, point.y, 0));
+    }
     geometry_msgs::msg::Point gb_pt_msg;
-    gb_pt_msg.x = point.x;
-    gb_pt_msg.y = point.y;
-    gb_pt_msg.z = point.z;
+    gb_pt_msg.x = act_point.x;
+    gb_pt_msg.y = act_point.y;
+    gb_pt_msg.z = act_point.z;
     geometry_msgs::msg::Point lc_pt_msg;
     tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_lidar_tf);
     new_point.x = lc_pt_msg.x;
@@ -273,8 +494,8 @@ void ObjectTrackingMap::visualize_predictions() {
         rot_mat.getRotation(quat_rot);
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
-        ellipse.pose.position.x = robot_mean(0);
-        ellipse.pose.position.y = robot_mean(1);
+        ellipse.pose.position.x = m_nav_x; // to overlay the map on top of the transform (GPS), especially in sim
+        ellipse.pose.position.y = m_nav_y;
         ellipse.pose.position.z = 0;
         ellipse.pose.orientation = tf2::toMsg(quat_rot);
         ellipse.scale.x = sqrt(a_x);
@@ -288,11 +509,11 @@ void ObjectTrackingMap::visualize_predictions() {
 
         visualization_msgs::msg::Marker angle_marker;
         angle_marker.type = visualization_msgs::msg::Marker::ARROW;
-        angle_marker.pose.position.x = robot_mean(0);
-        angle_marker.pose.position.y = robot_mean(1);
+        angle_marker.pose.position.x = m_nav_x;
+        angle_marker.pose.position.y = m_nav_y;
         angle_marker.pose.position.z = 0;
         tf2::Quaternion angle_quat;
-        angle_quat.setRPY(0, 0, m_state[2]);
+        angle_quat.setRPY(0, 0, m_nav_heading);
         angle_marker.pose.orientation = tf2::toMsg(angle_quat);
         angle_marker.scale.x = m_cov(2, 2);
         angle_marker.scale.y = 0.2;
@@ -320,21 +541,34 @@ void ObjectTrackingMap::visualize_predictions() {
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(obj_cov);
         double a_x = eigen_solver.eigenvalues()(0);
         double a_y = eigen_solver.eigenvalues()(1);
-        // RCLCPP_INFO(this->get_logger(), "OBJECT %d COVARIANCE AXES LENGTHS: (%lf, %lf)", i, a_x,
-        // a_y);
+        // RCLCPP_INFO(this->get_logger(), "OBJECT %d COVARIANCE AXES LENGTHS: (%lf, %lf)", i, a_x, a_y);
         Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
         Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
-        double cov_scale =
-            m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
+        double cov_scale = m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
         tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
         tf2::Quaternion quat_rot;
         rot_mat.getRotation(quat_rot);
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
-        ellipse.pose.position.x = obj_mean(0);
-        ellipse.pose.position.y = obj_mean(1);
+
+        if (m_track_robot){
+            double final_x, final_y, final_theta;
+            double r,p,init_theta;
+            rot_mat.getRPY(r,p,init_theta);
+            std::tie(final_x, final_y, final_theta) = ObjectTrackingMap::apply_transform_from_to(obj_mean(0), obj_mean(1), init_theta, m_state(0), m_state(1), m_state(2), m_nav_x, m_nav_y, m_nav_heading);
+            tf2::Quaternion final_quat_rot;
+            final_quat_rot.setRPY(0,0,final_theta);
+            // RCLCPP_INFO(this->get_logger(), "ROBOT: (%lf, %lf, %lf) -> (%lf, %lf, %lf), OBJECT: (%lf, %lf, %lf) -> (%lf, %lf, %lf)",m_state(0), m_state(1), m_state(2), m_nav_x, m_nav_y, m_nav_heading, obj_mean(0), obj_mean(1), init_theta, final_x, final_y, final_theta);
+            ellipse.pose.position.x = final_x;
+            ellipse.pose.position.y = final_y;
+            ellipse.pose.orientation = tf2::toMsg(final_quat_rot);
+        }else{
+            ellipse.pose.position.x = obj_mean(0);
+            ellipse.pose.position.y = obj_mean(1);
+            ellipse.pose.orientation = tf2::toMsg(quat_rot);
+        }
+        
         ellipse.pose.position.z = 0;
-        ellipse.pose.orientation = tf2::toMsg(quat_rot);
         ellipse.scale.x = cov_scale * sqrt(a_x);
         ellipse.scale.y = cov_scale * sqrt(a_y);
         ellipse.scale.z = 1;
@@ -353,7 +587,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     // Set up headers and transforms
     m_local_header = msg->objects[0].cloud.header;
-    m_global_header.frame_id = m_global_frame_id;
+    m_global_header.frame_id = m_track_robot? m_slam_frame_id : m_global_frame_id;
     m_global_header.stamp = m_local_header.stamp;
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
@@ -402,40 +636,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-    this->publish_map(m_local_header, "untracked", true, untracked_obs, m_untracked_map_pub,
+    this->publish_map(m_local_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
                       untracked_labels);
 
-    // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, implementation, in one case removed robot
-    // pose from the state and the respective motion updates, changed assignment algorithm)
-
-    /*
-    ******NOTES*******
-    BECAUSE THE BUOY POSITION PREDICTIONS ARE NOT CORRELATED WITH ONE ANOTHER DIRECTLY, BUT JUST VIA
-    THE ROBOT POSE THERE ARE TWO OPTIONS EITHER I DON'T INCLUDE THE ROBOT POSE, SO THEN THE
-    CORRELATION BETWEEN BUOYS WILL BE ZERO SO I WILL JUST STORE ONE COVARIANCE MATRIX FOR EACH BUOY
-    (2x2) WHICH WILL ALSO BE COMPUTATIONALLY EFFICIENT, BUT WON'T FIX THE POSITIONS OF OTHER BUOYS
-    WHEN THE ROBOT FIXES ITS POSE USING THE POSITION OF THE OTHER BUOYS (MOSTLY DURING TURNS AS IT
-    DRIFTS) TO DO THE LATTER I NEED TO FIND AN APPROPRIATE MOTION UPDATE SINCE I HAVE THE POSITION
-    AND ORIENTATION USING THE ODOMETRY DATA SO I NEED TO JUST SET IT TO THAT POSE AND ADD GAUSSIAN
-    NOISE (THAT FOR THE MOTION UPDATE) AND THEN THE MEASUREMENT UPDATE WILL UPDATE THE BUOYS
-    POSITIONS APPROPRIATELY BASED ON THE NEW POSITION AND COVARIANCE AND HAVE THE ENTIRE
-    (3N+2)x(3N+2) COVARIANCE MATRIX STORED, BUT WILL BE MORE COMPLICATED CODE-WISE AND SPEED-WISE
-    THE LATTER WILL JUST KEEP THE CORRELATION BETWEEN THE OBSERVED OBSTACLES, SUCH THAT WHEN IT
-    PERFORMS A MINOR FIX TO ONE OF THEM THAT MIGHT HAVE BEEN DUE TO TEMPORAY DRIFT, IT FIXES THE
-    OTHERS AS WELL
-    -->BECAUSE EKF IS BASED ON LINEAR UPDATES, JUST CREATE AN ARTIFICIAL LINEAR VELOCITY BY DIVIDING
-    THE DISTANCE FROM THE LAST PREDICTED STATE TO THE NEW ODOMETRY DATA WITH TIME
-
-    PUT THE ANGLE OF THE ROBOT IN THE PREDICTED STATE (SET ITS ANGULAR UNCERTAINTY PROPORTIONALLY TO
-    ITS ANGULAR VELOCITY), TO SOLVE THE DRIFT ISSUE, HOPEFULLY FIX THE IMU PREDICTIONS AND THE LAG
-    ISSUE WHEN TURNING BY ALIGNING IT WITH THE BUOYS ALSO PUT THE ROBOT POSE TO KEEP THE CORRELATION
-    BETWEEN THE BUOY POSITIONS AND THEY DON'T DRIFT APART FROM ONE ANOTHER, ESPECIALLY WHEN THE
-    ROBOT DOESN'T SEE MANY OF THEM BECAUSE THEY ARE BEHIND IT
-    -->THE POSITION OF THE ROBOT WILL UPDATE BY JUST SETTING IT TO THE NEW ONE AND HAVING A NORMAL
-    NOISE
-    -->THE ORIENTATION OF THE ROBOT WILL BE UPDATED BY USING ITS ANGULAR VELOCITY, AS IT MAY DRIFT
-    ANYWAYS, SO WE MIGHT AS WELL ALIGN IT
-    */
+    // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
 
     Eigen::Matrix<float, 2, 2> Q{
         {m_range_std, 0},
@@ -453,10 +657,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         Eigen::MatrixXf Psi;
         for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
             if (m_track_robot) {
-                float d_x = m_state(3 + 2 * tracked_id) - m_nav_x;
-                float d_y = m_state(3 + 2 * tracked_id + 1) - m_nav_y;
+                float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
+                float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);
                 float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
+                z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_state(2));
                 Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, 3 + 2 * m_num_obj);
                 F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
                 F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
@@ -547,9 +751,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             };
             if (m_track_robot) {
                 m_state.conservativeResize(3 + 2 * m_num_obj);
-                m_state.tail(2) = Eigen::Vector2f(m_nav_x, m_nav_y) +
-                                  range * Eigen::Vector2f(std::cos(bearing + m_nav_heading),
-                                                          std::sin(bearing + m_nav_heading));
+                m_state.tail(2) = Eigen::Vector2f(m_state(0), m_state(1)) +
+                                  range * Eigen::Vector2f(std::cos(bearing + m_state(2)),
+                                                          std::sin(bearing + m_state(2)));
                 m_cov.conservativeResizeLike(
                     Eigen::MatrixXf::Zero(3 + 2 * m_num_obj, 3 + 2 * m_num_obj));
                 m_cov.bottomRightCorner(2, 2) = init_new_cov;
@@ -563,15 +767,15 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
         int tracked_id = match[i] > 0 ? match[i] : m_num_obj - 1;
         if (m_track_robot) {
-            float d_x = m_state(3 + 2 * tracked_id) - m_nav_x;
-            float d_y = m_state(3 + 2 * tracked_id + 1) - m_nav_y;
+            float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
+            float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);
             float q = d_x * d_x + d_y * d_y;
             Eigen::Matrix<float, 2, 5> h{
                 {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
                  std::sqrt(q) * d_y},
                 {d_y, -d_x, -1, -d_y, d_x},
             };
-            Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
+            Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_state(2));
             Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, 3 + 2 * m_num_obj);
             F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
             F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
@@ -692,11 +896,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 // THRESHOLD: %lf", tracked_id,
                 // m_tracked_obstacles[tracked_id]->time_dead.seconds(), m_obstacle_drop_thresh);
                 if (m_tracked_obstacles[tracked_id]->time_dead.seconds() >
-                    m_obstacle_drop_thresh *
+                    (m_normalize_drop_thresh ? (m_obstacle_drop_thresh *
                         (pcl::euclideanDistance(p0,
                                                 m_tracked_obstacles[tracked_id]->local_centroid) /
                          avg_dist) *
-                        m_normalize_drop_dist) {
+                        m_normalize_drop_dist) : m_obstacle_drop_thresh)) {
                     // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d/%d DROPPED", tracked_id,
                     // m_num_obj);
                     to_remove.push_back(tracked_id);
@@ -747,40 +951,46 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
     std::vector<int> tracked_labels;
     for (std::shared_ptr<ObjectCloud> t_ob : m_tracked_obstacles) {
-        pcl::PointCloud<pcl::PointXYZI>::Ptr tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::PointCloud<pcl::PointXYZI>::Ptr local_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
         for (pcl::PointXYZHSV pt : t_ob->local_pcloud_ptr->points) {
             pcl::PointXYZRGB rgb_pt;
             pcl::PointXYZI i_pt;
             pcl::PointXYZHSVtoXYZRGB(pt, rgb_pt);
             pcl::PointXYZRGBtoXYZI(rgb_pt, i_pt);
-            tracked_cloud->push_back(i_pt);
+            local_tracked_cloud->push_back(i_pt);
         }
-        std::vector<int> ind(tracked_cloud->size());
-        std::iota(std::begin(ind), std::end(ind), 0);
+
+        pcl::PointCloud<pcl::PointXYZI>::Ptr global_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+        for (pcl::PointXYZHSV pt : t_ob->global_pcloud_ptr->points) {
+            pcl::PointXYZRGB rgb_pt;
+            pcl::PointXYZI i_pt;
+            pcl::PointXYZHSVtoXYZRGB(pt, rgb_pt);
+            pcl::PointXYZRGBtoXYZI(rgb_pt, i_pt);
+            global_tracked_cloud->push_back(i_pt);
+        }
+
         std::shared_ptr<all_seaing_perception::Obstacle> tracked_ob(
-            new all_seaing_perception::Obstacle(m_local_header, m_global_header, tracked_cloud, ind,
-                                                t_ob->id, m_lidar_map_tf));
+            new all_seaing_perception::Obstacle(m_local_header, m_global_header, local_tracked_cloud, global_tracked_cloud,
+                                                t_ob->id));
         tracked_labels.push_back(t_ob->label);
         tracked_obs.push_back(tracked_ob);
     }
-    this->publish_map(m_local_header, "tracked", true, tracked_obs, m_tracked_map_pub,
+    this->publish_map(m_local_header, m_global_header, "tracked", true, tracked_obs, m_tracked_map_pub,
                       tracked_labels);
     // RCLCPP_INFO(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
-    // publish covariance ellipsoid markers to understand prediction uncertainty (& fine-tune &
-    // debug)
-    this->visualize_predictions();
+    if(m_got_nav){
+        this->visualize_predictions();
+    }
+    if(m_track_robot && m_got_nav && m_got_odom){
+        publish_slam();
+    }
 }
 
 void ObjectTrackingMap::publish_map(
-    std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
+    std_msgs::msg::Header local_header, std_msgs::msg::Header global_header, std::string ns, bool is_labeled,
     const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub,
     std::vector<int> labels) {
-
-    // Create global header
-    std_msgs::msg::Header global_header = std_msgs::msg::Header();
-    global_header.frame_id = m_global_frame_id;
-    global_header.stamp = local_header.stamp;
 
     all_seaing_interfaces::msg::ObstacleMap map_msg;
     map_msg.ns = ns;

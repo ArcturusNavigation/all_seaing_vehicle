@@ -203,6 +203,7 @@ def launch_setup(context, *args, **kwargs):
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
             {"is_sim": False},
+            {"label_list": False},
         ]
     )
 
@@ -210,18 +211,29 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="object_tracking_map",
         output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
         parameters=[
             {"global_frame_id": "map"},
+            {"slam_frame_id": "slam_map"},
             {"obstacle_drop_thresh": 2.0},
-            {"range_uncertainty": 1.0},
+            {"normalize_drop_thresh": False},
+            {"range_uncertainty": 10.0},
             {"bearing_uncertainty": 0.1},
+            {"motion_gps_xy_noise": 1.0},
+            {"motion_gps_theta_noise": 0.1},
+            {"motion_imu_xy_noise": 10.0},
+            {"motion_imu_theta_noise": 0.01},
+            {"update_gps_xy_uncertainty": 5.0},
             {"new_object_slam_threshold": 2.0},
-            {"check_fov": False},
             {"init_new_cov": 10.0},
-            {"track_robot": False},
+            {"check_fov": False},
+            {"track_robot": True},
+            {"imu_predict": True},
+            {"gps_update": True},
+            {"direct_tf": False},
             {"is_sim": False},
         ]
     )
@@ -271,18 +283,18 @@ def launch_setup(context, *args, **kwargs):
         ekf_node,
         navsat_node,
         keyboard_ld,
-        run_tasks,
-        task_init_server, 
-        follow_buoy_path,
+        # run_tasks,
+        # task_init_server, 
+        # follow_buoy_path,
         buoy_yolo_node,
-        shape_yolo_node,
-        static_shape_yolo_node,
+        # shape_yolo_node,
+        # static_shape_yolo_node,
         bbox_project_pcloud_node,
-        # object_tracking_map_node,
-        object_tracking_map_euclidean_node,
-        obstacle_detector_node,
+        object_tracking_map_node,
+        # object_tracking_map_euclidean_node,
+        # obstacle_detector_node,
         # color_segmentation_node,
-        obstacle_bbox_overlay_node
+        # obstacle_bbox_overlay_node
     ]
 
 def generate_launch_description():

@@ -285,14 +285,24 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"obstacle_seg_thresh": 10.0},
+            {"slam_frame_id": "slam_map"},
             {"obstacle_drop_thresh": 2.0},
-            {"range_uncertainty": 1.0},
+            {"normalize_drop_thresh": False},
+            {"range_uncertainty": 10.0},
             {"bearing_uncertainty": 0.1},
+            {"motion_gps_xy_noise": 1.0},
+            {"motion_gps_theta_noise": 0.1},
+            {"motion_imu_xy_noise": 10.0},
+            {"motion_imu_theta_noise": 0.01},
+            {"update_gps_xy_uncertainty": 5.0},
             {"new_object_slam_threshold": 2.0},
             {"init_new_cov": 10.0},
+            {"check_fov": False},
             {"track_robot": True},
-            {"is_sim": True}
+            {"imu_predict": True},
+            {"gps_update": True},
+            {"direct_tf": False},
+            {"is_sim": True},
         ]
     )
 
@@ -461,7 +471,8 @@ def launch_setup(context, *args, **kwargs):
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "rb2025/rb2025_task1_task2.sdf",
+            # "world": "rb2025/rb2025_task1_task2.sdf",
+            "world": "follow_path_task.sdf",
             # "world": "speed_course_world.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
@@ -482,7 +493,7 @@ def launch_setup(context, *args, **kwargs):
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
-        object_tracking_map_euclidean_node,
+        # object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,
         navigation_server,
