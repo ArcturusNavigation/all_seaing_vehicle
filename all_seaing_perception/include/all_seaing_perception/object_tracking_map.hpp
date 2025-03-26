@@ -84,7 +84,7 @@ private:
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
     void odom_callback();
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
-    void publish_map(std_msgs::msg::Header local_header, std::string ns, bool is_labeled,
+    void publish_map(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header, std::string ns, bool is_labeled,
                      const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
                      rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub, std::vector<int> labels);
     template <typename T>
@@ -120,7 +120,7 @@ private:
     double m_obstacle_seg_thresh;
     double m_obstacle_drop_thresh;
     double m_init_new_cov;
-    bool m_track_robot, m_only_imu;
+    bool m_track_robot, m_imu_predict, m_gps_update;
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;
 
@@ -150,15 +150,17 @@ private:
     float m_range_std, m_bearing_std, m_new_obj_slam_thres;
     float m_gps_xy_noise, m_gps_theta_noise;
     float m_imu_xy_noise, m_imu_theta_noise;
+    float m_update_gps_xy_uncertainty;
     int m_num_obj;
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
-    bool m_first_state, m_got_local_frame, m_got_nav;
+    bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom;
     nav_msgs::msg::Odometry m_last_odom_msg;
 
     bool m_is_sim;
     bool m_check_fov;
     bool m_direct_tf;
+    bool m_normalize_drop_thresh;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();
