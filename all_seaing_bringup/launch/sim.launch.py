@@ -300,7 +300,7 @@ def launch_setup(context, *args, **kwargs):
             {"check_fov": False},
             {"track_robot": True},
             {"imu_predict": True},
-            {"gps_update": False},
+            {"gps_update": True},
             {"direct_tf": False},
             {"is_sim": True},
         ]
