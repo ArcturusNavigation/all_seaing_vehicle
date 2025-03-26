@@ -498,16 +498,17 @@ void ObjectTrackingMap::visualize_predictions() {
         ellipse.pose.position.y = robot_mean(1);
         ellipse.pose.position.z = 0;
         ellipse.pose.orientation = tf2::toMsg(quat_rot);
-        if(m_is_sim){
-            ellipse.pose.position.x = m_nav_x; // to overlay the map on top of the transform (GPS), especially in sim
-            ellipse.pose.position.y = m_nav_y;
-        }
+        // if(m_is_sim){
+        //     ellipse.pose.position.x = m_nav_x; // to overlay the map on top of the transform (GPS), especially in sim
+        //     ellipse.pose.position.y = m_nav_y;
+        // }
         ellipse.scale.x = sqrt(a_x);
         ellipse.scale.y = sqrt(a_y);
         ellipse.scale.z = 0.5;
         ellipse.color.a = 1;
         ellipse.color.g = 1;
         ellipse.header = m_global_header;
+        ellipse.header.frame_id = m_slam_frame_id;
         ellipse.id = m_num_obj + 1;
         ellipse_arr.markers.push_back(ellipse);
 
@@ -519,18 +520,19 @@ void ObjectTrackingMap::visualize_predictions() {
         tf2::Quaternion angle_quat;
         angle_quat.setRPY(0, 0, m_state(2));
         angle_marker.pose.orientation = tf2::toMsg(angle_quat);
-        if(m_is_sim){
-            ellipse.pose.position.x = m_nav_x;
-            ellipse.pose.position.y = m_nav_y;
-            tf2::Quaternion nav_quat;
-            nav_quat.setRPY(0,0,m_nav_heading);
-            ellipse.pose.orientation = tf2::toMsg(nav_quat);
-        }
+        // if(m_is_sim){
+        //     ellipse.pose.position.x = m_nav_x;
+        //     ellipse.pose.position.y = m_nav_y;
+        //     tf2::Quaternion nav_quat;
+        //     nav_quat.setRPY(0,0,m_nav_heading);
+        //     ellipse.pose.orientation = tf2::toMsg(nav_quat);
+        // }
         angle_marker.scale.x = m_cov(2, 2);
         angle_marker.scale.y = 0.2;
         angle_marker.scale.z = 0.2;
         angle_marker.color.a = 1;
         angle_marker.header = m_global_header;
+        angle_marker.header.frame_id = m_slam_frame_id;
         angle_marker.id = m_num_obj + 2;
         ellipse_arr.markers.push_back(angle_marker);
     }
@@ -562,22 +564,22 @@ void ObjectTrackingMap::visualize_predictions() {
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
 
-        if (m_track_robot && m_is_sim){
-            double final_x, final_y, final_theta;
-            double r,p,init_theta;
-            rot_mat.getRPY(r,p,init_theta);
-            std::tie(final_x, final_y, final_theta) = ObjectTrackingMap::apply_transform_from_to(obj_mean(0), obj_mean(1), init_theta, m_state(0), m_state(1), m_state(2), m_nav_x, m_nav_y, m_nav_heading);
-            tf2::Quaternion final_quat_rot;
-            final_quat_rot.setRPY(0,0,final_theta);
-            // RCLCPP_INFO(this->get_logger(), "ROBOT: (%lf, %lf, %lf) -> (%lf, %lf, %lf), OBJECT: (%lf, %lf, %lf) -> (%lf, %lf, %lf)",m_state(0), m_state(1), m_state(2), m_nav_x, m_nav_y, m_nav_heading, obj_mean(0), obj_mean(1), init_theta, final_x, final_y, final_theta);
-            ellipse.pose.position.x = final_x;
-            ellipse.pose.position.y = final_y;
-            ellipse.pose.orientation = tf2::toMsg(final_quat_rot);
-        }else{
-            ellipse.pose.position.x = obj_mean(0);
-            ellipse.pose.position.y = obj_mean(1);
-            ellipse.pose.orientation = tf2::toMsg(quat_rot);
-        }
+        // if (m_track_robot && m_is_sim){
+        //     double final_x, final_y, final_theta;
+        //     double r,p,init_theta;
+        //     rot_mat.getRPY(r,p,init_theta);
+        //     std::tie(final_x, final_y, final_theta) = ObjectTrackingMap::apply_transform_from_to(obj_mean(0), obj_mean(1), init_theta, m_state(0), m_state(1), m_state(2), m_nav_x, m_nav_y, m_nav_heading);
+        //     tf2::Quaternion final_quat_rot;
+        //     final_quat_rot.setRPY(0,0,final_theta);
+        //     // RCLCPP_INFO(this->get_logger(), "ROBOT: (%lf, %lf, %lf) -> (%lf, %lf, %lf), OBJECT: (%lf, %lf, %lf) -> (%lf, %lf, %lf)",m_state(0), m_state(1), m_state(2), m_nav_x, m_nav_y, m_nav_heading, obj_mean(0), obj_mean(1), init_theta, final_x, final_y, final_theta);
+        //     ellipse.pose.position.x = final_x;
+        //     ellipse.pose.position.y = final_y;
+        //     ellipse.pose.orientation = tf2::toMsg(final_quat_rot);
+        // }else{
+        ellipse.pose.position.x = obj_mean(0);
+        ellipse.pose.position.y = obj_mean(1);
+        ellipse.pose.orientation = tf2::toMsg(quat_rot);
+        // }
         
         ellipse.pose.position.z = 0;
         ellipse.scale.x = cov_scale * sqrt(a_x);
@@ -586,6 +588,9 @@ void ObjectTrackingMap::visualize_predictions() {
         ellipse.color.a = 1;
         ellipse.color.r = 1;
         ellipse.header = m_global_header;
+        if(m_track_robot){
+            ellipse.header.frame_id = m_slam_frame_id;
+        }
         ellipse.id = i;
         ellipse_arr.markers.push_back(ellipse);
     }

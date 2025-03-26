@@ -292,7 +292,7 @@ def launch_setup(context, *args, **kwargs):
             {"bearing_uncertainty": 0.2},
             {"motion_gps_xy_noise": 1.0},
             {"motion_gps_theta_noise": 0.1},
-            {"motion_imu_xy_noise": 1.0},
+            {"motion_imu_xy_noise": 10.0},
             {"motion_imu_theta_noise": 0.01},
             {"update_gps_xy_uncertainty": 500.0},
             {"new_object_slam_threshold": 2.0},
@@ -300,7 +300,7 @@ def launch_setup(context, *args, **kwargs):
             {"check_fov": False},
             {"track_robot": True},
             {"imu_predict": True},
-            {"gps_update": True},
+            {"gps_update": False},
             {"direct_tf": False},
             {"is_sim": True},
         ]
