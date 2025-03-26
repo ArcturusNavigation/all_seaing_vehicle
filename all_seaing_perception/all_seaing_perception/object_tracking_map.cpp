@@ -494,10 +494,14 @@ void ObjectTrackingMap::visualize_predictions() {
         rot_mat.getRotation(quat_rot);
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
-        ellipse.pose.position.x = m_nav_x; // to overlay the map on top of the transform (GPS), especially in sim
-        ellipse.pose.position.y = m_nav_y;
+        ellipse.pose.position.x = robot_mean(0);
+        ellipse.pose.position.y = robot_mean(1);
         ellipse.pose.position.z = 0;
         ellipse.pose.orientation = tf2::toMsg(quat_rot);
+        if(m_is_sim){
+            ellipse.pose.position.x = m_nav_x; // to overlay the map on top of the transform (GPS), especially in sim
+            ellipse.pose.position.y = m_nav_y;
+        }
         ellipse.scale.x = sqrt(a_x);
         ellipse.scale.y = sqrt(a_y);
         ellipse.scale.z = 0.5;
@@ -509,12 +513,19 @@ void ObjectTrackingMap::visualize_predictions() {
 
         visualization_msgs::msg::Marker angle_marker;
         angle_marker.type = visualization_msgs::msg::Marker::ARROW;
-        angle_marker.pose.position.x = m_nav_x;
-        angle_marker.pose.position.y = m_nav_y;
+        angle_marker.pose.position.x = robot_mean(0);
+        angle_marker.pose.position.y = robot_mean(1);
         angle_marker.pose.position.z = 0;
         tf2::Quaternion angle_quat;
-        angle_quat.setRPY(0, 0, m_nav_heading);
+        angle_quat.setRPY(0, 0, m_state(2));
         angle_marker.pose.orientation = tf2::toMsg(angle_quat);
+        if(m_is_sim){
+            ellipse.pose.position.x = m_nav_x;
+            ellipse.pose.position.y = m_nav_y;
+            tf2::Quaternion nav_quat;
+            nav_quat.setRPY(0,0,m_nav_heading);
+            ellipse.pose.orientation = tf2::toMsg(nav_quat);
+        }
         angle_marker.scale.x = m_cov(2, 2);
         angle_marker.scale.y = 0.2;
         angle_marker.scale.z = 0.2;
@@ -551,7 +562,7 @@ void ObjectTrackingMap::visualize_predictions() {
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
 
-        if (m_track_robot){
+        if (m_track_robot && m_is_sim){
             double final_x, final_y, final_theta;
             double r,p,init_theta;
             rot_mat.getRPY(r,p,init_theta);
