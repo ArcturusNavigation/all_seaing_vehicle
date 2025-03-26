@@ -49,11 +49,17 @@ ament_auto_add_executable(
     ${PROJECT_NAME}/object_tracking_map_euclidean.cpp
     ${PROJECT_NAME}/obstacle.cpp
 )
+ament_auto_add_executable(
+    object_tracking_map_pf
+    ${PROJECT_NAME}/object_tracking_map_pf.cpp
+    ${PROJECT_NAME}/obstacle.cpp
+)
 
 target_link_libraries(obstacle_bbox_visualizer yaml-cpp)
 target_link_libraries(bbox_project_pcloud yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 target_link_libraries(object_tracking_map yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 target_link_libraries(object_tracking_map_euclidean yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+target_link_libraries(object_tracking_map_pf yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 
 install(TARGETS
     obstacle_detector
@@ -64,6 +70,7 @@ install(TARGETS
     bbox_project_pcloud
     object_tracking_map
     object_tracking_map_euclidean
+    object_tracking_map_pf
     DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -25,7 +25,7 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
     slam_params = os.path.join(
-        bringup_prefix, "config", "perception", "slam_sim.yaml"
+        bringup_prefix, "config", "slam", "slam_sim.yaml"
     )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
