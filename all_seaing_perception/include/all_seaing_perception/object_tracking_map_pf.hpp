@@ -8,6 +8,8 @@
 #include <vector>
 #include <tuple>
 #include <chrono>
+#include <random>
+#include <math.h>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -59,36 +61,54 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
+#include <Eigen/LU>
 
 struct SLAMParticle{
     Eigen::Vector3f m_pose;
     int m_num_obj;
     std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> m_tracked_obstacles;// including EKF for each obstacle
     int m_obstacle_id;
-    bool m_got_gps;
+    bool m_got_nav;
     Eigen::Vector3f gps_mean;
     Eigen::Matrix3f gps_cov;
+    float m_weight;
+    double m_nav_x, m_nav_y, m_nav_heading;
 
     SLAMParticle(float init_x, float init_y, float init_theta);
 
-    void sample_pose(double dx, double dy, double dtheta, float dt, float xy_noise, float theta_noise);
+    template <typename T>
+    T convert_to_local(T point, geometry_msgs::msg::TransformStamped map_lidar_tf);
+
+    template <typename T>
+    T convert_to_global(T point, geometry_msgs::msg::TransformStamped lidar_map_tf);
+
+    void sample_pose(double vx, double vy, double omega, double dt, float vxy_noise_coeff, float omega_noise_coeff, float theta_noise_coeff);
+    
+    void update_nav_vars(double x, double y, double theta);
     
     void update_gps(double x, double y, double theta, float xy_uncertainty, float theta_uncertainty);
 
+    void reset_gps();
+
     void update_map(std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
         bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres,
-        bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model);
+        bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model,
+        geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tf);
 
-    float gps_prob();
+    float mahalanobis_to_prob(float mahalanobis_dist, Eigen::VectorXf cov);
 
-    float map_prob();
+    float prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::VectorXf cov);
 
-    float get_weight();
+    float gps_prob(bool include_odom_theta);
 
-    visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg::Header global_header, string slam_frame_id, int &id);
+    float get_weight(bool include_odom_theta);
 
-    visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::Header global_header, string slam_frame_id, int &id_start);
+    visualization_msgs::msg::MarkerArray visualize_pose(std_msgs::msg::Header global_header, string slam_frame_id, int &id);
+
+    visualization_msgs::msg::MarkerArray visualize_map(std_msgs::msg::Header global_header, string slam_frame_id, int &id_start);
 }
+
+std::shared_ptr<SLAMParticle> clone(std::shared_ptr<SLAMParticle> orig);
 
 class ObjectTrackingMapPF : public rclcpp::Node{
 private:
@@ -106,6 +126,7 @@ private:
     // Member variables
     int m_num_particles;
     std::vector<std::shared_ptr<SLAMParticle>> m_particles;
+    std::vector<float> m_weights;
     int m_best_particle_index;
 
     std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
@@ -142,8 +163,8 @@ private:
 
     //SLAM matrices & variables
     float m_range_std, m_bearing_std, m_new_obj_slam_thres;
-    float m_gps_xy_noise, m_gps_theta_noise;
-    float m_imu_xy_noise, m_imu_theta_noise;
+    float m_gps_vxy_noise_coeff, m_gps_omega_noise_coeff, m_gps_theta_noise_coeff;
+    float m_imu_vxy_noise_coeff, m_imu_omega_noise_coeff, m_imu_theta_noise_coeff;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom;
     nav_msgs::msg::Odometry m_last_odom_msg;

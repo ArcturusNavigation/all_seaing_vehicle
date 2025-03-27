@@ -96,8 +96,6 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
             "odometry/tracked", 10);
         m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
         // update odometry based on IMU data by subscribing to the odometry message
-        // TODO: check if another message publishes raw IMU acceleration data
-        // and maybe add the option to use that with the appropriate model that also keeps track of the velocity of the robot
         m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
             "odometry/filtered", 10,
             std::bind(&ObjectTrackingMap::odom_msg_callback, this, std::placeholders::_1));
@@ -124,6 +122,10 @@ ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV
         global_centroid.z += global_pt.z / ((double)global_pcloud_ptr->points.size());
     }
     this->update_loc_pcloud(loc);
+}
+
+std::shared_ptr<ObjectCloud> clone(std::shared_ptr<ObjectCloud> orig){
+    // TODO: object cloud clone function
 }
 
 void ObjectCloud::update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc) {
@@ -636,8 +638,8 @@ void ObjectTrackingMap::visualize_predictions() {
 
 std::tuple<vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
     std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
-    vector<vector<int>> p, float new_obj_thres){
-    // Assign each detection to a tracked or new object using the computed probabilities (actually -logs?)
+    vector<vector<float>> p, float new_obj_thres){
+    // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
     std::vector<int> match(detected_obstacles.size(), -1);
     float min_p = 0;
     std::unordered_set<int> chosen_detected, chosen_tracked;
@@ -665,6 +667,29 @@ std::tuple<vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy
             chosen_detected.insert(best_match.first);
         }
     }
+    return std::make_tuple(match, chosen_detected, chosen_tracked);
+}
+
+std::tuple<float, vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+    // Compute weight of particle based on the probability of the correspondence of matched obstacles (detections<->map)
+    // which is the product of the probabilities of each detection given the measurement prediction and covariance
+    // (computed by the EKFs of the individual obstacles) 
+    std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+    vector<vector<float>> p, vector<vector<float>> probs, float new_obj_thres){
+        vector<int> match;
+        std::unordered_set<int> chosen_detected, chosen_tracked;
+        std::tie(match, chosen_detected, chosen_tracked) = greedy_data_association(tracked_obstacles, detected_obstacles, p, new_obj_thres);
+        // probs' last element has the probability that an object is newly detected, computed using the mahalanobis distance threshold and the covariance matrix
+        float weight = 1;
+        for (size_t i = 0; i < detected_obstacles.size(); i++) {
+            if(match[i] == -1){
+                //unassigned
+                weight *= probs[i].back();
+            }else{
+                weight *= probs[i][match[i]];
+            }
+        }
+        return std::make_tuple(weight, match, chosen_detected, chosen_tracked); 
 }
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
@@ -823,7 +848,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 m_tracked_obstacles.back()->cov = init_new_cov;
             }
         }
-        int tracked_id = match[i] > 0 ? match[i] : m_num_obj - 1;
+        int tracked_id = match[i] >= 0 ? match[i] : m_num_obj - 1;
         if (m_track_robot) {
             float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
             float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);

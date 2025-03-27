@@ -8,10 +8,12 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
     this->declare_parameter<double>("range_uncertainty", 1.0);
     this->declare_parameter<double>("bearing_uncertainty", 1.0);
-    this->declare_parameter<double>("motion_gps_xy_noise", 1.0);
-    this->declare_parameter<double>("motion_gps_theta_noise", 1.0);
-    this->declare_parameter<double>("motion_imu_xy_noise", 1.0);
-    this->declare_parameter<double>("motion_imu_theta_noise", 1.0);
+    this->declare_parameter<double>("motion_gps_vxy_noise_coeff", 1.0);
+    this->declare_parameter<double>("motion_gps_omega_noise_coeff", 1.0);
+    this->declare_parameter<double>("motion_gps_theta_noise_coeff", 1.0);
+    this->declare_parameter<double>("motion_imu_vxy_noise_coeff", 1.0);
+    this->declare_parameter<double>("motion_imu_omega_noise_coeff", 1.0);
+    this->declare_parameter<double>("motion_imu_theta_noise_coeff", 1.0);
     this->declare_parameter<double>("update_gps_xy_uncertainty", 1.0);
     this->declare_parameter<double>("update_odom_theta_uncertainty", 1.0);
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
@@ -28,10 +30,12 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
     m_range_std = this->get_parameter("range_uncertainty").as_double();
     m_bearing_std = this->get_parameter("bearing_uncertainty").as_double();
-    m_gps_xy_noise = this->get_parameter("motion_gps_xy_noise").as_double();
-    m_gps_theta_noise = this->get_parameter("motion_gps_theta_noise").as_double();
-    m_imu_xy_noise = this->get_parameter("motion_imu_xy_noise").as_double();
-    m_imu_theta_noise = this->get_parameter("motion_imu_theta_noise").as_double();
+    m_gps_vxy_noise_coeff = this->get_parameter("motion_gps_vxy_noise_coeff").as_double();
+    m_gps_omega_noise_coeff = this->get_parameter("motion_gps_omega_noise_coeff").as_double();
+    m_gps_theta_noise_coeff = this->get_parameter("motion_gps_theta_noise_coeff").as_double();
+    m_imu_vxy_noise_coeff = this->get_parameter("motion_imu_vxy_noise_coeff").as_double();
+    m_imu_omega_noise_coeff = this->get_parameter("motion_imu_omega_noise_coeff").as_double();
+    m_imu_theta_noise_coeff = this->get_parameter("motion_imu_theta_noise_coeff").as_double();
     m_update_gps_xy_uncertainty = this->get_parameter("update_gps_xy_uncertainty").as_double();
     m_update_odom_theta_uncertainty = this->get_parameter("update_odom_theta_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
@@ -103,8 +107,6 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     m_got_local_frame = false;
     m_got_nav = false;
     m_got_odom = false;
-
-    m_best_particle_index = -1;
 }
 
 void ObjectTrackingMapPF::publish_slam(){
@@ -115,12 +117,12 @@ void ObjectTrackingMapPF::publish_slam(){
         // publish the transform from slam_map to the local frame (camera/lidar)
         t.header.frame_id = m_slam_frame_id;
         t.child_frame_id = m_local_frame_id;
-        t.transform.translation.x = m_state(0);
-        t.transform.translation.y = m_state(1);
+        t.transform.translation.x = m_particles[m_best_particle_index]->m_pose(0);
+        t.transform.translation.y = m_particles[m_best_particle_index]->m_pose(1);
         t.transform.translation.z = m_nav_z;
 
         tf2::Quaternion q;
-        q.setRPY(0, 0, m_state(2));
+        q.setRPY(0, 0, m_particles[m_best_particle_index]->m_pose(2));
         t.transform.rotation = tf2::toMsg(q);
     }else{
         // transform from slam_map to map, s.t. slam_map->robot is predicted pose
@@ -128,7 +130,11 @@ void ObjectTrackingMapPF::publish_slam(){
         t.child_frame_id = m_global_frame_id;
         double shift_x, shift_y, shift_theta;
         // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
-        std::tie(shift_x, shift_y, shift_theta) = all_seaing_perception::ObjectTrackingMap::compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)), all_seaing_perception::ObjectTrackingMap::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+        std::tie(shift_x, shift_y, shift_theta) = all_seaing_perception::ObjectTrackingMap::compose_transforms(std::make_tuple(
+                                                    m_particles[m_best_particle_index]->m_pose(0),
+                                                    m_particles[m_best_particle_index]->m_pose(1),
+                                                    m_particles[m_best_particle_index]->m_pose(2)),
+                                                    all_seaing_perception::ObjectTrackingMap::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
         t.transform.translation.x = shift_x;
         t.transform.translation.y = shift_y;
         t.transform.translation.z = 0;
@@ -143,17 +149,16 @@ void ObjectTrackingMapPF::publish_slam(){
     nav_msgs::msg::Odometry odom_msg = m_last_odom_msg;
     // odom_msg.header.stamp = this->get_clock()->now();
     odom_msg.header.frame_id = m_slam_frame_id;
-    odom_msg.pose.pose.position.x = m_state(0);
-    odom_msg.pose.pose.position.y = m_state(1);
+    odom_msg.pose.pose.position.x = m_particles[m_best_particle_index]->m_pose(0);
+    odom_msg.pose.pose.position.y = m_particles[m_best_particle_index]->m_pose(1);
     tf2::Quaternion q;
-    q.setRPY(0, 0, m_state(2));
+    q.setRPY(0, 0, m_particles[m_best_particle_index]->m_pose(2));
     odom_msg.pose.pose.orientation = tf2::toMsg(q);
 
     m_slam_pub->publish(odom_msg);
 }
 
 void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
-    // TODO: ODOM MESSAGE (IMU LINEAR + ANGULAR) CALLBACK
     // !!! THOSE ARE RELATIVE TO THE ROBOT AND DEPENDENT ON ITS HEADING, USE THE CORRECT MOTION MODEL
     if(m_is_sim){
         m_nav_vx = msg.twist.twist.linear.x;
@@ -182,40 +187,15 @@ void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
 
     if (!m_got_nav || !m_imu_predict || m_first_state) return;
 
-    Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
-    F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-
     /*
     IMU MOTION PREDICTION MODEL:
-    (x_old, y_old, theta_old) -> (x_old+cos(theta_old)*v_x*dt-sin(theta_old)*v_y*dt, y_old+sin(theta_old)*d_x*dt+cos(theta_old)*v_y*dt, theta_old+omega*dt)
-    mot_grad: rows -> components of final state (actually difference with old state), columns -> components of old state wrt to which the gradient is taken
+    (vx, vy, omega) provided by odometry
     */
 
-    Eigen::Vector3f mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
-    // gradient - identity
-    Eigen::Matrix3f mot_grad{
-        {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
-        {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
-        {0, 0, 0},
-    };
-
-    m_state += F.transpose() * mot_const;
-
-    // RCLCPP_INFO(this->get_logger(), "ROBOT PREDICTED POSE AFTER IMU UPDATE: (%lf, %lf), %lf", m_state(0), m_state(1), m_state(2));
-    Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
-                        F.transpose() * mot_grad * F;
-    // add a consistent amount of noise based on how much the robot moved since the last time
-    // Eigen::Matrix3f motion_noise{
-    //     {m_xy_noise * abs(mot_const[0]), 0, 0},
-    //     {0, m_xy_noise * abs(mot_const[1]), 0},
-    //     {0, 0, m_theta_noise * abs(mot_const[2])},
-    // };
-    Eigen::Matrix3f motion_noise{
-        {m_imu_xy_noise, 0, 0},
-        {0, m_imu_xy_noise, 0},
-        {0, 0, m_imu_theta_noise},
-    };
-    m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
+    // for every particle, sample a new pose based on the model above (weights are the same since we didn't do a measurement update)
+    for (std::shared_ptr<SLAMParticle> particle_ptr : m_particles){
+        particle_ptr->sample_pose(m_nav_vx, m_nav_vy, m_nav_omega, dt, m_imu_vxy_noise_coeff, m_imu_omega_noise_coeff, m_imu_theta_noise_coeff);
+    }
     
     // to see the robot position prediction mean & uncertainty
     if(m_got_nav){
@@ -229,14 +209,12 @@ void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
 }
 
 void ObjectTrackingMapPF::odom_callback() {
-    // TODO: ODOM TRANSFORM (GPS + HEADING) CALLBACK
     if(!m_got_local_frame) return;
 
     //update odometry transforms
-    //TODO: add a flag for each one that says if they succedeed, to know to continue or not
     // RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
-    m_map_lidar_tf = get_tf(m_global_frame_id, m_local_frame_id);
-    m_lidar_map_tf = get_tf(m_local_frame_id, m_global_frame_id);
+    m_map_lidar_tf = all_seaing_perception::ObjectTrackingMap::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_lidar_map_tf = all_seaing_perception::ObjectTrackingMap::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     m_nav_z = m_map_lidar_tf.transform.translation.z;
     tf2::Quaternion quat;
@@ -254,84 +232,34 @@ void ObjectTrackingMapPF::odom_callback() {
     m_nav_x = m_map_lidar_tf.transform.translation.x;
     m_nav_y = m_map_lidar_tf.transform.translation.y;
 
-
-    if (m_first_state) {
-        // initialize mean and cov robot pose
-        m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
-        Eigen::Matrix3f init_pose_noise{
-            {m_gps_xy_noise, 0, 0},
-            {0, m_gps_xy_noise, 0},
-            {0, 0, m_gps_theta_noise},
-        };
-        m_cov = init_pose_noise;
-        // m_cov = Eigen::Matrix3f::Zero();
+    if(m_first_state){
+        for (int i = 0; i < m_num_particles; i++){
+            m_particles.push_back(std::make_shared<SLAMParticle>(m_nav_x, m_nav_y, m_nav_heading))
+        }
+        m_weights = std::vector<float>(m_num_particles, 1);
         m_first_state = false;
-        // m_last_odom_time = rclcpp::Time(msg.header.stamp);
+        m_best_particle_index = -1;
         return;
     }
 
-    if (!m_imu_predict) {
+    for (std::shared_ptr<SLAMParticle> particle_ptr : m_particles){
+        particle_ptr->update_nav_vars(m_nav_x, m_nav_y, m_nav_heading);
+    }
 
-        Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
-        F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
+    if (!m_imu_predict) {
         
         /*
         GPS MOTION PREDICTION MODEL:
-        (x_old, y_old, theta_old) -> (x_old+v_comp_x*dt, y_old+v_comp_y*dt, theta_old+omega_comp*dt)
-        -->gradient is identity matrix (that way we keep the correlations with the objects, if we
-        set it to the new values it would be zero and delete them) remember that mot_grad is the
-        gradients minus the identity matrix, so with this model it is the zero matrix
+        (vx, vy, omega) = ((gps_x-x_old)/dt, (gps_y-y_old)/dt, (gps_theta-theta_old)/dt)
         */
 
-        Eigen::Vector3f mot_const = Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
-        Eigen::Matrix3f mot_grad = Eigen::Matrix3f::Zero();
+        for (std::shared_ptr<SLAMParticle> particle_ptr : m_particles){
+            particle_ptr->sample_pose((m_nav_x - particle_ptr->m_pose(0))*m_odom_refresh_rate, (m_nav_y - particle_ptr->m_pose(1))*m_odom_refresh_rate, (m_nav_heading - particle_ptr->m_pose(2))*m_odom_refresh_rate, 1/m_odom_refresh_rate, m_gps_vxy_noise_coeff, m_gps_omega_noise_coeff, m_gps_theta_noise_coeff);
+        }
 
-        m_state += F.transpose() * mot_const;
-        Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
-                            F.transpose() * mot_grad * F;
-        // add a consistent amount of noise based on how much the robot moved since the last time
-        Eigen::Matrix3f motion_noise{
-            {m_gps_xy_noise * abs(mot_const[0]), 0, 0},
-            {0, m_gps_xy_noise * abs(mot_const[1]), 0},
-            {0, 0, m_gps_theta_noise * abs(mot_const[2])},
-        };
-        m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
     }else if (m_gps_update){
-        if(!m_include_odom_theta){
-            // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
-            Eigen::Matrix2f Q{
-                {m_update_gps_xy_uncertainty, 0},
-                {0, m_update_gps_xy_uncertainty},
-            };
-            Eigen::Vector2f xy_actual(m_nav_x, m_nav_y);
-            Eigen::Vector2f xy_pred(m_state(0), m_state(1));
-            //gradient of measurement update model, identity since it's centered at the initial state
-            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(2, 3 + 2 * m_num_obj);
-            H.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
-            // Eigen::Matrix2f h = Eigen::Matrix2f::Identity();
-            // Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 3 + 2 * m_num_obj);
-            // F.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
-            // Eigen::MatrixXf H = h * F;
-            Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
-            m_state += K * (xy_actual - xy_pred);
-            m_cov =
-                (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;   
-        }else{
-            // Include theta, since that's provided by the IMU compass usually
-            Eigen::Matrix3f Q{
-                {m_update_gps_xy_uncertainty, 0, 0},
-                {0, m_update_gps_xy_uncertainty, 0},
-                {0, 0, m_update_odom_theta_uncertainty},
-            };
-            Eigen::Vector3f xyth_actual(m_nav_x, m_nav_y, m_nav_heading);
-            Eigen::Vector3f xyth_pred(m_state(0), m_state(1), m_state(2));
-            //gradient of measurement update model, identity since it's centered at the initial state
-            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
-            H.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-            Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
-            m_state += K * (xyth_actual - xyth_pred);
-            m_cov =
-                (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
+        for (std::shared_ptr<SLAMParticle> particle_ptr : m_particles){
+            particle_ptr->update_gps(m_nav_x, m_nav_y, m_nav_heading, m_update_gps_xy_uncertainty, m_update_gps_xy_uncertainty);
         }
     }
 
@@ -352,39 +280,175 @@ SLAMParticle::SLAMParticle(float init_x, float init_y, float init_theta){
     m_pose = Eigen::Vector3f(init_x, init_y, init_theta);
     m_num_obj = 0;
     m_obstacle_id = 0;
-    m_got_gps = false;
+    m_got_nav = false;
+    m_weight = 1;
+    m_nav_x = init_x;
+    m_nav_y = init_y;
+    m_nav_heading = init_theta;
 }
 
-void SLAMParticle::sample_pose(double dx, double dy, double dtheta, float dt, float xy_noise, float theta_noise){
-    // TODO: SAMPLE NEW POSE GIVEN PARTICLE POSE AND ODOMETRY DATA AND UNCERTAINTIES
+std::shared_ptr<SLAMParticle> clone(std::shared_ptr<SLAMParticle> orig){
+    // TODO: slam particle pointer clone function
+}
+
+template <typename T>
+T SLAMParticle::convert_to_global(T point, geometry_msgs::msg::TransformStamped lidar_map_tf) {
+    T new_point = point; // to keep color-related data
+    geometry_msgs::msg::Point lc_pt_msg;
+    lc_pt_msg.x = point.x;
+    lc_pt_msg.y = point.y;
+    lc_pt_msg.z = point.z;
+    geometry_msgs::msg::Point gb_pt_msg;
+    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, lidar_map_tf);
+    new_point.x = gb_pt_msg.x;
+    new_point.y = gb_pt_msg.y;
+    new_point.z = gb_pt_msg.z;
+    T act_point = new_point;
+    // point initially in map frame
+    // want slam_map->map (then will compose it with slam->point)
+    // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
+    std::tuple<double, double, double> slam_to_map_transform = compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)), compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+    double th; //uselesss
+    std::tie(act_point.x, act_point.y, th) = compose_transforms(slam_to_map_transform, std::make_tuple(point.x, point.y, 0));
+    return act_point;
+}
+
+template <typename T>
+T SLAMParticle::convert_to_local(T point, geometry_msgs::msg::TransformStamped map_lidar_tf) {
+    T new_point = point; // to keep color-related data
+    T act_point = point;
+    if(m_track_robot){
+        // point initially in slam_map frame
+        // want map->slam_map (then will compose it with slam->point)
+        // (map->robot)@(robot->slam_map) = (map->robot)@inv(slam_map->robot)
+        std::tuple<double, double, double> map_to_slam_transform = compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading), compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0));
+        double th; //uselesss
+        std::tie(act_point.x, act_point.y, th) = compose_transforms(map_to_slam_transform, std::make_tuple(point.x, point.y, 0));
+    }
+    geometry_msgs::msg::Point gb_pt_msg;
+    gb_pt_msg.x = act_point.x;
+    gb_pt_msg.y = act_point.y;
+    gb_pt_msg.z = act_point.z;
+    geometry_msgs::msg::Point lc_pt_msg;
+    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, map_lidar_tf);
+    new_point.x = lc_pt_msg.x;
+    new_point.y = lc_pt_msg.y;
+    new_point.z = lc_pt_msg.z;
+    return new_point;
+}
+
+void SLAMParticle::sample_pose(double vx, double vy, double omega, double dt, float vxy_noise_coeff, float omega_noise_coeff, float theta_noise_coeff){
+    /*
+    MOTION MODEL:
+    (x_old, y_old, theta_old) -> (x_old+cos(theta_old)*vx*dt-sin(theta_old)*vy*dt, y_old+sin(theta_old)*vx*dt+cos(theta_old)*vy*dt, theta_old+omega*dt)
+    */
+
+    // setup random variables for sampling
+    std::random_device rd{};
+    std::mt19937 gen{rd()};
+
+    std::normal_distribution<double> vx_normal{0, vxy_noise_coeff*vx};// maybe include both vx and vy in the noise
+    std::normal_distribution<double> vy_normal{0, vxy_noise_coeff*vy};
+    std::normal_distribution<double> omega_normal{0, omega_noise_coeff*omega};
+    std::normal_distribution<double> theta_normal{0, theta_noise_coeff*omega};
+
+    double vx_sample = vx + gen(vx_normal);
+    double vy_sample = vy + gen(vy_normal);
+    double omega_sample = omega + gen(omega_normal);
+    double theta_noise_sample = gen(theta_normal);
+
+    // compute new pose
+    std::tie(m_pose(0), m_pose(1), m_pose(2)) = all_seaing_perception::ObjectTrackingMap::compose_transforms(std::make_tuple<double, double, double>(m_pose(0), m_pose(1), m_pose(2)),
+                                                                                                                std::make_tuple<double, double, double>(vx_sample*dt, vy_sample*dt, omega_sample*dt+theta_noise_sample));
+}
+
+void SLAMParticle::update_nav_vars(double x, double y, double theta){
+    m_nav_x = x;
+    m_nav_y = y;
+    m_nav_heading = theta;
 }
 
 void SLAMParticle::update_gps(double x, double y, double theta, float xy_uncertainty, float theta_uncertainty){
-    // TODO: GPS UPDATE (SAME EKF UPDATE BUT JUST ON THE 3X3 GPS MATRIX THAT FUSES ALL THE MEASUREMENTS RECEIVED)
+    if (!m_got_nav) {
+        // initialize mean and cov robot pose
+        gps_mean = Eigen::Vector3f(x, y, theta);
+        Eigen::Matrix3f init_pose_noise{
+            {xy_uncertainty, 0, 0},
+            {0, xy_uncertainty, 0},
+            {0, 0, theta_uncertainty},
+        };
+        gps_cov = init_pose_noise;
+        m_got_nav = true;
+        return;
+    }
+    // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
+    // Include theta, since that's provided by the IMU compass usually
+    Eigen::Matrix3f Q{
+        {xy_uncertainty, 0, 0},
+        {0, xy_uncertainty, 0},
+        {0, 0, theta_uncertainty},
+    };
+    Eigen::Vector3f xyth_actual(x, y, theta);
+    Eigen::Vector3f xyth_pred(gps_mean(0), gps_mean(1), gps_mean(2));
+    //gradient of measurement update model, identity since it's centered at the initial state
+    Eigen::MatrixXf K = gps_cov * (gps_cov + Q).inverse();
+    gps_mean += K * (xyth_actual - xyth_pred);
+    gps_cov = (Eigen::Matrix3f::Identity() - K) * gps_cov;
+}
+
+void SLAMParticle::reset_gps(){
+    m_got_nav = false;
+}
+
+float mahalanobis_to_prob(float mahalanobis_dist, Eigen::VectorXf cov){
+    return (1/sqrt((2*((float)M_PI)*cov).determinant()))*exp(-(1/((float)2))*mahalanobis_dist);
+}
+
+float prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::VectorXf cov){
+    return mahalanobis_to_prob((measurement-mean).transpose()*cov.inverse()*(measurement-mean), cov);
+}
+
+float SLAMParticle::gps_prob(bool include_odom_theta){
+    // probability of particle pose given the GPS EKF
+    if(!m_got_nav) return 1;
+    if(include_odom_theta){
+        return this->prob_normal(m_pose, gps_mean, gps_cov);
+    }else{
+        return this->prob_normal(m_pose.segment(0,2), gps_mean.segment(0,2), gps_cov.topLeftCorner(2,2));
+    }
+}
+
+float SLAMParticle::get_weight(bool include_odom_theta){
+    // total weight of the particle
+    return m_weight*this->gps_prob(include_odom_theta);
 }
 
 void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
     bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres,
-    bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model){
-    
+    bool check_fov, float obstacle_drop_thres, bool normalize_drop_dist, image_geometry::PinholeCameraModel cam_model,
+    geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tf){
+
     Eigen::Matrix<float, 2, 2> Q{
         {range_std, 0},
         {0, bearing_std},
     };
 
-    std::vector<std::vector<float>> p;
+    std::vector<std::vector<float>> p, probs;
     for (std::shared_ptr<ObjectCloud> det_obs : detected_obstacles) {
         float range, bearing;
         int signature;
         std::tie(range, bearing, signature) =
             all_seaing_perception::ObjectTrackingMap::local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
         p.push_back(std::vector<float>());
+        probs.push_back(std::vector<float>());
         Eigen::Vector2f z_pred;
         Eigen::MatrixXf Psi;
+        float min_unassigned_prob = 1;
         for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
             float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_pose(0);
             float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_pose(1);
             float q = d_x * d_x + d_y * d_y;
+            // mean of measurement model
             z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_pose(2));
 
             Eigen::Matrix<float, 2, 2> h{
@@ -393,18 +457,22 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
             };
 
             Eigen::MatrixXf H = h / q;
+            // covariance of measurement model
             Psi = H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q;
 
             Eigen::Vector2f z_actual(range, bearing);
 
             p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
                                (z_actual - z_pred));
+            probs.back().push_back(this->prob_normal(z_actual, z_pred, Psi));
+            min_unassigned_prob = min(min_unassigned_prob, this->mahalanobis_to_prob(new_obj_slam_thres, Psi))
         }
+        probs.back().push_back(min_unassigned_prob);
     }
 
     vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
-    std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::ObjectTrackingMap::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, new_obj_slam_thres);
+    std::tie(m_weight, match, chosen_detected, chosen_tracked) = all_seaing_perception::ObjectTrackingMap::greedy_data_association_probs(m_tracked_obstacles, detected_obstacles, p, new_obj_slam_thres);
 
     // Update vectors, now with known correspondence
     for (size_t i = 0; i < detected_obstacles.size(); i++) {
@@ -462,7 +530,7 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
         upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
         upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
         pcl::PointXYZ upd_loc_centr;
-        upd_loc_centr = all_seaing_perception::ObjectTrackingMap::convert_to_local(upd_glob_centr);
+        upd_loc_centr = this->convert_to_local(upd_glob_centr, map_lidar_tf);
 
         // move everything based on the difference between that and the previous assumed global (then local) centroid
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(
@@ -471,7 +539,7 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
             global_pt.x += upd_glob_centr.x - m_tracked_obstacles[i]->global_centroid.x;
             global_pt.y += upd_glob_centr.y - m_tracked_obstacles[i]->global_centroid.y;
             upd_local_obj_pcloud->push_back(
-                all_seaing_perception::ObjectTrackingMap::convert_to_local(global_pt));
+                this->convert_to_local(global_pt, map_lidar_tf));
         }
 
         m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
@@ -510,7 +578,7 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
             if (m_tracked_obstacles[tracked_id]->is_dead) {
                 // Was also dead before, add time dead
                 m_tracked_obstacles[tracked_id]->time_dead =
-                    rclcpp::Time(curr_time) -
+                    curr_time -
                     m_tracked_obstacles[tracked_id]->last_dead +
                     m_tracked_obstacles[tracked_id]->time_dead;
 
@@ -657,8 +725,8 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
 
-    m_lidar_map_tf = get_tf(m_global_frame_id, m_local_frame_id);
-    m_map_lidar_tf = get_tf(m_local_frame_id, m_global_frame_id);
+    m_lidar_map_tf = all_seaing_perception::ObjectTrackingMap::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_map_lidar_tf = all_seaing_perception::ObjectTrackingMap::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     if(m_first_state) return;
 
@@ -671,7 +739,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         pcl::fromROSMsg(obj.cloud, *local_obj_pcloud);
         for (pcl::PointXYZHSV &pt : local_obj_pcloud->points) {
             pcl::PointXYZHSV global_pt =
-                all_seaing_perception::ObjectTrackingMap::convert_to_global(pt);
+                this->convert_to_global(pt, lidar_map_tf);
             global_obj_pcloud->push_back(global_pt);
         }
         std::shared_ptr<ObjectCloud> obj_cloud(
@@ -702,12 +770,24 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     all_seaing_perception::ObjectTrackingMap::publish_map(m_local_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
                       untracked_labels);
 
-    // TODO: FastSLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
+    // FastSLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
+
+    // update the map for each particle and compute the weight based on the new detections
+    for (int i = 0; i < m_num_particles; i++){
+        m_particles[i]->update_map(detected_obstacles, rclcpp::Time(msg->objects[0].time), m_is_sim, m_range_std, m_bearing_std,
+                                    m_init_new_cov, m_new_obj_slam_thres, m_check_fov, m_obstacle_drop_thresh,
+                                    m_normalize_drop_dist, m_cam_model,
+                                m_map_lidar_tf, m_lidar_map_tf);
+        w = m_particles[i]->get_weight(m_include_odom_theta);
+        m_weights.push_back(w);
+        m_particles[i]->reset_gps();
+        if(m_best_particle_index == -1 || w > m_weights[m_best_particle_index]) m_best_particle_index = i;
+    }
 
     // Publish map with tracked obstacles
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
     std::vector<int> tracked_labels;
-    for (std::shared_ptr<ObjectCloud> t_ob : m_tracked_obstacles) {
+    for (std::shared_ptr<ObjectCloud> t_ob : m_particles[m_best_particle_index]->m_tracked_obstacles) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr local_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
         for (pcl::PointXYZHSV pt : t_ob->local_pcloud_ptr->points) {
             pcl::PointXYZRGB rgb_pt;
@@ -738,9 +818,20 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     if(m_got_nav){
         this->visualize_predictions();
     }
-    if( m_got_nav && m_got_odom){
+    if(m_got_nav && m_got_odom){
         publish_slam();
     }
+
+    // resample based on the weights of the particles
+    std::vector<std::shared_ptr<SLAMParticle>> new_particles();
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::discrete_distribution<> d(weights.begin(), weights.end());
+    for(int i = 0; i < m_num_particles; i++){
+        new_particles.push_back(clone(m_particles[d(gen)]));
+    }
+    m_particles = new_particles;
+    m_weights = std::vector<float>(m_num_particles, 1);
 }
 
 ObjectTrackingMapPF::~ObjectTrackingMapPF() {}

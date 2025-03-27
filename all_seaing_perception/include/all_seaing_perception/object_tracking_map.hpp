@@ -79,6 +79,8 @@ struct ObjectCloud{
     void update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc);
 };
 
+std::shared_ptr<ObjectCloud> clone(std::shared_ptr<ObjectCloud> orig);
+
 class ObjectTrackingMap : public rclcpp::Node{
 private:
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
@@ -114,7 +116,12 @@ private:
     // Returns the matchings from detections to map and the sets of indices of chosen tracked and detected obstacles
     std::tuple<vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
         std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
-        vector<vector<int>> p, float new_obj_thres);
+        vector<vector<float>> p, float new_obj_thres);
+    
+    // Similar to the greedy_data_association function but returning the computed weight as well
+    std::tuple<float, vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+        vector<vector<float>> p, vector<vector<float>> probs, float new_obj_thres);
 
     // Member variables
     std::vector<std::shared_ptr<ObjectCloud>> m_tracked_obstacles;
