@@ -53,6 +53,7 @@ ament_auto_add_executable(
     object_tracking_map_pf
     ${PROJECT_NAME}/object_tracking_map_pf.cpp
     ${PROJECT_NAME}/obstacle.cpp
+    ${PROJECT_NAME}/object_tracking_map.cpp
 )
 
 target_link_libraries(obstacle_bbox_visualizer yaml-cpp)

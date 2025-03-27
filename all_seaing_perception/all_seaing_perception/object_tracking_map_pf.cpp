@@ -4,6 +4,7 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "map");
     this->declare_parameter<std::string>("slam_frame_id", "slam_map");
+    this->declare_parameter<int>("num_particles", 100);
     this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
     this->declare_parameter<double>("range_uncertainty", 1.0);
     this->declare_parameter<double>("bearing_uncertainty", 1.0);
@@ -15,7 +16,6 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     this->declare_parameter<double>("update_odom_theta_uncertainty", 1.0);
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
     this->declare_parameter<double>("init_new_cov", 10.0);
-    this->declare_parameter<bool>("track_robot", true);
     this->declare_parameter<bool>("imu_predict", true);
     this->declare_parameter<bool>("gps_update", true);
     this->declare_parameter<double>("normalize_drop_dist", 1.0);
@@ -24,6 +24,7 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
     m_slam_frame_id = this->get_parameter("slam_frame_id").as_string();
+    m_num_particles = this->get_parameter("num_particles").as_int();
     m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
     m_range_std = this->get_parameter("range_uncertainty").as_double();
     m_bearing_std = this->get_parameter("bearing_uncertainty").as_double();
@@ -35,7 +36,6 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     m_update_odom_theta_uncertainty = this->get_parameter("update_odom_theta_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
     m_init_new_cov = this->get_parameter("init_new_cov").as_double();
-    m_track_robot = this->get_parameter("track_robot").as_bool();
     m_imu_predict = this->get_parameter("imu_predict").as_bool();
     m_gps_update = this->get_parameter("gps_update").as_bool();
     
@@ -90,92 +90,21 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     odom_timer = this->create_wall_timer(
     std::chrono::duration<float>(((float)1.0)/m_odom_refresh_rate), std::bind(&ObjectTrackingMapPF::odom_callback, this));
 
-    if(m_track_robot){
-        // publish computed global robot position as a transform slam_map->map and a message with the pose of the robot wrt slam_map
-        m_slam_pub = this->create_publisher<nav_msgs::msg::Odometry>(
-            "odometry/tracked", 10);
-        m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-        // update odometry based on IMU data by subscribing to the odometry message
-        // TODO: check if another message publishes raw IMU acceleration data
-        // and maybe add the option to use that with the appropriate model that also keeps track of the velocity of the robot
-        m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
-            "odometry/filtered", 10,
-            std::bind(&ObjectTrackingMapPF::odom_msg_callback, this, std::placeholders::_1));
-    }
+    // publish computed global robot position as a transform slam_map->map and a message with the pose of the robot wrt slam_map
+    m_slam_pub = this->create_publisher<nav_msgs::msg::Odometry>(
+        "odometry/tracked", 10);
+    m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+    // update odometry based on IMU data by subscribing to the odometry message
+    m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+        "odometry/filtered", 10,
+        std::bind(&ObjectTrackingMapPF::odom_msg_callback, this, std::placeholders::_1));
 
     m_first_state = true;
     m_got_local_frame = false;
     m_got_nav = false;
     m_got_odom = false;
-}
 
-ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc,
-                         pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob) {
-    id = -1;
-    label = l;
-    time_seen = t;
-    last_dead = rclcpp::Time(0);
-    time_dead = rclcpp::Duration(0, 0);
-    is_dead = false;
-    global_pcloud_ptr = glob;
-    for (pcl::PointXYZHSV &global_pt : global_pcloud_ptr->points) {
-        global_centroid.x += global_pt.x / ((double)global_pcloud_ptr->points.size());
-        global_centroid.y += global_pt.y / ((double)global_pcloud_ptr->points.size());
-        global_centroid.z += global_pt.z / ((double)global_pcloud_ptr->points.size());
-    }
-    this->update_loc_pcloud(loc);
-}
-
-void ObjectCloud::update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc) {
-    local_pcloud_ptr = loc;
-    for (pcl::PointXYZHSV &local_pt : local_pcloud_ptr->points) {
-        local_centroid.x += local_pt.x / ((double)local_pcloud_ptr->points.size());
-        local_centroid.y += local_pt.y / ((double)local_pcloud_ptr->points.size());
-        local_centroid.z += local_pt.z / ((double)local_pcloud_ptr->points.size());
-    }
-}
-
-template <typename T_matrix> std::string matrix_to_string(T_matrix matrix) {
-    std::stringstream ss;
-    ss << matrix;
-    return ss.str();
-}
-
-template <typename T_vector> std::string vector_to_string(T_vector v) {
-    std::stringstream ss;
-    for (size_t i = 0; i < v.size(); ++i) {
-        if (i != 0)
-            ss << ",";
-        ss << v[i];
-    }
-    return ss.str();
-}
-
-std::tuple<double, double, double> ObjectTrackingMapPF::compute_transform_from_to(double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta){
-    double dx = cos(from_theta)*(to_x-from_x)+sin(from_theta)*(to_y-from_y);
-    double dy = -sin(from_theta)*(to_x-from_x)+cos(from_theta)*(to_y-from_y);
-    double dtheta = to_theta - from_theta;
-    // RCLCPP_INFO(this->get_logger(), "(%lf, %lf, %lf) -> (%lf, %lf, %lf): (%lf, %lf, %lf)", from_x, from_y, from_theta, to_x, to_y, to_theta, dx, dy, dtheta);
-    return std::make_tuple(dx, dy, dtheta);
-}
-
-// multiply left to right
-std::tuple<double, double, double> ObjectTrackingMapPF::compose_transforms(std::tuple<double, double, double> t1, std::tuple<double, double, double> t2){
-    double t1_dx, t1_dy, t1_dtheta, t2_dx, t2_dy, t2_dtheta;
-    std::tie(t1_dx, t1_dy, t1_dtheta) = t1;
-    std::tie(t2_dx, t2_dy, t2_dtheta) = t2;
-    double t_dx = t1_dx+cos(t1_dtheta)*t2_dx-sin(t1_dtheta)*t2_dy;
-    double t_dy = t1_dy+sin(t1_dtheta)*t2_dx+cos(t1_dtheta)*t2_dy;
-    double t_dtheta = t1_dtheta+t2_dtheta;
-    // RCLCPP_INFO(this->get_logger(), "(%lf, %lf, %lf)@(%lf, %lf, %lf)=(%lf, %lf, %lf)", t1_dx, t1_dy, t1_dtheta, t2_dx, t2_dy, t2_dtheta, t_dx, t_dy, t_dtheta);
-    return std::make_tuple(t_dx, t_dy, t_dtheta);
-}
-
-// given the starting and ending robot positions (wrt to world) and object pos wrt world given first robot position being true, compute world to object given second robot position being true (robot to object should be the same)
-// useful to overlay maps with two different robot positions
-std::tuple<double, double, double> ObjectTrackingMapPF::apply_transform_from_to(double x, double y, double theta, double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta){
-    std::tuple<double, double, double> local_rel = compute_transform_from_to(from_x, from_y, from_theta, x, y, theta);// from starting pos to object
-    return compose_transforms(std::make_tuple(to_x, to_y, to_theta), local_rel);
+    m_best_particle_index = -1;
 }
 
 void ObjectTrackingMapPF::publish_slam(){
@@ -199,7 +128,7 @@ void ObjectTrackingMapPF::publish_slam(){
         t.child_frame_id = m_global_frame_id;
         double shift_x, shift_y, shift_theta;
         // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
-        std::tie(shift_x, shift_y, shift_theta) = compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)), compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+        std::tie(shift_x, shift_y, shift_theta) = all_seaing_perception::ObjectTrackingMap::compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)), all_seaing_perception::ObjectTrackingMap::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
         t.transform.translation.x = shift_x;
         t.transform.translation.y = shift_y;
         t.transform.translation.z = 0;
@@ -224,6 +153,7 @@ void ObjectTrackingMapPF::publish_slam(){
 }
 
 void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
+    // TODO: ODOM MESSAGE (IMU LINEAR + ANGULAR) CALLBACK
     // !!! THOSE ARE RELATIVE TO THE ROBOT AND DEPENDENT ON ITS HEADING, USE THE CORRECT MOTION MODEL
     if(m_is_sim){
         m_nav_vx = msg.twist.twist.linear.x;
@@ -250,7 +180,7 @@ void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
 
     // RCLCPP_INFO(this->get_logger(), "IMU MESSAGE ODOM: (%lf, %lf), %lf", m_nav_vx, m_nav_vy, m_nav_omega);
 
-    if (!m_got_nav || !m_track_robot || !m_imu_predict || m_first_state) return;
+    if (!m_got_nav || !m_imu_predict || m_first_state) return;
 
     Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
     F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
@@ -293,12 +223,13 @@ void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     }
     // publish robot pose predictions (here and after measurement update) as transforms from map to lidar/camera frame, possibly also as a message
     // it should ultimately be a source of odometry that can be used by other nodes along with the global map
-    if(m_track_robot && m_got_nav && m_got_odom){
+    if(m_got_nav && m_got_odom){
         publish_slam();
     }
 }
 
 void ObjectTrackingMapPF::odom_callback() {
+    // TODO: ODOM TRANSFORM (GPS + HEADING) CALLBACK
     if(!m_got_local_frame) return;
 
     //update odometry transforms
@@ -317,18 +248,12 @@ void ObjectTrackingMapPF::odom_callback() {
 
     m_got_nav = true;
 
-    // to ignore gps TFs that are the same thing 5000 times a second and cause SLAM to lock into the GPS
-    // RCLCPP_INFO(this->get_logger(), "COMPARE: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_lidar_tf.transform.translation.x, m_map_lidar_tf.transform.translation.y);
+    // to ignore gps TFs that are the same thing many times a second due to lag and cause SLAM to lock into the GPS
     if((!m_first_state) && (m_nav_x == m_map_lidar_tf.transform.translation.x) && (m_nav_y == m_map_lidar_tf.transform.translation.y)) return;
 
-    // RCLCPP_INFO(this->get_logger(), "GOT ODOM");
     m_nav_x = m_map_lidar_tf.transform.translation.x;
     m_nav_y = m_map_lidar_tf.transform.translation.y;
-    // RCLCPP_INFO(this->get_logger(), "COMPARE NEW: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_lidar_tf.transform.translation.x, m_map_lidar_tf.transform.translation.y);
 
-    // RCLCPP_INFO(this->get_logger(), "NEW GPS: (%lf, %lf)", m_nav_x, m_nav_y);
-
-    if(!m_track_robot) return;
 
     if (m_first_state) {
         // initialize mean and cov robot pose
@@ -346,15 +271,6 @@ void ObjectTrackingMapPF::odom_callback() {
     }
 
     if (!m_imu_predict) {
-
-        // rclcpp::Time curr_odom_time = rclcpp::Time(msg.header.stamp);
-        // float dt = (curr_odom_time - m_last_odom_time).seconds();
-        // m_last_odom_time = curr_odom_time;
-        // m_nav_omega = (m_nav_heading - m_state[2]) / dt;
-
-        // RCLCPP_INFO(this->get_logger(), "ROBOT ODOM DATA: (%lf, %lf, %lf), pub omega: %lf, dt:
-        // %lf, comp omega: %lf", m_nav_x, m_nav_y, m_nav_heading, msg.twist.twist.angular.z, dt,
-        // (m_nav_heading-m_state[2])/dt);
 
         Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
         F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
@@ -422,7 +338,7 @@ void ObjectTrackingMapPF::odom_callback() {
     if(m_got_nav){
         this->visualize_predictions();
     }
-    if(m_track_robot && m_got_nav && m_got_odom){
+    if(m_got_nav && m_got_odom){
         publish_slam();
     }
 }
@@ -432,80 +348,204 @@ void ObjectTrackingMapPF::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info
     m_cam_model.fromCameraInfo(info_msg);
 }
 
-geometry_msgs::msg::TransformStamped ObjectTrackingMapPF::get_tf(const std::string &in_target_frame,
-                                                               const std::string &in_src_frame) {
-    geometry_msgs::msg::TransformStamped tf;
-    try {
-        tf = m_tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
-    } catch (tf2::TransformException &ex) {
-        RCLCPP_INFO(this->get_logger(), "%s", ex.what());
+SLAMParticle::SLAMParticle(float init_x, float init_y, float init_theta){
+    m_pose = Eigen::Vector3f(init_x, init_y, init_theta);
+    m_num_obj = 0;
+    m_obstacle_id = 0;
+    m_got_gps = false;
+}
+
+void SLAMParticle::sample_pose(double dx, double dy, double dtheta, float dt, float xy_noise, float theta_noise){
+    // TODO: SAMPLE NEW POSE GIVEN PARTICLE POSE AND ODOMETRY DATA AND UNCERTAINTIES
+}
+
+void SLAMParticle::update_gps(double x, double y, double theta, float xy_uncertainty, float theta_uncertainty){
+    // TODO: GPS UPDATE (SAME EKF UPDATE BUT JUST ON THE 3X3 GPS MATRIX THAT FUSES ALL THE MEASUREMENTS RECEIVED)
+}
+
+void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
+    bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres,
+    bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model){
+    
+    Eigen::Matrix<float, 2, 2> Q{
+        {range_std, 0},
+        {0, bearing_std},
+    };
+
+    std::vector<std::vector<float>> p;
+    for (std::shared_ptr<ObjectCloud> det_obs : detected_obstacles) {
+        float range, bearing;
+        int signature;
+        std::tie(range, bearing, signature) =
+            all_seaing_perception::ObjectTrackingMap::local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
+        p.push_back(std::vector<float>());
+        Eigen::Vector2f z_pred;
+        Eigen::MatrixXf Psi;
+        for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
+            float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_pose(0);
+            float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_pose(1);
+            float q = d_x * d_x + d_y * d_y;
+            z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_pose(2));
+
+            Eigen::Matrix<float, 2, 2> h{
+                {std::sqrt(q) * d_x, std::sqrt(q) * d_y},
+                {-d_y, d_x},
+            };
+
+            Eigen::MatrixXf H = h / q;
+            Psi = H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q;
+
+            Eigen::Vector2f z_actual(range, bearing);
+
+            p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
+                               (z_actual - z_pred));
+        }
     }
-    return tf;
-}
 
-template <typename T>
-T ObjectTrackingMapPF::convert_to_global(T point) {
-    T new_point = point; // to keep color-related data
-    geometry_msgs::msg::Point lc_pt_msg;
-    lc_pt_msg.x = point.x;
-    lc_pt_msg.y = point.y;
-    lc_pt_msg.z = point.z;
-    geometry_msgs::msg::Point gb_pt_msg;
-    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_lidar_map_tf);
-    new_point.x = gb_pt_msg.x;
-    new_point.y = gb_pt_msg.y;
-    new_point.z = gb_pt_msg.z;
-    T act_point = new_point;
-    if(m_track_robot){
-        // point initially in map frame
-        // want slam_map->map (then will compose it with slam->point)
-        // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
-        std::tuple<double, double, double> slam_to_map_transform = compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)), compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
-        double th; //uselesss
-        std::tie(act_point.x, act_point.y, th) = compose_transforms(slam_to_map_transform, std::make_tuple(point.x, point.y, 0));
+    vector<int> match;
+    std::unordered_set<int> chosen_detected, chosen_tracked;
+    std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::ObjectTrackingMap::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, new_obj_slam_thres);
+
+    // Update vectors, now with known correspondence
+    for (size_t i = 0; i < detected_obstacles.size(); i++) {
+        float range, bearing;
+        int signature;
+        std::tie(range, bearing, signature) = all_seaing_perception::ObjectTrackingMap::local_to_range_bearing_signature(
+            detected_obstacles[i]->local_centroid, detected_obstacles[i]->label);
+        Eigen::Vector2f z_actual(range, bearing);
+        if (match[i] == -1) {
+            // increase object count and expand & initialize matrices
+            m_num_obj++;
+            // add object to tracked obstacles vector
+            detected_obstacles[i]->id = m_obstacle_id++;
+            m_tracked_obstacles.push_back(detected_obstacles[i]);
+            Eigen::Matrix<float, 2, 2> matrix_init_new_cov{
+                {(float)init_new_cov, 0},
+                {0, (float)init_new_cov},
+            };
+            m_tracked_obstacles.back()->mean_pred =
+                Eigen::Vector2f(pose(0), m_pose(1)) +
+                range * Eigen::Vector2f(std::cos(bearing + m_pose(2)),
+                                        std::sin(bearing + m_pose(2)));
+            m_tracked_obstacles.back()->cov = matrix_init_new_cov;
+        }
+        int tracked_id = match[i] > 0 ? match[i] : m_num_obj - 1;
+        float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_pose(0);
+        float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_pose(1);
+        float q = d_x * d_x + d_y * d_y;
+        Eigen::Matrix<float, 2, 2> h{
+            {std::sqrt(q) * d_x, std::sqrt(q) * d_y},
+            {-d_y, d_x},
+        };
+        Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_pose(2));
+        Eigen::MatrixXf H = h / q;
+        Eigen::MatrixXf K =
+            m_tracked_obstacles[tracked_id]->cov * H.transpose() *
+            (H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q).inverse();
+        m_tracked_obstacles[tracked_id]->mean_pred += K * (z_actual - z_pred);
+        m_tracked_obstacles[tracked_id]->cov =
+            (Eigen::Matrix2f::Identity() - K * H) * m_tracked_obstacles[tracked_id]->cov;
+        detected_obstacles[i]->mean_pred = m_tracked_obstacles[tracked_id]->mean_pred;
+        detected_obstacles[i]->cov = m_tracked_obstacles[tracked_id]->cov;
+
+        // update data for matched obstacles (we'll update position after we update SLAM with all points)
+        detected_obstacles[i]->id = m_tracked_obstacles[tracked_id]->id;
+        m_tracked_obstacles[tracked_id] = detected_obstacles[i];
     }
-    return act_point;
-}
 
-template <typename T>
-T ObjectTrackingMapPF::convert_to_local(T point) {
-    T new_point = point; // to keep color-related data
-    T act_point = point;
-    if(m_track_robot){
-        // point initially in slam_map frame
-        // want map->slam_map (then will compose it with slam->point)
-        // (map->robot)@(robot->slam_map) = (map->robot)@inv(slam_map->robot)
-        std::tuple<double, double, double> map_to_slam_transform = compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading), compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0));
-        double th; //uselesss
-        std::tie(act_point.x, act_point.y, th) = compose_transforms(map_to_slam_transform, std::make_tuple(point.x, point.y, 0));
+    // Update all (new and old, since they also have correlation with each other) objects global
+    // positions (including the cloud, and then the local points respectively)
+    pcl::PointXYZ p0(0, 0, 0);
+    float avg_dist = 0;
+    for (size_t i = 0; i < m_tracked_obstacles.size(); i++) {
+        pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
+        upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
+        upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
+        pcl::PointXYZ upd_loc_centr;
+        upd_loc_centr = all_seaing_perception::ObjectTrackingMap::convert_to_local(upd_glob_centr);
+
+        // move everything based on the difference between that and the previous assumed global (then local) centroid
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(
+            new pcl::PointCloud<pcl::PointXYZHSV>);
+        for (pcl::PointXYZHSV &global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points) {
+            global_pt.x += upd_glob_centr.x - m_tracked_obstacles[i]->global_centroid.x;
+            global_pt.y += upd_glob_centr.y - m_tracked_obstacles[i]->global_centroid.y;
+            upd_local_obj_pcloud->push_back(
+                all_seaing_perception::ObjectTrackingMap::convert_to_local(global_pt));
+        }
+
+        m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
+        m_tracked_obstacles[i]->local_centroid = upd_loc_centr;
+        avg_dist += pcl::euclideanDistance(p0, upd_loc_centr) / ((float)m_tracked_obstacles.size());
     }
-    geometry_msgs::msg::Point gb_pt_msg;
-    gb_pt_msg.x = act_point.x;
-    gb_pt_msg.y = act_point.y;
-    gb_pt_msg.z = act_point.z;
-    geometry_msgs::msg::Point lc_pt_msg;
-    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_lidar_tf);
-    new_point.x = lc_pt_msg.x;
-    new_point.y = lc_pt_msg.y;
-    new_point.z = lc_pt_msg.z;
-    return new_point;
+
+    // Filter old obstacles
+    std::vector<int> to_remove;
+    std::vector<int> to_keep;
+    for (int tracked_id = 0; tracked_id < static_cast<int>(m_tracked_obstacles.size());
+         tracked_id++) {
+        if (chosen_tracked.count(tracked_id)) {
+            to_keep.push_back(tracked_id);
+            continue;
+        }
+        // Check if in FoV (which'll mean it's dead, at least temporarily)
+        geometry_msgs::msg::Point lidar_point;
+        lidar_point.x = m_tracked_obstacles[tracked_id]->local_centroid.x;
+        lidar_point.y = m_tracked_obstacles[tracked_id]->local_centroid.y;
+        lidar_point.z = m_tracked_obstacles[tracked_id]->local_centroid.z;
+        geometry_msgs::msg::Point camera_point =
+            lidar_point; // ALREADY IN THE SAME FRAME, WAS TRANSFORMED BEFORE BEING PUBLISHED BY
+                         // bbox_project_pcloud.cpp
+        cv::Point2d xy_rect =
+            is_sim ? cam_model.project3dToPixel(
+                           cv::Point3d(camera_point.y, camera_point.z, -camera_point.x))
+                     : cam_model.project3dToPixel(
+                           cv::Point3d(camera_point.x, camera_point.y, camera_point.z));
+        ;
+
+        if (((xy_rect.x >= 0) && (xy_rect.x < cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
+             (xy_rect.y < cam_model.cameraInfo().height) && (lidar_point.x >= 0)) ||
+            !check_fov) {
+            // Dead
+            if (m_tracked_obstacles[tracked_id]->is_dead) {
+                // Was also dead before, add time dead
+                m_tracked_obstacles[tracked_id]->time_dead =
+                    rclcpp::Time(curr_time) -
+                    m_tracked_obstacles[tracked_id]->last_dead +
+                    m_tracked_obstacles[tracked_id]->time_dead;
+
+                if (m_tracked_obstacles[tracked_id]->time_dead.seconds() >
+                    (normalize_drop_thresh ? (obstacle_drop_thresh *
+                        (pcl::euclideanDistance(p0,
+                                                m_tracked_obstacles[tracked_id]->local_centroid) /
+                         avg_dist) *
+                        normalize_drop_dist) : obstacle_drop_thresh)) {
+                    // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d/%d DROPPED", tracked_id, m_num_obj);
+                    to_remove.push_back(tracked_id);
+                    continue;
+                }
+            }
+            m_tracked_obstacles[tracked_id]->is_dead = true;
+            m_tracked_obstacles[tracked_id]->last_dead = curr_time;
+        } else {
+            m_tracked_obstacles[tracked_id]->is_dead = false;
+        }
+    }
+
+    // update vectors & matrices
+    if (!to_remove.empty()) {
+        std::vector<std::shared_ptr<ObjectCloud>> new_obj;
+
+        for (int i : to_keep) {
+            new_obj.push_back(m_tracked_obstacles[i]);
+        }
+
+        m_tracked_obstacles = new_obj;
+        m_num_obj = to_keep.size();
+    }
 }
 
-//(range, bearing, signature)
-template <typename T>
-ObjectTrackingMapPF::det_rbs ObjectTrackingMapPF::local_to_range_bearing_signature(T point, int label) {
-    double range = std::hypot(point.x, point.y);
-    double bearing = std::atan2(point.y, point.x);
-    // RCLCPP_INFO(this->get_logger(), "LOCAL: (%lf, %lf) -> RBS: (%lf, %lf, %d)", point.x, point.y,
-    // range, bearing, label);
-    return det_rbs(range, bearing, label);
-}
-
-void ObjectTrackingMapPF::visualize_predictions() {
-    // RCLCPP_INFO(this->get_logger(), "NUMBER OF OBJECTS: %d", m_num_obj);
-    // RCLCPP_INFO(this->get_logger(), "STATE SIZE: %d", m_state.rows());
-    // RCLCPP_INFO(this->get_logger(), "COV SIZE: %dx%d", m_cov.rows(), m_cov.cols());
-
+void ObjectTrackingMapPF::visualize_predictions(){
     // delete previous markers
     visualization_msgs::msg::MarkerArray delete_arr;
     visualization_msgs::msg::Marker delete_mark;
@@ -515,86 +555,73 @@ void ObjectTrackingMapPF::visualize_predictions() {
     m_map_cov_viz_pub->publish(delete_arr);
 
     visualization_msgs::msg::MarkerArray ellipse_arr;
-    // robot pose prediction
-    if (m_track_robot) {
-        Eigen::Vector2f robot_mean = m_state.segment(0, 2);
-        Eigen::Matrix2f robot_cov = m_cov.block(0, 0, 2, 2);
-        // RCLCPP_INFO(this->get_logger(), "ROBOT PREDICTED POSE: (%lf, %lf)", robot_mean(0), robot_mean(1));
-        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(robot_cov);
-        double a_x = eigen_solver.eigenvalues()(0);
-        double a_y = eigen_solver.eigenvalues()(1);
-        // RCLCPP_INFO(this->get_logger(), "ROBOT COVARIANCE AXES LENGTHS: (%lf, %lf)", a_x, a_y);
-        Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
-        Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
-        tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
-        tf2::Quaternion quat_rot;
-        rot_mat.getRotation(quat_rot);
-        visualization_msgs::msg::Marker ellipse;
-        ellipse.type = visualization_msgs::msg::Marker::SPHERE;
-        ellipse.pose.position.x = robot_mean(0);
-        ellipse.pose.position.y = robot_mean(1);
-        ellipse.pose.position.z = 0;
-        ellipse.pose.orientation = tf2::toMsg(quat_rot);
-        // if(m_is_sim){
-        //     ellipse.pose.position.x = m_nav_x; // to overlay the map on top of the transform (GPS), especially in sim
-        //     ellipse.pose.position.y = m_nav_y;
-        // }
-        ellipse.scale.x = sqrt(a_x);
-        ellipse.scale.y = sqrt(a_y);
-        ellipse.scale.z = 0.5;
-        ellipse.color.a = 1;
-        ellipse.color.g = 1;
-        ellipse.header = m_global_header;
-        ellipse.header.frame_id = m_slam_frame_id;
-        ellipse.id = m_num_obj + 1;
-        ellipse_arr.markers.push_back(ellipse);
-
-        visualization_msgs::msg::Marker angle_marker;
-        angle_marker.type = visualization_msgs::msg::Marker::ARROW;
-        angle_marker.pose.position.x = robot_mean(0);
-        angle_marker.pose.position.y = robot_mean(1);
-        angle_marker.pose.position.z = 0;
-        tf2::Quaternion angle_quat;
-        angle_quat.setRPY(0, 0, m_state(2));
-        angle_marker.pose.orientation = tf2::toMsg(angle_quat);
-        // if(m_is_sim){
-        //     ellipse.pose.position.x = m_nav_x;
-        //     ellipse.pose.position.y = m_nav_y;
-        //     tf2::Quaternion nav_quat;
-        //     nav_quat.setRPY(0,0,m_nav_heading);
-        //     ellipse.pose.orientation = tf2::toMsg(nav_quat);
-        // }
-        angle_marker.scale.x = m_cov(2, 2);
-        angle_marker.scale.y = 0.2;
-        angle_marker.scale.z = 0.2;
-        angle_marker.color.a = 1;
-        angle_marker.header = m_global_header;
-        angle_marker.header.frame_id = m_slam_frame_id;
-        angle_marker.id = m_num_obj + 2;
-        ellipse_arr.markers.push_back(angle_marker);
+    marker_id = 0;
+    for (int i = 0; i < m_num_particles; i++){
+        // show particle itself
+        ellipse_arr.markers.extend(m_particles[i]->visualize_pose(m_global_header, m_slam_header_id, marker_id).markers);
+        if (i == m_best_particle_index){
+            // show particle and map
+            ellipse_arr.markers.extend(m_particles[i]->visualize_map(m_global_header, m_slam_header_id, marker_id).markers);
+        }
     }
+    m_map_cov_viz_pub->publish(ellipse_arr)
+}
+
+visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg::Header global_header, string slam_frame_id, int &id) {
+    visualization_msgs::msg::MarkerArray ellipse_arr;
+
+    visualization_msgs::msg::Marker ellipse;
+    ellipse.type = visualization_msgs::msg::Marker::SPHERE;
+    ellipse.pose.position.x = m_pose(0);
+    ellipse.pose.position.y = m_pose(1);
+    ellipse.pose.position.z = 0;
+    ellipse.pose.orientation = tf2::toMsg(quat_rot);
+
+    ellipse.scale.x = 0.5;
+    ellipse.scale.y = 0.5;
+    ellipse.scale.z = 0.5;
+    ellipse.color.a = 1;
+    ellipse.color.g = 1;
+    ellipse.header = global_header;
+    ellipse.header.frame_id = slam_frame_id;
+    ellipse.id = id_start++;
+    ellipse_arr.markers.push_back(ellipse);
+
+    visualization_msgs::msg::Marker angle_marker;
+    angle_marker.type = visualization_msgs::msg::Marker::ARROW;
+    angle_marker.pose.position.x = m_pose(0);
+    angle_marker.pose.position.y = m_pose(1);
+    angle_marker.pose.position.z = 0;
+    tf2::Quaternion angle_quat;
+    angle_quat.setRPY(0, 0, m_state(2));
+    angle_marker.pose.orientation = tf2::toMsg(angle_quat);
+
+    angle_marker.scale.x = 0.5;
+    angle_marker.scale.y = 0.2;
+    angle_marker.scale.z = 0.2;
+    angle_marker.color.a = 1;
+    angle_marker.header = global_header;
+    angle_marker.header.frame_id = slam_frame_id;
+    angle_marker.id = id_start++;
+    ellipse_arr.markers.push_back(angle_marker);
+
+    return ellipse_arr;
+}
+
+visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::Header local_header, string slam_frame_id, float new_obj_slam_thres, int &id_start) {
+    visualization_msgs::msg::MarkerArray ellipse_arr;
 
     // obstacle predictions
     for (int i = 0; i < m_num_obj; i++) {
-        Eigen::Vector2f obj_mean;
-        Eigen::Matrix2f obj_cov;
-        if (m_track_robot) {
-            obj_mean = m_state.segment(
-                3 + 2 * i,
-                2); // z coord is the label (will visualize the variance of that too to identify
-                    // possible bugs in its update, because it should not be changed)
-            obj_cov = m_cov.block(3 + 2 * i, 3 + 2 * i, 2, 2);
-        } else {
-            obj_mean = m_tracked_obstacles[i]->mean_pred;
-            obj_cov = m_tracked_obstacles[i]->cov;
-        }
+        Eigen::Vector2f obj_mean = m_tracked_obstacles[i]->mean_pred;
+        Eigen::Matrix2f obj_cov = m_tracked_obstacles[i]->cov;
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(obj_cov);
         double a_x = eigen_solver.eigenvalues()(0);
         double a_y = eigen_solver.eigenvalues()(1);
-        // RCLCPP_INFO(this->get_logger(), "OBJECT %d COVARIANCE AXES LENGTHS: (%lf, %lf)", i, a_x, a_y);
+
         Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
         Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
-        double cov_scale = m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
+        double cov_scale = new_obj_slam_thres; // to visualize the threshold where new obstacles are added
         tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
         tf2::Quaternion quat_rot;
         rot_mat.getRotation(quat_rot);
@@ -611,33 +638,29 @@ void ObjectTrackingMapPF::visualize_predictions() {
         ellipse.scale.z = 1;
         ellipse.color.a = 1;
         ellipse.color.r = 1;
-        ellipse.header = m_global_header;
-        if(m_track_robot){
-            ellipse.header.frame_id = m_slam_frame_id;
-        }
-        ellipse.id = i;
+        ellipse.header = global_header;
+        ellipse.header.frame_id = slam_frame_id;
+        ellipse.id = id_start++;
         ellipse_arr.markers.push_back(ellipse);
     }
-    m_map_cov_viz_pub->publish(ellipse_arr);
+
+    return ellipse_arr;
 }
 
 void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
-    if(msg->objects.size()==0) return;    
-    // RCLCPP_INFO(this->get_logger(), "GOT DATA");
+    if(msg->objects.size() == 0) return;    
 
     // Set up headers and transforms
     m_local_header = msg->objects[0].cloud.header;
-    m_global_header.frame_id = m_track_robot? m_slam_frame_id : m_global_frame_id;
+    m_global_header.frame_id = m_slam_frame_id;
     m_global_header.stamp = m_local_header.stamp;
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
 
-    // RCLCPP_INFO(this->get_logger(), "BEFORE GETTING ODOMETRY TF");
     m_lidar_map_tf = get_tf(m_global_frame_id, m_local_frame_id);
     m_map_lidar_tf = get_tf(m_local_frame_id, m_global_frame_id);
-    // RCLCPP_INFO(this->get_logger(), "GOT ODOMETRY TF");
 
-    if(m_track_robot && m_first_state) return;
+    if(m_first_state) return;
 
     std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles;
     for (all_seaing_interfaces::msg::LabeledObjectPointCloud obj : msg->objects) {
@@ -648,14 +671,14 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         pcl::fromROSMsg(obj.cloud, *local_obj_pcloud);
         for (pcl::PointXYZHSV &pt : local_obj_pcloud->points) {
             pcl::PointXYZHSV global_pt =
-                this->convert_to_global(pt);
+                all_seaing_perception::ObjectTrackingMap::convert_to_global(pt);
             global_obj_pcloud->push_back(global_pt);
         }
-        // pcl::transformPointCloud(*local_obj_pcloud, *global_obj_pcloud, m_lidar_map_tf);
         std::shared_ptr<ObjectCloud> obj_cloud(
             new ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
         detected_obstacles.push_back(obj_cloud);
     }
+
     // Make and publish untracked map
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> untracked_obs;
     std::vector<int> untracked_labels;
@@ -676,316 +699,10 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-    this->publish_map(m_local_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
+    all_seaing_perception::ObjectTrackingMap::publish_map(m_local_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
                       untracked_labels);
 
-    // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
-
-    Eigen::Matrix<float, 2, 2> Q{
-        {m_range_std, 0},
-        {0, m_bearing_std},
-    };
-    std::vector<std::vector<float>> p;
-    // RCLCPP_INFO(this->get_logger(), "COMPUTE WITH UNKNOWN CORRESPONDENCE");
-    for (std::shared_ptr<ObjectCloud> det_obs : detected_obstacles) {
-        float range, bearing;
-        int signature;
-        std::tie(range, bearing, signature) =
-            local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
-        p.push_back(std::vector<float>());
-        Eigen::Vector2f z_pred;
-        Eigen::MatrixXf Psi;
-        for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
-            if (m_track_robot) {
-                float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
-                float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);
-                float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_state(2));
-                Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, 3 + 2 * m_num_obj);
-                F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-                F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
-                Eigen::Matrix<float, 2, 5> h{
-                    {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
-                     std::sqrt(q) * d_y},
-                    {d_y, -d_x, -1, -d_y, d_x},
-                };
-                // Do not store vectors, since they don't compute covariance with other obstacles in
-                // the same detection batch
-                Eigen::MatrixXf H = h * F / q;
-
-                Psi = H * m_cov * H.transpose() + Q;
-            } else {
-                float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_nav_x;
-                float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_nav_y;
-                float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
-                // Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 2*m_num_obj);
-                // F.block(0, 2*tracked_id, 2, 2) = Eigen::MatrixXf::Identity(2,2);
-                Eigen::Matrix<float, 2, 2> h{
-                    {std::sqrt(q) * d_x, std::sqrt(q) * d_y},
-                    {-d_y, d_x},
-                };
-                // Do not store vectors, since they don't compute covariance with other obstacles in
-                // the same detection batch
-                //  Eigen::MatrixXf H = h*F/q;
-                Eigen::MatrixXf H = h / q;
-                Psi = H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q;
-            }
-
-            Eigen::Vector2f z_actual(range, bearing);
-
-            p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
-                               (z_actual - z_pred));
-        }
-    }
-
-    // Assign each detection to a tracked or new object using the computed probabilities (actually
-    // -logs?)
-    std::vector<int> match(detected_obstacles.size(), -1);
-    float min_p = 0;
-    std::unordered_set<int> chosen_detected, chosen_tracked;
-    while (min_p < m_new_obj_slam_thres) {
-        min_p = m_new_obj_slam_thres;
-        std::pair<int, int> best_match = std::make_pair(-1, -1);
-        for (size_t i = 0; i < detected_obstacles.size(); i++) {
-            if (chosen_detected.count(i))
-                continue;
-            for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
-                if (chosen_tracked.count(tracked_id) ||
-                    m_tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
-                    continue;
-                // RCLCPP_INFO(this->get_logger(), "P(%d, %d)=%lf", i, tracked_id,
-                // p[i][tracked_id]);
-                if (p[i][tracked_id] < min_p) {
-                    best_match = std::make_pair(i, tracked_id);
-                    min_p = p[i][tracked_id];
-                }
-            }
-        }
-        if (min_p < m_new_obj_slam_thres) {
-            // RCLCPP_INFO(this->get_logger(), "MATCHING (%d, %d), with p: %lf", best_match.first,
-            // best_match.second, p[best_match.first][best_match.second]);
-            match[best_match.first] = best_match.second;
-            chosen_tracked.insert(best_match.second);
-            chosen_detected.insert(best_match.first);
-        }
-    }
-
-    // Update vectors, now with known correspondence
-    //  RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN CORRESPONDENCE");
-    for (size_t i = 0; i < detected_obstacles.size(); i++) {
-        float range, bearing;
-        int signature;
-        std::tie(range, bearing, signature) = local_to_range_bearing_signature(
-            detected_obstacles[i]->local_centroid, detected_obstacles[i]->label);
-        Eigen::Vector2f z_actual(range, bearing);
-        if (match[i] == -1) {
-            // increase object count and expand & initialize matrices
-            m_num_obj++;
-            // add object to tracked obstacles vector
-            detected_obstacles[i]->id = m_obstacle_id++;
-            m_tracked_obstacles.push_back(detected_obstacles[i]);
-            Eigen::Matrix<float, 2, 2> init_new_cov{
-                {(float)m_init_new_cov, 0},
-                {0, (float)m_init_new_cov},
-            };
-            if (m_track_robot) {
-                m_state.conservativeResize(3 + 2 * m_num_obj);
-                m_state.tail(2) = Eigen::Vector2f(m_state(0), m_state(1)) +
-                                  range * Eigen::Vector2f(std::cos(bearing + m_state(2)),
-                                                          std::sin(bearing + m_state(2)));
-                m_cov.conservativeResizeLike(
-                    Eigen::MatrixXf::Zero(3 + 2 * m_num_obj, 3 + 2 * m_num_obj));
-                m_cov.bottomRightCorner(2, 2) = init_new_cov;
-            } else {
-                m_tracked_obstacles.back()->mean_pred =
-                    Eigen::Vector2f(m_nav_x, m_nav_y) +
-                    range * Eigen::Vector2f(std::cos(bearing + m_nav_heading),
-                                            std::sin(bearing + m_nav_heading));
-                m_tracked_obstacles.back()->cov = init_new_cov;
-            }
-        }
-        int tracked_id = match[i] > 0 ? match[i] : m_num_obj - 1;
-        if (m_track_robot) {
-            float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
-            float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);
-            float q = d_x * d_x + d_y * d_y;
-            Eigen::Matrix<float, 2, 5> h{
-                {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
-                 std::sqrt(q) * d_y},
-                {d_y, -d_x, -1, -d_y, d_x},
-            };
-            Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_state(2));
-            Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, 3 + 2 * m_num_obj);
-            F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-            F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
-            Eigen::MatrixXf H = h * F / q;
-            Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
-            m_state += K * (z_actual - z_pred);
-            m_cov =
-                (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
-        } else {
-            float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_nav_x;
-            float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_nav_y;
-            float q = d_x * d_x + d_y * d_y;
-            Eigen::Matrix<float, 2, 2> h{
-                {std::sqrt(q) * d_x, std::sqrt(q) * d_y},
-                {-d_y, d_x},
-            };
-            Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
-            Eigen::MatrixXf H = h / q;
-            Eigen::MatrixXf K =
-                m_tracked_obstacles[tracked_id]->cov * H.transpose() *
-                (H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q).inverse();
-            m_tracked_obstacles[tracked_id]->mean_pred += K * (z_actual - z_pred);
-            m_tracked_obstacles[tracked_id]->cov =
-                (Eigen::Matrix2f::Identity() - K * H) * m_tracked_obstacles[tracked_id]->cov;
-            detected_obstacles[i]->mean_pred = m_tracked_obstacles[tracked_id]->mean_pred;
-            detected_obstacles[i]->cov = m_tracked_obstacles[tracked_id]->cov;
-        }
-
-        // update data for matched obstacles (we'll update position after we update SLAM with all
-        // points)
-        detected_obstacles[i]->id = m_tracked_obstacles[tracked_id]->id;
-        m_tracked_obstacles[tracked_id] = detected_obstacles[i];
-    }
-
-    // Update all (new and old, since they also have correlation with each other) objects global
-    // positions (including the cloud, and then the local points respectively)
-    pcl::PointXYZ p0(0, 0, 0);
-    float avg_dist = 0;
-    for (size_t i = 0; i < m_tracked_obstacles.size(); i++) {
-        pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
-        if (m_track_robot) {
-            upd_glob_centr.x = m_state[3 + 2 * i];
-            upd_glob_centr.y =
-                m_state[3 + 2 * i + 1]; // to not lose the z coordinate, it's useful for checking if
-                                        // the objects should be in the camera frame
-        } else {
-            upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
-            upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
-        }
-        pcl::PointXYZ upd_loc_centr;
-        upd_loc_centr = this->convert_to_local(upd_glob_centr);
-        // RCLCPP_INFO(this->get_logger(), "ROBOT POSE: (%lf, %lf, %lf), TRACKED OBSTACLE %d GLOBAL
-        // COORDS: (%lf, %lf), LOCAL COORDS: (%lf, %lf)", m_nav_x, m_nav_y, m_nav_heading,
-        // m_tracked_obstacles[i]->id, upd_glob_centr.x, upd_glob_centr.y, upd_loc_centr.x,
-        // upd_loc_centr.y);
-        // move everything based on the difference between that and the previous assumed global
-        // (then local) centroid
-        pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(
-            new pcl::PointCloud<pcl::PointXYZHSV>);
-        for (pcl::PointXYZHSV &global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points) {
-            // TODO: Find a way to correctly transfer the z coordinate from the local detection using the transforms
-            global_pt.x += upd_glob_centr.x - m_tracked_obstacles[i]->global_centroid.x;
-            global_pt.y += upd_glob_centr.y - m_tracked_obstacles[i]->global_centroid.y;
-            upd_local_obj_pcloud->push_back(
-                this->convert_to_local(global_pt));
-        }
-        // pcl::transformPointCloud(*m_tracked_obstacles[i]->global_pcloud_ptr, *m_tracked_obstacles[i]->local_pcloud_ptr, m_map_lidar_tf);
-        m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
-        m_tracked_obstacles[i]->local_centroid = upd_loc_centr;
-        avg_dist += pcl::euclideanDistance(p0, upd_loc_centr) / ((float)m_tracked_obstacles.size());
-    }
-
-    // Filter old obstacles
-    std::vector<int> to_remove;
-    std::vector<int> to_keep;
-    std::vector<int> to_keep_flat = {0, 1, 2};
-    for (int tracked_id = 0; tracked_id < static_cast<int>(m_tracked_obstacles.size());
-         tracked_id++) {
-        if (chosen_tracked.count(tracked_id)) {
-            to_keep.push_back(tracked_id);
-            if (m_track_robot) {
-                to_keep_flat.insert(to_keep_flat.end(),
-                                    {3 + 2 * tracked_id, 3 + 2 * tracked_id + 1});
-            }
-            continue;
-        }
-        // Check if in FoV (which'll mean it's dead, at least temporarily)
-        geometry_msgs::msg::Point lidar_point;
-        lidar_point.x = m_tracked_obstacles[tracked_id]->local_centroid.x;
-        lidar_point.y = m_tracked_obstacles[tracked_id]->local_centroid.y;
-        lidar_point.z = m_tracked_obstacles[tracked_id]->local_centroid.z;
-        geometry_msgs::msg::Point camera_point =
-            lidar_point; // ALREADY IN THE SAME FRAME, WAS TRANSFORMED BEFORE BEING PUBLISHED BY
-                         // bbox_project_pcloud.cpp
-        cv::Point2d xy_rect =
-            m_is_sim ? m_cam_model.project3dToPixel(
-                           cv::Point3d(camera_point.y, camera_point.z, -camera_point.x))
-                     : m_cam_model.project3dToPixel(
-                           cv::Point3d(camera_point.x, camera_point.y, camera_point.z));
-        ;
-        // RCLCPP_INFO(this->get_logger(), "OBSTACLE ID %d (%lf, %lf, %lf)->(%lf, %lf)",
-        // m_tracked_obstacles[tracked_id]->id, lidar_point.x, lidar_point.y, lidar_point.z,
-        // xy_rect.x, xy_rect.y);
-        if (((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-             (xy_rect.y < m_cam_model.cameraInfo().height) && (lidar_point.x >= 0)) ||
-            !m_check_fov) {
-            // Dead
-            if (m_tracked_obstacles[tracked_id]->is_dead) {
-                // Was also dead before, add time dead
-                // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d TIME PERIOD FROM PREVIOUS DEAD: %lf
-                // - %lf", tracked_id, m_tracked_obstacles[tracked_id]->last_dead.seconds(),
-                // rclcpp::Time(msg->objects[0].time).seconds());
-                m_tracked_obstacles[tracked_id]->time_dead =
-                    rclcpp::Time(msg->objects[0].time) -
-                    m_tracked_obstacles[tracked_id]->last_dead +
-                    m_tracked_obstacles[tracked_id]->time_dead;
-                // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d DEAD FOR %lf SECONDS, OBSTACLE DROP
-                // THRESHOLD: %lf", tracked_id,
-                // m_tracked_obstacles[tracked_id]->time_dead.seconds(), m_obstacle_drop_thresh);
-                if (m_tracked_obstacles[tracked_id]->time_dead.seconds() >
-                    (m_normalize_drop_thresh ? (m_obstacle_drop_thresh *
-                        (pcl::euclideanDistance(p0,
-                                                m_tracked_obstacles[tracked_id]->local_centroid) /
-                         avg_dist) *
-                        m_normalize_drop_dist) : m_obstacle_drop_thresh)) {
-                    // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d/%d DROPPED", tracked_id,
-                    // m_num_obj);
-                    to_remove.push_back(tracked_id);
-                    continue;
-                }
-            }
-            m_tracked_obstacles[tracked_id]->is_dead = true;
-            m_tracked_obstacles[tracked_id]->last_dead = msg->objects[0].time;
-        } else {
-            m_tracked_obstacles[tracked_id]->is_dead = false;
-        }
-        to_keep.push_back(tracked_id);
-        if (m_track_robot) {
-            to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * tracked_id, 3 + 2 * tracked_id + 1});
-        }
-    }
-
-    // update vectors & matrices
-    if (!to_remove.empty()) {
-        std::vector<std::shared_ptr<ObjectCloud>> new_obj;
-
-        for (int i : to_keep) {
-            new_obj.push_back(m_tracked_obstacles[i]);
-        }
-
-        if (m_track_robot) {
-            Eigen::MatrixXf new_state(3 + 2 * to_keep.size(), 1);
-            Eigen::MatrixXf new_cov(3 + 2 * to_keep.size(), 3 + 2 * to_keep.size());
-            int new_i = 0;
-            for (int i : to_keep_flat) {
-                new_state(new_i) = m_state(i);
-                int new_j = 0;
-                for (int j : to_keep_flat) {
-                    new_cov(new_i, new_j) = m_cov(i, j);
-                    new_j++;
-                }
-                new_i++;
-            }
-            m_state = new_state;
-            m_cov = new_cov;
-        }
-
-        m_tracked_obstacles = new_obj;
-        m_num_obj = to_keep.size();
-    }
+    // TODO: FastSLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
 
     // Publish map with tracked obstacles
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
@@ -1015,37 +732,15 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         tracked_labels.push_back(t_ob->label);
         tracked_obs.push_back(tracked_ob);
     }
-    this->publish_map(m_local_header, m_global_header, "tracked", true, tracked_obs, m_tracked_map_pub,
+    all_seaing_perception::ObjectTrackingMap::publish_map(m_local_header, m_global_header, "tracked", true, tracked_obs, m_tracked_map_pub,
                       tracked_labels);
-    // RCLCPP_INFO(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
+    
     if(m_got_nav){
         this->visualize_predictions();
     }
-    if(m_track_robot && m_got_nav && m_got_odom){
+    if( m_got_nav && m_got_odom){
         publish_slam();
     }
-}
-
-void ObjectTrackingMapPF::publish_map(
-    std_msgs::msg::Header local_header, std_msgs::msg::Header global_header, std::string ns, bool is_labeled,
-    const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
-    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub,
-    std::vector<int> labels) {
-
-    all_seaing_interfaces::msg::ObstacleMap map_msg;
-    map_msg.ns = ns;
-    map_msg.local_header = local_header;
-    map_msg.header = global_header;
-    map_msg.is_labeled = is_labeled;
-    for (size_t i = 0; i < map.size(); i++) {
-        all_seaing_interfaces::msg::Obstacle det_obstacle;
-        map[i]->to_ros_msg(det_obstacle);
-        if (is_labeled) {
-            det_obstacle.label = labels[i];
-        }
-        map_msg.obstacles.push_back(det_obstacle);
-    }
-    pub->publish(map_msg);
 }
 
 ObjectTrackingMapPF::~ObjectTrackingMapPF() {}

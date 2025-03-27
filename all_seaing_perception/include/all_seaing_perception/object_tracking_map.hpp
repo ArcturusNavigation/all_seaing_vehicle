@@ -102,8 +102,8 @@ private:
     void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
 
     // Get transform from source frame to target frame
-    geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
-                                                const std::string &in_src_frame);
+    geometry_msgs::msg::TransformStamped ObjectTrackingMap::get_tf(const std::unique_ptr<tf2_ros::Buffer> tf_buffer,
+        const std::string &in_target_frame, const std::string &in_src_frame);
                                                 
     std::tuple<double, double, double> compute_transform_from_to(double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta);
     std::tuple<double, double, double> compose_transforms(std::tuple<double, double, double> t1, std::tuple<double, double, double> t2);
@@ -111,13 +111,17 @@ private:
     
     void publish_slam();
 
+    // Returns the matchings from detections to map and the sets of indices of chosen tracked and detected obstacles
+    std::tuple<vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+        vector<vector<int>> p, float new_obj_thres);
+
     // Member variables
     std::vector<std::shared_ptr<ObjectCloud>> m_tracked_obstacles;
     std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header;
     int m_obstacle_id;
-    double m_obstacle_seg_thresh;
     double m_obstacle_drop_thresh;
     double m_init_new_cov;
     bool m_track_robot, m_imu_predict, m_gps_update;

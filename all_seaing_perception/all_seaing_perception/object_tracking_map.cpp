@@ -304,8 +304,8 @@ void ObjectTrackingMap::odom_callback() {
     //update odometry transforms
     //TODO: add a flag for each one that says if they succedeed, to know to continue or not
     // RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
-    m_map_lidar_tf = get_tf(m_global_frame_id, m_local_frame_id);
-    m_lidar_map_tf = get_tf(m_local_frame_id, m_global_frame_id);
+    m_map_lidar_tf = get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_lidar_map_tf = get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     m_nav_z = m_map_lidar_tf.transform.translation.z;
     tf2::Quaternion quat;
@@ -432,11 +432,11 @@ void ObjectTrackingMap::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_m
     m_cam_model.fromCameraInfo(info_msg);
 }
 
-geometry_msgs::msg::TransformStamped ObjectTrackingMap::get_tf(const std::string &in_target_frame,
+geometry_msgs::msg::TransformStamped ObjectTrackingMap::get_tf(const std::unique_ptr<tf2_ros::Buffer> tf_buffer, const std::string &in_target_frame,
                                                                const std::string &in_src_frame) {
     geometry_msgs::msg::TransformStamped tf;
     try {
-        tf = m_tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
+        tf = tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
     } catch (tf2::TransformException &ex) {
         RCLCPP_INFO(this->get_logger(), "%s", ex.what());
     }
@@ -634,6 +634,39 @@ void ObjectTrackingMap::visualize_predictions() {
     m_map_cov_viz_pub->publish(ellipse_arr);
 }
 
+std::tuple<vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+    std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+    vector<vector<int>> p, float new_obj_thres){
+    // Assign each detection to a tracked or new object using the computed probabilities (actually -logs?)
+    std::vector<int> match(detected_obstacles.size(), -1);
+    float min_p = 0;
+    std::unordered_set<int> chosen_detected, chosen_tracked;
+    while (min_p < new_obj_thres) {
+        min_p = new_obj_thres;
+        std::pair<int, int> best_match = std::make_pair(-1, -1);
+        for (size_t i = 0; i < detected_obstacles.size(); i++) {
+            if (chosen_detected.count(i))
+                continue;
+            for (int tracked_id = 0; tracked_id < tracked_obstacles.size(); tracked_id++) {
+                if (chosen_tracked.count(tracked_id) ||
+                    tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
+                    continue;
+                // RCLCPP_INFO(this->get_logger(), "P(%d, %d)=%lf", i, tracked_id, p[i][tracked_id]);
+                if (p[i][tracked_id] < min_p) {
+                    best_match = std::make_pair(i, tracked_id);
+                    min_p = p[i][tracked_id];
+                }
+            }
+        }
+        if (min_p < new_obj_thres) {
+            // RCLCPP_INFO(this->get_logger(), "MATCHING (%d, %d), with p: %lf", best_match.first, best_match.second, p[best_match.first][best_match.second]);
+            match[best_match.first] = best_match.second;
+            chosen_tracked.insert(best_match.second);
+            chosen_detected.insert(best_match.first);
+        }
+    }
+}
+
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
     if(msg->objects.size()==0) return;    
     // RCLCPP_INFO(this->get_logger(), "GOT DATA");
@@ -646,8 +679,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     m_got_local_frame = true;
 
     // RCLCPP_INFO(this->get_logger(), "BEFORE GETTING ODOMETRY TF");
-    m_lidar_map_tf = get_tf(m_global_frame_id, m_local_frame_id);
-    m_map_lidar_tf = get_tf(m_local_frame_id, m_global_frame_id);
+    m_lidar_map_tf = get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_map_lidar_tf = get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
     // RCLCPP_INFO(this->get_logger(), "GOT ODOMETRY TF");
 
     if(m_track_robot && m_first_state) return;
@@ -752,37 +785,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
     }
 
-    // Assign each detection to a tracked or new object using the computed probabilities (actually
-    // -logs?)
-    std::vector<int> match(detected_obstacles.size(), -1);
-    float min_p = 0;
+    vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
-    while (min_p < m_new_obj_slam_thres) {
-        min_p = m_new_obj_slam_thres;
-        std::pair<int, int> best_match = std::make_pair(-1, -1);
-        for (size_t i = 0; i < detected_obstacles.size(); i++) {
-            if (chosen_detected.count(i))
-                continue;
-            for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
-                if (chosen_tracked.count(tracked_id) ||
-                    m_tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
-                    continue;
-                // RCLCPP_INFO(this->get_logger(), "P(%d, %d)=%lf", i, tracked_id,
-                // p[i][tracked_id]);
-                if (p[i][tracked_id] < min_p) {
-                    best_match = std::make_pair(i, tracked_id);
-                    min_p = p[i][tracked_id];
-                }
-            }
-        }
-        if (min_p < m_new_obj_slam_thres) {
-            // RCLCPP_INFO(this->get_logger(), "MATCHING (%d, %d), with p: %lf", best_match.first,
-            // best_match.second, p[best_match.first][best_match.second]);
-            match[best_match.first] = best_match.second;
-            chosen_tracked.insert(best_match.second);
-            chosen_detected.insert(best_match.first);
-        }
-    }
+    std::tie(match, chosen_detected, chosen_tracked) = greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
 
     // Update vectors, now with known correspondence
     //  RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN CORRESPONDENCE");
@@ -889,7 +894,6 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(
             new pcl::PointCloud<pcl::PointXYZHSV>);
         for (pcl::PointXYZHSV &global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points) {
-            // TODO: Find a way to correctly transfer the z coordinate from the local detection using the transforms
             global_pt.x += upd_glob_centr.x - m_tracked_obstacles[i]->global_centroid.x;
             global_pt.y += upd_glob_centr.y - m_tracked_obstacles[i]->global_centroid.y;
             upd_local_obj_pcloud->push_back(

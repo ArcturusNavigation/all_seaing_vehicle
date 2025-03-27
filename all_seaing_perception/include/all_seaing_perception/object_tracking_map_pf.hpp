@@ -52,6 +52,7 @@
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
 
 #include "all_seaing_perception/obstacle.hpp"
+#include "all_seaing_perception/object_tracking_map.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
@@ -59,65 +60,58 @@
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 
-//custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)
-struct ObjectCloud{
-    int id;
-    int label;
-    rclcpp::Time time_seen;
-    rclcpp::Time last_dead;
-    rclcpp::Duration time_dead = rclcpp::Duration(0,0);
-    bool is_dead;
-    pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_pcloud_ptr;
-    pcl::PointCloud<pcl::PointXYZHSV>::Ptr global_pcloud_ptr;
-    pcl::PointXYZ local_centroid;
-    pcl::PointXYZ global_centroid;
-    Eigen::Vector2f mean_pred;
-    Eigen::Matrix2f cov; 
+struct SLAMParticle{
+    Eigen::Vector3f m_pose;
+    int m_num_obj;
+    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> m_tracked_obstacles;// including EKF for each obstacle
+    int m_obstacle_id;
+    bool m_got_gps;
+    Eigen::Vector3f gps_mean;
+    Eigen::Matrix3f gps_cov;
 
-    ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc, pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob);
+    SLAMParticle(float init_x, float init_y, float init_theta);
 
-    void update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc);
-};
+    void sample_pose(double dx, double dy, double dtheta, float dt, float xy_noise, float theta_noise);
+    
+    void update_gps(double x, double y, double theta, float xy_uncertainty, float theta_uncertainty);
+
+    void update_map(std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
+        bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres,
+        bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model);
+
+    float gps_prob();
+
+    float map_prob();
+
+    float get_weight();
+
+    visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg::Header global_header, string slam_frame_id, int &id);
+
+    visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::Header global_header, string slam_frame_id, int &id_start);
+}
 
 class ObjectTrackingMapPF : public rclcpp::Node{
 private:
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
     void odom_callback();
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
-    void publish_map(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header, std::string ns, bool is_labeled,
-                     const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
-                     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub, std::vector<int> labels);
-    template <typename T>
-    T convert_to_global(T point);
-    template <typename T>
-    T convert_to_local(T point);
 
     void visualize_predictions();
 
-    typedef std::tuple<float, float, int> det_rbs;
-    template <typename T>
-    det_rbs local_to_range_bearing_signature(T point, int label);
-
     // Get intrinsic camera model information needed for projection
     void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
-
-    // Get transform from source frame to target frame
-    geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
-                                                const std::string &in_src_frame);
-                                                
-    std::tuple<double, double, double> compute_transform_from_to(double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta);
-    std::tuple<double, double, double> compose_transforms(std::tuple<double, double, double> t1, std::tuple<double, double, double> t2);
-    std::tuple<double, double, double> apply_transform_from_to(double x, double y, double theta, double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta);
     
     void publish_slam();
 
     // Member variables
-    std::vector<std::shared_ptr<ObjectCloud>> m_tracked_obstacles;
+    int m_num_particles;
+    std::vector<std::shared_ptr<SLAMParticle>> m_particles;
+    int m_best_particle_index;
+
     std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header;
     int m_obstacle_id;
-    double m_obstacle_seg_thresh;
     double m_obstacle_drop_thresh;
     double m_init_new_cov;
     bool m_track_robot, m_imu_predict, m_gps_update;
@@ -151,9 +145,6 @@ private:
     float m_gps_xy_noise, m_gps_theta_noise;
     float m_imu_xy_noise, m_imu_theta_noise;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
-    int m_num_obj;
-    Eigen::VectorXf m_state;//obstacle map
-    Eigen::MatrixXf m_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom;
     nav_msgs::msg::Odometry m_last_odom_msg;
 

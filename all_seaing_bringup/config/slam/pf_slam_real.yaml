@@ -2,6 +2,7 @@ object_tracking_map:
   ros__parameters:
     global_frame_id: "map"
     slam_frame_id: "slam_map"
+    num_particles: 100
     obstacle_drop_thresh: 2.0
     normalize_drop_thresh: False
     range_uncertainty: 50.0
