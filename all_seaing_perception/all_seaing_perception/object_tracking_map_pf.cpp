@@ -288,7 +288,11 @@ SLAMParticle::SLAMParticle(float init_x, float init_y, float init_theta){
 }
 
 std::shared_ptr<SLAMParticle> clone(std::shared_ptr<SLAMParticle> orig){
-    // TODO: slam particle pointer clone function
+    std::shared_ptr<SLAMParticle> new_particle = std::make_shared<SLAMParticle>(*orig);
+    new_particle->m_tracked_obstacles = std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>>();
+    for (std::shared_ptr<all_seaing_perception::ObjectCloud> orig_ocl : orig->m_tracked_obstacles){
+        new_particle->m_tracked_obstacles.push_back(all_seaing_perception::clone(orig_ocl));
+    }
 }
 
 template <typename T>

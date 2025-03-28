@@ -125,7 +125,10 @@ ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV
 }
 
 std::shared_ptr<ObjectCloud> clone(std::shared_ptr<ObjectCloud> orig){
-    // TODO: object cloud clone function
+    std::shared_ptr<ObjectCloud> new_ocl = std::make_shared<ObjectCloud>(*orig);
+    new_ocl.local_pcloud_ptr = (*orig->local_pcloud_ptr).makeShared();
+    new_ocl.global_pcloud_ptr = (*orig->global_pcloud_ptr).makeShared();
+    return new_ocl;
 }
 
 void ObjectCloud::update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc) {
@@ -671,11 +674,11 @@ std::tuple<vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy
 }
 
 std::tuple<float, vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+    std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+    vector<vector<float>> p, vector<vector<float>> probs, float new_obj_thres){
     // Compute weight of particle based on the probability of the correspondence of matched obstacles (detections<->map)
     // which is the product of the probabilities of each detection given the measurement prediction and covariance
     // (computed by the EKFs of the individual obstacles) 
-    std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
-    vector<vector<float>> p, vector<vector<float>> probs, float new_obj_thres){
         vector<int> match;
         std::unordered_set<int> chosen_detected, chosen_tracked;
         std::tie(match, chosen_detected, chosen_tracked) = greedy_data_association(tracked_obstacles, detected_obstacles, p, new_obj_thres);
