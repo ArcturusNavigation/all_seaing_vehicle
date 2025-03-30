@@ -54,7 +54,7 @@
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
 
 #include "all_seaing_perception/obstacle.hpp"
-#include "all_seaing_perception/object_tracking_map.hpp"
+#include "all_seaing_perception/object_tracking_shared.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
@@ -90,23 +90,23 @@ struct SLAMParticle{
 
     void reset_gps();
 
-    void update_map(std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
+    void update_map(std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
         bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres,
         bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model,
         geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tf);
 
-    float mahalanobis_to_prob(float mahalanobis_dist, Eigen::VectorXf cov);
+    float mahalanobis_to_prob(float mahalanobis_dist, Eigen::MatrixXf cov);
 
-    float prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::VectorXf cov);
+    float prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::MatrixXf cov);
 
     float gps_prob(bool include_odom_theta);
 
     float get_weight(bool include_odom_theta);
 
-    visualization_msgs::msg::MarkerArray visualize_pose(std_msgs::msg::Header global_header, string slam_frame_id, int &id);
+    visualization_msgs::msg::MarkerArray visualize_pose(std_msgs::msg::Header global_header, std::string slam_frame_id, int &id_start);
 
-    visualization_msgs::msg::MarkerArray visualize_map(std_msgs::msg::Header global_header, string slam_frame_id, int &id_start);
-}
+    visualization_msgs::msg::MarkerArray visualize_map(std_msgs::msg::Header global_header, std::string slam_frame_id, float new_obj_slam_thres, int &id_start);
+};
 
 std::shared_ptr<SLAMParticle> clone(std::shared_ptr<SLAMParticle> orig);
 
@@ -115,6 +115,10 @@ private:
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
     void odom_callback();
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
+    template <typename T>
+    T convert_to_global(T point);
+    template <typename T>
+    T convert_to_local(T point);
 
     void visualize_predictions();
 

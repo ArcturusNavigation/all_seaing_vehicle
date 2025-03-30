@@ -130,11 +130,11 @@ void ObjectTrackingMapPF::publish_slam(){
         t.child_frame_id = m_global_frame_id;
         double shift_x, shift_y, shift_theta;
         // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
-        std::tie(shift_x, shift_y, shift_theta) = all_seaing_perception::ObjectTrackingMap::compose_transforms(std::make_tuple(
+        std::tie(shift_x, shift_y, shift_theta) = all_seaing_perception::compose_transforms(std::make_tuple(
                                                     m_particles[m_best_particle_index]->m_pose(0),
                                                     m_particles[m_best_particle_index]->m_pose(1),
                                                     m_particles[m_best_particle_index]->m_pose(2)),
-                                                    all_seaing_perception::ObjectTrackingMap::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+                                                    all_seaing_perception::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
         t.transform.translation.x = shift_x;
         t.transform.translation.y = shift_y;
         t.transform.translation.z = 0;
@@ -213,8 +213,8 @@ void ObjectTrackingMapPF::odom_callback() {
 
     //update odometry transforms
     // RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
-    m_map_lidar_tf = all_seaing_perception::ObjectTrackingMap::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
-    m_lidar_map_tf = all_seaing_perception::ObjectTrackingMap::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    m_map_lidar_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_lidar_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     m_nav_z = m_map_lidar_tf.transform.translation.z;
     tf2::Quaternion quat;
@@ -234,7 +234,7 @@ void ObjectTrackingMapPF::odom_callback() {
 
     if(m_first_state){
         for (int i = 0; i < m_num_particles; i++){
-            m_particles.push_back(std::make_shared<SLAMParticle>(m_nav_x, m_nav_y, m_nav_heading))
+            m_particles.push_back(std::make_shared<SLAMParticle>(m_nav_x, m_nav_y, m_nav_heading));
         }
         m_weights = std::vector<float>(m_num_particles, 1);
         m_first_state = false;
@@ -291,8 +291,9 @@ std::shared_ptr<SLAMParticle> clone(std::shared_ptr<SLAMParticle> orig){
     std::shared_ptr<SLAMParticle> new_particle = std::make_shared<SLAMParticle>(*orig);
     new_particle->m_tracked_obstacles = std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>>();
     for (std::shared_ptr<all_seaing_perception::ObjectCloud> orig_ocl : orig->m_tracked_obstacles){
-        new_particle->m_tracked_obstacles.push_back(all_seaing_perception::clone(orig_ocl));
+        new_particle->m_tracked_obstacles.push_back(clone(orig_ocl));
     }
+    return new_particle;
 }
 
 template <typename T>
@@ -311,9 +312,9 @@ T SLAMParticle::convert_to_global(T point, geometry_msgs::msg::TransformStamped 
     // point initially in map frame
     // want slam_map->map (then will compose it with slam->point)
     // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
-    std::tuple<double, double, double> slam_to_map_transform = compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)), compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+    std::tuple<double, double, double> slam_to_map_transform = all_seaing_perception::compose_transforms(std::make_tuple(m_pose(0), m_pose(1), m_pose(2)), all_seaing_perception::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
     double th; //uselesss
-    std::tie(act_point.x, act_point.y, th) = compose_transforms(slam_to_map_transform, std::make_tuple(point.x, point.y, 0));
+    std::tie(act_point.x, act_point.y, th) = all_seaing_perception::compose_transforms(slam_to_map_transform, std::make_tuple(point.x, point.y, 0));
     return act_point;
 }
 
@@ -321,20 +322,50 @@ template <typename T>
 T SLAMParticle::convert_to_local(T point, geometry_msgs::msg::TransformStamped map_lidar_tf) {
     T new_point = point; // to keep color-related data
     T act_point = point;
-    if(m_track_robot){
-        // point initially in slam_map frame
-        // want map->slam_map (then will compose it with slam->point)
-        // (map->robot)@(robot->slam_map) = (map->robot)@inv(slam_map->robot)
-        std::tuple<double, double, double> map_to_slam_transform = compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading), compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0));
-        double th; //uselesss
-        std::tie(act_point.x, act_point.y, th) = compose_transforms(map_to_slam_transform, std::make_tuple(point.x, point.y, 0));
-    }
+    // point initially in slam_map frame
+    // want map->slam_map (then will compose it with slam->point)
+    // (map->robot)@(robot->slam_map) = (map->robot)@inv(slam_map->robot)
+    std::tuple<double, double, double> map_to_slam_transform = all_seaing_perception::compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading), all_seaing_perception::compute_transform_from_to(m_pose(0), m_pose(1), m_pose(2), 0, 0, 0));
+    double th; //uselesss
+    std::tie(act_point.x, act_point.y, th) = all_seaing_perception::compose_transforms(map_to_slam_transform, std::make_tuple(point.x, point.y, 0));
     geometry_msgs::msg::Point gb_pt_msg;
     gb_pt_msg.x = act_point.x;
     gb_pt_msg.y = act_point.y;
     gb_pt_msg.z = act_point.z;
     geometry_msgs::msg::Point lc_pt_msg;
     tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, map_lidar_tf);
+    new_point.x = lc_pt_msg.x;
+    new_point.y = lc_pt_msg.y;
+    new_point.z = lc_pt_msg.z;
+    return new_point;
+}
+
+template <typename T>
+T ObjectTrackingMapPF::convert_to_global(T point) {
+    T new_point = point; // to keep color-related data
+    geometry_msgs::msg::Point lc_pt_msg;
+    lc_pt_msg.x = point.x;
+    lc_pt_msg.y = point.y;
+    lc_pt_msg.z = point.z;
+    geometry_msgs::msg::Point gb_pt_msg;
+    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_lidar_map_tf);
+    new_point.x = gb_pt_msg.x;
+    new_point.y = gb_pt_msg.y;
+    new_point.z = gb_pt_msg.z;
+    T act_point = new_point;
+    return act_point;
+}
+
+template <typename T>
+T ObjectTrackingMapPF::convert_to_local(T point) {
+    T new_point = point; // to keep color-related data
+    T act_point = point;
+    geometry_msgs::msg::Point gb_pt_msg;
+    gb_pt_msg.x = act_point.x;
+    gb_pt_msg.y = act_point.y;
+    gb_pt_msg.z = act_point.z;
+    geometry_msgs::msg::Point lc_pt_msg;
+    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_lidar_tf);
     new_point.x = lc_pt_msg.x;
     new_point.y = lc_pt_msg.y;
     new_point.z = lc_pt_msg.z;
@@ -356,13 +387,13 @@ void SLAMParticle::sample_pose(double vx, double vy, double omega, double dt, fl
     std::normal_distribution<double> omega_normal{0, omega_noise_coeff*omega};
     std::normal_distribution<double> theta_normal{0, theta_noise_coeff*omega};
 
-    double vx_sample = vx + gen(vx_normal);
-    double vy_sample = vy + gen(vy_normal);
-    double omega_sample = omega + gen(omega_normal);
-    double theta_noise_sample = gen(theta_normal);
+    double vx_sample = vx + vx_normal(gen);
+    double vy_sample = vy + vy_normal(gen);
+    double omega_sample = omega + omega_normal(gen);
+    double theta_noise_sample = theta_normal(gen);
 
     // compute new pose
-    std::tie(m_pose(0), m_pose(1), m_pose(2)) = all_seaing_perception::ObjectTrackingMap::compose_transforms(std::make_tuple<double, double, double>(m_pose(0), m_pose(1), m_pose(2)),
+    std::tie(m_pose(0), m_pose(1), m_pose(2)) = all_seaing_perception::compose_transforms(std::make_tuple<double, double, double>(m_pose(0), m_pose(1), m_pose(2)),
                                                                                                                 std::make_tuple<double, double, double>(vx_sample*dt, vy_sample*dt, omega_sample*dt+theta_noise_sample));
 }
 
@@ -404,11 +435,11 @@ void SLAMParticle::reset_gps(){
     m_got_nav = false;
 }
 
-float mahalanobis_to_prob(float mahalanobis_dist, Eigen::VectorXf cov){
+float SLAMParticle::mahalanobis_to_prob(float mahalanobis_dist, Eigen::MatrixXf cov){
     return (1/sqrt((2*((float)M_PI)*cov).determinant()))*exp(-(1/((float)2))*mahalanobis_dist);
 }
 
-float prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::VectorXf cov){
+float SLAMParticle::prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::MatrixXf cov){
     return mahalanobis_to_prob((measurement-mean).transpose()*cov.inverse()*(measurement-mean), cov);
 }
 
@@ -427,7 +458,7 @@ float SLAMParticle::get_weight(bool include_odom_theta){
     return m_weight*this->gps_prob(include_odom_theta);
 }
 
-void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
+void SLAMParticle::update_map(std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
     bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres,
     bool check_fov, float obstacle_drop_thres, bool normalize_drop_dist, image_geometry::PinholeCameraModel cam_model,
     geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tf){
@@ -438,11 +469,11 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
     };
 
     std::vector<std::vector<float>> p, probs;
-    for (std::shared_ptr<ObjectCloud> det_obs : detected_obstacles) {
+    for (std::shared_ptr<all_seaing_perception::ObjectCloud> det_obs : detected_obstacles) {
         float range, bearing;
         int signature;
         std::tie(range, bearing, signature) =
-            all_seaing_perception::ObjectTrackingMap::local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
+            all_seaing_perception::local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
         p.push_back(std::vector<float>());
         probs.push_back(std::vector<float>());
         Eigen::Vector2f z_pred;
@@ -469,20 +500,20 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
             p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
                                (z_actual - z_pred));
             probs.back().push_back(this->prob_normal(z_actual, z_pred, Psi));
-            min_unassigned_prob = min(min_unassigned_prob, this->mahalanobis_to_prob(new_obj_slam_thres, Psi))
+            min_unassigned_prob = std::min(min_unassigned_prob, this->mahalanobis_to_prob(new_obj_slam_thres, Psi));
         }
         probs.back().push_back(min_unassigned_prob);
     }
 
-    vector<int> match;
+    std::vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
-    std::tie(m_weight, match, chosen_detected, chosen_tracked) = all_seaing_perception::ObjectTrackingMap::greedy_data_association_probs(m_tracked_obstacles, detected_obstacles, p, new_obj_slam_thres);
+    std::tie(m_weight, match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association_probs(m_tracked_obstacles, detected_obstacles, p, probs, new_obj_slam_thres);
 
     // Update vectors, now with known correspondence
     for (size_t i = 0; i < detected_obstacles.size(); i++) {
         float range, bearing;
         int signature;
-        std::tie(range, bearing, signature) = all_seaing_perception::ObjectTrackingMap::local_to_range_bearing_signature(
+        std::tie(range, bearing, signature) = all_seaing_perception::local_to_range_bearing_signature(
             detected_obstacles[i]->local_centroid, detected_obstacles[i]->label);
         Eigen::Vector2f z_actual(range, bearing);
         if (match[i] == -1) {
@@ -496,7 +527,7 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
                 {0, (float)init_new_cov},
             };
             m_tracked_obstacles.back()->mean_pred =
-                Eigen::Vector2f(pose(0), m_pose(1)) +
+                Eigen::Vector2f(m_pose(0), m_pose(1)) +
                 range * Eigen::Vector2f(std::cos(bearing + m_pose(2)),
                                         std::sin(bearing + m_pose(2)));
             m_tracked_obstacles.back()->cov = matrix_init_new_cov;
@@ -582,16 +613,16 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
             if (m_tracked_obstacles[tracked_id]->is_dead) {
                 // Was also dead before, add time dead
                 m_tracked_obstacles[tracked_id]->time_dead =
-                    curr_time -
+                    rclcpp::Time(curr_time) -
                     m_tracked_obstacles[tracked_id]->last_dead +
                     m_tracked_obstacles[tracked_id]->time_dead;
 
                 if (m_tracked_obstacles[tracked_id]->time_dead.seconds() >
-                    (normalize_drop_thresh ? (obstacle_drop_thresh *
+                    (normalize_drop_dist ? (obstacle_drop_thres *
                         (pcl::euclideanDistance(p0,
                                                 m_tracked_obstacles[tracked_id]->local_centroid) /
                          avg_dist) *
-                        normalize_drop_dist) : obstacle_drop_thresh)) {
+                        normalize_drop_dist) : obstacle_drop_thres)) {
                     // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d/%d DROPPED", tracked_id, m_num_obj);
                     to_remove.push_back(tracked_id);
                     continue;
@@ -606,7 +637,7 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
 
     // update vectors & matrices
     if (!to_remove.empty()) {
-        std::vector<std::shared_ptr<ObjectCloud>> new_obj;
+        std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> new_obj;
 
         for (int i : to_keep) {
             new_obj.push_back(m_tracked_obstacles[i]);
@@ -614,6 +645,13 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<ObjectCloud>> detected
 
         m_tracked_obstacles = new_obj;
         m_num_obj = to_keep.size();
+    }
+}
+
+template<typename T>
+void extend(std::vector<T> &a, std::vector<T> b){
+    for(T b_ : b){
+        a.push_back(b_);
     }
 }
 
@@ -627,19 +665,19 @@ void ObjectTrackingMapPF::visualize_predictions(){
     m_map_cov_viz_pub->publish(delete_arr);
 
     visualization_msgs::msg::MarkerArray ellipse_arr;
-    marker_id = 0;
+    int marker_id = 0;
     for (int i = 0; i < m_num_particles; i++){
         // show particle itself
-        ellipse_arr.markers.extend(m_particles[i]->visualize_pose(m_global_header, m_slam_header_id, marker_id).markers);
+        extend(ellipse_arr.markers, m_particles[i]->visualize_pose(m_global_header, m_slam_frame_id, marker_id).markers);
         if (i == m_best_particle_index){
             // show particle and map
-            ellipse_arr.markers.extend(m_particles[i]->visualize_map(m_global_header, m_slam_header_id, marker_id).markers);
+            extend(ellipse_arr.markers, m_particles[i]->visualize_map(m_global_header, m_slam_frame_id, m_new_obj_slam_thres, marker_id).markers);
         }
     }
-    m_map_cov_viz_pub->publish(ellipse_arr)
+    m_map_cov_viz_pub->publish(ellipse_arr);
 }
 
-visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg::Header global_header, string slam_frame_id, int &id) {
+visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg::Header global_header, std::string slam_frame_id, int &id_start) {
     visualization_msgs::msg::MarkerArray ellipse_arr;
 
     visualization_msgs::msg::Marker ellipse;
@@ -647,7 +685,6 @@ visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg:
     ellipse.pose.position.x = m_pose(0);
     ellipse.pose.position.y = m_pose(1);
     ellipse.pose.position.z = 0;
-    ellipse.pose.orientation = tf2::toMsg(quat_rot);
 
     ellipse.scale.x = 0.5;
     ellipse.scale.y = 0.5;
@@ -665,7 +702,7 @@ visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg:
     angle_marker.pose.position.y = m_pose(1);
     angle_marker.pose.position.z = 0;
     tf2::Quaternion angle_quat;
-    angle_quat.setRPY(0, 0, m_state(2));
+    angle_quat.setRPY(0, 0, m_pose(2));
     angle_marker.pose.orientation = tf2::toMsg(angle_quat);
 
     angle_marker.scale.x = 0.5;
@@ -680,7 +717,7 @@ visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg:
     return ellipse_arr;
 }
 
-visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::Header local_header, string slam_frame_id, float new_obj_slam_thres, int &id_start) {
+visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::Header global_header, std::string slam_frame_id, float new_obj_slam_thres, int &id_start) {
     visualization_msgs::msg::MarkerArray ellipse_arr;
 
     // obstacle predictions
@@ -729,12 +766,12 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
 
-    m_lidar_map_tf = all_seaing_perception::ObjectTrackingMap::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
-    m_map_lidar_tf = all_seaing_perception::ObjectTrackingMap::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    m_lidar_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_map_lidar_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     if(m_first_state) return;
 
-    std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles;
+    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> detected_obstacles;
     for (all_seaing_interfaces::msg::LabeledObjectPointCloud obj : msg->objects) {
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_obj_pcloud(
             new pcl::PointCloud<pcl::PointXYZHSV>);
@@ -743,18 +780,18 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         pcl::fromROSMsg(obj.cloud, *local_obj_pcloud);
         for (pcl::PointXYZHSV &pt : local_obj_pcloud->points) {
             pcl::PointXYZHSV global_pt =
-                this->convert_to_global(pt, lidar_map_tf);
+                this->convert_to_global(pt);
             global_obj_pcloud->push_back(global_pt);
         }
-        std::shared_ptr<ObjectCloud> obj_cloud(
-            new ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
+        std::shared_ptr<all_seaing_perception::ObjectCloud> obj_cloud(
+            new all_seaing_perception::ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
         detected_obstacles.push_back(obj_cloud);
     }
 
     // Make and publish untracked map
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> untracked_obs;
     std::vector<int> untracked_labels;
-    for (std::shared_ptr<ObjectCloud> det_obs : detected_obstacles) {
+    for (std::shared_ptr<all_seaing_perception::ObjectCloud> det_obs : detected_obstacles) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZI>);
         for (pcl::PointXYZHSV pt : det_obs->local_pcloud_ptr->points) {
             pcl::PointXYZRGB rgb_pt;
@@ -771,7 +808,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-    all_seaing_perception::ObjectTrackingMap::publish_map(m_local_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
+    all_seaing_perception::publish_map(m_local_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
                       untracked_labels);
 
     // FastSLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
@@ -782,7 +819,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
                                     m_init_new_cov, m_new_obj_slam_thres, m_check_fov, m_obstacle_drop_thresh,
                                     m_normalize_drop_dist, m_cam_model,
                                 m_map_lidar_tf, m_lidar_map_tf);
-        w = m_particles[i]->get_weight(m_include_odom_theta);
+        float w = m_particles[i]->get_weight(m_include_odom_theta);
         m_weights.push_back(w);
         m_particles[i]->reset_gps();
         if(m_best_particle_index == -1 || w > m_weights[m_best_particle_index]) m_best_particle_index = i;
@@ -791,7 +828,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     // Publish map with tracked obstacles
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
     std::vector<int> tracked_labels;
-    for (std::shared_ptr<ObjectCloud> t_ob : m_particles[m_best_particle_index]->m_tracked_obstacles) {
+    for (std::shared_ptr<all_seaing_perception::ObjectCloud> t_ob : m_particles[m_best_particle_index]->m_tracked_obstacles) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr local_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
         for (pcl::PointXYZHSV pt : t_ob->local_pcloud_ptr->points) {
             pcl::PointXYZRGB rgb_pt;
@@ -816,7 +853,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         tracked_labels.push_back(t_ob->label);
         tracked_obs.push_back(tracked_ob);
     }
-    all_seaing_perception::ObjectTrackingMap::publish_map(m_local_header, m_global_header, "tracked", true, tracked_obs, m_tracked_map_pub,
+    all_seaing_perception::publish_map(m_local_header, m_global_header, "tracked", true, tracked_obs, m_tracked_map_pub,
                       tracked_labels);
     
     if(m_got_nav){
@@ -827,10 +864,10 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     }
 
     // resample based on the weights of the particles
-    std::vector<std::shared_ptr<SLAMParticle>> new_particles();
+    std::vector<std::shared_ptr<SLAMParticle>> new_particles;
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::discrete_distribution<> d(weights.begin(), weights.end());
+    std::discrete_distribution<> d(m_weights.begin(), m_weights.end());
     for(int i = 0; i < m_num_particles; i++){
         new_particles.push_back(clone(m_particles[d(gen)]));
     }
