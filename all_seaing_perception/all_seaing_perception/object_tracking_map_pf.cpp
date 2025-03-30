@@ -763,6 +763,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     m_local_header = msg->objects[0].cloud.header;
     m_global_header.frame_id = m_slam_frame_id;
     m_global_header.stamp = m_local_header.stamp;
+    m_global_untracked_header.frame_id = m_global_frame_id;
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
 
@@ -803,12 +804,12 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         std::vector<int> ind(raw_cloud->size());
         std::iota(std::begin(ind), std::end(ind), 0);
         std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
-            new all_seaing_perception::Obstacle(m_local_header, m_global_header, raw_cloud, ind,
+            new all_seaing_perception::Obstacle(m_local_header, m_global_untracked_header, raw_cloud, ind,
                                                 m_obstacle_id++, m_lidar_map_tf));
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-    all_seaing_perception::publish_map(m_local_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
+    all_seaing_perception::publish_map(m_local_header, m_global_untracked_header, "untracked", true, untracked_obs, m_untracked_map_pub,
                       untracked_labels);
 
     // FastSLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)

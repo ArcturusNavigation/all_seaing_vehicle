@@ -396,7 +396,7 @@ T ObjectTrackingMap::convert_to_global(T point, bool untracked) {
         // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
         std::tuple<double, double, double> slam_to_map_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)),all_seaing_perception:: compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
         double th; //uselesss
-        std::tie(act_point.x, act_point.y, th) =all_seaing_perception::compose_transforms(slam_to_map_transform, std::make_tuple(point.x, point.y, 0));
+        std::tie(act_point.x, act_point.y, th) =all_seaing_perception::compose_transforms(slam_to_map_transform, std::make_tuple(new_point.x, new_point.y, 0));
     }
     return act_point;
 }
@@ -411,7 +411,7 @@ T ObjectTrackingMap::convert_to_local(T point, bool untracked) {
         // (map->robot)@(robot->slam_map) = (map->robot)@inv(slam_map->robot)
         std::tuple<double, double, double> map_to_slam_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading),all_seaing_perception:: compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0));
         double th; //uselesss
-        std::tie(act_point.x, act_point.y, th) =all_seaing_perception::compose_transforms(map_to_slam_transform, std::make_tuple(point.x, point.y, 0));
+        std::tie(act_point.x, act_point.y, th) =all_seaing_perception::compose_transforms(map_to_slam_transform, std::make_tuple(new_point.x, new_point.y, 0));
     }
     geometry_msgs::msg::Point gb_pt_msg;
     gb_pt_msg.x = act_point.x;
@@ -566,6 +566,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     m_local_header = msg->objects[0].cloud.header;
     m_global_header.frame_id = m_track_robot? m_slam_frame_id : m_global_frame_id;
     m_global_header.stamp = m_local_header.stamp;
+    std_msgs::msg::Header m_global_untracked_header = m_global_header;
+    m_global_untracked_header.frame_id = m_global_frame_id;
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
 
@@ -585,7 +587,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         pcl::fromROSMsg(obj.cloud, *local_obj_pcloud);
         for (pcl::PointXYZHSV &pt : local_obj_pcloud->points) {
             pcl::PointXYZHSV global_pt =
-                this->convert_to_global(pt);
+                this->convert_to_global(pt, true);
             global_obj_pcloud->push_back(global_pt);
         }
         // pcl::transformPointCloud(*local_obj_pcloud, *global_obj_pcloud, m_lidar_map_tf);
@@ -606,15 +608,15 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             raw_cloud->push_back(i_pt);
         }
         std::vector<int> ind(raw_cloud->size());
-        std::iota(std::begin(ind), std::end(ind), 0);
+        std::iota(std::begin(ind), std::end(ind), 0); 
         std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
-            new all_seaing_perception::Obstacle(m_local_header, m_global_header, raw_cloud, ind,
+            new all_seaing_perception::Obstacle(m_local_header, m_global_untracked_header, raw_cloud, ind,
                                                 m_obstacle_id++, m_lidar_map_tf));
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-     all_seaing_perception::publish_map(m_local_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
-                      untracked_labels);
+    all_seaing_perception::publish_map(m_global_untracked_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
+                    untracked_labels);
 
     // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
 

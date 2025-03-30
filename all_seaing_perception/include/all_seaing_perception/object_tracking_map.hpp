@@ -81,7 +81,7 @@ private:
     std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> m_tracked_obstacles;
     std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
     std_msgs::msg::Header m_local_header;
-    std_msgs::msg::Header m_global_header;
+    std_msgs::msg::Header m_global_header, m_global_untracked_header;
     int m_obstacle_id;
     double m_obstacle_drop_thresh;
     double m_init_new_cov;
