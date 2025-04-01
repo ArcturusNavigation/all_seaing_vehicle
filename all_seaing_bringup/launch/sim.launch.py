@@ -490,7 +490,7 @@ def launch_setup(context, *args, **kwargs):
         # buoy_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
-        object_tracking_map_node,
+        # object_tracking_map_node,
         object_tracking_map_pf_node,
         # object_tracking_map_euclidean_node,
         rviz_node,

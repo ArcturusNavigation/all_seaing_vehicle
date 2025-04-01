@@ -1,6 +1,7 @@
 #include "all_seaing_perception/object_tracking_shared.hpp"
 
 namespace all_seaing_perception{
+
     ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc,
                          pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob) {
         id = -1;
@@ -32,6 +33,14 @@ namespace all_seaing_perception{
         new_ocl->local_pcloud_ptr = (*orig->local_pcloud_ptr).makeShared();
         new_ocl->global_pcloud_ptr = (*orig->global_pcloud_ptr).makeShared();
         return new_ocl;
+    }
+
+    std::vector<std::shared_ptr<ObjectCloud>> clone(std::vector<std::shared_ptr<ObjectCloud>> orig){
+        std::vector<std::shared_ptr<ObjectCloud>> new_vec;
+        for(auto ocl : orig){
+            new_vec.push_back(clone(ocl));
+        }
+        return new_vec;
     }
 
     std::tuple<double, double, double> compute_transform_from_to(double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta){

@@ -31,6 +31,7 @@
 #include "builtin_interfaces/msg/time.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "std_msgs/msg/header.hpp"
+#include "std_msgs/msg/color_rgba.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 
@@ -66,7 +67,7 @@
 struct SLAMParticle{
     Eigen::Vector3f m_pose;
     int m_num_obj;
-    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> m_tracked_obstacles;// including EKF for each obstacle
+    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> m_tracked_obstacles, m_detected_global;// including EKF for each obstacle
     int m_obstacle_id;
     bool m_got_nav;
     Eigen::Vector3f gps_mean;
@@ -91,9 +92,9 @@ struct SLAMParticle{
     void reset_gps();
 
     void update_map(std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
-        bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres,
+        bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres, float new_object_slam_coeff, bool use_const_new_obj_prob, float new_object_slam_prob,
         bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model,
-        geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tf);
+        geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tfm, rclcpp::Logger logger);
 
     float mahalanobis_to_prob(float mahalanobis_dist, Eigen::MatrixXf cov);
 
@@ -103,9 +104,9 @@ struct SLAMParticle{
 
     float get_weight(bool include_odom_theta);
 
-    visualization_msgs::msg::MarkerArray visualize_pose(std_msgs::msg::Header global_header, std::string slam_frame_id, int &id_start);
+    visualization_msgs::msg::MarkerArray visualize_pose(std_msgs::msg::Header global_header, int &id_start, std_msgs::msg::ColorRGBA color);
 
-    visualization_msgs::msg::MarkerArray visualize_map(std_msgs::msg::Header global_header, std::string slam_frame_id, float new_obj_slam_thres, int &id_start);
+    visualization_msgs::msg::MarkerArray visualize_map(std_msgs::msg::Header global_header, float new_obj_slam_thres, int &id_start);
 };
 
 std::shared_ptr<SLAMParticle> clone(std::shared_ptr<SLAMParticle> orig);
@@ -138,7 +139,7 @@ private:
     std_msgs::msg::Header m_global_header, m_global_untracked_header;
     int m_obstacle_id;
     double m_obstacle_drop_thresh;
-    double m_init_new_cov;
+    double m_init_new_cov, m_init_xy_noise, m_init_theta_noise;
     bool m_track_robot, m_imu_predict, m_gps_update;
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;
@@ -166,7 +167,7 @@ private:
     image_geometry::PinholeCameraModel m_cam_model;
 
     //SLAM matrices & variables
-    float m_range_std, m_bearing_std, m_new_obj_slam_thres;
+    float m_range_std, m_bearing_std, m_new_obj_slam_thres, m_new_object_slam_prob, m_new_object_slam_coeff;
     float m_gps_vxy_noise_coeff, m_gps_omega_noise_coeff, m_gps_theta_noise_coeff;
     float m_imu_vxy_noise_coeff, m_imu_omega_noise_coeff, m_imu_theta_noise_coeff;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
@@ -178,6 +179,7 @@ private:
     bool m_direct_tf;
     bool m_normalize_drop_thresh;
     bool m_include_odom_theta;
+    bool m_use_const_new_obj_prob;
 public:
     ObjectTrackingMapPF();
     virtual ~ObjectTrackingMapPF();

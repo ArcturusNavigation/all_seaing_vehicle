@@ -9,6 +9,7 @@
 #include <vector>
 #include <tuple>
 #include <chrono>
+#include <string>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -82,6 +83,8 @@ namespace all_seaing_perception {
     };
 
     std::shared_ptr<ObjectCloud> clone(std::shared_ptr<ObjectCloud> orig);
+
+    std::vector<std::shared_ptr<ObjectCloud>> clone(std::vector<std::shared_ptr<ObjectCloud>> orig);
 
     std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZ point, int label);
 

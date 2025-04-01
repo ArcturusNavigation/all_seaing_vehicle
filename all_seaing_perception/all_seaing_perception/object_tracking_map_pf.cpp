@@ -16,8 +16,12 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     this->declare_parameter<double>("motion_imu_theta_noise_coeff", 1.0);
     this->declare_parameter<double>("update_gps_xy_uncertainty", 1.0);
     this->declare_parameter<double>("update_odom_theta_uncertainty", 1.0);
+    this->declare_parameter<double>("new_object_slam_coeff", 0.1);
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
+    this->declare_parameter<double>("new_object_slam_prob", 0.01);
     this->declare_parameter<double>("init_new_cov", 10.0);
+    this->declare_parameter<double>("init_xy_noise", 1.0);
+    this->declare_parameter<double>("init_theta_noise", 1.0);
     this->declare_parameter<bool>("imu_predict", true);
     this->declare_parameter<bool>("gps_update", true);
     this->declare_parameter<double>("normalize_drop_dist", 1.0);
@@ -39,9 +43,15 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     m_update_gps_xy_uncertainty = this->get_parameter("update_gps_xy_uncertainty").as_double();
     m_update_odom_theta_uncertainty = this->get_parameter("update_odom_theta_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
+    m_new_object_slam_coeff = this->get_parameter("new_object_slam_coeff").as_double();
+    m_new_object_slam_prob = this->get_parameter("new_object_slam_prob").as_double();
     m_init_new_cov = this->get_parameter("init_new_cov").as_double();
+    m_init_xy_noise = this->get_parameter("init_xy_noise").as_double();
+    m_init_theta_noise = this->get_parameter("init_theta_noise").as_double();
     m_imu_predict = this->get_parameter("imu_predict").as_bool();
     m_gps_update = this->get_parameter("gps_update").as_bool();
+    
+    RCLCPP_INFO(this->get_logger(), "NUM PARTICLES: %d", m_num_particles);
     
     m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
     m_odom_refresh_rate = this->get_parameter("odom_refresh_rate").as_double();
@@ -60,6 +70,9 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
 
     this->declare_parameter<bool>("include_odom_theta", false);
     m_include_odom_theta = this->get_parameter("include_odom_theta").as_bool();
+
+    this->declare_parameter<bool>("use_const_new_obj_prob", false);
+    m_use_const_new_obj_prob = this->get_parameter("use_const_new_obj_prob").as_bool();
 
     // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
@@ -107,6 +120,24 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     m_got_local_frame = false;
     m_got_nav = false;
     m_got_odom = false;
+
+    m_weights = std::vector<float>(m_num_particles, 1);
+}
+
+template <typename T_matrix> std::string matrix_to_string(T_matrix matrix) {
+    std::stringstream ss;
+    ss << matrix;
+    return ss.str();
+}
+
+template <typename T_vector> std::string vector_to_string(T_vector v) {
+    std::stringstream ss;
+    for (size_t i = 0; i < v.size(); ++i) {
+        if (i != 0)
+            ss << ",";
+        ss << v[i];
+    }
+    return ss.str();
 }
 
 void ObjectTrackingMapPF::publish_slam(){
@@ -203,9 +234,9 @@ void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     }
     // publish robot pose predictions (here and after measurement update) as transforms from map to lidar/camera frame, possibly also as a message
     // it should ultimately be a source of odometry that can be used by other nodes along with the global map
-    if(m_got_nav && m_got_odom){
-        publish_slam();
-    }
+    // if(m_got_nav && m_got_odom){
+    //     publish_slam();
+    // }
 }
 
 void ObjectTrackingMapPF::odom_callback() {
@@ -233,8 +264,13 @@ void ObjectTrackingMapPF::odom_callback() {
     m_nav_y = m_map_lidar_tf.transform.translation.y;
 
     if(m_first_state){
+        std::random_device rd{};
+        std::mt19937 gen{rd()};
         for (int i = 0; i < m_num_particles; i++){
-            m_particles.push_back(std::make_shared<SLAMParticle>(m_nav_x, m_nav_y, m_nav_heading));
+            std::normal_distribution<double> x_normal{0, m_init_xy_noise};
+            std::normal_distribution<double> y_normal{0, m_init_xy_noise};
+            std::normal_distribution<double> theta_normal{0, m_init_theta_noise};
+            m_particles.push_back(std::make_shared<SLAMParticle>(m_nav_x+x_normal(gen), m_nav_y+y_normal(gen), m_nav_heading+theta_normal(gen)));
         }
         m_weights = std::vector<float>(m_num_particles, 1);
         m_first_state = false;
@@ -245,6 +281,8 @@ void ObjectTrackingMapPF::odom_callback() {
     for (std::shared_ptr<SLAMParticle> particle_ptr : m_particles){
         particle_ptr->update_nav_vars(m_nav_x, m_nav_y, m_nav_heading);
     }
+
+    // RCLCPP_INFO(this->get_logger(), "UPDATED NAV VARS");
 
     if (!m_imu_predict) {
         
@@ -257,18 +295,23 @@ void ObjectTrackingMapPF::odom_callback() {
             particle_ptr->sample_pose((m_nav_x - particle_ptr->m_pose(0))*m_odom_refresh_rate, (m_nav_y - particle_ptr->m_pose(1))*m_odom_refresh_rate, (m_nav_heading - particle_ptr->m_pose(2))*m_odom_refresh_rate, 1/m_odom_refresh_rate, m_gps_vxy_noise_coeff, m_gps_omega_noise_coeff, m_gps_theta_noise_coeff);
         }
 
+        // RCLCPP_INFO(this->get_logger(), "SAMPLED NEW POSES BASED ON GPS");
+
     }else if (m_gps_update){
         for (std::shared_ptr<SLAMParticle> particle_ptr : m_particles){
             particle_ptr->update_gps(m_nav_x, m_nav_y, m_nav_heading, m_update_gps_xy_uncertainty, m_update_gps_xy_uncertainty);
         }
+        // RCLCPP_INFO(this->get_logger(), "UPDATED GPS EKF");
     }
 
     if(m_got_nav){
         this->visualize_predictions();
+        // RCLCPP_INFO(this->get_logger(), "VISUALIZED PREDICTIONS");
     }
-    if(m_got_nav && m_got_odom){
-        publish_slam();
-    }
+    // if(m_got_nav && m_got_odom){
+    //     publish_slam();
+    //     RCLCPP_INFO(this->get_logger(), "PUBLISHED SLAM");
+    // }
 }
 
 void ObjectTrackingMapPF::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
@@ -289,10 +332,7 @@ SLAMParticle::SLAMParticle(float init_x, float init_y, float init_theta){
 
 std::shared_ptr<SLAMParticle> clone(std::shared_ptr<SLAMParticle> orig){
     std::shared_ptr<SLAMParticle> new_particle = std::make_shared<SLAMParticle>(*orig);
-    new_particle->m_tracked_obstacles = std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>>();
-    for (std::shared_ptr<all_seaing_perception::ObjectCloud> orig_ocl : orig->m_tracked_obstacles){
-        new_particle->m_tracked_obstacles.push_back(clone(orig_ocl));
-    }
+    new_particle->m_tracked_obstacles = all_seaing_perception::clone(orig->m_tracked_obstacles);
     return new_particle;
 }
 
@@ -459,9 +499,9 @@ float SLAMParticle::get_weight(bool include_odom_theta){
 }
 
 void SLAMParticle::update_map(std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
-    bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres,
+    bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres, float new_object_slam_coeff, bool use_const_new_obj_prob, float new_object_slam_prob,
     bool check_fov, float obstacle_drop_thres, bool normalize_drop_dist, image_geometry::PinholeCameraModel cam_model,
-    geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tf){
+    geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tf, rclcpp::Logger logger){
 
     Eigen::Matrix<float, 2, 2> Q{
         {range_std, 0},
@@ -502,7 +542,11 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<all_seaing_perception:
             probs.back().push_back(this->prob_normal(z_actual, z_pred, Psi));
             min_unassigned_prob = std::min(min_unassigned_prob, this->mahalanobis_to_prob(new_obj_slam_thres, Psi));
         }
-        probs.back().push_back(min_unassigned_prob);
+        if(use_const_new_obj_prob){
+            probs.back().push_back(new_object_slam_prob);
+        }else{
+            probs.back().push_back(new_object_slam_coeff*min_unassigned_prob);
+        }
     }
 
     std::vector<int> match;
@@ -510,11 +554,18 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<all_seaing_perception:
     std::tie(m_weight, match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association_probs(m_tracked_obstacles, detected_obstacles, p, probs, new_obj_slam_thres);
 
     // Update vectors, now with known correspondence
+    m_detected_global.clear();
     for (size_t i = 0; i < detected_obstacles.size(); i++) {
         float range, bearing;
         int signature;
         std::tie(range, bearing, signature) = all_seaing_perception::local_to_range_bearing_signature(
             detected_obstacles[i]->local_centroid, detected_obstacles[i]->label);
+        m_detected_global.push_back(all_seaing_perception::clone(detected_obstacles[i]));
+        m_detected_global.back()->mean_pred =
+            Eigen::Vector2f(m_pose(0), m_pose(1)) +
+            range * Eigen::Vector2f(std::cos(bearing + m_pose(2)),
+                                    std::sin(bearing + m_pose(2)));
+        m_detected_global.back()->cov = Eigen::Matrix2f::Zero();
         Eigen::Vector2f z_actual(range, bearing);
         if (match[i] == -1) {
             // increase object count and expand & initialize matrices
@@ -541,13 +592,22 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<all_seaing_perception:
             {-d_y, d_x},
         };
         Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_pose(2));
+
+        RCLCPP_INFO(logger, "OBSTACLE ASSIGNMENT");
+        RCLCPP_INFO(logger, "z_pred: %s", vector_to_string(z_pred).c_str());
+        RCLCPP_INFO(logger, "z_actual: %s", vector_to_string(z_actual).c_str());
+        RCLCPP_INFO(logger, "ROBOT: (%lf, %lf), OBSTACLE: (%lf, %lf)", m_pose(0), m_pose(1), m_tracked_obstacles[tracked_id]->mean_pred[0], m_tracked_obstacles[tracked_id]->mean_pred[1]);
+        
         Eigen::MatrixXf H = h / q;
         Eigen::MatrixXf K =
             m_tracked_obstacles[tracked_id]->cov * H.transpose() *
             (H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q).inverse();
+        // RCLCPP_INFO(logger, "Q: %s", matrix_to_string(Q).c_str());
         m_tracked_obstacles[tracked_id]->mean_pred += K * (z_actual - z_pred);
         m_tracked_obstacles[tracked_id]->cov =
             (Eigen::Matrix2f::Identity() - K * H) * m_tracked_obstacles[tracked_id]->cov;
+        // RCLCPP_INFO(logger, "MEAN: %s", vector_to_string(m_tracked_obstacles[tracked_id]->mean_pred).c_str());
+        // RCLCPP_INFO(logger, "COV: %s", matrix_to_string(m_tracked_obstacles[tracked_id]->cov).c_str());
         detected_obstacles[i]->mean_pred = m_tracked_obstacles[tracked_id]->mean_pred;
         detected_obstacles[i]->cov = m_tracked_obstacles[tracked_id]->cov;
 
@@ -668,16 +728,25 @@ void ObjectTrackingMapPF::visualize_predictions(){
     int marker_id = 0;
     for (int i = 0; i < m_num_particles; i++){
         // show particle itself
-        extend(ellipse_arr.markers, m_particles[i]->visualize_pose(m_global_header, m_slam_frame_id, marker_id).markers);
+        std_msgs::msg::ColorRGBA g;
+        g.g = 1;
+        g.a = 1;
+        std_msgs::msg::ColorRGBA o;
+        o.r = 1;
+        o.b = 1;
+        o.a = 1;
         if (i == m_best_particle_index){
             // show particle and map
-            extend(ellipse_arr.markers, m_particles[i]->visualize_map(m_global_header, m_slam_frame_id, m_new_obj_slam_thres, marker_id).markers);
+            extend(ellipse_arr.markers, m_particles[i]->visualize_pose(m_global_header, marker_id, o).markers);
+            extend(ellipse_arr.markers, m_particles[i]->visualize_map(m_global_header, m_new_obj_slam_thres, marker_id).markers);
+        }else{
+            extend(ellipse_arr.markers, m_particles[i]->visualize_pose(m_global_header, marker_id, g).markers);
         }
     }
     m_map_cov_viz_pub->publish(ellipse_arr);
 }
 
-visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg::Header global_header, std::string slam_frame_id, int &id_start) {
+visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg::Header global_header, int &id_start, std_msgs::msg::ColorRGBA color) {
     visualization_msgs::msg::MarkerArray ellipse_arr;
 
     visualization_msgs::msg::Marker ellipse;
@@ -689,10 +758,8 @@ visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg:
     ellipse.scale.x = 0.5;
     ellipse.scale.y = 0.5;
     ellipse.scale.z = 0.5;
-    ellipse.color.a = 1;
-    ellipse.color.g = 1;
+    ellipse.color = color;
     ellipse.header = global_header;
-    ellipse.header.frame_id = slam_frame_id;
     ellipse.id = id_start++;
     ellipse_arr.markers.push_back(ellipse);
 
@@ -710,14 +777,13 @@ visualization_msgs::msg::MarkerArray SLAMParticle::visualize_pose(std_msgs::msg:
     angle_marker.scale.z = 0.2;
     angle_marker.color.a = 1;
     angle_marker.header = global_header;
-    angle_marker.header.frame_id = slam_frame_id;
     angle_marker.id = id_start++;
     ellipse_arr.markers.push_back(angle_marker);
 
     return ellipse_arr;
 }
 
-visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::Header global_header, std::string slam_frame_id, float new_obj_slam_thres, int &id_start) {
+visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::Header global_header, float new_obj_slam_thres, int &id_start) {
     visualization_msgs::msg::MarkerArray ellipse_arr;
 
     // obstacle predictions
@@ -748,7 +814,39 @@ visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::
         ellipse.color.a = 1;
         ellipse.color.r = 1;
         ellipse.header = global_header;
-        ellipse.header.frame_id = slam_frame_id;
+        ellipse.id = id_start++;
+        ellipse_arr.markers.push_back(ellipse);
+    }
+
+    //debugging
+    for (std::shared_ptr<all_seaing_perception::ObjectCloud> obj : m_detected_global) {
+        Eigen::Vector2f obj_mean = obj->mean_pred;
+        Eigen::Matrix2f obj_cov = obj->cov;
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(obj_cov);
+        double a_x = eigen_solver.eigenvalues()(0);
+        double a_y = eigen_solver.eigenvalues()(1);
+
+        Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
+        Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
+        double cov_scale = new_obj_slam_thres; // to visualize the threshold where new obstacles are added
+        tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
+        tf2::Quaternion quat_rot;
+        rot_mat.getRotation(quat_rot);
+        visualization_msgs::msg::Marker ellipse;
+        ellipse.type = visualization_msgs::msg::Marker::SPHERE;
+
+        ellipse.pose.position.x = obj_mean(0);
+        ellipse.pose.position.y = obj_mean(1);
+        ellipse.pose.orientation = tf2::toMsg(quat_rot);
+
+        ellipse.pose.position.z = 0;
+        ellipse.scale.x = 1;
+        ellipse.scale.y = 1;
+        ellipse.scale.z = 1;
+        ellipse.color.a = 1;
+        ellipse.color.r = 1;
+        ellipse.color.g = 1;
+        ellipse.header = global_header;
         ellipse.id = id_start++;
         ellipse_arr.markers.push_back(ellipse);
     }
@@ -757,8 +855,8 @@ visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::
 }
 
 void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
-    if(msg->objects.size() == 0) return;    
-
+    if(msg->objects.size() == 0) return;   
+    
     // Set up headers and transforms
     m_local_header = msg->objects[0].cloud.header;
     m_global_header.frame_id = m_slam_frame_id;
@@ -772,6 +870,8 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
 
     if(m_first_state) return;
 
+    // RCLCPP_INFO(this->get_logger(), "BUILDING UNTRACKED MAP");
+
     std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> detected_obstacles;
     for (all_seaing_interfaces::msg::LabeledObjectPointCloud obj : msg->objects) {
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr local_obj_pcloud(
@@ -780,6 +880,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
             new pcl::PointCloud<pcl::PointXYZHSV>);
         pcl::fromROSMsg(obj.cloud, *local_obj_pcloud);
         for (pcl::PointXYZHSV &pt : local_obj_pcloud->points) {
+            // RCLCPP_INFO(this->get_logger(), "BEFORE CONVERSION TO GLOBAL");
             pcl::PointXYZHSV global_pt =
                 this->convert_to_global(pt);
             global_obj_pcloud->push_back(global_pt);
@@ -788,6 +889,8 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
             new all_seaing_perception::ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
         detected_obstacles.push_back(obj_cloud);
     }
+    
+    // RCLCPP_INFO(this->get_logger(), "UNTRACKED MAP");
 
     // Make and publish untracked map
     std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> untracked_obs;
@@ -814,14 +917,16 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
 
     // FastSLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
 
+    // RCLCPP_INFO(this->get_logger(), "FASTSLAM");
+
     // update the map for each particle and compute the weight based on the new detections
     for (int i = 0; i < m_num_particles; i++){
-        m_particles[i]->update_map(detected_obstacles, rclcpp::Time(msg->objects[0].time), m_is_sim, m_range_std, m_bearing_std,
-                                    m_init_new_cov, m_new_obj_slam_thres, m_check_fov, m_obstacle_drop_thresh,
+        m_particles[i]->update_map(all_seaing_perception::clone(detected_obstacles), rclcpp::Time(msg->objects[0].time), m_is_sim, m_range_std, m_bearing_std,
+                                    m_init_new_cov, m_new_obj_slam_thres, m_new_object_slam_coeff, m_use_const_new_obj_prob, m_new_object_slam_prob, m_check_fov, m_obstacle_drop_thresh,
                                     m_normalize_drop_dist, m_cam_model,
-                                m_map_lidar_tf, m_lidar_map_tf);
+                                m_map_lidar_tf, m_lidar_map_tf, this->get_logger());
         float w = m_particles[i]->get_weight(m_include_odom_theta);
-        m_weights.push_back(w);
+        m_weights[i] = w;
         m_particles[i]->reset_gps();
         if(m_best_particle_index == -1 || w > m_weights[m_best_particle_index]) m_best_particle_index = i;
     }
@@ -860,9 +965,14 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     if(m_got_nav){
         this->visualize_predictions();
     }
+
+    // RCLCPP_INFO(this->get_logger(), "VISUALIZED PREDICTIONS");
+
     if(m_got_nav && m_got_odom){
         publish_slam();
     }
+
+    // RCLCPP_INFO(this->get_logger(), "PUBLISHED SLAM");
 
     // resample based on the weights of the particles
     std::vector<std::shared_ptr<SLAMParticle>> new_particles;
