@@ -16,6 +16,7 @@ from threading import Semaphore, Event
 import math
 import time
 
+TIMER_PERIOD = 1 / 60
 
 class NavigationServer(ActionServerBase):
     def __init__(self):
@@ -27,6 +28,7 @@ class NavigationServer(ActionServerBase):
             "follow_path",
             execute_callback=self.follow_path_callback,
             cancel_callback=self.default_cancel_callback,
+            #TODO: refactor cancel logic for navigation
         )
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
 
@@ -38,8 +40,6 @@ class NavigationServer(ActionServerBase):
 
         self.stop_plan_semaphore = Semaphore(1)
         self.stop_plan_evt = Event()
-
-        self.timer_period = 1 / 60
 
     def start_plan(self):
         self.stop_plan_evt.set()
@@ -167,7 +167,7 @@ class NavigationServer(ActionServerBase):
                     goal_handle.canceled()
                     return FollowPath.Result()
 
-                time.sleep(self.timer_period)
+                time.sleep(TIMER_PERIOD)
 
         self.end_process("Path following completed!")
         goal_handle.succeed()

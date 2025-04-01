@@ -6,6 +6,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake_auto REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(rviz_common REQUIRED)
+find_package(all_seaing_interfaces REQUIRED)
 ament_auto_find_build_dependencies()
 
 include_directories(include)
@@ -35,4 +39,4 @@ ament_export_include_directories(include)
 ament_export_targets(export_all_seaing_rviz_plugins)
 pluginlib_export_plugin_description_file(rviz_common plugins_description.xml)
 
-ament_auto_package(INSTALL_TO_SHARE plugins_description.xml)
+ament_auto_package()

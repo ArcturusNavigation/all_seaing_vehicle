@@ -22,18 +22,33 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
+    slam_params = os.path.join(
+        bringup_prefix, "config", "perception", "slam_real.yaml"
+    )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
     )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
+    color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
+    )
+    buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+    )
+    matching_weights = os.path.join(
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
+    )
+    contour_matching_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
 
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
 
     location = context.perform_substitution(LaunchConfiguration("location"))
-    use_lora = LaunchConfiguration("use_lora")
+    comms = LaunchConfiguration("comms")
     use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
 
@@ -88,8 +103,8 @@ def launch_setup(context, *args, **kwargs):
             {
                 "front_right_port": 2,
                 "front_left_port": 3,
-                "back_right_port": 4,
-                "back_left_port": 5,
+                "back_left_port": 4,
+                "back_right_port": 5,
             }
         ],
         condition=UnlessCondition(use_bag),
@@ -110,14 +125,20 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    # waypoint_finder = launch_ros.actions.Node(
-    #     package="all_seaing_autonomy",
-    #     executable="waypoint_finder.py",
-    #     parameters=[
-    #         {"color_label_mappings_file": color_label_mappings},
-    #         {"safe_margin": 0.2},
-    #     ],
-    # )
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": color_label_mappings},
+            {"forward_speed": 1.2},
+            {"max_yaw": 0.2},
+            {"pid_vals": [0.0009, 0.0, 0.0003]},
+        ],
+        remappings=[
+            ("camera_info", "/zed/zed_node/rgb/camera_info"),
+        ],
+    )
 
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
@@ -144,7 +165,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            {"range_radius": [0.5, 100000.0]},
+            {"range_radius": [0.5, 60.0]},
         ],
         condition=UnlessCondition(use_bag),
     )
@@ -167,8 +188,8 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"obstacle_size_min": 10},
-            {"obstacle_size_max": 800},
+            {"obstacle_size_min": 5},
+            {"obstacle_size_max": 300},
             {"clustering_distance": 0.1},
         ],
     )
@@ -206,10 +227,35 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_lora_controller.py",
         condition=IfCondition(
             PythonExpression([
-                "'", use_lora, "' == 'true' and '", use_bag, "' == 'false'",
+                "'", comms, "' == 'lora' and '", use_bag, "' == 'false'",
             ]),
         ),
         output="screen",
+    )
+
+    rover_custom_controller = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="rover_custom_controller.py",
+        parameters=[
+            {"joy_x_scale": -1.8},
+            {"joy_ang_scale": 0.2},
+        ],
+        condition=IfCondition(
+            PythonExpression([
+                "'", comms, "' == 'custom' and '", use_bag, "' == 'false'",
+            ]),
+        ),
+    )
+
+    webcam_publisher = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="webcam_publisher.py",
+        parameters=[
+            {"video_index": 0},
+        ],
+        remappings=[
+            ("webcam_image", "turret_image"),
+        ]
     )
 
     grid_map_generator = launch_ros.actions.Node(
@@ -223,12 +269,103 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    yolov8_node = launch_ros.actions.Node(
+    buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"label_config": "color_label_mappings"},
+            {"conf": 0.6},
+            {"use_color_names": True},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
+    shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+            {"use_color_names": False},
+        ],
+        remappings=[
+            ("image", "turret_image"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "shape_boxes"),
+        ],
+        output="screen",
+    )
+
+    static_shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "static_shape_boxes"),
+        ],
+        output="screen",
+    )
+
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
         output="screen",
         remappings=[
-            ("image_raw", "/zed/zed_node/rgb/image_rect_color"),
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+            ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
+            ("lidar_topic", "/point_cloud/filtered"),
+            ("bounding_boxes", "static_shape_boxes")
+        ],
+        parameters=[
+            {"bbox_object_margin": 1.0},
+            {"color_label_mappings_file": buoy_label_mappings},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": False},
+            {"label_list": True},
+        ]
+    )
+
+    object_tracking_map_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+        ],
+        parameters=[slam_params],
+    )
+
+    object_tracking_map_euclidean_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_euclidean",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"check_fov": False},
+            {"is_sim": True},
         ]
     )
 
@@ -239,6 +376,23 @@ def launch_setup(context, *args, **kwargs):
             {"robot_frame_id": "wamv/wamv/base_link"},
         ],
         output="screen",
+    )
+
+    task_init_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_init.py",
+        parameters=[{"is_sim": False}],
+    )
+
+    delivery_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="delivery_server.py",
+    )
+
+    central_hub = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="central_hub_ros.py",
+        parameters=[{"port": "/dev/ttyACM2"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -311,23 +465,31 @@ def launch_setup(context, *args, **kwargs):
         ekf_node,
         navsat_node,
         navigation_server,
-        rviz_waypoint_sender,
-        rover_lora_controller,
-        thrust_commander_node,
-        lidar_ld,
-        point_cloud_filter_node,
         obstacle_bbox_overlay_node,
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
-        # waypoint_finder,
+        point_cloud_filter_node,
+        rover_custom_controller,
+        rover_lora_controller,
+        rviz_waypoint_sender,
+        thrust_commander_node,
+        buoy_yolo_node,
+        # shape_yolo_node,
+        # static_shape_yolo_node,
+        bbox_project_pcloud_node,
+        object_tracking_map_node,
         run_tasks,
+        task_init_server, 
         follow_buoy_path,
+        follow_buoy_pid,
         grid_map_generator,
+        central_hub,
         amcl_ld,
-        mavros_ld,
-        yolov8_node,
-        zed_ld,
         static_transforms_ld,
+        webcam_publisher,
+        lidar_ld,
+        mavros_ld,
+        zed_ld,
     ]
 
 
@@ -336,7 +498,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("location", default_value="boathouse"),
             DeclareLaunchArgument(
-                "use_lora", default_value="false", choices=["true", "false"]
+                "comms", default_value="wifi", choices=["wifi", "lora", "custom"]
             ),
             DeclareLaunchArgument(
                 "use_bag", default_value="false", choices=["true", "false"]

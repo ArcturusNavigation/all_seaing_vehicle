@@ -24,14 +24,32 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
+    slam_params = os.path.join(
+        bringup_prefix, "config", "perception", "slam_sim.yaml"
+    )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
     )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
+    color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
+    )
     color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "color_ranges.yaml"
+    )
+    ycrcb_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "color_ranges_LED_ycrcb.yaml"
+    )
+    matching_weights = os.path.join(
+        bringup_prefix, "config", "perception", "matching_weights.yaml"
+    )
+    contour_matching_color_ranges = os.path.join(
+        bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
+    buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
 
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
@@ -120,6 +138,20 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    ycrcb_color_segmentation_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="color_segmentation_ycrcb.py",
+        remappings=[
+            ("/webcam_image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+                "color_ranges_file": ycrcb_color_ranges,
+            }
+        ],
+    )
+
     color_segmentation_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="color_segmentation.py",
@@ -132,6 +164,67 @@ def launch_setup(context, *args, **kwargs):
                 "color_ranges_file": color_ranges,
             }
         ],
+    )
+
+    yolov8_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        output="screen",
+        remappings=[
+            ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+        ],
+        parameters=[
+            {
+                "use_color_names": True,
+            }
+        ]
+    )
+
+    buoy_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"label_config": "color_label_mappings"},
+            {"conf": 0.6},
+        ],
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
+    shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "shape_boxes"),
+        ],
+        output="screen",
+    )
+
+    static_shape_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_shape_2025"},
+            {"label_config": "shape_label_mappings"},
+            {"conf": 0.4},
+        ],
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("annotated_image", "annotated_image/shape"),
+            ("bounding_boxes", "static_shape_boxes"),
+        ],
+        output="screen",
     )
 
     point_cloud_filter_node = launch_ros.actions.Node(
@@ -160,6 +253,57 @@ def launch_setup(context, *args, **kwargs):
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
         ],
+    )
+
+    bbox_project_pcloud_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            ("camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("lidar_topic", "point_cloud/filtered")
+        ],
+        parameters=[
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": color_buoy_label_mappings},
+            {"color_ranges_file": color_ranges},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 60},
+            {"clustering_distance": 1.0},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": True},
+            {"label_list": True}
+        ]
+    )
+
+    object_tracking_map_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+        ],
+        parameters=[slam_params],
+    )
+
+    object_tracking_map_euclidean_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_euclidean",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"obstacle_seg_thresh": 10.0},
+            {"obstacle_drop_thresh": 1.0},
+            {"check_fov": False},
+            {"is_sim": True},
+        ]
     )
 
     rviz_node = launch_ros.actions.Node(
@@ -210,6 +354,8 @@ def launch_setup(context, *args, **kwargs):
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"grid_resolution": 0.3},
+            {"obstacle_radius_sigma": 3.0},
+            {"search_radius_sigma": 15.0}
         ],
     )
 
@@ -234,15 +380,50 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    speed_challenge_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge_pid.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
+            ),
+            (
+                "imu",
+                "/wamv/sensors/imu/imu/data"
+            )
+        ],
+    )
+
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
+            )
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
     )
 
-    # task_1_server = launch_ros.actions.Node(
-    #     package="all_seaing_autonomy",
-    #     executable="task_1.py",
-    # )
+    task_init_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="task_init.py",
+        parameters=[{"is_sim": True}],
+    )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
@@ -269,15 +450,13 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
 
-    if no_gui == "true":
-        extra_gz_args = "-v -s 0"
-    else:
-        extra_gz_args = "-v 0"
+    extra_gz_args = "-v -s 0" if no_gui == "true" else "-v 0"
     sim_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
-            "world": "rb2025/rb2025_task1_task2.sdf",
-            #"world": "follow_path_task",
+            # "world": "rb2025/rb2025_task1_task2.sdf",
+            "world": "follow_path_task.sdf",
+            # "world": "speed_course_world.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -292,15 +471,23 @@ def launch_setup(context, *args, **kwargs):
         obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
+        ycrcb_color_segmentation_node,
+        # yolov8_node,
+        # buoy_yolo_node,
         point_cloud_filter_node,
+        bbox_project_pcloud_node,
+        object_tracking_map_node,
+        # object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,
         navigation_server,
         grid_map_generator,
         onshore_node,
         run_tasks,
-        #task_1_server,
-        follow_buoy_path,
+        task_init_server,
+        # follow_buoy_path,
+        # follow_buoy_pid,
+        # speed_challenge_pid,
         rviz_waypoint_sender,
         map_to_odom,
         keyboard_ld,

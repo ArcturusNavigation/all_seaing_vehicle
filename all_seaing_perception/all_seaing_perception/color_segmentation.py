@@ -46,16 +46,17 @@ class ColorSegmentation(Node):
         bboxes.header = img.header
 
         try:
-            img = self.bridge.imgmsg_to_cv2(img, "rgb8")
+            img = self.bridge.imgmsg_to_cv2(img, "bgr8")
         except cv_bridge.CvBridgeError as e:
             self.get_logger().info(str(e))
-        hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
         colors = self.colors
         label_dict = self.label_dict
 
         rgbs = {
             "red": (255, 0, 0),
+            # "red": (0, 0, 255),
             "orange": (255, 165, 0),
             "green": (0, 255, 0),
             "black": (0, 0, 0),
@@ -75,13 +76,13 @@ class ColorSegmentation(Node):
                 upper_limit = np.array([h_max, s_max, v_max])
                 mask = mask + cv2.inRange(hsv_img, lower_limit, upper_limit)
 
-            # erode and dilate mask
+            # Erode and dilate mask
             kernel = np.ones((5, 5), np.uint8)
             mask = cv2.erode(mask, kernel, iterations=1)
             kernel2 = np.ones((7, 7), np.uint8)
             mask = cv2.dilate(mask, kernel2, iterations=1)
 
-            contours, hierarchy = cv2.findContours(
+            contours, _ = cv2.findContours(
                 mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
             )
             for contour in contours:
@@ -95,7 +96,7 @@ class ColorSegmentation(Node):
 
                 bboxes.boxes.append(bbox)
 
-                # draw a rectangle on the image that is the bounding box
+                # Draw a rectangle on the image that is the bounding box
                 cv2.rectangle(
                     img,
                     (bbox.min_x, bbox.min_y),
@@ -104,7 +105,7 @@ class ColorSegmentation(Node):
                     4,
                 )
 
-            self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
+            self.img_pub.publish(self.bridge.cv2_to_imgmsg(img, "bgr8"))
         self.bbox_pub.publish(bboxes)
 
 

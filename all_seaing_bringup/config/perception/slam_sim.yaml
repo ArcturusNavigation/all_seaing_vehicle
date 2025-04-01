@@ -1,0 +1,23 @@
+object_tracking_map:
+  ros__parameters:
+    global_frame_id: "map"
+    slam_frame_id: "slam_map"
+    obstacle_drop_thresh: 2.0
+    normalize_drop_thresh: False
+    range_uncertainty: 100.0
+    bearing_uncertainty: 0.2
+    motion_gps_xy_noise: 1.0
+    motion_gps_theta_noise: 0.1
+    motion_imu_xy_noise: 1.0
+    motion_imu_theta_noise: 0.01
+    update_gps_xy_uncertainty: 5.0
+    include_odom_theta: True
+    update_odom_theta_uncertainty: 0.01
+    new_object_slam_threshold: 2.0
+    init_new_cov: 10.0
+    check_fov: False
+    track_robot: True
+    imu_predict: True
+    gps_update: True
+    direct_tf: False
+    is_sim: True
