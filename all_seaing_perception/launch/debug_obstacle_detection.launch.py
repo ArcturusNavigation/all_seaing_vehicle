@@ -23,6 +23,9 @@ def launch_setup(context, *args, **kwargs):
     color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
     )
+    inc_color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
+    )
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
@@ -160,9 +163,9 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_2025"},
-            {"label_config": "color_label_mappings"},
+            {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
-            {"use_color_names": True},
+            {"use_color_names": False},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
@@ -215,8 +218,8 @@ def launch_setup(context, *args, **kwargs):
             ("lidar_topic", "/point_cloud/filtered")
         ],
         parameters=[
-            {"bbox_object_margin": 1.0},
-            {"color_label_mappings_file": color_buoy_label_mappings},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
