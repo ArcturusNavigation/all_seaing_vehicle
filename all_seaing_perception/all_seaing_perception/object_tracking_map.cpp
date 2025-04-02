@@ -231,6 +231,10 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         {0, 0, m_imu_theta_noise},
     };
     m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
+
+    if (m_track_robot) {
+        m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
+    }
     
     // to see the robot position prediction mean & uncertainty
     if(m_got_nav){
@@ -364,6 +368,10 @@ void ObjectTrackingMap::odom_callback() {
         }
     }
 
+    if (m_track_robot) {
+        m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
+    }
+
     if(m_got_nav){
         this->visualize_predictions();
     }
@@ -466,7 +474,7 @@ void ObjectTrackingMap::visualize_predictions() {
         ellipse.scale.x = sqrt(a_x);
         ellipse.scale.y = sqrt(a_y);
         ellipse.scale.z = 0.5;
-        ellipse.color.a = 1;
+        ellipse.color.a = 0.5;
         ellipse.color.g = 1;
         ellipse.header = m_global_header;
         ellipse.header.frame_id = m_slam_frame_id;
@@ -546,7 +554,7 @@ void ObjectTrackingMap::visualize_predictions() {
         ellipse.scale.x = cov_scale * sqrt(a_x);
         ellipse.scale.y = cov_scale * sqrt(a_y);
         ellipse.scale.z = 1;
-        ellipse.color.a = 1;
+        ellipse.color.a = 0.2;
         ellipse.color.r = 1;
         ellipse.header = m_global_header;
         if(m_track_robot){
@@ -555,6 +563,24 @@ void ObjectTrackingMap::visualize_predictions() {
         ellipse.id = i;
         ellipse_arr.markers.push_back(ellipse);
     }
+
+    visualization_msgs::msg::Marker trace;
+    trace.type = visualization_msgs::msg::Marker::LINE_STRIP;
+    trace.header = m_global_header;
+    trace.id = m_num_obj+3;
+    trace.scale.x = 0.1;
+    trace.scale.y = 0.1;
+    trace.color.a = 1;
+    trace.color.r = 1;
+    trace.color.g = 1;
+    for (std::pair<float, float> p : m_trace){
+        geometry_msgs::msg::Point pt = geometry_msgs::msg::Point();
+        pt.x = p.first;
+        pt.y = p.second;
+        trace.points.push_back(pt);
+    }
+    ellipse_arr.markers.push_back(trace);
+
     m_map_cov_viz_pub->publish(ellipse_arr);
 }
 
@@ -895,6 +921,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
         m_tracked_obstacles = new_obj;
         m_num_obj = to_keep.size();
+    }
+
+    if (m_track_robot) {
+        m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
     }
 
     // Publish map with tracked obstacles
