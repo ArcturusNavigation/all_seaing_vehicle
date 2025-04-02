@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
-from sensor_msgs.msg import PointCloud2, PointField, CameraInfo
-from geometry_msgs.msg import Point, PointStamped, Pose, Vector3, TransformStamped
+from geometry_msgs.msg import Point, PointStamped
 from visualization_msgs.msg import Marker, MarkerArray
-from std_msgs.msg import Header, ColorRGBA
 
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
@@ -18,14 +15,12 @@ from ament_index_python.packages import get_package_share_directory
 from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_controller.pid_controller import PIDController
 from all_seaing_interfaces.action import Task
-from all_seaing_interfaces.msg import LabeledObjectPointCloudArray, LabeledObjectPointCloud, ControlOption
-from all_seaing_interfaces.srv import CommandAdj, CommandServo
+from all_seaing_interfaces.msg import LabeledObjectPointCloudArray, ControlOption
 
 from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
 
 import time
 import sensor_msgs_py.point_cloud2 as pc2
-import open3d as o3d
 import math
 import yaml
 import os
@@ -47,8 +42,8 @@ class Docking(ActionServerBase):
         )
 
         self.control_pub = self.create_publisher(
-            ControlOption, 
-            "control_options", 
+            ControlOption,
+            "control_options",
             10
         )
 
@@ -63,7 +58,7 @@ class Docking(ActionServerBase):
 
         self.cam_base_link_tf = None
         self.got_tf = False
-        
+
         pid_vals = (
             self.declare_parameter("pid_vals", [0.003, 0.001, 0.001]) # TODO: fine-tune values (especially D term)
             .get_parameter_value()
@@ -100,7 +95,7 @@ class Docking(ActionServerBase):
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
-        
+
         # update from subs
         self.labeled_pcl = []
         self.dock_banners = []
@@ -131,7 +126,7 @@ class Docking(ActionServerBase):
         ).value
         with open(shape_label_mappings_file, "r") as f:
             self.label_mappings = yaml.safe_load(f)
-        
+
         self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
         self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
         self.inv_label_mappings = {}
@@ -139,7 +134,7 @@ class Docking(ActionServerBase):
             self.inv_label_mappings[value] = key
         # self.get_logger().info(' '.join([str(x) for x in self.dock_labels]))
         # self.get_logger().info(' '.join([str(x) for x in self.boat_labels]))
-    
+
     def bbox_pcl_cb(self, msg):
         # self.get_logger().info('GOT OBJECTS')
         dock_banner_points = []
@@ -186,7 +181,7 @@ class Docking(ActionServerBase):
                 # marker_arr.markers.append(VisualizationTools.visualize_line(wall_params, mark_id, (0.0, 0.0, 1.0)))
                 mark_id = mark_id + 1
                 self.get_logger().info(f'DOCK: {self.inv_label_mappings[bbox_pcl_msg.label]} -> {(pt_left, pt_right).__str__()}')
-        
+
         if(not (len(dock_banner_points) == 0)):
             wall_params, (pt_left, pt_right) = self.find_segment_ransac(dock_banner_points)
             new_dock_banner_line = (wall_params, (pt_left, pt_right))
@@ -207,7 +202,7 @@ class Docking(ActionServerBase):
 
         if(not self.got_dock):
             return
-        
+
         # check for taken docks and stuff
         for dock_label, dock_params, (dock_left, dock_right) in self.dock_banners:
             if (dock_label in self.taken):
@@ -245,7 +240,7 @@ class Docking(ActionServerBase):
         x, y = point
         (a, b, c), _ = line_params
         return ((x*b**2-a*b*y-a*c)/(a**2+b**2), (-x*a*b+a**2*y-b*c)/(a**2+b**2))
-    
+
     def distance(self, point, wall_params):
         x, y = point
         (a, b, c), _ = wall_params
@@ -260,7 +255,7 @@ class Docking(ActionServerBase):
         x1, y1 = pt1
         x2, y2 = pt2
         return (x2-x1, y2-y1)
-    
+
     def norm(self, pt):
         x, y = pt
         return math.sqrt(x**2+y**2)
@@ -271,7 +266,7 @@ class Docking(ActionServerBase):
         x1, y1 = self.difference(p1left, p1right)
         x2, y2 = self.difference(p2left, p2right)
         return math.acos(abs(x1*x2+y1*y2)/(self.norm((x1,y1))*self.norm((x2,y2))))
-    
+
     def find_segment_ransac(self, sliced_scan):
         # RANSAC
         wall_params = ((0.0, 0.0, 0.0), 0.0)
@@ -312,7 +307,7 @@ class Docking(ActionServerBase):
                 x_right, y_right = x_proj, y_proj
 
         return (wall_params, ((x_left, y_left), (x_right, y_right)))
-            
+
     def find_inliers(self, wall_params, points):
         (a, b, c), _ = wall_params
         count = 0
@@ -326,7 +321,7 @@ class Docking(ActionServerBase):
         if(count != 0):
             in_error_avg = in_error_avg/count
         return count, in_error_avg, inliers
-    
+
     def fit_points(self, point_set):
         # linear regression, analytical solution
         x_list, y_list = zip(*point_set)
@@ -340,20 +335,20 @@ class Docking(ActionServerBase):
         slope, offset = analytic_sol[0], analytic_sol[1]
         distance = abs(offset)/math.sqrt(slope**2+1)
         return ((slope, offset), distance)
-    
+
     def fit_pair(self, point_pair):
         (x1,y1), (x2,y2) = point_pair
         # (y-y1)(x2-x1) = (y2-y1)*(x-x1) -> y(x2-x1)+x(y1-y2)+x1(y2-y1)+y1(x1-x2) = 0 -> y(x2-x1)+x(y1-y2)+x1y2-x2y1
         return (y1-y2, x2-x1, x1*y2-x2*y1), abs(x1*y2-x2*y1)/math.sqrt((y1-y2)**2+(x2-x1)**2)
-    
+
     def control_loop(self):
         if(not self.picked_slot):
             return # maybe stop the robot? or just go forward/steer to the left
-        
+
         # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
         slot_back_mid = self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])
         ((a, b, c), _), _ = self.dock_banner_line
-        perp_dock_line_params = (-b, a, 
+        perp_dock_line_params = (-b, a,
                                  b*slot_back_mid[0] - a*slot_back_mid[1])
 
         # go to that line and forward (positive error if boat left of line, negative if right)
@@ -364,7 +359,7 @@ class Docking(ActionServerBase):
         else:
             approach_angle = math.atan(-perp_dock_line_params[0]/perp_dock_line_params[1])
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.pid.update(offset + self.boat_angle_coeff*approach_angle, dt)            
+        self.pid.update(offset + self.boat_angle_coeff*approach_angle, dt)
         yaw_rate = self.pid.get_effort()
         self.prev_update_time = self.get_clock().now()
 
@@ -397,7 +392,7 @@ class Docking(ActionServerBase):
 
             self.control_loop()
             time.sleep(self.timer_period)
-        
+
         self.end_process("docking completed!")
         goal_handle.succeed()
         return Task.Result(success=True)
