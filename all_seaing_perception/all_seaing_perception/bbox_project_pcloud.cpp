@@ -75,11 +75,11 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
             if(m_label_list){
                 for(int label : it->second.as<std::vector<int>>()){
                     label_color_map[label] = it->first.as<std::string>();
-                    RCLCPP_DEBUG(this->get_logger(), "%d -> %s", label, it->first.as<std::string>().c_str());
+                    RCLCPP_INFO(this->get_logger(), "%d -> %s", label, it->first.as<std::string>().c_str());
                 }
             }else{
                 label_color_map[it->second.as<int>()] = it->first.as<std::string>();
-                RCLCPP_DEBUG(this->get_logger(), "%d -> %s", it->second.as<int>(), it->first.as<std::string>().c_str());
+                RCLCPP_INFO(this->get_logger(), "%d -> %s", it->second.as<int>(), it->first.as<std::string>().c_str());
             }
         }
     } 

@@ -1,0 +1,30 @@
+object_tracking_map_pf:
+  ros__parameters:
+    global_frame_id: "map"
+    slam_frame_id: "slam_map"
+    num_particles: 25
+    obstacle_drop_thresh: 2.0
+    normalize_drop_thresh: False
+    range_uncertainty: 100.0
+    bearing_uncertainty: 0.5
+    motion_gps_vxy_noise_coeff: 10.0
+    motion_gps_omega_noise_coeff: 1.0
+    motion_gps_theta_noise_coeff: 1.0
+    motion_imu_vxy_noise_coeff: 1.0
+    motion_imu_omega_noise_coeff: 0.5
+    motion_imu_theta_noise_coeff: 0.1
+    update_gps_xy_uncertainty: 5.0
+    include_odom_theta: True
+    update_odom_theta_uncertainty: 0.01
+    new_object_slam_threshold: 2.0
+    new_object_slam_coeff: 0.1
+    use_const_new_obj_prob: True
+    new_object_slam_prob: 0.001
+    init_new_cov: 50.0
+    init_xy_noise: 1.0
+    init_theta_noise: 0.1
+    check_fov: True
+    imu_predict: True
+    gps_update: True
+    direct_tf: False
+    is_sim: True
