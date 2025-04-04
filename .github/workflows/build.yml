@@ -26,7 +26,7 @@ jobs:
       - name: Build modules and run nodes
         run: cd ../arcturus_nix;
           nix develop -i --accept-flake-config --keep HOME --command bash -c "
-          which ros2nix;
+          ros2nix --help;
           bash ci/run.sh all_seaing_autonomy;
           bash ci/run.sh all_seaing_bringup;
           bash ci/run.sh all_seaing_common;
