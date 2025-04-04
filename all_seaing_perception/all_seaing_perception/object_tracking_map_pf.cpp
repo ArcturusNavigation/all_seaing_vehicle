@@ -227,7 +227,8 @@ void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     for (std::shared_ptr<SLAMParticle> particle_ptr : m_particles){
         particle_ptr->sample_pose(m_nav_vx, m_nav_vy, m_nav_omega, dt, m_imu_vxy_noise_coeff, m_imu_omega_noise_coeff, m_imu_theta_noise_coeff);
     }
-    m_curr_particle->sample_pose(m_nav_vx, m_nav_vy, m_nav_omega, dt, 0, 0, 0);
+    // m_curr_particle->sample_pose(m_nav_vx, m_nav_vy, m_nav_omega, dt, 0, 0, 0);
+    update_curr_particle();
 
     m_trace.push_back(std::make_pair(m_curr_particle->m_pose(0), m_curr_particle->m_pose(1)));
     
@@ -298,7 +299,7 @@ void ObjectTrackingMapPF::odom_callback() {
         for (std::shared_ptr<SLAMParticle> particle_ptr : m_particles){
             particle_ptr->sample_pose((m_nav_x - particle_ptr->m_pose(0))*m_odom_refresh_rate, (m_nav_y - particle_ptr->m_pose(1))*m_odom_refresh_rate, (m_nav_heading - particle_ptr->m_pose(2))*m_odom_refresh_rate, 1/m_odom_refresh_rate, m_gps_vxy_noise_coeff, m_gps_omega_noise_coeff, m_gps_theta_noise_coeff);
         }
-        m_curr_particle->sample_pose((m_nav_x - m_curr_particle->m_pose(0))*m_odom_refresh_rate, (m_nav_y - m_curr_particle->m_pose(1))*m_odom_refresh_rate, (m_nav_heading - m_curr_particle->m_pose(2))*m_odom_refresh_rate, 1/m_odom_refresh_rate, 0, 0, 0);
+        // m_curr_particle->sample_pose((m_nav_x - m_curr_particle->m_pose(0))*m_odom_refresh_rate, (m_nav_y - m_curr_particle->m_pose(1))*m_odom_refresh_rate, (m_nav_heading - m_curr_particle->m_pose(2))*m_odom_refresh_rate, 1/m_odom_refresh_rate, 0, 0, 0);
 
         // RCLCPP_INFO(this->get_logger(), "SAMPLED NEW POSES BASED ON GPS");
 
@@ -308,6 +309,8 @@ void ObjectTrackingMapPF::odom_callback() {
         }
         // RCLCPP_INFO(this->get_logger(), "UPDATED GPS EKF");
     }
+
+    update_curr_particle();
 
     m_trace.push_back(std::make_pair(m_curr_particle->m_pose(0), m_curr_particle->m_pose(1)));
 
@@ -627,26 +630,26 @@ void SLAMParticle::update_map(std::vector<std::shared_ptr<all_seaing_perception:
     // positions (including the cloud, and then the local points respectively)
     pcl::PointXYZ p0(0, 0, 0);
     float avg_dist = 0;
-    for (size_t i = 0; i < m_tracked_obstacles.size(); i++) {
-        pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
-        upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
-        upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
-        pcl::PointXYZ upd_loc_centr;
-        upd_loc_centr = this->convert_to_local(upd_glob_centr, map_lidar_tf);
-
-        // move everything based on the difference between that and the previous assumed global (then local) centroid
+    for(std::shared_ptr<all_seaing_perception::ObjectCloud> obj : m_tracked_obstacles) {
+        pcl::PointXYZ upd_glob_centr = obj->global_centroid;
+        upd_glob_centr.x = obj->mean_pred[0];
+        upd_glob_centr.y = obj->mean_pred[1];
+        // map->point = (map->centroid)@(centroid->point)
+        float useless_theta;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(
             new pcl::PointCloud<pcl::PointXYZHSV>);
-        for (pcl::PointXYZHSV &global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points) {
-            global_pt.x += upd_glob_centr.x - m_tracked_obstacles[i]->global_centroid.x;
-            global_pt.y += upd_glob_centr.y - m_tracked_obstacles[i]->global_centroid.y;
+        for (pcl::PointXYZHSV &global_pt : obj->global_pcloud_ptr->points){
+            pcl::PointXYZHSV upd_global_pt = global_pt;
+            std::tuple<double, double, double> centroid_to_point = all_seaing_perception::compute_transform_from_to(obj->global_centroid.x, obj->global_centroid.y, 0, global_pt.x, global_pt.y, 0);
+            std::tie(upd_global_pt.x, upd_global_pt.y, useless_theta) = all_seaing_perception::compose_transforms(std::make_tuple(upd_glob_centr.x, upd_glob_centr.y, 0), centroid_to_point);
+            global_pt = upd_global_pt;
             upd_local_obj_pcloud->push_back(
                 this->convert_to_local(global_pt, map_lidar_tf));
         }
 
-        m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
-        m_tracked_obstacles[i]->local_centroid = upd_loc_centr;
-        avg_dist += pcl::euclideanDistance(p0, upd_loc_centr) / ((float)m_tracked_obstacles.size());
+        obj->global_centroid = upd_glob_centr;
+        obj->local_centroid = this->convert_to_local(upd_glob_centr, map_lidar_tf);;
+        avg_dist += pcl::euclideanDistance(p0, obj->local_centroid) / ((float)m_tracked_obstacles.size());
     }
 
     // Filter old obstacles
@@ -881,6 +884,16 @@ visualization_msgs::msg::MarkerArray SLAMParticle::visualize_map(std_msgs::msg::
     return ellipse_arr;
 }
 
+void ObjectTrackingMapPF::update_curr_particle(){
+    m_curr_particle->m_pose = Eigen::Vector3f::Zero();
+    float sum_weights = 0;
+    for(std::shared_ptr<SLAMParticle> p : m_particles){
+        m_curr_particle->m_pose += p->m_pose*p->get_weight(m_include_odom_theta);
+        sum_weights += p->get_weight(m_include_odom_theta);
+    }
+    m_curr_particle->m_pose /= sum_weights;
+}
+
 void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
     if(msg->objects.size() == 0) return;   
     
@@ -959,6 +972,28 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     }
 
     m_curr_particle = clone(m_particles[m_best_particle_index]);
+    update_curr_particle();
+    // shift the highest probability map to the estimated pose
+    for(std::shared_ptr<all_seaing_perception::ObjectCloud> obj : m_curr_particle->m_tracked_obstacles){
+        // local map is fine, just change the global one to match it
+        // map->obstacle = (map->particle)@(particle->obstacle)
+        // where particle->obstacle should be the same in the mean and the opt particle, so we use then opt one to construct the mean global map
+        std::tuple<double, double, double> mean_pose = std::make_tuple(m_curr_particle->m_pose(0), m_curr_particle->m_pose(1), m_curr_particle->m_pose(2));
+        float useless_theta;
+        std::tuple<double, double, double> opt_to_ctr = all_seaing_perception::compute_transform_from_to(m_particles[m_best_particle_index]->m_pose(0), m_particles[m_best_particle_index]->m_pose(1), m_particles[m_best_particle_index]->m_pose(2),
+                                                                    obj->global_centroid.x, obj->global_centroid.y, 0);
+        pcl::PointXYZ upd_glob_ctr = obj->global_centroid;
+        std::tie(upd_glob_ctr.x, upd_glob_ctr.y, useless_theta) = all_seaing_perception::compose_transforms(mean_pose, opt_to_ctr);
+        obj->global_centroid = upd_glob_ctr;
+
+        for (int i=0; i < obj->local_pcloud_ptr->points.size(); i++){
+            std::tuple<double, double, double> opt_to_point = all_seaing_perception::compute_transform_from_to(m_particles[m_best_particle_index]->m_pose(0), m_particles[m_best_particle_index]->m_pose(1), m_particles[m_best_particle_index]->m_pose(2),
+                                                                    obj->global_pcloud_ptr->points[i].x, obj->global_pcloud_ptr->points[i].y, 0);
+            pcl::PointXYZHSV upd_glob_pt = obj->global_pcloud_ptr->points[i];
+            std::tie(upd_glob_pt.x, upd_glob_pt.y, useless_theta) = all_seaing_perception::compose_transforms(mean_pose, opt_to_point);
+            obj->global_pcloud_ptr->points[i] = upd_glob_pt;
+        }
+    }
 
     m_trace.push_back(std::make_pair(m_curr_particle->m_pose(0), m_curr_particle->m_pose(1)));
 

@@ -84,7 +84,7 @@ private:
     std_msgs::msg::Header m_global_header, m_global_untracked_header;
     int m_obstacle_id;
     double m_obstacle_drop_thresh;
-    double m_init_new_cov;
+    double m_init_new_cov, m_init_xy_noise, m_init_theta_noise;
     bool m_track_robot, m_imu_predict, m_gps_update;
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;

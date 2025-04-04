@@ -128,6 +128,8 @@ private:
     
     void publish_slam();
 
+    void update_curr_particle();
+
     // Member variables
     int m_num_particles;
     std::vector<std::shared_ptr<SLAMParticle>> m_particles;

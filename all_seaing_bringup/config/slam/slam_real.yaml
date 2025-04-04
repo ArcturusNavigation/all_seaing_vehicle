@@ -10,10 +10,12 @@ object_tracking_map:
     motion_gps_theta_noise: 0.1
     motion_imu_xy_noise: 1.0
     motion_imu_theta_noise: 0.1
-    update_gps_xy_uncertainty: 2.0
+    update_gps_xy_uncertainty: 250.0
     include_odom_theta: True
-    update_odom_theta_uncertainty: 0.1
+    update_odom_theta_uncertainty: 1.0
     new_object_slam_threshold: 5.0
+    init_xy_noise: 0.5
+    init_theta_noise: 1.0
     init_new_cov: 50.0
     check_fov: True
     track_robot: True

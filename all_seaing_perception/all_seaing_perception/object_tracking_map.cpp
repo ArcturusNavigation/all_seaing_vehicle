@@ -14,6 +14,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<double>("update_gps_xy_uncertainty", 1.0);
     this->declare_parameter<double>("update_odom_theta_uncertainty", 1.0);
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
+    this->declare_parameter<double>("init_xy_noise", 1.0);
+    this->declare_parameter<double>("init_theta_noise", 1.0);
     this->declare_parameter<double>("init_new_cov", 10.0);
     this->declare_parameter<bool>("track_robot", true);
     this->declare_parameter<bool>("imu_predict", true);
@@ -34,6 +36,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_update_gps_xy_uncertainty = this->get_parameter("update_gps_xy_uncertainty").as_double();
     m_update_odom_theta_uncertainty = this->get_parameter("update_odom_theta_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
+    m_init_xy_noise = this->get_parameter("init_xy_noise").as_double();
+    m_init_theta_noise = this->get_parameter("init_theta_noise").as_double();
     m_init_new_cov = this->get_parameter("init_new_cov").as_double();
     m_track_robot = this->get_parameter("track_robot").as_bool();
     m_imu_predict = this->get_parameter("imu_predict").as_bool();
@@ -283,9 +287,9 @@ void ObjectTrackingMap::odom_callback() {
         // initialize mean and cov robot pose
         m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
         Eigen::Matrix3f init_pose_noise{
-            {m_gps_xy_noise, 0, 0},
-            {0, m_gps_xy_noise, 0},
-            {0, 0, m_gps_theta_noise},
+            {m_init_xy_noise, 0, 0},
+            {0, m_init_xy_noise, 0},
+            {0, 0, m_init_theta_noise},
         };
         m_cov = init_pose_noise;
         // m_cov = Eigen::Matrix3f::Zero();
@@ -802,26 +806,22 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
             upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
         }
-        pcl::PointXYZ upd_loc_centr;
-        upd_loc_centr = this->convert_to_local(upd_glob_centr);
-        // RCLCPP_INFO(this->get_logger(), "ROBOT POSE: (%lf, %lf, %lf), TRACKED OBSTACLE %d GLOBAL
-        // COORDS: (%lf, %lf), LOCAL COORDS: (%lf, %lf)", m_nav_x, m_nav_y, m_nav_heading,
-        // m_tracked_obstacles[i]->id, upd_glob_centr.x, upd_glob_centr.y, upd_loc_centr.x,
-        // upd_loc_centr.y);
-        // move everything based on the difference between that and the previous assumed global
-        // (then local) centroid
+        // map->point = (map->centroid)@(centroid->point)
+        float useless_theta;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(
             new pcl::PointCloud<pcl::PointXYZHSV>);
-        for (pcl::PointXYZHSV &global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points) {
-            global_pt.x += upd_glob_centr.x - m_tracked_obstacles[i]->global_centroid.x;
-            global_pt.y += upd_glob_centr.y - m_tracked_obstacles[i]->global_centroid.y;
+        for (pcl::PointXYZHSV &global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points){
+            pcl::PointXYZHSV upd_global_pt = global_pt;
+            std::tuple<double, double, double> centroid_to_point = all_seaing_perception::compute_transform_from_to(m_tracked_obstacles[i]->global_centroid.x, m_tracked_obstacles[i]->global_centroid.y, 0, global_pt.x, global_pt.y, 0);
+            std::tie(upd_global_pt.x, upd_global_pt.y, useless_theta) = all_seaing_perception::compose_transforms(std::make_tuple(upd_glob_centr.x, upd_glob_centr.y, 0), centroid_to_point);
+            global_pt = upd_global_pt;
             upd_local_obj_pcloud->push_back(
                 this->convert_to_local(global_pt));
         }
-        // pcl::transformPointCloud(*m_tracked_obstacles[i]->global_pcloud_ptr, *m_tracked_obstacles[i]->local_pcloud_ptr, m_map_lidar_tf);
+
         m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
-        m_tracked_obstacles[i]->local_centroid = upd_loc_centr;
-        avg_dist += pcl::euclideanDistance(p0, upd_loc_centr) / ((float)m_tracked_obstacles.size());
+        m_tracked_obstacles[i]->local_centroid = this->convert_to_local(upd_glob_centr);;
+        avg_dist += pcl::euclideanDistance(p0, m_tracked_obstacles[i]->local_centroid) / ((float)m_tracked_obstacles.size());
     }
 
     // Filter old obstacles

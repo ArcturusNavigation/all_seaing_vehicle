@@ -21,8 +21,8 @@ object_tracking_map_pf:
     use_const_new_obj_prob: True
     new_object_slam_prob: 0.0001
     init_new_cov: 50.0
-    init_xy_noise: 5.0
-    init_theta_noise: 0.1
+    init_xy_noise: 0.5
+    init_theta_noise: 1.0
     check_fov: True
     imu_predict: True
     gps_update: True
