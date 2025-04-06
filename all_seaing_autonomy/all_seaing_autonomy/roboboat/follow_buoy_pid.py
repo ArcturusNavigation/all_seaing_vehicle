@@ -7,7 +7,7 @@ from rclpy.executors import MultiThreadedExecutor
 from all_seaing_interfaces.action import Task
 from all_seaing_controller.pid_controller import PIDController
 from ament_index_python.packages import get_package_share_directory
-from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption
+from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption, ObstacleMap
 from all_seaing_common.action_server_base import ActionServerBase
 from sensor_msgs.msg import CameraInfo
 
@@ -27,10 +27,20 @@ class FollowBuoyPID(ActionServerBase):
             cancel_callback=self.default_cancel_callback,
         )
 
+        # Replaced by obstacle map 
         self.bbox_sub = self.create_subscription(
             LabeledBoundingBox2DArray, 
             "bounding_boxes", 
             self.bbox_callback, 
+            10
+        )
+
+        # New obstacle map node 
+        # Will use type label and local point 
+        self.bbox_sub_new = self.create_subscription(
+            ObstacleMap,
+            "obstacle_map/refined_untracked",
+            self.bbox_callback_new,
             10
         )
 
@@ -75,7 +85,8 @@ class FollowBuoyPID(ActionServerBase):
         # update from subs
         self.height = None
         self.width = None
-        self.bboxes = []
+        self.bboxes = [] # To be commented out 
+        self.obstacleboxes = [] 
 
         self.timer_period = 1 / 30.0
 
@@ -118,11 +129,15 @@ class FollowBuoyPID(ActionServerBase):
         self.height = msg.height
         self.width = msg.width
 
+    # Replaced by obstacle map 
     def bbox_callback(self, msg):
         self.bboxes = msg.boxes
 
+    def bbox_callback_new(self, msg):
+        self.obstacleboxes = msg.boxes
+
     def control_loop(self):
-        if self.width is None or len(self.bboxes) == 0:
+        if self.width is None or len(self.obstacleboxes) == 0:
             return
         
 
@@ -142,8 +157,9 @@ class FollowBuoyPID(ActionServerBase):
         # but diff size should be a rotation and probably 
         # a bit of a y shift too?
 
+        # Still use this logic to find the largest buoy, since probably most relative to path 
         forward = False
-        for box in self.bboxes:
+        for box in self.obstacleboxes:
             area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
             midpt = (box.max_x + box.min_x) / 2.0
             width = box.max_x - box.min_x
@@ -193,6 +209,9 @@ class FollowBuoyPID(ActionServerBase):
         #     yaw0 = True
         #     return
 
+        # Need to change this logic to something less crude, pure pursuit was suggested in task description 
+        # Currently uses location in image, need to change to each obstacle's local points 
+
         # can update, not impt rn
         left_x = red_center_x
         right_x = green_center_x
@@ -219,6 +238,9 @@ class FollowBuoyPID(ActionServerBase):
         left_ctr_thresh = img_ctr * 0.45
         right_ctr_thresh = img_ctr * 0.55
         offset = None
+
+        #Current obstacle avoidance that should be changed
+        # Currently based on location in image not local points 
 
         # yellow buoy exists
         if yellow_left is not None:
