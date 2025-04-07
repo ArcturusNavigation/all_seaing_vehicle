@@ -23,6 +23,9 @@ def launch_setup(context, *args, **kwargs):
     color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_buoy_label_mappings.yaml"
     )
+    inc_color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
+    )
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
@@ -45,7 +48,10 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
     slam_params = os.path.join(
-        bringup_prefix, "config", "perception", "slam_real.yaml"
+        bringup_prefix, "config", "slam", "slam_real.yaml"
+    )
+    pf_slam_params = os.path.join(
+        bringup_prefix, "config", "slam", "pf_slam_real.yaml"
     )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
@@ -157,9 +163,9 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "roboboat_2025"},
-            {"label_config": "color_label_mappings"},
+            {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
-            {"use_color_names": True},
+            {"use_color_names": False},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
@@ -212,8 +218,8 @@ def launch_setup(context, *args, **kwargs):
             ("lidar_topic", "/point_cloud/filtered")
         ],
         parameters=[
-            {"bbox_object_margin": 1.0},
-            {"color_label_mappings_file": color_buoy_label_mappings},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
@@ -233,6 +239,17 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
         parameters=[slam_params]
+    )
+
+    object_tracking_map_pf_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_pf",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+        ],
+        parameters=[pf_slam_params],
     )
 
     object_tracking_map_euclidean_node = launch_ros.actions.Node(
@@ -288,7 +305,8 @@ def launch_setup(context, *args, **kwargs):
         # shape_yolo_node,
         # static_shape_yolo_node,
         bbox_project_pcloud_node,
-        object_tracking_map_node,
+        # object_tracking_map_node,
+        object_tracking_map_pf_node,
         # object_tracking_map_euclidean_node,
         # obstacle_detector_node,
         # color_segmentation_node,

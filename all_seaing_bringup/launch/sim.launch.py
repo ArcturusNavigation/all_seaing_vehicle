@@ -25,7 +25,10 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
     slam_params = os.path.join(
-        bringup_prefix, "config", "perception", "slam_sim.yaml"
+        bringup_prefix, "config", "slam", "slam_sim.yaml"
+    )
+    pf_slam_params = os.path.join(
+        bringup_prefix, "config", "slam", "pf_slam_sim.yaml"
     )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
@@ -289,6 +292,17 @@ def launch_setup(context, *args, **kwargs):
         parameters=[slam_params],
     )
 
+    object_tracking_map_pf_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map_pf",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+        ],
+        parameters=[pf_slam_params],
+    )
+
     object_tracking_map_euclidean_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="object_tracking_map_euclidean",
@@ -476,7 +490,8 @@ def launch_setup(context, *args, **kwargs):
         # buoy_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
-        object_tracking_map_node,
+        # object_tracking_map_node,
+        object_tracking_map_pf_node,
         # object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,

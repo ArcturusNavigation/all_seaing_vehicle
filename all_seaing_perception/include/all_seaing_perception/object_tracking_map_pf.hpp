@@ -1,5 +1,5 @@
-#ifndef ALL_SEAING_PERCEPTION__OBJECT_TRACKING_MAP_HPP
-#define ALL_SEAING_PERCEPTION__OBJECT_TRACKING_MAP_HPP
+#ifndef ALL_SEAING_PERCEPTION__OBJECT_TRACKING_MAP_PF_HPP
+#define ALL_SEAING_PERCEPTION__OBJECT_TRACKING_MAP_PF_HPP
 
 #include <iostream>
 #include <fstream>
@@ -8,6 +8,8 @@
 #include <vector>
 #include <tuple>
 #include <chrono>
+#include <random>
+#include <math.h>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -29,6 +31,7 @@
 #include "builtin_interfaces/msg/time.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "std_msgs/msg/header.hpp"
+#include "std_msgs/msg/color_rgba.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 
@@ -59,16 +62,64 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
+#include <Eigen/LU>
 
-class ObjectTrackingMap : public rclcpp::Node{
+struct SLAMParticle{
+    Eigen::Vector3f m_pose;
+    int m_num_obj;
+    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> m_tracked_obstacles, m_detected_global;// including EKF for each obstacle
+    int m_obstacle_id;
+    bool m_got_nav;
+    Eigen::Vector3f gps_mean;
+    Eigen::Matrix3f gps_cov;
+    float m_weight;
+    double m_nav_x, m_nav_y, m_nav_heading;
+
+    SLAMParticle(float init_x, float init_y, float init_theta);
+
+    template <typename T>
+    T convert_to_local(T point, geometry_msgs::msg::TransformStamped map_lidar_tf);
+
+    template <typename T>
+    T convert_to_global(T point, geometry_msgs::msg::TransformStamped lidar_map_tf);
+
+    void sample_pose(double vx, double vy, double omega, double dt, float vxy_noise_coeff, float omega_noise_coeff, float theta_noise_coeff);
+    
+    void update_nav_vars(double x, double y, double theta);
+    
+    void update_gps(double x, double y, double theta, float xy_uncertainty, float theta_uncertainty);
+
+    void reset_gps();
+
+    void update_map(std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> detected_obstacles, builtin_interfaces::msg::Time curr_time,
+        bool is_sim, float range_std, float bearing_std, float init_new_cov, float new_obj_slam_thres, float new_object_slam_coeff, bool use_const_new_obj_prob, float new_object_slam_prob,
+        bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model,
+        geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tfm, rclcpp::Logger logger);
+
+    float mahalanobis_to_prob(float mahalanobis_dist, Eigen::MatrixXf cov);
+
+    float prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::MatrixXf cov);
+
+    float gps_prob(bool include_odom_theta);
+
+    float get_weight(bool include_odom_theta);
+
+    visualization_msgs::msg::MarkerArray visualize_pose(std_msgs::msg::Header global_header, int &id_start, std_msgs::msg::ColorRGBA color);
+
+    visualization_msgs::msg::MarkerArray visualize_map(std_msgs::msg::Header global_header, float new_obj_slam_thres, int &id_start);
+};
+
+std::shared_ptr<SLAMParticle> clone(std::shared_ptr<SLAMParticle> orig);
+
+class ObjectTrackingMapPF : public rclcpp::Node{
 private:
     void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
     void odom_callback();
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
     template <typename T>
-    T convert_to_global(T point, bool untracked = false);
+    T convert_to_global(T point);
     template <typename T>
-    T convert_to_local(T point, bool untracked = false);
+    T convert_to_local(T point);
 
     void visualize_predictions();
 
@@ -77,8 +128,15 @@ private:
     
     void publish_slam();
 
+    void update_curr_particle();
+
     // Member variables
-    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> m_tracked_obstacles;
+    int m_num_particles;
+    std::vector<std::shared_ptr<SLAMParticle>> m_particles;
+    std::shared_ptr<SLAMParticle> m_curr_particle;
+    std::vector<float> m_weights;
+    int m_best_particle_index;
+
     std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header, m_global_untracked_header;
@@ -91,7 +149,7 @@ private:
 
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
-    
+
     std::vector<std::pair<float, float>> m_trace;
 
     // Publishers and subscribers
@@ -114,13 +172,10 @@ private:
     image_geometry::PinholeCameraModel m_cam_model;
 
     //SLAM matrices & variables
-    float m_range_std, m_bearing_std, m_new_obj_slam_thres;
-    float m_gps_xy_noise, m_gps_theta_noise;
-    float m_imu_xy_noise, m_imu_theta_noise;
+    float m_range_std, m_bearing_std, m_new_obj_slam_thres, m_new_object_slam_prob, m_new_object_slam_coeff;
+    float m_gps_vxy_noise_coeff, m_gps_omega_noise_coeff, m_gps_theta_noise_coeff;
+    float m_imu_vxy_noise_coeff, m_imu_omega_noise_coeff, m_imu_theta_noise_coeff;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
-    int m_num_obj;
-    Eigen::VectorXf m_state;//obstacle map
-    Eigen::MatrixXf m_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom;
     nav_msgs::msg::Odometry m_last_odom_msg;
 
@@ -129,9 +184,10 @@ private:
     bool m_direct_tf;
     bool m_normalize_drop_thresh;
     bool m_include_odom_theta;
+    bool m_use_const_new_obj_prob;
 public:
-    ObjectTrackingMap();
-    virtual ~ObjectTrackingMap();
+    ObjectTrackingMapPF();
+    virtual ~ObjectTrackingMapPF();
 };
 
-#endif // ALL_SEAING_PERCEPTION__OBJECT_TRACKING_MAP_HPP
+#endif // ALL_SEAING_PERCEPTION__OBJECT_TRACKING_MAP_PF_HPP
