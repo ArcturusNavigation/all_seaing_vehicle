@@ -24,17 +24,16 @@ jobs:
           cp -r ../all_seaing_vehicle dev_ws/src/;
           nix develop -i --accept-flake-config --keep HOME --command bash -c "bash ./build.sh;";
       - name: Build modules and run nodes
+        # omitted due to build failures (currently unsupported on nix):
+        # bash ci/run.sh all_seaing_perception;
+        # bash ci/run.sh all_seaing_bringup;
         run: cd ../arcturus_nix;
-          nix develop -i --accept-flake-config --keep HOME --command bash -c "
           bash ci/run.sh all_seaing_autonomy;
-          bash ci/run.sh all_seaing_bringup;
           bash ci/run.sh all_seaing_common;
           bash ci/run.sh all_seaing_controller;
           bash ci/run.sh all_seaing_description;
           bash ci/run.sh all_seaing_driver;
           bash ci/run.sh all_seaing_interfaces;
           bash ci/run.sh all_seaing_navigation;
-          bash ci/run.sh all_seaing_perception;
           bash ci/run.sh all_seaing_rviz_plugins;
           bash ci/run.sh all_seaing_utility;
-          "
