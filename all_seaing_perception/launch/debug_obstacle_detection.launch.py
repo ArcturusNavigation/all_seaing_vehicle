@@ -247,7 +247,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
         parameters=[pf_slam_params],
     )
