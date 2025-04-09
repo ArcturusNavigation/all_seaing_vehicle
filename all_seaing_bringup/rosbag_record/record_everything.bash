@@ -1,0 +1,6 @@
+#!/bin/bash
+
+current_date_time=$(date +"%m_%d__%H_%M")
+file_name="everything_$current_date_time"
+echo "Recording everything to $file_name"
+ros2 bag record -o ../rosbags/$file_name --all
