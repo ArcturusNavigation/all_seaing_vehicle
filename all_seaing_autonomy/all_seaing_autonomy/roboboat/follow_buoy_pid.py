@@ -27,16 +27,16 @@ class FollowBuoyPID(ActionServerBase):
             cancel_callback=self.default_cancel_callback,
         )
 
-        # Replaced by obstacle map 
+        # Replaced by obstacle map
         self.bbox_sub = self.create_subscription(
-            LabeledBoundingBox2DArray, 
-            "bounding_boxes", 
-            self.bbox_callback, 
+            LabeledBoundingBox2DArray,
+            "bounding_boxes",
+            self.bbox_callback,
             10
         )
 
-        # New obstacle map node 
-        # Will use type label and local point 
+        # New obstacle map node
+        # Will use type label and local point
         self.bbox_sub_new = self.create_subscription(
             ObstacleMap,
             "obstacle_map/refined_untracked",
@@ -45,15 +45,15 @@ class FollowBuoyPID(ActionServerBase):
         )
 
         self.intrinsics_sub = self.create_subscription(
-            CameraInfo, 
+            CameraInfo,
             "camera_info",
             self.intrinsics_callback,
             10
         )
 
         self.control_pub = self.create_publisher(
-            ControlOption, 
-            "control_options", 
+            ControlOption,
+            "control_options",
             10
         )
 
@@ -79,14 +79,14 @@ class FollowBuoyPID(ActionServerBase):
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
-        
+
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         # update from subs
         self.height = None
         self.width = None
-        self.bboxes = [] # To be commented out 
-        self.obstacleboxes = [] 
+        self.bboxes = [] # To be commented out
+        self.obstacleboxes = []
 
         self.timer_period = 1 / 30.0
 
@@ -99,13 +99,17 @@ class FollowBuoyPID(ActionServerBase):
 
         self.scale_right = 1.0
 
-        
+
         self.declare_parameter(
-            "color_label_mappings_file", 
+            "color_label_mappings_file",
             os.path.join(
                 bringup_prefix, "config", "perception", "color_label_mappings.yaml"
             ),
         )
+        self.declare_parameter("right_color", "green")
+        # Integers, feet apart
+        self.declare_parameter("max_distance_apart", 10)
+        self.declare_parameter("min_distance_apart", 6)
 
         self.red_green_ratio = None
 
@@ -122,14 +126,14 @@ class FollowBuoyPID(ActionServerBase):
         else:
             self.yellow_labels.add(label_mappings["yellow"])
 
-        
+
 
 
     def intrinsics_callback(self, msg):
         self.height = msg.height
         self.width = msg.width
 
-    # Replaced by obstacle map 
+    # Replaced by obstacle map
     def bbox_callback(self, msg):
         self.bboxes = msg.boxes
 
@@ -140,48 +144,51 @@ class FollowBuoyPID(ActionServerBase):
     def control_loop(self):
         if self.width is None or len(self.obstacleboxes) == 0:
             return
-        
 
-        red_center_x = None
+        # Access point through name.point.x, etc.?
+        red_location = None
         red_area = 0
 
-        green_center_x = None
+        green_location = None
         green_area = 0
 
         # yellow_center_x = None
         yellow_area = 0
-        yellow_left = None
-        yellow_right = None
+        # yellow_left = None
+        # yellow_right = None
+        yellow_location = None
 
         # handle balancing box sizes later ?
         # ex. same size but offset should be y shift
-        # but diff size should be a rotation and probably 
+        # but diff size should be a rotation and probably
         # a bit of a y shift too?
 
-        # Still use this logic to find the largest buoy, since probably most relative to path 
+        # Still use this logic to find the largest buoy, since probably most relative to path
         forward = False
         for box in self.obstacleboxes:
             area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
-            midpt = (box.max_x + box.min_x) / 2.0
-            width = box.max_x - box.min_x
+            # midpt = (box.max_x + box.min_x) / 2.0
+            # width = box.max_x - box.min_x
+            location = box.local_point
             if box.label in self.green_labels and area > green_area:
                 green_area = area
-                green_center_x = midpt
+                green_location = location
                 # sets flag if width large enough regardless of if sees anything
-                if width >= self.width * 0.15:
-                    forward = True
-                    self.forward_start = self.get_clock().now()
+                # if width >= self.width * 0.15:
+                #     forward = True
+                #     self.forward_start = self.get_clock().now()
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
-                red_center_x = midpt
-                if width >= self.width * 0.15:
-                    forward = True
-                    self.forward_start = self.get_clock().now()
+                red_location = location
+                # if width >= self.width * 0.15:
+                #     forward = True
+                #     self.forward_start = self.get_clock().now()
             elif box.label in self.yellow_labels and area > yellow_area:
                 yellow_area = area
-                yellow_left = box.min_x
-                yellow_right = box.max_x
-                
+                # yellow_left = box.min_x
+                # yellow_right = box.max_x
+                yellow_location = location
+
         # if we only see one of red / green, rotate
         # if we see neither, log + kill
         # if red_center_x is None or green_center_x is None:
@@ -191,84 +198,124 @@ class FollowBuoyPID(ActionServerBase):
         #     return
 
         yaw0 = False
-        if red_center_x is None and green_center_x is None:
+        if red_location is None and green_location is None:
             yaw0 = True
             if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
                 self.get_logger().info("no more buoys killing")
                 # wait 1 second, then send a stopping control msg (in case we haven't fully passed the buoys)
                 time.sleep(1)
-        
+
                 self.result = True
             return
         else:
             self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
-        if red_center_x is not None and green_center_x is not None:
-            self.red_green_ratio = red_area / green_area
+        # if red_center_x is not None and green_center_x is not None:
+        #     self.red_green_ratio = red_area / green_area
         # keep going in the same direction if the ratio is too far off.
         # if self.red_green_ratio is not None and (self.red_green_ratio > 0.5 or self.red_green_ratio < 0.5):
         #     yaw0 = True
         #     return
 
-        # Need to change this logic to something less crude, pure pursuit was suggested in task description 
-        # Currently uses location in image, need to change to each obstacle's local points 
+        # Need to change this logic to something less crude, pure pursuit was suggested in task description
+        # Currently uses location in image, need to change to each obstacle's local points
 
         # can update, not impt rn
-        left_x = red_center_x
-        right_x = green_center_x
-        img_ctr = self.width / 2.0
+        # left_x = red_center_x
+        # right_x = green_center_x
+        # img_ctr = self.width / 2.0
 
-        if left_x is None: 
- #           if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
- #               yaw0 = True
- #               left_x = 0 # this doesn't actually do anything, just to prevent erroring gate_ctr calculation
-            if right_x < img_ctr:
-                left_x = right_x - (self.width * 0.75)
-            else:
-                left_x = 0
-        if right_x is None: 
-            # if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9: 
-              #   yaw0 = True
-                # right_x = 0
-            if left_x >= img_ctr:
-                right_x = left_x + (self.width * 0.75)
-            else:
-                right_x = self.width - 1
+        correction_value = (self.max_distance_apart + self.min_distance_apart)/2
+        waypoint_x = None
+        waypoint_y = None
+        red_location_x = None
+        red_location_y = None
+        green_location_x = None
+        green_location_y = None
 
-        gate_ctr = (left_x + right_x) / 2.0
-        left_ctr_thresh = img_ctr * 0.45
-        right_ctr_thresh = img_ctr * 0.55
-        offset = None
+        if green_location == None:
+            red_location_y = red_location.point.y
+            red_location_x = red_location.point.x
+            if self.right_color == "green":
+                green_location_y = red_location_y + correction_value
+            elif self.right_color == "red":
+                green_location_y = red_location_y - correction_value
+        if red_location == None:
+            green_location_y = green_location.point.y
+            green_location_x = green_location.point.x
+            if self.right_color == "green":
+                red_location_y = green_location_y - correction_value
+            if self.right_color == "red":
+                red_location_y = green_location_y + correction_value
+        else:
+            green_location_y = green_location.point.y
+            green_location_x = green_location.point.x
+            red_location_y = red_location.point.y
+            red_location_x = red_location.point.x
+
+
+        if yellow_location != None:
+            waypoint_y = (red_location_y + green_location_y)/2
+            waypoint_x = (red_location_x + green_location_x)/2
+        else:
+            # To change
+            waypoint_x = None
+            waypoint_y = None
+
+
+# OLD CODE DON'T NEED?
+
+#         if left_x is None:
+#  #           if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9:
+#  #               yaw0 = True
+#  #               left_x = 0 # this doesn't actually do anything, just to prevent erroring gate_ctr calculation
+#             if right_x < img_ctr:
+#                 left_x = right_x - (self.width * 0.75)
+#             else:
+#                 left_x = 0
+#         if right_x is None:
+#             # if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9:
+#               #   yaw0 = True
+#                 # right_x = 0
+#             if left_x >= img_ctr:
+#                 right_x = left_x + (self.width * 0.75)
+#             else:
+#                 right_x = self.width - 1
+
+#         gate_ctr = (left_x + right_x) / 2.0
+#         left_ctr_thresh = img_ctr * 0.45
+#         right_ctr_thresh = img_ctr * 0.55
+#         offset = None
 
         #Current obstacle avoidance that should be changed
-        # Currently based on location in image not local points 
+        # Currently based on location in image not local points
 
         # yellow buoy exists
-        if yellow_left is not None:
-            # if yellow_left <= right_ctr_thresh and yellow_right >= right_ctr_thresh:
+        # if yellow_left is not None:
+        #     # if yellow_left <= right_ctr_thresh and yellow_right >= right_ctr_thresh:
 
-            yellow_ctr = (yellow_left + yellow_right) / 2.0
-            if yellow_left <= img_ctr and yellow_right >= img_ctr and left_x <= yellow_ctr <= right_x:
-                # yellow buoy is in the middle (on both sides of camera)
-                left_diff = img_ctr - yellow_left
-                right_diff = yellow_right - img_ctr
-                if left_diff < right_diff:
-                    # yellow buoy is on the right side
-                    # want to turn left
-                    # goal is to get yellow_left to align with right_ctr_thresh 
-                    # should overshoot a bit ?
-                    # bc this would stop running once its past the center. 
-                    self.get_logger().info("yellow buoy on the right side. turning left. ")
-                    offset = yellow_left - right_ctr_thresh
+        #     yellow_ctr = (yellow_left + yellow_right) / 2.0
+        #     if yellow_left <= img_ctr and yellow_right >= img_ctr and left_x <= yellow_ctr <= right_x:
+        #         # yellow buoy is in the middle (on both sides of camera)
+        #         left_diff = img_ctr - yellow_left
+        #         right_diff = yellow_right - img_ctr
+        #         if left_diff < right_diff:
+        #             # yellow buoy is on the right side
+        #             # want to turn left
+        #             # goal is to get yellow_left to align with right_ctr_thresh
+        #             # should overshoot a bit ?
+        #             # bc this would stop running once its past the center.
+        #             self.get_logger().info("yellow buoy on the right side. turning left. ")
+        #             offset = yellow_left - right_ctr_thresh
 
-                else:
-                    self.get_logger().info("yellow buoy is on the left side. turning right.")
-                    offset = yellow_right - left_ctr_thresh
-                    # yellow buoy is on the left side
-                    # want to turn right
-                    # goal is to get yellow_right to align with left_ctr_thresh
-        if offset is None:
-            offset = gate_ctr - self.width / 2.0
+        #         else:
+        #             self.get_logger().info("yellow buoy is on the left side. turning right.")
+        #             offset = yellow_right - left_ctr_thresh
+        #             # yellow buoy is on the left side
+        #             # want to turn right
+        #             # goal is to get yellow_right to align with left_ctr_thresh
+        # if offset is None:
+        #     offset = gate_ctr - self.width / 2.0
 
 
         #     if yellow_left > img_ctr and yellow_right > img_ctr:
@@ -294,22 +341,24 @@ class FollowBuoyPID(ActionServerBase):
         # self.width / 2.0 is img ctr
         # offset = gate_ctr - self.width / 2.0
 
-        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.pid.update(offset, dt)            
-        self.get_logger().info(f"offset: {offset}")
-        yaw_rate = self.pid.get_effort()
-        if yaw_rate < 0.0: # 3/6: if turning rihgt, make turn larger
-            yaw_rate = max(yaw_rate * self.scale_right, -self.max_yaw_rate)
-        if yaw0:
-            yaw_rate = 0.0
-        self.prev_update_time = self.get_clock().now()
+        # OLD PID CODE!!!! (346-361)
 
-        control_msg = ControlOption()
-        control_msg.priority = 1
-        control_msg.twist.linear.x = float(self.forward_speed)
-        control_msg.twist.linear.y = 0.0
-        control_msg.twist.angular.z = float(yaw_rate)
-        self.control_pub.publish(control_msg)
+        # dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        # self.pid.update(offset, dt)
+        # self.get_logger().info(f"offset: {offset}")
+        # yaw_rate = self.pid.get_effort()
+        # if yaw_rate < 0.0: # 3/6: if turning rihgt, make turn larger
+        #     yaw_rate = max(yaw_rate * self.scale_right, -self.max_yaw_rate)
+        # if yaw0:
+        #     yaw_rate = 0.0
+        # self.prev_update_time = self.get_clock().now()
+
+        # control_msg = ControlOption()
+        # control_msg.priority = 1
+        # control_msg.twist.linear.x = float(self.forward_speed)
+        # control_msg.twist.linear.y = 0.0
+        # control_msg.twist.angular.z = float(yaw_rate)
+        # self.control_pub.publish(control_msg)
 
     def execute_callback(self, goal_handle):
         self.start_process("follow buoy pid starting")
@@ -329,7 +378,7 @@ class FollowBuoyPID(ActionServerBase):
 
             self.control_loop()
             time.sleep(self.timer_period)
-        
+
         self.end_process("follow buoy pid completed!")
         goal_handle.succeed()
         return Task.Result(success=True)
@@ -348,5 +397,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-
-    
