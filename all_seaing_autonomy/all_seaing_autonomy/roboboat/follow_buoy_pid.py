@@ -133,6 +133,7 @@ class FollowBuoyPID(ActionServerBase):
     def bbox_callback(self, msg):
         self.bboxes = msg.boxes
 
+    # New version with obstacles
     def bbox_callback_new(self, msg):
         self.obstacleboxes = msg.boxes
 
