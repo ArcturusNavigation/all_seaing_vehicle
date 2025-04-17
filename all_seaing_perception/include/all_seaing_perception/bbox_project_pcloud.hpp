@@ -68,7 +68,7 @@ private:
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
-    geometry_msgs::msg::TransformStamped m_pc_cam_tf;
+    geometry_msgs::msg::TransformStamped m_pc_cam_tf, m_cam_base_link_tf;
     bool m_pc_cam_tf_ok;
 
     // Intrinsics callback camera model variables
@@ -113,6 +113,8 @@ private:
     // for cluster-contour matching/selection
     std::string matching_weights_file;
     std::string contour_matching_color_ranges_file;
+
+    std::string m_base_link_frame;
 
     YAML::Node matching_weights_config_yaml, contour_matching_ranges_config_yaml;
 

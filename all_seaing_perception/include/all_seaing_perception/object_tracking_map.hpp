@@ -107,7 +107,7 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
     std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
-    geometry_msgs::msg::TransformStamped m_lidar_map_tf, m_map_lidar_tf;
+    geometry_msgs::msg::TransformStamped m_base_link_map_tf, m_map_base_link_tf;
     rclcpp::TimerBase::SharedPtr odom_timer;
 
     // Intrinsics callback camera model variables
