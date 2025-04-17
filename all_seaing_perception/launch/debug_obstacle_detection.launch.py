@@ -17,6 +17,7 @@ def launch_setup(context, *args, **kwargs):
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     driver_prefix = get_package_share_directory("all_seaing_driver")
     description_prefix = get_package_share_directory("all_seaing_description")
+    utility_prefix = get_package_share_directory("all_seaing_utility")
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -95,13 +96,25 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource(
             [
                 description_prefix,
-                "/launch/static_transforms.launch.py",
+                "/launch/static_transforms_rosbag.launch.py",
             ]
         ),
         launch_arguments={
             "indoors": is_indoors,
         }.items(),
-        condition=UnlessCondition(use_bag),
+    )
+
+    tf_filtering = launch_ros.actions.Node(
+        package="all_seaing_utility",
+        executable="filter_tf.py",
+        parameters=[
+            {"old_tf_topic": "/tf_fake"},
+            {"new_tf_topic": "/tf"},
+            {"old_static_tf_topic": "/tf_static_fake"},
+            {"new_static_tf_topic": "/tf_static"},
+            # {"child_frames_to_remove": ["zed_camera_link"]},
+            {"parent_frames_to_remove": ["base_link"]},
+        ]
     )
 
     run_tasks = launch_ros.actions.Node(
@@ -299,6 +312,7 @@ def launch_setup(context, *args, **kwargs):
         navsat_node,
         keyboard_ld,
         static_transforms_ld,
+        tf_filtering,
         # run_tasks,
         # task_init_server, 
         # follow_buoy_path,
