@@ -114,6 +114,8 @@ private:
     std::string matching_weights_file;
     std::string contour_matching_color_ranges_file;
 
+    std::string m_base_link_frame;
+
     YAML::Node matching_weights_config_yaml, contour_matching_ranges_config_yaml;
 
     double m_clustering_distance_weight;

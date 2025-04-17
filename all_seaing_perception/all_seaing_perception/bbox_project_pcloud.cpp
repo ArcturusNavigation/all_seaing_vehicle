@@ -39,6 +39,9 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
 
     color_label_mappings_file = this->get_parameter("color_label_mappings_file").as_string();
 
+    this->declare_parameter("base_link_frame", "base_link");
+    m_base_link_frame = this->get_parameter("base_link_frame").as_string();
+
     // for cluster-contour matching & selection
     this->declare_parameter("matching_weights_file", "");
     this->declare_parameter("contour_matching_color_ranges_file", "");
@@ -165,7 +168,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
     if (!m_pc_cam_tf_ok)
         m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id);
-    m_cam_base_link_tf = get_tf("base_link", in_img_msg->header.frame_id);
+    m_cam_base_link_tf = get_tf(m_base_link_frame, in_img_msg->header.frame_id);
 
     // Transform in_cloud_msg to the camera frame and convert PointCloud2 to PCL PointCloud
     sensor_msgs::msg::PointCloud2 in_cloud_tf;
@@ -228,7 +231,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 RCLCPP_DEBUG(this->get_logger(), "Projection exception: %s", e.what());
             }
             // Check if within bounds & in front of the boat
-            float actual_z = m_is_sim? -point_tf.x : point_tf.z;
+            float actual_z = m_is_sim? point_tf.x : point_tf.z;
             if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
                 (xy_rect.y < m_cam_model.cameraInfo().height) && (actual_z >= 0)) {          
                 // Check if point is in bbox
