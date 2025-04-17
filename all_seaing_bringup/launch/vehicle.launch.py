@@ -332,6 +332,7 @@ def launch_setup(context, *args, **kwargs):
             ("bounding_boxes", "static_shape_boxes")
         ],
         parameters=[
+            {"base_link_frame": "actual_base_link"},
             {"bbox_object_margin": 1.0},
             {"color_label_mappings_file": buoy_label_mappings},
             {"obstacle_size_min": 2},

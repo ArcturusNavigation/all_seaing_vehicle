@@ -23,7 +23,8 @@ def launch_setup(context, *args, **kwargs):
         executable="static_transform_publisher",
         arguments=[
             "--frame-id",
-            "base_link", 
+            # "base_link",
+            "actual_base_link", # hotfix
             "--child-frame-id",
             "zed_camera_link",
         ],
@@ -55,10 +56,30 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    rotate_base_link = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--qx",
+            "0.0",
+            "--qy",
+            "0.0",
+            "--qz",
+            "-0.7071068",
+            "--qw",
+            "0.7071068",
+            "--frame-id",
+            "base_link",
+            "--child-frame-id",
+            "actual_base_link",
+        ],
+    )
+
     return [
         map_to_odom,
         lidar_to_camera,
         zed_to_base,
+        rotate_base_link,
     ]
 
 
