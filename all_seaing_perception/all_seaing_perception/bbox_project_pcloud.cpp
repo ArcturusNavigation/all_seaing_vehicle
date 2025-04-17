@@ -166,9 +166,10 @@ void BBoxProjectPCloud::bb_pcl_project(
     RCLCPP_DEBUG(this->get_logger(), "GOT DATA");
 
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
-    if (!m_pc_cam_tf_ok)
-        m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id);
-    m_cam_base_link_tf = get_tf(m_base_link_frame, in_img_msg->header.frame_id);
+    while (!m_pc_cam_tf_ok)
+        m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id, "pc_cam");
+    while (!m_cam_base_link_tf_ok)
+        m_cam_base_link_tf = get_tf(m_base_link_frame, in_img_msg->header.frame_id, "cam_base_link");
 
     // Transform in_cloud_msg to the camera frame and convert PointCloud2 to PCL PointCloud
     sensor_msgs::msg::PointCloud2 in_cloud_tf;
@@ -585,12 +586,18 @@ void BBoxProjectPCloud::bb_pcl_project(
 }
 
 geometry_msgs::msg::TransformStamped BBoxProjectPCloud::get_tf(const std::string &in_target_frame,
-                                                             const std::string &in_src_frame) {
+                                                             const std::string &in_src_frame, std::string info) {
     geometry_msgs::msg::TransformStamped tf;
-    m_pc_cam_tf_ok = false;
+    if (info == "pc_cam")
+        m_pc_cam_tf_ok = false;
+    else if (info == "cam_base_link")
+        m_cam_base_link_tf_ok = false;
     try {
         tf = m_tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
-        m_pc_cam_tf_ok = true;
+        if (info == "pc_cam")
+            m_pc_cam_tf_ok = true;
+        else if (info == "cam_base_link")
+            m_cam_base_link_tf_ok = true;
         // RCLCPP_DEBUG(this->get_logger(), "LiDAR to Camera Transform good");
         RCLCPP_DEBUG(this->get_logger(), "in_target_frame: %s, in_src_frame: %s",
                     in_target_frame.c_str(), in_src_frame.c_str());

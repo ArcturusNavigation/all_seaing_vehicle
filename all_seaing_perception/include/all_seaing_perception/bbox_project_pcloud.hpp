@@ -69,7 +69,7 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
     geometry_msgs::msg::TransformStamped m_pc_cam_tf, m_cam_base_link_tf;
-    bool m_pc_cam_tf_ok;
+    bool m_pc_cam_tf_ok, m_cam_base_link_tf_ok;
 
     // Intrinsics callback camera model variables
     image_geometry::PinholeCameraModel m_cam_model;
@@ -87,7 +87,7 @@ private:
 
     // Get transform from source frame to target frame
     geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
-                                                const std::string &in_src_frame);
+                                                const std::string &in_src_frame, std::string info);
 
     // Get the point cloud from the LiDAR, the image from the camera (only to get the camera frame),
     // and the bounding boxes of the objects detected from the YOLOv8 (or other object detector/color segmentator) node,
