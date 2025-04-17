@@ -14,7 +14,7 @@ object_tracking_map_pf:
     motion_imu_omega_noise_coeff: 0.5
     motion_imu_theta_noise_coeff: 0.1
     update_gps_xy_uncertainty: 250.0
-    include_odom_theta: False # if do that rotate it 90 degrees as the transform is currently wrong
+    include_odom_theta: True # if do that rotate it 90 degrees from base_link as the transform is currently wrong
     update_odom_theta_uncertainty: 1.0
     new_object_slam_threshold: 5.0
     new_object_slam_coeff: 0.1

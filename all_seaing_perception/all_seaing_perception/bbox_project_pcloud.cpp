@@ -166,10 +166,16 @@ void BBoxProjectPCloud::bb_pcl_project(
     RCLCPP_DEBUG(this->get_logger(), "GOT DATA");
 
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
-    while (!m_pc_cam_tf_ok)
+    if (!m_pc_cam_tf_ok){
         m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id, "pc_cam");
-    while (!m_cam_base_link_tf_ok)
+        if (!m_pc_cam_tf_ok)
+            return;
+    }
+    if (!m_cam_base_link_tf_ok){
         m_cam_base_link_tf = get_tf(m_base_link_frame, in_img_msg->header.frame_id, "cam_base_link");
+        if (!m_cam_base_link_tf_ok)
+            return;
+    }
 
     // Transform in_cloud_msg to the camera frame and convert PointCloud2 to PCL PointCloud
     sensor_msgs::msg::PointCloud2 in_cloud_tf;
