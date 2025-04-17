@@ -23,8 +23,8 @@ def launch_setup(context, *args, **kwargs):
         executable="static_transform_publisher",
         arguments=[
             "--frame-id",
-            "base_link",
-            # "actual_base_link", # hotfix
+            # "base_link",
+            "actual_base_link", # hotfix
             "--child-frame-id",
             "zed_camera_link",
         ],
@@ -76,10 +76,10 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        map_to_odom,
-        lidar_to_camera,
+        # map_to_odom,
+        # lidar_to_camera,
         zed_to_base,
-        # rotate_base_link,
+        rotate_base_link,
     ]
 
 
