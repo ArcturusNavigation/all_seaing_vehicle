@@ -9,6 +9,7 @@ ekf_filter_node:
 
     odom_frame: odom
     base_link_frame: base_link
+    # base_link_frame: base_link_rotated
     world_frame: odom
     publish_tf: true
     reset_on_time_jump: true

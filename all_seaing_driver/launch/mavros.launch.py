@@ -17,6 +17,10 @@ def generate_launch_description():
                 executable="mavros_node",
                 parameters=[
                     {"fcu_url": LaunchConfiguration("port")},
+                    {"imu/frame_id": "imu_link"},
+                    {"global_position/frame_id": "gps_link"},
+                    # {"global_position/tf/frame_id": "gps_world"},
+                    # {"global_position/tf/child_frame_id": "gps_link"},
                 ],
                 output="both",
             ),

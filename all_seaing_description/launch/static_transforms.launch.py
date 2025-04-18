@@ -24,7 +24,6 @@ def launch_setup(context, *args, **kwargs):
         arguments=[
             "--frame-id",
             "base_link",
-            # "actual_base_link", # hotfix
             "--child-frame-id",
             "zed_camera_link",
         ],
@@ -56,7 +55,57 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    rotate_base_link = Node(
+    base_link_to_imu = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--x",
+            "0.0",
+            "--y",
+            "0.0",
+            "--z",
+            "0.0",
+            "--qx",
+            "0.0",
+            "--qy",
+            "0.0",
+            "--qz",
+            "-0.7071068",
+            "--qw",
+            "0.7071068",
+            "--frame-id",
+            "base_link",
+            "--child-frame-id",
+            "imu_link",
+        ],
+    )
+
+    base_link_to_gps = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--x",
+            "0.0",
+            "--y",
+            "0.0",
+            "--z",
+            "0.0",
+            "--qx",
+            "0.0",
+            "--qy",
+            "0.0",
+            "--qz",
+            "0.0",
+            "--qw",
+            "0.0",
+            "--frame-id",
+            "base_link",
+            "--child-frame-id",
+            "gps_link",
+        ],
+    )
+
+    rotate_rotated_base_link = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         arguments=[
@@ -69,9 +118,9 @@ def launch_setup(context, *args, **kwargs):
             "--qw",
             "0.7071068",
             "--frame-id",
-            "base_link",
+            "rotated_base_link",
             "--child-frame-id",
-            "actual_base_link",
+            "base_link",
         ],
     )
 
@@ -79,7 +128,9 @@ def launch_setup(context, *args, **kwargs):
         map_to_odom,
         lidar_to_camera,
         zed_to_base,
-        # rotate_base_link,
+        base_link_to_imu,
+        base_link_to_gps,
+        # rotate_rotated_base_link
     ]
 
 
