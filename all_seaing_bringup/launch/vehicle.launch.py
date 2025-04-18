@@ -154,11 +154,11 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             (
                 "camera_info",
-                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
+                "/zed/zed_node/rgb/camera_info"
             ),
             (
                 "imu",
-                "/wamv/sensors/imu/imu/data"
+                "/mavros/imu/data"
             )
         ],
     )
