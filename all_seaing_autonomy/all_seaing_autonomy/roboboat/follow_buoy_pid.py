@@ -57,12 +57,40 @@ class FollowBuoyPID(ActionServerBase):
             10
         )
 
-
-        pid_vals = (
-            self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
+        Kpid_x = (
+            self.declare_parameter("Kpid_x", [1.0, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
+        Kpid_y = (
+            self.declare_parameter("Kpid_y", [1.0, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        Kpid_theta = (
+            self.declare_parameter("Kpid_theta", [1.0, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        self.max_vel = (
+            self.declare_parameter("max_vel", [4.0, 2.0, 1.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+
+        self.x_pid = PIDController(*Kpid_x)
+        self.y_pid = PIDController(*Kpid_y)
+        self.theta_pid = CircularPID(*Kpid_theta)
+        self.theta_pid.set_effort_min(-self.max_vel[2])
+        self.theta_pid.set_effort_max(self.max_vel[2])
+        self.prev_update_time = self.get_clock().now()
+
+
+        # pid_vals = (
+        #     self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
+        #     .get_parameter_value()
+        #     .double_array_value
+        # )
 
 
         self.declare_parameter("forward_speed", 5.0)
@@ -83,8 +111,6 @@ class FollowBuoyPID(ActionServerBase):
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         # update from subs
-        self.height = None
-        self.width = None
         self.bboxes = [] # To be commented out
         self.obstacleboxes = []
 
@@ -134,10 +160,24 @@ class FollowBuoyPID(ActionServerBase):
 
 
 
+    def set_pid_setpoints(self, x, y, theta):
+        self.x_pid.set_setpoint(x)
+        self.y_pid.set_setpoint(y)
+        self.theta_pid.set_setpoint(theta)
 
-    def intrinsics_callback(self, msg):
-        self.height = msg.height
-        self.width = msg.width
+    def update_pid(self, x, y, heading):
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        self.x_pid.update(x, dt)
+        self.y_pid.update(y, dt)
+        self.theta_pid.update(heading, dt)
+        self.prev_update_time = self.get_clock().now()
+
+    def scale_thrust(self, x_vel, y_vel):
+        if abs(x_vel) <= self.max_vel[0] and abs(y_vel) <= self.max_vel[1]:
+            return x_vel, y_vel
+
+        scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
+        return scale * x_vel, scale * y_vel
 
     # Replaced by obstacle map
     def bbox_callback(self, msg):
@@ -302,6 +342,21 @@ class FollowBuoyPID(ActionServerBase):
 
 
             # POINTS TO GIVE PID: waypoint_y and waypoint_x
+            
+            self.update_pid(waypoint_x, waypoint_y, math.atan2(waypoint_y, waypoint_x))
+            x_output = self.x_pid.get_effort()
+            y_output = self.y_pid.get_effort()
+            theta_output = self.theta_pid.get_effort()
+            x_vel = x_output
+            y_vel = y_output
+
+            x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
+            control_msg = ControlOption()
+            control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+            control_msg.twist.linear.x = x_vel
+            control_msg.twist.linear.y = y_vel
+            control_msg.twist.angular.z = theta_output
+            self.control_pub.publish(control_msg)
 
 
 # OLD CODE DON'T NEED?
@@ -404,6 +459,7 @@ class FollowBuoyPID(ActionServerBase):
     def execute_callback(self, goal_handle):
         self.start_process("follow buoy pid starting")
         self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
+        self.set_pid_setpoints(0, 0, 0) #want angle to point to be 0 radians
 
         while not self.result:
 
