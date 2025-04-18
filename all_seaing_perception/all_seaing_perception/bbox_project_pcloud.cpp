@@ -291,6 +291,8 @@ void BBoxProjectPCloud::bb_pcl_project(
 
     // REFINE OBJECT POINT CLOUDS
     auto refined_objects_pub = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
+    refined_objects_pub.header.stamp = in_cloud_msg->header.stamp;
+    refined_objects_pub.header.frame_id = m_base_link_frame;
     std::vector<std::pair<pcl::PointCloud<pcl::PointXYZHSV>, std::vector<cv::Point>>> refined_cloud_contour_vec;
     // int max_refined_len = 0;
 

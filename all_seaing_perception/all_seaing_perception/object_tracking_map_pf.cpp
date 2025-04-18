@@ -903,7 +903,8 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     if(msg->objects.size() == 0) return;   
     
     // Set up headers and transforms
-    m_local_header = msg->objects[0].cloud.header;
+    // m_local_header = msg->objects[0].cloud.header;
+    m_local_header = msg->header;
     m_global_header.frame_id = m_slam_frame_id;
     m_global_header.stamp = m_local_header.stamp;
     m_global_untracked_header.frame_id = m_global_frame_id;
@@ -966,7 +967,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
 
     // update the map for each particle and compute the weight based on the new detections
     for (int i = 0; i < m_num_particles; i++){
-        m_particles[i]->update_map(all_seaing_perception::clone(detected_obstacles), rclcpp::Time(msg->objects[0].time), m_is_sim, m_range_std, m_bearing_std,
+        m_particles[i]->update_map(all_seaing_perception::clone(detected_obstacles), rclcpp::Time(m_local_header.stamp), m_is_sim, m_range_std, m_bearing_std,
                                     m_init_new_cov, m_new_obj_slam_thres, m_new_object_slam_coeff, m_use_const_new_obj_prob, m_new_object_slam_prob, m_check_fov, m_obstacle_drop_thresh,
                                     m_normalize_drop_dist, m_cam_model,
                                 m_map_base_link_tf, m_base_link_map_tf, this->get_logger());

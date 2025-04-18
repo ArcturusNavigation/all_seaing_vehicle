@@ -134,7 +134,8 @@ void ObjectTrackingMapEuclidean::object_track_map_publish(
     // RCLCPP_DEBUG(this->get_logger(), "GOT DATA");
 
     // Set up headers and transforms
-    m_local_header = msg->objects[0].cloud.header;
+    // m_local_header = msg->objects[0].cloud.header;
+    m_local_header = msg->header;
     m_global_header.frame_id = m_global_frame_id;
     m_global_header.stamp = m_local_header.stamp;
     m_local_frame_id = m_local_header.frame_id;
@@ -268,9 +269,9 @@ void ObjectTrackingMapEuclidean::object_track_map_publish(
                              "OBSTACLE ID %d TIME PERIOD FROM PREVIOUS DEAD: %lf - %lf",
                              m_tracked_obstacles[tracked_id]->id,
                              m_tracked_obstacles[tracked_id]->last_dead.seconds(),
-                             rclcpp::Time(msg->objects[0].time).seconds());
+                             rclcpp::Time(m_local_header.stamp).seconds());
                 m_tracked_obstacles[tracked_id]->time_dead =
-                    rclcpp::Time(msg->objects[0].time) -
+                    rclcpp::Time(m_local_header.stamp) -
                     m_tracked_obstacles[tracked_id]->last_dead +
                     m_tracked_obstacles[tracked_id]->time_dead;
                 RCLCPP_DEBUG(this->get_logger(),
@@ -287,7 +288,7 @@ void ObjectTrackingMapEuclidean::object_track_map_publish(
                 }
             }
             m_tracked_obstacles[tracked_id]->is_dead = true;
-            m_tracked_obstacles[tracked_id]->last_dead = msg->objects[0].time;
+            m_tracked_obstacles[tracked_id]->last_dead = m_local_header.stamp;
         } else {
             m_tracked_obstacles[tracked_id]->is_dead = false;
         }

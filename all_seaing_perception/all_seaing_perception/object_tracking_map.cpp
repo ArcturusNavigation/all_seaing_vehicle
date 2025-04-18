@@ -594,11 +594,12 @@ void ObjectTrackingMap::visualize_predictions() {
 }
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
-    if(msg->objects.size()==0) return;    
+    // if(msg->objects.size()==0) return;
     // RCLCPP_INFO(this->get_logger(), "GOT DATA");
 
     // Set up headers and transforms
-    m_local_header = msg->objects[0].cloud.header;
+    // m_local_header = msg->objects[0].cloud.header;
+    m_local_header = msg->header;
     m_global_header.frame_id = m_track_robot? m_slam_frame_id : m_global_frame_id;
     m_global_header.stamp = m_local_header.stamp;
     std_msgs::msg::Header m_global_untracked_header = m_global_header;
@@ -651,7 +652,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-    all_seaing_perception::publish_map(m_global_untracked_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
+    all_seaing_perception::publish_map(m_local_header, m_global_untracked_header, "untracked", true, untracked_obs, m_untracked_map_pub,
                     untracked_labels);
 
     // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
@@ -869,9 +870,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 // Was also dead before, add time dead
                 // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d TIME PERIOD FROM PREVIOUS DEAD: %lf
                 // - %lf", tracked_id, m_tracked_obstacles[tracked_id]->last_dead.seconds(),
-                // rclcpp::Time(msg->objects[0].time).seconds());
+                // rclcpp::Time(m_local_header.stamp).seconds());
                 m_tracked_obstacles[tracked_id]->time_dead =
-                    rclcpp::Time(msg->objects[0].time) -
+                    rclcpp::Time(m_local_header.stamp) -
                     m_tracked_obstacles[tracked_id]->last_dead +
                     m_tracked_obstacles[tracked_id]->time_dead;
                 // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d DEAD FOR %lf SECONDS, OBSTACLE DROP
@@ -890,7 +891,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 }
             }
             m_tracked_obstacles[tracked_id]->is_dead = true;
-            m_tracked_obstacles[tracked_id]->last_dead = msg->objects[0].time;
+            m_tracked_obstacles[tracked_id]->last_dead = m_local_header.stamp;
         } else {
             m_tracked_obstacles[tracked_id]->is_dead = false;
         }
