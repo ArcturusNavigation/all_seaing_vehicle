@@ -110,8 +110,14 @@ class FollowBuoyPID(ActionServerBase):
         # Integers, feet apart
         self.declare_parameter("max_distance_apart", 10)
         self.declare_parameter("min_distance_apart", 6)
+        self.declare_parameter("meters_feet_conversion", 0.3048)
 
         self.red_green_ratio = None
+
+        self.right_color = self.get_parameter("right_color").get_parameter_value().string_value
+        self.max_distance_apart = self.get_parameter("max_distance_apart").get_parameter_value().integer_value
+        self.min_distance_apart = self.get_parameter("min_distance_apart").get_parameter_value().integer_value
+        self.meters_feet_conversion = self.get_parameter("meters_feet_conversion").get_parameter_value().double_value
 
         color_label_mappings_file = self.get_parameter(
             "color_label_mappings_file"
@@ -225,7 +231,7 @@ class FollowBuoyPID(ActionServerBase):
         # right_x = green_center_x
         # img_ctr = self.width / 2.0
 
-        correction_value = (self.max_distance_apart + self.min_distance_apart)/2
+        correction_value = (self.max_distance_apart + self.min_distance_apart)/2 * self.meters_feet_conversion
         waypoint_x = None
         waypoint_y = None
         red_location_x = None
@@ -238,15 +244,19 @@ class FollowBuoyPID(ActionServerBase):
             red_location_x = red_location.point.x
             if self.right_color == "green":
                 green_location_y = red_location_y + correction_value
+                green_location_x = red_location_x
             elif self.right_color == "red":
                 green_location_y = red_location_y - correction_value
+                green_location_x = red_location_x
         if red_location == None:
             green_location_y = green_location.point.y
             green_location_x = green_location.point.x
             if self.right_color == "green":
                 red_location_y = green_location_y - correction_value
+                red_location_x = green_location_x
             if self.right_color == "red":
                 red_location_y = green_location_y + correction_value
+                red_location_x = green_location_x
         else:
             green_location_y = green_location.point.y
             green_location_x = green_location.point.x
