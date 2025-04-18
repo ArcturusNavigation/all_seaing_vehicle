@@ -134,12 +134,32 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             {"color_label_mappings_file": color_label_mappings},
-            {"forward_speed": 1.2},
-            {"max_yaw": 0.2},
-            {"pid_vals": [0.0009, 0.0, 0.0003]},
+            # {"forward_speed": 1.2},
+            # {"max_yaw": 0.2},
+            # {"pid_vals": [0.0009, 0.0, 0.0003]},
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
+        ],
+    )
+
+    speed_challenge_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge_pid.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": color_label_mappings},
+            {"forward_speed": 1.2}
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
+            ),
+            (
+                "imu",
+                "/wamv/sensors/imu/imu/data"
+            )
         ],
     )
 
@@ -496,8 +516,9 @@ def launch_setup(context, *args, **kwargs):
         # object_tracking_map_pf_node,
         run_tasks,
         task_init_server, 
-        follow_buoy_path,
+        # follow_buoy_path,
         follow_buoy_pid,
+        speed_challenge_pid,
         grid_map_generator,
         central_hub,
         amcl_ld,
