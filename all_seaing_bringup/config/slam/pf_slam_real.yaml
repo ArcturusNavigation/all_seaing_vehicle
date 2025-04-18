@@ -5,17 +5,18 @@ object_tracking_map_pf:
     num_particles: 1000
     obstacle_drop_thresh: 2.0
     normalize_drop_thresh: False
-    range_uncertainty: 150.0
-    bearing_uncertainty: 1.0
+    range_uncertainty: 50.0
+    bearing_uncertainty: 0.2
     motion_gps_vxy_noise_coeff: 10.0
     motion_gps_omega_noise_coeff: 1.0
     motion_gps_theta_noise_coeff: 1.0
     motion_imu_vxy_noise_coeff: 2.5
     motion_imu_omega_noise_coeff: 0.5
     motion_imu_theta_noise_coeff: 0.1
-    update_gps_xy_uncertainty: 250.0
-    include_odom_theta: True # if do that rotate it 90 degrees from base_link as the transform is currently wrong
-    update_odom_theta_uncertainty: 1.0
+    update_gps_xy_uncertainty: 1000.0
+    include_odom_theta: True
+    rotate_odom: False
+    update_odom_theta_uncertainty: 20.0
     new_object_slam_threshold: 5.0
     new_object_slam_coeff: 0.1
     use_const_new_obj_prob: True
@@ -25,6 +26,6 @@ object_tracking_map_pf:
     init_theta_noise: 1.0
     check_fov: True
     imu_predict: True
-    gps_update: True
+    gps_update: False
     direct_tf: False
     is_sim: False

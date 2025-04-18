@@ -121,7 +121,7 @@ private:
     int m_num_obj;
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
-    bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom;
+    bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
     nav_msgs::msg::Odometry m_last_odom_msg;
 
     bool m_is_sim;

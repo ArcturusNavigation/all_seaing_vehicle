@@ -65,6 +65,9 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     this->declare_parameter<bool>("direct_tf", false);
     m_direct_tf = this->get_parameter("direct_tf").as_bool();
 
+    this->declare_parameter<bool>("rotate_odom", false);
+    m_rotate_odom = this->get_parameter("rotate_odom").as_bool();
+
     this->declare_parameter<bool>("normalize_drop_thresh", false);
     m_normalize_drop_thresh = this->get_parameter("normalize_drop_thresh").as_bool();
 
@@ -191,13 +194,15 @@ void ObjectTrackingMapPF::publish_slam(){
 
 void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     // !!! THOSE ARE RELATIVE TO THE ROBOT AND DEPENDENT ON ITS HEADING, USE THE CORRECT MOTION MODEL
-    if(m_is_sim){
+    if(!m_rotate_odom){
         m_nav_vx = msg.twist.twist.linear.x;
         m_nav_vy = msg.twist.twist.linear.y;   
     }else{
         // Pixhawk rotated to the left, facing up, so need to rotate the acceleration vector accordingly
         m_nav_vx = -msg.twist.twist.linear.y;
         m_nav_vy = msg.twist.twist.linear.x;
+        // m_nav_vx = msg.twist.twist.linear.x;
+        // m_nav_vy = msg.twist.twist.linear.y;
     }
     m_nav_vz = msg.twist.twist.linear.z;
     m_nav_omega = msg.twist.twist.angular.z;

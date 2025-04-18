@@ -1,0 +1,12 @@
+odom_transformer:
+  ros__parameters:
+    base_frame: actual_base_link
+
+    odoms_to_transform: ["imu"]
+
+    imu:
+      topic_in: odometry/filtered
+      source_frame: base_link
+      topic_out: odometry_correct/filtered
+    
+    # use_sim_time: True
