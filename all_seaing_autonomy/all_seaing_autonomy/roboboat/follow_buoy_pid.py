@@ -40,7 +40,7 @@ class FollowBuoyPID(ActionServerBase):
         # Will use type label and local point
         self.bbox_sub_new = self.create_subscription(
             ObstacleMap,
-            "obstacle_map/refined_untracked",
+            "obstacle_map/labeled",
             self.bbox_callback_new,
             10
         )
@@ -74,7 +74,7 @@ class FollowBuoyPID(ActionServerBase):
             .double_array_value
         )
         self.max_vel = (
-            self.declare_parameter("max_vel", [4.0, 2.0, 1.0])
+            self.declare_parameter("max_vel", [2.0, 2.0, 0.4])
             .get_parameter_value()
             .double_array_value
         )
@@ -185,6 +185,9 @@ class FollowBuoyPID(ActionServerBase):
     def intrinsics_callback(self, msg):
         self.height = msg.height
         self.width = msg.width
+    
+    def dist_squared(self, vect):
+        return vect[0] * vect[0] + vect[1] * vect[1]
 
     # Replaced by obstacle map
     def bbox_callback(self, msg):
@@ -282,70 +285,58 @@ class FollowBuoyPID(ActionServerBase):
         correction_value = (self.max_distance_apart + self.min_distance_apart)/2 * self.meters_feet_conversion
         waypoint_x = None
         waypoint_y = None
-        red_location_x = None
-        red_location_y = None
-        green_location_x = None
-        green_location_y = None
+        red_x = None
+        red_y = None
+        green_x = None
+        green_y = None
 
         if green_location == None:
-            red_location_y = red_location.point.y
-            red_location_x = red_location.point.x
+            red_y = red_location.point.y
+            red_x = red_location.point.x
             if self.right_color == "green":
-                green_location_y = red_location_y + correction_value
-                green_location_x = red_location_x
+                green_y = red_y + correction_value
+                green_x = red_x
             elif self.right_color == "red":
-                green_location_y = red_location_y - correction_value
-                green_location_x = red_location_x
-        if red_location == None:
-            green_location_y = green_location.point.y
-            green_location_x = green_location.point.x
+                green_y = red_y - correction_value
+                green_x = red_x
+        elif red_location == None:
+            green_y = green_location.point.y
+            green_x = green_location.point.x
             if self.right_color == "green":
-                red_location_y = green_location_y - correction_value
-                red_location_x = green_location_x
+                red_y = green_y - correction_value
+                red_x = green_x
             if self.right_color == "red":
-                red_location_y = green_location_y + correction_value
-                red_location_x = green_location_x
+                red_y = green_y + correction_value
+                red_x = green_x
         else:
-            green_location_y = green_location.point.y
-            green_location_x = green_location.point.x
-            red_location_y = red_location.point.y
-            red_location_x = red_location.point.x
+            green_y = green_location.point.y
+            green_x = green_location.point.x
+            red_y = red_location.point.y
+            red_x = red_location.point.x
 
         if yellow_location == None:
-            waypoint_y = (red_location_y + green_location_y)/2
-            waypoint_x = (red_location_x + green_location_x)/2
+            waypoint_y = (red_y + green_y)/2
+            waypoint_x = (red_x + green_x)/2
         else:
-            right_x = None
-            right_y = None
-            left_x = None 
-            left_y = None
-            if self.right_color == "green": 
-                green_location_x = right_x
-                green_location_y = right_y
-                red_location_x = left_x
-                red_location_y = left_y
-            elif self.right_color == "red":
-                green_location_x = left_x
-                green_location_y = left_y 
-                red_location_x = right_x
-                red_location_y = right_y 
-            # add if loops specifying two cases
-                # yellow buoy needs to be between the red and green buoy 
-                    # if left_y < yellow_location.point.y < right_y and yellow_location.point.x > 
-                # whether yellow buoy is in front of or behind the line connecting the red and green buoy 
-            # To change
-            left_to_right_slope = (right_x-left_x)/(right_y- left_y)
-            perpendicular_slope = -1/left_to_right_slope
-            intersection_y = ((-left_to_right_slope * right_y) + right_x + (perpendicular_slope * yellow_location.point.y) - yellow_location.point.x)/(-left_to_right_slope + perpendicular_slope)
-            intersection_x = left_to_right_slope*(waypoint_y - right_y) + right_x
-            square_distance_left = (intersection_y - left_y)**2 + (intersection_x - left_x)**2 
-            square_distance_right = (intersection_y - right_y)**2 + (intersection_x - right_x)**2
-            if square_distance_left >= square_distance_right: 
-                waypoint_x = (left_x + intersection_x)/2 
-                waypoint_y = (left_y + intersection_y)/2
+            yellow_x = yellow_location.point.x
+            yellow_y = yellow_location.point.y
+
+            red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
+            red_to_green = (green_x - red_x, green_y - red_y)
+            dot_prod = red_to_yellow[0] * red_to_green[0] + red_to_yellow[1] * red_to_green[1]
+            const_fact = dot_prod / self.dist_squared(red_to_green)
+            intersection_x = red_to_green[0] * const_fact + red_x
+            intersection_y = red_to_green[1] * const_fact + red_y
+
+
+            square_distance_red = (intersection_y - red_y)**2 + (intersection_x - red_x)**2 
+            square_distance_green = (intersection_y - green_y)**2 + (intersection_x - green_x)**2
+            if square_distance_red >= square_distance_green: 
+                waypoint_x = (red_x + intersection_x)/2 
+                waypoint_y = (red_y + intersection_y)/2
             else: 
-                waypoint_x = (right_x + intersection_x)/2
-                waypoint_y = (right_y + intersection_y)/2
+                waypoint_x = (green_x + intersection_x)/2
+                waypoint_y = (green_y + intersection_y)/2
 
 
         # POINTS TO GIVE PID: waypoint_y and waypoint_x
