@@ -254,7 +254,7 @@ class FollowBuoyPID(ActionServerBase):
             red_location_x = red_location.point.x
 
 
-        if yellow_location != None:
+        if yellow_location == None:
             waypoint_y = (red_location_y + green_location_y)/2
             waypoint_x = (red_location_x + green_location_x)/2
         else:
