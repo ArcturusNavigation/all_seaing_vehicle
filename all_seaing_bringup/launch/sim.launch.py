@@ -502,7 +502,7 @@ def launch_setup(context, *args, **kwargs):
         run_tasks,
         task_init_server,
         # follow_buoy_path,
-        # follow_buoy_pid,
+        follow_buoy_pid,
         # speed_challenge_pid,
         rviz_waypoint_sender,
         map_to_odom,
