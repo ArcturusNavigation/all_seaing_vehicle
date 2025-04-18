@@ -275,8 +275,16 @@ class FollowBuoyPID(ActionServerBase):
             # To change
             left_to_right_slope = (right_x-left_x)/(right_y- left_y)
             perpendicular_slope = -1/left_to_right_slope
-            waypoint_y = ((-left_to_right_slope * right_y) + right_x + (perpendicular_slope * yellow_location.point.y) - yellow_location.point.x)/(-left_to_right_slope + perpendicular_slope)
-            waypoint_x = left_to_right_slope*(waypoint_y - right_y) + right_x
+            intersection_y = ((-left_to_right_slope * right_y) + right_x + (perpendicular_slope * yellow_location.point.y) - yellow_location.point.x)/(-left_to_right_slope + perpendicular_slope)
+            intersection_x = left_to_right_slope*(waypoint_y - right_y) + right_x
+            square_distance_left = (intersection_y - left_y)**2 + (intersection_x - left_x)**2 
+            square_distance_right = (intersection_y - right_y)**2 + (intersection_x - right_x)**2
+            if square_distance_left >= square_distance_right: 
+                waypoint_x = (left_x + intersection_x)/2 
+                waypoint_y = (left_y + intersection_y)/2
+            else: 
+                waypoint_x = (right_x + intersection_x)/2
+                waypoint_y = (right_y + intersection_y)/2
 
 
             # POINTS TO GIVE PID: waypoint_y and waypoint_x
