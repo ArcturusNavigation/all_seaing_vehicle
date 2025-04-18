@@ -18,6 +18,9 @@ def launch_setup(context, *args, **kwargs):
     driver_prefix = get_package_share_directory("all_seaing_driver")
     description_prefix = get_package_share_directory("all_seaing_description")
     utility_prefix = get_package_share_directory("all_seaing_utility")
+    odom_transformer_params = os.path.join(
+        description_prefix, "config", "odom_transformer_params.yaml"
+    )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -115,6 +118,14 @@ def launch_setup(context, *args, **kwargs):
             # {"child_frames_to_remove": ["zed_camera_link"]},
             {"parent_frames_to_remove": ["base_link"]},
         ]
+    )
+
+    odom_transformer = launch_ros.actions.Node(
+        package="odom_transformer",
+        executable="transformer_node.py",
+        name="odom_transformer",
+        # output={"both": {"screen", "log", "own_log"}},
+        parameters=[odom_transformer_params],
     )
 
     run_tasks = launch_ros.actions.Node(
@@ -251,6 +262,7 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+            ("odometry/filtered", "odometry_correct/filtered")
         ],
         parameters=[slam_params]
     )
@@ -262,6 +274,7 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+            ("odometry/filtered", "odometry_correct/filtered")
         ],
         parameters=[pf_slam_params],
     )
@@ -313,6 +326,7 @@ def launch_setup(context, *args, **kwargs):
         keyboard_ld,
         static_transforms_ld,
         tf_filtering,
+        odom_transformer,
         # run_tasks,
         # task_init_server, 
         # follow_buoy_path,
