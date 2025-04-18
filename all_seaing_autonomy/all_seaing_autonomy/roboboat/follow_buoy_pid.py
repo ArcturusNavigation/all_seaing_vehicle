@@ -5,7 +5,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 
 from all_seaing_interfaces.action import Task
-from all_seaing_controller.pid_controller import PIDController
+from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption, ObstacleMap
 from all_seaing_common.action_server_base import ActionServerBase
@@ -14,6 +14,7 @@ from sensor_msgs.msg import CameraInfo
 import os
 import yaml
 import time
+import math
 
 class FollowBuoyPID(ActionServerBase):
     def __init__(self):
@@ -98,10 +99,10 @@ class FollowBuoyPID(ActionServerBase):
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
         self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
 
-        self.pid = PIDController(*pid_vals)
-        self.pid.set_effort_min(-self.max_yaw_rate)
-        self.pid.set_effort_max(self.max_yaw_rate)
-        self.prev_update_time = self.get_clock().now()
+        # self.pid = PIDController(*pid_vals)
+        # self.pid.set_effort_min(-self.max_yaw_rate)
+        # self.pid.set_effort_max(self.max_yaw_rate)
+        # self.prev_update_time = self.get_clock().now()
         self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
 
@@ -111,6 +112,8 @@ class FollowBuoyPID(ActionServerBase):
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         # update from subs
+        self.height = None
+        self.width = None
         self.bboxes = [] # To be commented out
         self.obstacleboxes = []
 
@@ -178,6 +181,10 @@ class FollowBuoyPID(ActionServerBase):
 
         scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
         return scale * x_vel, scale * y_vel
+    
+    def intrinsics_callback(self, msg):
+        self.height = msg.height
+        self.width = msg.width
 
     # Replaced by obstacle map
     def bbox_callback(self, msg):
@@ -185,11 +192,12 @@ class FollowBuoyPID(ActionServerBase):
 
     # New version with obstacles
     def bbox_callback_new(self, msg):
-        self.obstacleboxes = msg.boxes
+        self.obstacleboxes = msg.obstacles
 
     def control_loop(self):
         if self.width is None or len(self.obstacleboxes) == 0:
-            return
+            self.get_logger().info(f"no obstalces or zero width {self.width}, {len(self.obstacleboxes)}")
+            return 
 
         # Access point through name.point.x, etc.?
         red_location = None
@@ -212,9 +220,9 @@ class FollowBuoyPID(ActionServerBase):
         # Still use this logic to find the largest buoy, since probably most relative to path
         forward = False
         for box in self.obstacleboxes:
-            area = (box.max_x - box.min_x) * (box.max_y - box.min_y)
-            # midpt = (box.max_x + box.min_x) / 2.0
-            # width = box.max_x - box.min_x
+            area = (box.bbox_max.x - box.bbox_min.x) * (box.bbox_max.y - box.bbox_min.y)
+            # midpt = (box.bbox_max.x + box.bbox_min.x) / 2.0
+            # width = box.bbox_max.x - box.bbox_min.x
             location = box.local_point
             if box.label in self.green_labels and area > green_area:
                 green_area = area
@@ -231,8 +239,8 @@ class FollowBuoyPID(ActionServerBase):
                 #     self.forward_start = self.get_clock().now()
             elif box.label in self.yellow_labels and area > yellow_area:
                 yellow_area = area
-                # yellow_left = box.min_x
-                # yellow_right = box.max_x
+                # yellow_left = box.bbox_min.x
+                # yellow_right = box.bbox_max.x
                 yellow_location = location
 
         # if we only see one of red / green, rotate
@@ -303,7 +311,6 @@ class FollowBuoyPID(ActionServerBase):
             red_location_y = red_location.point.y
             red_location_x = red_location.point.x
 
-
         if yellow_location == None:
             waypoint_y = (red_location_y + green_location_y)/2
             waypoint_x = (red_location_x + green_location_x)/2
@@ -341,22 +348,23 @@ class FollowBuoyPID(ActionServerBase):
                 waypoint_y = (right_y + intersection_y)/2
 
 
-            # POINTS TO GIVE PID: waypoint_y and waypoint_x
-            
-            self.update_pid(waypoint_x, waypoint_y, math.atan2(waypoint_y, waypoint_x))
-            x_output = self.x_pid.get_effort()
-            y_output = self.y_pid.get_effort()
-            theta_output = self.theta_pid.get_effort()
-            x_vel = x_output
-            y_vel = y_output
+        # POINTS TO GIVE PID: waypoint_y and waypoint_x
+        self.get_logger().info(f"waypoint x: {waypoint_x}, waypoint y: {waypoint_y}")
+        
+        self.update_pid(-waypoint_x, -waypoint_y, math.atan2(-waypoint_y, -waypoint_x))
+        x_output = self.x_pid.get_effort()
+        y_output = self.y_pid.get_effort()
+        theta_output = self.theta_pid.get_effort()
+        x_vel = x_output
+        y_vel = y_output
 
-            x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
-            control_msg = ControlOption()
-            control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
-            control_msg.twist.linear.x = x_vel
-            control_msg.twist.linear.y = y_vel
-            control_msg.twist.angular.z = theta_output
-            self.control_pub.publish(control_msg)
+        x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
+        control_msg = ControlOption()
+        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+        control_msg.twist.linear.x = x_vel
+        control_msg.twist.linear.y = y_vel
+        control_msg.twist.angular.z = theta_output
+        self.control_pub.publish(control_msg)
 
 
 # OLD CODE DON'T NEED?
