@@ -17,6 +17,10 @@ def launch_setup(context, *args, **kwargs):
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
     driver_prefix = get_package_share_directory("all_seaing_driver")
     description_prefix = get_package_share_directory("all_seaing_description")
+    utility_prefix = get_package_share_directory("all_seaing_utility")
+    odom_transformer_params = os.path.join(
+        description_prefix, "config", "odom_transformer_params.yaml"
+    )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -95,13 +99,33 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource(
             [
                 description_prefix,
-                "/launch/static_transforms.launch.py",
+                "/launch/static_transforms_rosbag.launch.py",
             ]
         ),
         launch_arguments={
             "indoors": is_indoors,
         }.items(),
-        condition=UnlessCondition(use_bag),
+    )
+
+    tf_filtering = launch_ros.actions.Node(
+        package="all_seaing_utility",
+        executable="filter_tf.py",
+        parameters=[
+            {"old_tf_topic": "/tf_fake"},
+            {"new_tf_topic": "/tf"},
+            {"old_static_tf_topic": "/tf_static_fake"},
+            {"new_static_tf_topic": "/tf_static"},
+            # {"child_frames_to_remove": ["zed_camera_link"]},
+            {"parent_frames_to_remove": ["base_link"]},
+        ]
+    )
+
+    odom_transformer = launch_ros.actions.Node(
+        package="odom_transformer",
+        executable="transformer_node.py",
+        name="odom_transformer",
+        # output={"both": {"screen", "log", "own_log"}},
+        parameters=[odom_transformer_params],
     )
 
     run_tasks = launch_ros.actions.Node(
@@ -218,6 +242,7 @@ def launch_setup(context, *args, **kwargs):
             ("lidar_topic", "/point_cloud/filtered")
         ],
         parameters=[
+            {"base_link_frame": "actual_base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
@@ -237,6 +262,7 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+            ("odometry/filtered", "odometry_correct/filtered")
         ],
         parameters=[slam_params]
     )
@@ -247,7 +273,8 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+            ("odometry/filtered", "odometry_correct/filtered")
         ],
         parameters=[pf_slam_params],
     )
@@ -298,6 +325,8 @@ def launch_setup(context, *args, **kwargs):
         navsat_node,
         keyboard_ld,
         static_transforms_ld,
+        tf_filtering,
+        odom_transformer,
         # run_tasks,
         # task_init_server, 
         # follow_buoy_path,
@@ -305,8 +334,8 @@ def launch_setup(context, *args, **kwargs):
         # shape_yolo_node,
         # static_shape_yolo_node,
         bbox_project_pcloud_node,
-        # object_tracking_map_node,
-        object_tracking_map_pf_node,
+        object_tracking_map_node,
+        # object_tracking_map_pf_node,
         # object_tracking_map_euclidean_node,
         # obstacle_detector_node,
         # color_segmentation_node,

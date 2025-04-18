@@ -165,7 +165,7 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
     std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
-    geometry_msgs::msg::TransformStamped m_lidar_map_tf, m_map_lidar_tf;
+    geometry_msgs::msg::TransformStamped m_base_link_map_tf, m_map_base_link_tf;
     rclcpp::TimerBase::SharedPtr odom_timer;
 
     // Intrinsics callback camera model variables
@@ -176,7 +176,7 @@ private:
     float m_gps_vxy_noise_coeff, m_gps_omega_noise_coeff, m_gps_theta_noise_coeff;
     float m_imu_vxy_noise_coeff, m_imu_omega_noise_coeff, m_imu_theta_noise_coeff;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
-    bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom;
+    bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
     nav_msgs::msg::Odometry m_last_odom_msg;
 
     bool m_is_sim;

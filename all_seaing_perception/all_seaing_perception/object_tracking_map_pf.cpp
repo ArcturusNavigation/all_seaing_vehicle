@@ -65,6 +65,9 @@ ObjectTrackingMapPF::ObjectTrackingMapPF() : Node("object_tracking_map_pf") {
     this->declare_parameter<bool>("direct_tf", false);
     m_direct_tf = this->get_parameter("direct_tf").as_bool();
 
+    this->declare_parameter<bool>("rotate_odom", false);
+    m_rotate_odom = this->get_parameter("rotate_odom").as_bool();
+
     this->declare_parameter<bool>("normalize_drop_thresh", false);
     m_normalize_drop_thresh = this->get_parameter("normalize_drop_thresh").as_bool();
 
@@ -191,13 +194,15 @@ void ObjectTrackingMapPF::publish_slam(){
 
 void ObjectTrackingMapPF::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     // !!! THOSE ARE RELATIVE TO THE ROBOT AND DEPENDENT ON ITS HEADING, USE THE CORRECT MOTION MODEL
-    if(m_is_sim){
+    if(!m_rotate_odom){
         m_nav_vx = msg.twist.twist.linear.x;
         m_nav_vy = msg.twist.twist.linear.y;   
     }else{
         // Pixhawk rotated to the left, facing up, so need to rotate the acceleration vector accordingly
         m_nav_vx = -msg.twist.twist.linear.y;
         m_nav_vy = msg.twist.twist.linear.x;
+        // m_nav_vx = msg.twist.twist.linear.x;
+        // m_nav_vy = msg.twist.twist.linear.y;
     }
     m_nav_vz = msg.twist.twist.linear.z;
     m_nav_omega = msg.twist.twist.angular.z;
@@ -248,12 +253,12 @@ void ObjectTrackingMapPF::odom_callback() {
 
     //update odometry transforms
     // RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
-    m_map_lidar_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
-    m_lidar_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
-    m_nav_z = m_map_lidar_tf.transform.translation.z;
+    m_nav_z = m_map_base_link_tf.transform.translation.z;
     tf2::Quaternion quat;
-    tf2::fromMsg(m_map_lidar_tf.transform.rotation, quat);
+    tf2::fromMsg(m_map_base_link_tf.transform.rotation, quat);
     tf2::Matrix3x3 m(quat);
     double r, p, y;
     m.getRPY(r, p, y);
@@ -262,10 +267,10 @@ void ObjectTrackingMapPF::odom_callback() {
     m_got_nav = true;
 
     // to ignore gps TFs that are the same thing many times a second due to lag and cause SLAM to lock into the GPS
-    if((!m_first_state) && (m_nav_x == m_map_lidar_tf.transform.translation.x) && (m_nav_y == m_map_lidar_tf.transform.translation.y)) return;
+    if((!m_first_state) && (m_nav_x == m_map_base_link_tf.transform.translation.x) && (m_nav_y == m_map_base_link_tf.transform.translation.y)) return;
 
-    m_nav_x = m_map_lidar_tf.transform.translation.x;
-    m_nav_y = m_map_lidar_tf.transform.translation.y;
+    m_nav_x = m_map_base_link_tf.transform.translation.x;
+    m_nav_y = m_map_base_link_tf.transform.translation.y;
 
     if(m_first_state){
         std::random_device rd{};
@@ -398,7 +403,7 @@ T ObjectTrackingMapPF::convert_to_global(T point) {
     lc_pt_msg.y = point.y;
     lc_pt_msg.z = point.z;
     geometry_msgs::msg::Point gb_pt_msg;
-    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_lidar_map_tf);
+    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_base_link_map_tf);
     new_point.x = gb_pt_msg.x;
     new_point.y = gb_pt_msg.y;
     new_point.z = gb_pt_msg.z;
@@ -415,7 +420,7 @@ T ObjectTrackingMapPF::convert_to_local(T point) {
     gb_pt_msg.y = act_point.y;
     gb_pt_msg.z = act_point.z;
     geometry_msgs::msg::Point lc_pt_msg;
-    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_lidar_tf);
+    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_base_link_tf);
     new_point.x = lc_pt_msg.x;
     new_point.y = lc_pt_msg.y;
     new_point.z = lc_pt_msg.z;
@@ -905,8 +910,8 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
 
-    m_lidar_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
-    m_map_lidar_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     if(m_first_state) return;
 
@@ -948,7 +953,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         std::iota(std::begin(ind), std::end(ind), 0);
         std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
             new all_seaing_perception::Obstacle(m_local_header, m_global_untracked_header, raw_cloud, ind,
-                                                m_obstacle_id++, m_lidar_map_tf));
+                                                m_obstacle_id++, m_base_link_map_tf));
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
@@ -964,7 +969,7 @@ void ObjectTrackingMapPF::object_track_map_publish(const all_seaing_interfaces::
         m_particles[i]->update_map(all_seaing_perception::clone(detected_obstacles), rclcpp::Time(msg->objects[0].time), m_is_sim, m_range_std, m_bearing_std,
                                     m_init_new_cov, m_new_obj_slam_thres, m_new_object_slam_coeff, m_use_const_new_obj_prob, m_new_object_slam_prob, m_check_fov, m_obstacle_drop_thresh,
                                     m_normalize_drop_dist, m_cam_model,
-                                m_map_lidar_tf, m_lidar_map_tf, this->get_logger());
+                                m_map_base_link_tf, m_base_link_map_tf, this->get_logger());
         float w = m_particles[i]->get_weight(m_include_odom_theta);
         m_weights[i] = w;
         m_particles[i]->reset_gps();
