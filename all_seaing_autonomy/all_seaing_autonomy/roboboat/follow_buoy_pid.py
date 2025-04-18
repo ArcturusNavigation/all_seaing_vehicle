@@ -258,9 +258,28 @@ class FollowBuoyPID(ActionServerBase):
             waypoint_y = (red_location_y + green_location_y)/2
             waypoint_x = (red_location_x + green_location_x)/2
         else:
+            right_x = None
+            right_y = None
+            left_x = None 
+            left_y = None
+            if self.right_color == "green": 
+                green_location_x = right_x
+                green_location_y = right_y
+                red_location_x = left_x
+                red_location_y = left_y
+            elif self.right_color == "red":
+                green_location_x = left_x
+                green_location_y = left_y 
+                red_location_x = right_x
+                red_location_y = right_y 
             # To change
-            waypoint_x = None
-            waypoint_y = None
+            left_to_right_slope = (right_x-left_x)/(right_y- left_y)
+            perpendicular_slope = -1/left_to_right_slope
+            waypoint_y = ((-left_to_right_slope * right_y) + right_x + (perpendicular_slope * yellow_location.point.y) - yellow_location.point.x)/(-left_to_right_slope + perpendicular_slope)
+            waypoint_x = left_to_right_slope*(waypoint_y - right_y) + right_x
+
+
+            # POINTS TO GIVE PID: waypoint_y and waypoint_x
 
 
 # OLD CODE DON'T NEED?
