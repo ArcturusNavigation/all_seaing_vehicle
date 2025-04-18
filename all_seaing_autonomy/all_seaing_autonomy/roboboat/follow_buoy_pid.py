@@ -282,6 +282,10 @@ class FollowBuoyPID(ActionServerBase):
                 green_location_y = left_y 
                 red_location_x = right_x
                 red_location_y = right_y 
+            # add if loops specifying two cases
+                # yellow buoy needs to be between the red and green buoy 
+                    # if left_y < yellow_location.point.y < right_y and yellow_location.point.x > 
+                # whether yellow buoy is in front of or behind the line connecting the red and green buoy 
             # To change
             left_to_right_slope = (right_x-left_x)/(right_y- left_y)
             perpendicular_slope = -1/left_to_right_slope
