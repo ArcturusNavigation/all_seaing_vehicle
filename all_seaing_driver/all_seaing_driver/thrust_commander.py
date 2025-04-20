@@ -80,13 +80,15 @@ class ThrustCommander(Node):
 
     def timer_callback(self):
         time_since_last_heartbeat = (self.get_clock().now() - self.prev_heartbeat).nanoseconds / 1e9
-
+        self.get_logger().info(f"time since last heartbeat{time_since_last_heartbeat}")
         if time_since_last_heartbeat > self.heartbeat_threshold and not self.e_stopped:
             self.e_stopped = True
 
         if self.e_stopped:
             self.get_logger().warning("Lost heartbeat! Entering e-stop mode.")
             self.turn_off_thrusters()
+        else:
+            self.get_logger().info(f'GOT HEARTBEAT')
         
         self.send_pwm(self.front_right_port, self.front_right_command)
         self.send_pwm(self.front_left_port, self.front_left_command)
