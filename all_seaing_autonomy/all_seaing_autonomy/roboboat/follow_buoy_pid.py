@@ -181,13 +181,25 @@ class FollowBuoyPID(ActionServerBase):
 
         scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
         return scale * x_vel, scale * y_vel
-    
+
     def intrinsics_callback(self, msg):
         self.height = msg.height
         self.width = msg.width
-    
+
     def dist_squared(self, vect):
         return vect[0] * vect[0] + vect[1] * vect[1]
+
+    def ccw(self, right, yellow, left):
+        """Return True if the points a, b, c are counterclockwise, respectively"""
+        area = (
+            right[0] * yellow[1]
+            + yellow[0] * left[1]
+            + left[0] * right[1]
+            - right[1] * yellow[0]
+            - yellow[1] * left[0]
+            - left[1] * right[0]
+        )
+        return area > 0
 
     # Replaced by obstacle map
     def bbox_callback(self, msg):
@@ -200,7 +212,7 @@ class FollowBuoyPID(ActionServerBase):
     def control_loop(self):
         if self.width is None or len(self.obstacleboxes) == 0:
             self.get_logger().info(f"no obstalces or zero width {self.width}, {len(self.obstacleboxes)}")
-            return 
+            return
 
         # Access point through name.point.x, etc.?
         red_location = None
@@ -318,30 +330,54 @@ class FollowBuoyPID(ActionServerBase):
             waypoint_y = (red_y + green_y)/2
             waypoint_x = (red_x + green_x)/2
         else:
+        # whether yellow buoy is in front of or behind the line connecting the red and green buoy
+
             yellow_x = yellow_location.point.x
             yellow_y = yellow_location.point.y
+            front = None
 
-            red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
-            red_to_green = (green_x - red_x, green_y - red_y)
-            dot_prod = red_to_yellow[0] * red_to_green[0] + red_to_yellow[1] * red_to_green[1]
-            const_fact = dot_prod / self.dist_squared(red_to_green)
-            intersection_x = red_to_green[0] * const_fact + red_x
-            intersection_y = red_to_green[1] * const_fact + red_y
+            if self.right_color == "green":
+                front = self.ccw((green_y, green_x), (yellow_y, yellow_x), (red_y, red_x))
+            else:
+                front = self.ccw((red_y, red_x), (yellow_y, yellow_x), (green_y, green_x))
+
+            if (self.right_color == "green" and red_y < yellow_y < green_y) or (self.right_color == "red" and green_y < yellow_y < red_y):
+                if front:
+                    red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
+                    red_to_green = (green_x - red_x, green_y - red_y)
+                    dot_prod = red_to_yellow[0] * red_to_green[0] + red_to_yellow[1] * red_to_green[1]
+                    const_fact = dot_prod / self.dist_squared(red_to_green)
+                    intersection_x = red_to_green[0] * const_fact + red_x
+                    intersection_y = red_to_green[1] * const_fact + red_y
 
 
-            square_distance_red = (intersection_y - red_y)**2 + (intersection_x - red_x)**2 
-            square_distance_green = (intersection_y - green_y)**2 + (intersection_x - green_x)**2
-            if square_distance_red >= square_distance_green: 
-                waypoint_x = (red_x + intersection_x)/2 
-                waypoint_y = (red_y + intersection_y)/2
-            else: 
-                waypoint_x = (green_x + intersection_x)/2
-                waypoint_y = (green_y + intersection_y)/2
+                    square_distance_red = (intersection_y - red_y)**2 + (intersection_x - red_x)**2
+                    square_distance_green = (intersection_y - green_y)**2 + (intersection_x - green_x)**2
+                    if square_distance_red >= square_distance_green:
+                        waypoint_x = (red_x + intersection_x)/2
+                        waypoint_y = (red_y + intersection_y)/2
+                    else:
+                        waypoint_x = (green_x + intersection_x)/2
+                        waypoint_y = (green_y + intersection_y)/2
+                else:
+                    red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
+                    green_to_yellow = (yellow_x - green_x, yellow_y -green_y)
+                    ry_dist = self.dist_squared(red_to_yellow)
+                    gy_dist = self.dist_squared(green_to_yellow)
+                    if ry_dist >= gy_dist:
+                        waypoint_x = (red_x + yellow_x)/2
+                        waypoint_y = (red_y + yellow_y)/2
+                    else:
+                        waypoint_x = (green_x + yellow_x)/2
+                        waypoint_y = (green_y + yellow_y)/2
+            else:
+                waypoint_y = (red_y + green_y)/2
+                waypoint_x = (red_x + green_x)/2
 
 
         # POINTS TO GIVE PID: waypoint_y and waypoint_x
         self.get_logger().info(f"waypoint x: {waypoint_x}, waypoint y: {waypoint_y}")
-        
+
         self.update_pid(-waypoint_x, -waypoint_y, math.atan2(-waypoint_y, -waypoint_x))
         x_output = self.x_pid.get_effort()
         y_output = self.y_pid.get_effort()
