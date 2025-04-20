@@ -96,6 +96,8 @@ struct SLAMParticle{
         bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model,
         geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tfm, rclcpp::Logger logger);
 
+    void update_maps(geometry_msgs::msg::TransformStamped map_lidar_tf);
+
     float mahalanobis_to_prob(float mahalanobis_dist, Eigen::MatrixXf cov);
 
     float prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::MatrixXf cov);
@@ -129,6 +131,8 @@ private:
     void publish_slam();
 
     void update_curr_particle();
+
+    void publish_maps();
 
     // Member variables
     int m_num_particles;
