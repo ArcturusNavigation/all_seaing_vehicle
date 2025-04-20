@@ -70,6 +70,10 @@ private:
     template <typename T>
     T convert_to_local(T point, bool untracked = false);
 
+    void update_maps();
+
+    void publish_maps();
+
     void visualize_predictions();
 
     // Get intrinsic camera model information needed for projection
