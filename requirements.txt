@@ -55,6 +55,7 @@ image-geometry==3.2.1
 interactive-markers==2.3.2
 itsdangerous==2.2.0
 Jinja2==3.1.6
+joblib==1.4.2
 jupyter_core==5.7.2
 keyboard-msgs==1.0.0
 laser-geometry==2.4.0
@@ -79,7 +80,7 @@ nav2-msgs==1.1.18
 nbformat==5.10.4
 networkx==3.4.2
 nmea-msgs==2.0.0
-numpy==2.1.1
+numpy==1.23.0
 open3d==0.18.0
 opencv-python==4.11.0.86
 osrf-pycommon==2.1.4
@@ -153,6 +154,7 @@ rqt-service-caller==1.0.5
 rqt-shell==1.0.2
 rqt-srv==1.0.3
 rqt-topic==1.5.0
+scikit-learn==1.6.1
 seaborn==0.13.2
 sensor-msgs==4.2.4
 sensor-msgs-py==4.2.4
@@ -174,6 +176,7 @@ tf2-py==0.25.12
 tf2-ros-py==0.25.12
 tf2-tools==0.25.12
 theora-image-transport==2.5.3
+threadpoolctl==3.6.0
 topic-monitor==0.20.5
 torch==2.6.0
 torchvision==0.21.0
