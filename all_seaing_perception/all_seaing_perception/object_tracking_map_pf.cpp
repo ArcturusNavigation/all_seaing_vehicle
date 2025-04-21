@@ -148,15 +148,27 @@ void ObjectTrackingMapPF::publish_slam(){
     t.header.stamp = m_last_odom_msg.header.stamp;
     // t.header.stamp = this->get_clock()->now();
     if(m_direct_tf){
-        // publish the transform from slam_map to the local frame (camera/lidar)
-        t.header.frame_id = m_slam_frame_id;
-        t.child_frame_id = m_local_frame_id;
-        t.transform.translation.x = m_curr_particle->m_pose(0);
-        t.transform.translation.y = m_curr_particle->m_pose(1);
-        t.transform.translation.z = m_nav_z;
+        // publish the transform from the local frame (base_link) to slam_map
+        // (slam_map is a child of base_link to not interfere with the ekf localization node map)
+        // t.header.frame_id = m_slam_frame_id;
+        // t.child_frame_id = m_local_frame_id;
+        // t.transform.translation.x = m_curr_particle->m_pose(0);
+        // t.transform.translation.y = m_curr_particle->m_pose(1);
+        // t.transform.translation.z = m_nav_z;
+
+        // tf2::Quaternion q;
+        // q.setRPY(0, 0, m_curr_particle->m_pose(2));
+        // t.transform.rotation = tf2::toMsg(q);
+        t.header.frame_id = m_local_frame_id;
+        t.child_frame_id = m_slam_frame_id;
+        float inv_x, inv_y, inv_theta;
+        std::tie(inv_x, inv_y, inv_theta) = all_seaing_perception::compute_transform_from_to(m_curr_particle->m_pose(0), m_curr_particle->m_pose(1), m_curr_particle->m_pose(2), 0, 0, 0);
+        t.transform.translation.x = inv_x;
+        t.transform.translation.y = inv_y;
+        t.transform.translation.z = -m_nav_z;
 
         tf2::Quaternion q;
-        q.setRPY(0, 0, m_curr_particle->m_pose(2));
+        q.setRPY(0, 0, inv_theta);
         t.transform.rotation = tf2::toMsg(q);
     }else{
         // transform from slam_map to map, s.t. slam_map->robot is predicted pose

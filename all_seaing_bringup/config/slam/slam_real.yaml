@@ -22,4 +22,5 @@ object_tracking_map:
     track_robot: True
     imu_predict: True
     gps_update: False
+    direct_tf: True
     is_sim: False
