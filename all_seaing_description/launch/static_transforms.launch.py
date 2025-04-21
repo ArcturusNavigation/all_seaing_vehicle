@@ -125,7 +125,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        # map_to_odom,
+        map_to_odom,
         lidar_to_camera,
         zed_to_base,
         base_link_to_imu,
