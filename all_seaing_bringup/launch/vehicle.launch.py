@@ -22,6 +22,12 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
+    robot_localization_odom_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_odom_real.yaml"
+    )
+    inc_color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
+    )
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
@@ -65,7 +71,18 @@ def launch_setup(context, *args, **kwargs):
             ]),
         ),
     )
-        
+
+    ekf_odom_node = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_odom_params],
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'"
+            ]),
+        ),
+    )
+
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     navsat_node = launch_ros.actions.Node(
@@ -328,13 +345,13 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
-            ("lidar_topic", "/point_cloud/filtered"),
-            ("bounding_boxes", "static_shape_boxes")
+            ("lidar_topic", "/point_cloud/filtered")
         ],
         parameters=[
-            {"base_link_frame": "actual_base_link"},
-            {"bbox_object_margin": 1.0},
-            {"color_label_mappings_file": buoy_label_mappings},
+            # {"base_link_frame": "actual_base_link"},
+            {"base_link_frame": "base_link"},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
@@ -478,6 +495,7 @@ def launch_setup(context, *args, **kwargs):
         controller_node,
         controller_server,
         ekf_node,
+        # ekf_odom_node,
         navsat_node,
         navigation_server,
         obstacle_bbox_overlay_node,
@@ -496,13 +514,13 @@ def launch_setup(context, *args, **kwargs):
         # object_tracking_map_pf_node,
         run_tasks,
         task_init_server, 
-        follow_buoy_path,
-        follow_buoy_pid,
+        # follow_buoy_path,
+        # follow_buoy_pid,
         grid_map_generator,
         central_hub,
-        amcl_ld,
+        # amcl_ld,
         static_transforms_ld,
-        webcam_publisher,
+        # webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,
