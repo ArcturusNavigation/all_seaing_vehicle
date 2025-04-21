@@ -22,6 +22,9 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
+    robot_localization_odom_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_odom_real.yaml"
+    )
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
@@ -65,7 +68,18 @@ def launch_setup(context, *args, **kwargs):
             ]),
         ),
     )
-        
+
+    ekf_odom_node = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_odom_params],
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'"
+            ]),
+        ),
+    )
+
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     navsat_node = launch_ros.actions.Node(
@@ -478,6 +492,7 @@ def launch_setup(context, *args, **kwargs):
         controller_node,
         controller_server,
         ekf_node,
+        ekf_odom_node,
         navsat_node,
         navigation_server,
         obstacle_bbox_overlay_node,
@@ -487,7 +502,7 @@ def launch_setup(context, *args, **kwargs):
         rover_custom_controller,
         rover_lora_controller,
         rviz_waypoint_sender,
-        thrust_commander_node,
+        # thrust_commander_node,
         buoy_yolo_node,
         # shape_yolo_node,
         # static_shape_yolo_node,
@@ -498,14 +513,14 @@ def launch_setup(context, *args, **kwargs):
         task_init_server, 
         follow_buoy_path,
         follow_buoy_pid,
-        grid_map_generator,
-        central_hub,
-        amcl_ld,
+        # grid_map_generator,
+        # central_hub,
+        # amcl_ld,
         static_transforms_ld,
-        webcam_publisher,
-        lidar_ld,
+        # webcam_publisher,
+        # lidar_ld,
         mavros_ld,
-        zed_ld,
+        # zed_ld,
     ]
 
 

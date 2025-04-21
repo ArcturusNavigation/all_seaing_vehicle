@@ -8,6 +8,8 @@ ekf_filter_node:
     print_diagnostics: false
     debug: false
 
+    # TODO: also change the sim to reflect the real-life changes in frames
+
     odom_frame: odom
     base_link_frame: wamv/wamv/base_link
     world_frame: odom
