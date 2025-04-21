@@ -11,6 +11,7 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 import launch_ros
 import os
 import yaml
+import xacro
 
 
 def launch_setup(context, *args, **kwargs):
@@ -19,6 +20,12 @@ def launch_setup(context, *args, **kwargs):
     description_prefix = get_package_share_directory("all_seaing_description")
     driver_prefix = get_package_share_directory("all_seaing_driver")
 
+    robot_urdf_file = os.path.join(
+        description_prefix, "urdf", "fish_and_chips", "robot.urdf.xacro"
+    )
+    lidar_camera_calibration_file = os.path.join(
+        description_prefix, "urdf", "fish_and_chips", "lidar_camera.urdf.xacro"
+    )
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
@@ -473,6 +480,22 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(use_bag),
     )
 
+    robot_urdf = xacro.process_file(robot_urdf_file).toxml()
+    robot_state_publisher = launch_ros.actions.Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        output='screen',
+        parameters=[{'robot_description': robot_urdf}]
+    )
+
+    lidar_camera_urdf = xacro.process_file(lidar_camera_calibration_file).toxml()
+    calibration_publisher = launch_ros.actions.Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        output='screen',
+        parameters=[{'robot_description': lidar_camera_urdf}]
+    )
+
     amcl_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -520,6 +543,8 @@ def launch_setup(context, *args, **kwargs):
         central_hub,
         # amcl_ld,
         static_transforms_ld,
+        robot_state_publisher,
+        calibration_publisher,
         # webcam_publisher,
         lidar_ld,
         mavros_ld,
