@@ -11,9 +11,9 @@ ekf_filter_node:
     # base_link_frame: base_link
     # world_frame: map
     # map_frame: map
-    odom_frame: map
+    odom_frame: odom
     base_link_frame: base_link
-    world_frame: map
+    world_frame: odom
     publish_tf: true
     reset_on_time_jump: true
 
