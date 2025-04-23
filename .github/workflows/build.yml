@@ -1,0 +1,39 @@
+name: build-modules
+on:
+  workflow_dispatch: # allows manual triggering
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Setup CI binary cache
+        uses: DeterminateSystems/flakehub-cache-action@main
+      - name: Launch Nix development environment and build Nix package manifests
+        run: cd ..;
+          git clone https://github.com/ArcturusNavigation/arcturus_nix;
+          cd arcturus_nix;
+          chmod +x *.sh;
+          chmod +x ci/*.sh;
+          bash ci/pull.sh;
+          cp -r ../all_seaing_vehicle dev_ws/src/;
+          nix develop -i --accept-flake-config --keep HOME --command bash -c "bash ./build.sh;";
+      - name: Build modules and run nodes
+        # omitted due to build failures (currently unsupported on nix):
+        # bash ci/run.sh all_seaing_perception;
+        # bash ci/run.sh all_seaing_bringup;
+        run: cd ../arcturus_nix;
+          bash ci/run.sh all_seaing_autonomy;
+          bash ci/run.sh all_seaing_common;
+          bash ci/run.sh all_seaing_controller;
+          bash ci/run.sh all_seaing_description;
+          bash ci/run.sh all_seaing_driver;
+          bash ci/run.sh all_seaing_interfaces;
+          bash ci/run.sh all_seaing_navigation;
+          bash ci/run.sh all_seaing_rviz_plugins;
+          bash ci/run.sh all_seaing_utility;

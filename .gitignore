@@ -50,3 +50,7 @@ bag/
 
 # Vim related
 .swp
+
+# Nix related
+# ignore package.nix in favor of package.xml
+package.nix
