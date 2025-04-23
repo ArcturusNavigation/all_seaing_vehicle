@@ -55,6 +55,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("direct_tf", false);
     m_direct_tf = this->get_parameter("direct_tf").as_bool();
 
+    this->declare_parameter<bool>("rotate_odom", false);
+    m_rotate_odom = this->get_parameter("rotate_odom").as_bool();
+
     this->declare_parameter<bool>("normalize_drop_thresh", false);
     m_normalize_drop_thresh = this->get_parameter("normalize_drop_thresh").as_bool();
 
@@ -174,13 +177,15 @@ void ObjectTrackingMap::publish_slam(){
 
 void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     // !!! THOSE ARE RELATIVE TO THE ROBOT AND DEPENDENT ON ITS HEADING, USE THE CORRECT MOTION MODEL
-    if(m_is_sim){
+    if(!m_rotate_odom){
         m_nav_vx = msg.twist.twist.linear.x;
         m_nav_vy = msg.twist.twist.linear.y;   
     }else{
         // Pixhawk rotated to the left, facing up, so need to rotate the acceleration vector accordingly
         m_nav_vx = -msg.twist.twist.linear.y;
         m_nav_vy = msg.twist.twist.linear.x;
+        // m_nav_vx = msg.twist.twist.linear.x;
+        // m_nav_vy = msg.twist.twist.linear.y;
     }
     m_nav_vz = msg.twist.twist.linear.z;
     m_nav_omega = msg.twist.twist.angular.z;
@@ -239,6 +244,8 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     if (m_track_robot) {
         m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
     }
+
+    this->publish_maps();
     
     // to see the robot position prediction mean & uncertainty
     if(m_got_nav){
@@ -257,12 +264,12 @@ void ObjectTrackingMap::odom_callback() {
     //update odometry transforms
     //TODO: add a flag for each one that says if they succedeed, to know to continue or not
     // RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
-    m_map_lidar_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
-    m_lidar_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
-    m_nav_z = m_map_lidar_tf.transform.translation.z;
+    m_nav_z = m_map_base_link_tf.transform.translation.z;
     tf2::Quaternion quat;
-    tf2::fromMsg(m_map_lidar_tf.transform.rotation, quat);
+    tf2::fromMsg(m_map_base_link_tf.transform.rotation, quat);
     tf2::Matrix3x3 m(quat);
     double r, p, y;
     m.getRPY(r, p, y);
@@ -271,13 +278,13 @@ void ObjectTrackingMap::odom_callback() {
     m_got_nav = true;
 
     // to ignore gps TFs that are the same thing 5000 times a second and cause SLAM to lock into the GPS
-    // RCLCPP_INFO(this->get_logger(), "COMPARE: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_lidar_tf.transform.translation.x, m_map_lidar_tf.transform.translation.y);
-    if((!m_first_state) && (m_nav_x == m_map_lidar_tf.transform.translation.x) && (m_nav_y == m_map_lidar_tf.transform.translation.y)) return;
+    // RCLCPP_INFO(this->get_logger(), "COMPARE: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_base_link_tf.transform.translation.x, m_map_base_link_tf.transform.translation.y);
+    if((!m_first_state) && (m_nav_x == m_map_base_link_tf.transform.translation.x) && (m_nav_y == m_map_base_link_tf.transform.translation.y)) return;
 
     // RCLCPP_INFO(this->get_logger(), "GOT ODOM");
-    m_nav_x = m_map_lidar_tf.transform.translation.x;
-    m_nav_y = m_map_lidar_tf.transform.translation.y;
-    // RCLCPP_INFO(this->get_logger(), "COMPARE NEW: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_lidar_tf.transform.translation.x, m_map_lidar_tf.transform.translation.y);
+    m_nav_x = m_map_base_link_tf.transform.translation.x;
+    m_nav_y = m_map_base_link_tf.transform.translation.y;
+    // RCLCPP_INFO(this->get_logger(), "COMPARE NEW: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_base_link_tf.transform.translation.x, m_map_base_link_tf.transform.translation.y);
 
     // RCLCPP_INFO(this->get_logger(), "NEW GPS: (%lf, %lf)", m_nav_x, m_nav_y);
 
@@ -376,12 +383,18 @@ void ObjectTrackingMap::odom_callback() {
         m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
     }
 
+    this->publish_maps();
+
     if(m_got_nav){
         this->visualize_predictions();
     }
+
     if(m_track_robot && m_got_nav && m_got_odom){
         publish_slam();
     }
+
+    this->update_maps();
+    this->publish_maps();
 }
 
 void ObjectTrackingMap::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
@@ -397,7 +410,7 @@ T ObjectTrackingMap::convert_to_global(T point, bool untracked) {
     lc_pt_msg.y = point.y;
     lc_pt_msg.z = point.z;
     geometry_msgs::msg::Point gb_pt_msg;
-    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_lidar_map_tf);
+    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_base_link_map_tf);
     new_point.x = gb_pt_msg.x;
     new_point.y = gb_pt_msg.y;
     new_point.z = gb_pt_msg.z;
@@ -430,11 +443,76 @@ T ObjectTrackingMap::convert_to_local(T point, bool untracked) {
     gb_pt_msg.y = act_point.y;
     gb_pt_msg.z = act_point.z;
     geometry_msgs::msg::Point lc_pt_msg;
-    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_lidar_tf);
+    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_base_link_tf);
     new_point.x = lc_pt_msg.x;
     new_point.y = lc_pt_msg.y;
     new_point.z = lc_pt_msg.z;
     return new_point;
+}
+
+void ObjectTrackingMap::update_maps(){
+    // Update all (new and old, since they also have correlation with each other) objects global
+    // positions (including the cloud, and then the local points respectively)
+    for (size_t i = 0; i < m_tracked_obstacles.size(); i++) {
+        pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
+        if (m_track_robot) {
+            upd_glob_centr.x = m_state[3 + 2 * i];
+            upd_glob_centr.y =
+                m_state[3 + 2 * i + 1]; // to not lose the z coordinate, it's useful for checking if
+                                        // the objects should be in the camera frame
+        } else {
+            upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
+            upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
+        }
+        // map->point = (map->centroid)@(centroid->point)
+        float useless_theta;
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(
+            new pcl::PointCloud<pcl::PointXYZHSV>);
+        for (pcl::PointXYZHSV &global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points){
+            pcl::PointXYZHSV upd_global_pt = global_pt;
+            std::tuple<double, double, double> centroid_to_point = all_seaing_perception::compute_transform_from_to(m_tracked_obstacles[i]->global_centroid.x, m_tracked_obstacles[i]->global_centroid.y, 0, global_pt.x, global_pt.y, 0);
+            std::tie(upd_global_pt.x, upd_global_pt.y, useless_theta) = all_seaing_perception::compose_transforms(std::make_tuple(upd_glob_centr.x, upd_glob_centr.y, 0), centroid_to_point);
+            global_pt = upd_global_pt;
+            upd_local_obj_pcloud->push_back(
+                this->convert_to_local(global_pt));
+        }
+
+        m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
+        m_tracked_obstacles[i]->local_centroid = this->convert_to_local(upd_glob_centr);
+    }
+}
+
+void ObjectTrackingMap::publish_maps(){
+    // Publish map with tracked obstacles
+    std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
+    std::vector<int> tracked_labels;
+    for (std::shared_ptr<all_seaing_perception::ObjectCloud> t_ob : m_tracked_obstacles) {
+        pcl::PointCloud<pcl::PointXYZI>::Ptr local_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+        for (pcl::PointXYZHSV pt : t_ob->local_pcloud_ptr->points) {
+            pcl::PointXYZRGB rgb_pt;
+            pcl::PointXYZI i_pt;
+            pcl::PointXYZHSVtoXYZRGB(pt, rgb_pt);
+            pcl::PointXYZRGBtoXYZI(rgb_pt, i_pt);
+            local_tracked_cloud->push_back(i_pt);
+        }
+
+        pcl::PointCloud<pcl::PointXYZI>::Ptr global_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+        for (pcl::PointXYZHSV pt : t_ob->global_pcloud_ptr->points) {
+            pcl::PointXYZRGB rgb_pt;
+            pcl::PointXYZI i_pt;
+            pcl::PointXYZHSVtoXYZRGB(pt, rgb_pt);
+            pcl::PointXYZRGBtoXYZI(rgb_pt, i_pt);
+            global_tracked_cloud->push_back(i_pt);
+        }
+
+        std::shared_ptr<all_seaing_perception::Obstacle> tracked_ob(
+            new all_seaing_perception::Obstacle(m_local_header, m_global_header, local_tracked_cloud, global_tracked_cloud,
+                                                t_ob->id));
+        tracked_labels.push_back(t_ob->label);
+        tracked_obs.push_back(tracked_ob);
+    }
+    all_seaing_perception::publish_map(m_local_header, m_global_header, "tracked", true, tracked_obs, m_tracked_map_pub,
+                    tracked_labels);
 }
 
 void ObjectTrackingMap::visualize_predictions() {
@@ -589,11 +667,12 @@ void ObjectTrackingMap::visualize_predictions() {
 }
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
-    if(msg->objects.size()==0) return;    
+    // if(msg->objects.size()==0) return;
     // RCLCPP_INFO(this->get_logger(), "GOT DATA");
 
     // Set up headers and transforms
-    m_local_header = msg->objects[0].cloud.header;
+    // m_local_header = msg->objects[0].cloud.header;
+    m_local_header = msg->header;
     m_global_header.frame_id = m_track_robot? m_slam_frame_id : m_global_frame_id;
     m_global_header.stamp = m_local_header.stamp;
     std_msgs::msg::Header m_global_untracked_header = m_global_header;
@@ -602,8 +681,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     m_got_local_frame = true;
 
     // RCLCPP_INFO(this->get_logger(), "BEFORE GETTING ODOMETRY TF");
-    m_lidar_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
-    m_map_lidar_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    // RCLCPP_INFO(this->get_logger(), "LOCAL FRAME: %s, GLOBAL FRAME: %s", m_local_frame_id.c_str(), m_global_frame_id.c_str());
     // RCLCPP_INFO(this->get_logger(), "GOT ODOMETRY TF");
 
     if(m_track_robot && m_first_state) return;
@@ -620,7 +700,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 this->convert_to_global(pt, true);
             global_obj_pcloud->push_back(global_pt);
         }
-        // pcl::transformPointCloud(*local_obj_pcloud, *global_obj_pcloud, m_lidar_map_tf);
+        // pcl::transformPointCloud(*local_obj_pcloud, *global_obj_pcloud, m_base_link_map_tf);
         std::shared_ptr<all_seaing_perception::ObjectCloud> obj_cloud(
             new all_seaing_perception::ObjectCloud(obj.time, obj.label, local_obj_pcloud, global_obj_pcloud));
         detected_obstacles.push_back(obj_cloud);
@@ -641,11 +721,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::iota(std::begin(ind), std::end(ind), 0); 
         std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
             new all_seaing_perception::Obstacle(m_local_header, m_global_untracked_header, raw_cloud, ind,
-                                                m_obstacle_id++, m_lidar_map_tf));
+                                                m_obstacle_id++, m_base_link_map_tf));
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
-    all_seaing_perception::publish_map(m_global_untracked_header, m_global_header, "untracked", true, untracked_obs, m_untracked_map_pub,
+    all_seaing_perception::publish_map(m_local_header, m_global_untracked_header, "untracked", true, untracked_obs, m_untracked_map_pub,
                     untracked_labels);
 
     // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
@@ -790,37 +870,12 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         detected_obstacles[i]->id = m_tracked_obstacles[tracked_id]->id;
         m_tracked_obstacles[tracked_id] = detected_obstacles[i];
     }
+    
+    this->update_maps();
 
-    // Update all (new and old, since they also have correlation with each other) objects global
-    // positions (including the cloud, and then the local points respectively)
     pcl::PointXYZ p0(0, 0, 0);
     float avg_dist = 0;
     for (size_t i = 0; i < m_tracked_obstacles.size(); i++) {
-        pcl::PointXYZ upd_glob_centr = m_tracked_obstacles[i]->global_centroid;
-        if (m_track_robot) {
-            upd_glob_centr.x = m_state[3 + 2 * i];
-            upd_glob_centr.y =
-                m_state[3 + 2 * i + 1]; // to not lose the z coordinate, it's useful for checking if
-                                        // the objects should be in the camera frame
-        } else {
-            upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
-            upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
-        }
-        // map->point = (map->centroid)@(centroid->point)
-        float useless_theta;
-        pcl::PointCloud<pcl::PointXYZHSV>::Ptr upd_local_obj_pcloud(
-            new pcl::PointCloud<pcl::PointXYZHSV>);
-        for (pcl::PointXYZHSV &global_pt : m_tracked_obstacles[i]->global_pcloud_ptr->points){
-            pcl::PointXYZHSV upd_global_pt = global_pt;
-            std::tuple<double, double, double> centroid_to_point = all_seaing_perception::compute_transform_from_to(m_tracked_obstacles[i]->global_centroid.x, m_tracked_obstacles[i]->global_centroid.y, 0, global_pt.x, global_pt.y, 0);
-            std::tie(upd_global_pt.x, upd_global_pt.y, useless_theta) = all_seaing_perception::compose_transforms(std::make_tuple(upd_glob_centr.x, upd_glob_centr.y, 0), centroid_to_point);
-            global_pt = upd_global_pt;
-            upd_local_obj_pcloud->push_back(
-                this->convert_to_local(global_pt));
-        }
-
-        m_tracked_obstacles[i]->global_centroid = upd_glob_centr;
-        m_tracked_obstacles[i]->local_centroid = this->convert_to_local(upd_glob_centr);;
         avg_dist += pcl::euclideanDistance(p0, m_tracked_obstacles[i]->local_centroid) / ((float)m_tracked_obstacles.size());
     }
 
@@ -863,9 +918,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 // Was also dead before, add time dead
                 // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d TIME PERIOD FROM PREVIOUS DEAD: %lf
                 // - %lf", tracked_id, m_tracked_obstacles[tracked_id]->last_dead.seconds(),
-                // rclcpp::Time(msg->objects[0].time).seconds());
+                // rclcpp::Time(m_local_header.stamp).seconds());
                 m_tracked_obstacles[tracked_id]->time_dead =
-                    rclcpp::Time(msg->objects[0].time) -
+                    rclcpp::Time(m_local_header.stamp) -
                     m_tracked_obstacles[tracked_id]->last_dead +
                     m_tracked_obstacles[tracked_id]->time_dead;
                 // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d DEAD FOR %lf SECONDS, OBSTACLE DROP
@@ -884,7 +939,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 }
             }
             m_tracked_obstacles[tracked_id]->is_dead = true;
-            m_tracked_obstacles[tracked_id]->last_dead = msg->objects[0].time;
+            m_tracked_obstacles[tracked_id]->last_dead = m_local_header.stamp;
         } else {
             m_tracked_obstacles[tracked_id]->is_dead = false;
         }
@@ -927,36 +982,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
     }
 
-    // Publish map with tracked obstacles
-    std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
-    std::vector<int> tracked_labels;
-    for (std::shared_ptr<all_seaing_perception::ObjectCloud> t_ob : m_tracked_obstacles) {
-        pcl::PointCloud<pcl::PointXYZI>::Ptr local_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-        for (pcl::PointXYZHSV pt : t_ob->local_pcloud_ptr->points) {
-            pcl::PointXYZRGB rgb_pt;
-            pcl::PointXYZI i_pt;
-            pcl::PointXYZHSVtoXYZRGB(pt, rgb_pt);
-            pcl::PointXYZRGBtoXYZI(rgb_pt, i_pt);
-            local_tracked_cloud->push_back(i_pt);
-        }
+    this->publish_maps();
 
-        pcl::PointCloud<pcl::PointXYZI>::Ptr global_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-        for (pcl::PointXYZHSV pt : t_ob->global_pcloud_ptr->points) {
-            pcl::PointXYZRGB rgb_pt;
-            pcl::PointXYZI i_pt;
-            pcl::PointXYZHSVtoXYZRGB(pt, rgb_pt);
-            pcl::PointXYZRGBtoXYZI(rgb_pt, i_pt);
-            global_tracked_cloud->push_back(i_pt);
-        }
-
-        std::shared_ptr<all_seaing_perception::Obstacle> tracked_ob(
-            new all_seaing_perception::Obstacle(m_local_header, m_global_header, local_tracked_cloud, global_tracked_cloud,
-                                                t_ob->id));
-        tracked_labels.push_back(t_ob->label);
-        tracked_obs.push_back(tracked_ob);
-    }
-     all_seaing_perception::publish_map(m_local_header, m_global_header, "tracked", true, tracked_obs, m_tracked_map_pub,
-                      tracked_labels);
     // RCLCPP_INFO(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
     if(m_got_nav){
         this->visualize_predictions();

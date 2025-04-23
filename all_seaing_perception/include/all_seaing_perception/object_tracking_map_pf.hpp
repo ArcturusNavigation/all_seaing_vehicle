@@ -96,6 +96,8 @@ struct SLAMParticle{
         bool check_fov, float obstacle_drop_thres, bool normalize_drop_thres, image_geometry::PinholeCameraModel cam_model,
         geometry_msgs::msg::TransformStamped map_lidar_tf, geometry_msgs::msg::TransformStamped lidar_map_tfm, rclcpp::Logger logger);
 
+    void update_maps(geometry_msgs::msg::TransformStamped map_lidar_tf);
+
     float mahalanobis_to_prob(float mahalanobis_dist, Eigen::MatrixXf cov);
 
     float prob_normal(Eigen::VectorXf measurement, Eigen::VectorXf mean, Eigen::MatrixXf cov);
@@ -129,6 +131,8 @@ private:
     void publish_slam();
 
     void update_curr_particle();
+
+    void publish_maps();
 
     // Member variables
     int m_num_particles;
@@ -165,7 +169,7 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
     std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
-    geometry_msgs::msg::TransformStamped m_lidar_map_tf, m_map_lidar_tf;
+    geometry_msgs::msg::TransformStamped m_base_link_map_tf, m_map_base_link_tf;
     rclcpp::TimerBase::SharedPtr odom_timer;
 
     // Intrinsics callback camera model variables
@@ -176,7 +180,7 @@ private:
     float m_gps_vxy_noise_coeff, m_gps_omega_noise_coeff, m_gps_theta_noise_coeff;
     float m_imu_vxy_noise_coeff, m_imu_omega_noise_coeff, m_imu_theta_noise_coeff;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
-    bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom;
+    bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
     nav_msgs::msg::Odometry m_last_odom_msg;
 
     bool m_is_sim;

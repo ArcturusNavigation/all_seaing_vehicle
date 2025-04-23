@@ -7,6 +7,10 @@ ekf_filter_node:
     print_diagnostics: false
     debug: false
 
+    # odom_frame: odom
+    # base_link_frame: base_link
+    # world_frame: map
+    # map_frame: map
     odom_frame: odom
     base_link_frame: base_link
     world_frame: odom
@@ -22,23 +26,30 @@ ekf_filter_node:
         true,  true,  true,  # roll', pitch', yaw'
         true, true, true, # X'', Y'', Z''
       ]
+      # [
+      #   true, true, true, # X, Y, Z
+      #   true,  true,  true,  # roll, pitch, yaw
+      #   true, true, true, # X', Y', Z'
+      #   true,  true,  true,  # roll', pitch', yaw'
+      #   true, true, true, # X'', Y'', Z''
+      # ]
     imu0_differential: false
     imu0_relative: false
     imu0_queue_size: 10
     imu0_remove_gravitational_acceleration: true
 
-    imu1: /gps/imu
-    imu1_config:
-      [
-        false, false, false, # X, Y, Z
-        false,  false,  false,  # roll, pitch, yaw
-        false, false, false, # X', Y', Z'
-        false, false, false, # roll', pitch', yaw'
-        false, false, false, # X'', Y'', Z''
-      ]
-    imu1_differential: false
-    imu1_relative: false
-    imu1_queue_size: 10
+    # imu1: /gps/imu
+    # imu1_config:
+    #   [
+    #     false, false, false, # X, Y, Z
+    #     false,  false,  false,  # roll, pitch, yaw
+    #     false, false, false, # X', Y', Z'
+    #     false, false, false, # roll', pitch', yaw'
+    #     false, false, false, # X'', Y'', Z''
+    #   ]
+    # imu1_differential: false
+    # imu1_relative: false
+    # imu1_queue_size: 10
 
     odom0: /odometry/gps
     odom0_config:
@@ -54,6 +65,25 @@ ekf_filter_node:
     odom0_queue_size: 10
 
     use_control: false
+
+    # process_noise_covariance: 
+    #   [
+    #     10.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 10.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 1e-3, 0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.3, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.3, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.0,
+    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3
+    #   ]
 
     process_noise_covariance: 
       [

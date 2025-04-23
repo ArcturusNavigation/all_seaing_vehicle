@@ -11,6 +11,7 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 import launch_ros
 import os
 import yaml
+import xacro
 
 
 def launch_setup(context, *args, **kwargs):
@@ -19,8 +20,20 @@ def launch_setup(context, *args, **kwargs):
     description_prefix = get_package_share_directory("all_seaing_description")
     driver_prefix = get_package_share_directory("all_seaing_driver")
 
+    robot_urdf_file = os.path.join(
+        description_prefix, "urdf", "fish_and_chips", "robot.urdf.xacro"
+    )
+    lidar_camera_calibration_file = os.path.join(
+        description_prefix, "urdf", "fish_and_chips", "lidar_camera.urdf.xacro"
+    )
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
+    )
+    robot_localization_odom_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_odom_real.yaml"
+    )
+    inc_color_buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
     )
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
@@ -65,7 +78,18 @@ def launch_setup(context, *args, **kwargs):
             ]),
         ),
     )
-        
+
+    ekf_odom_node = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_odom_params],
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'"
+            ]),
+        ),
+    )
+
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     navsat_node = launch_ros.actions.Node(
@@ -328,12 +352,13 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
-            ("lidar_topic", "/point_cloud/filtered"),
-            ("bounding_boxes", "static_shape_boxes")
+            ("lidar_topic", "/point_cloud/filtered")
         ],
         parameters=[
-            {"bbox_object_margin": 1.0},
-            {"color_label_mappings_file": buoy_label_mappings},
+            # {"base_link_frame": "actual_base_link"},
+            {"base_link_frame": "base_link"},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
@@ -455,6 +480,22 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(use_bag),
     )
 
+    robot_urdf = xacro.process_file(robot_urdf_file).toxml()
+    robot_state_publisher = launch_ros.actions.Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        output='screen',
+        parameters=[{'robot_description': robot_urdf}]
+    )
+
+    lidar_camera_urdf = xacro.process_file(lidar_camera_calibration_file).toxml()
+    calibration_publisher = launch_ros.actions.Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        output='screen',
+        parameters=[{'robot_description': lidar_camera_urdf}]
+    )
+
     amcl_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -477,6 +518,7 @@ def launch_setup(context, *args, **kwargs):
         controller_node,
         controller_server,
         ekf_node,
+        # ekf_odom_node,
         navsat_node,
         navigation_server,
         obstacle_bbox_overlay_node,
@@ -491,17 +533,19 @@ def launch_setup(context, *args, **kwargs):
         # shape_yolo_node,
         # static_shape_yolo_node,
         bbox_project_pcloud_node,
-        # object_tracking_map_node,
-        object_tracking_map_pf_node,
+        object_tracking_map_node,
+        # object_tracking_map_pf_node,
         run_tasks,
         task_init_server, 
-        follow_buoy_path,
-        follow_buoy_pid,
+        # follow_buoy_path,
+        # follow_buoy_pid,
         grid_map_generator,
         central_hub,
-        amcl_ld,
+        # amcl_ld,
         static_transforms_ld,
-        webcam_publisher,
+        robot_state_publisher,
+        calibration_publisher,
+        # webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,

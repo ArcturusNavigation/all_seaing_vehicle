@@ -268,6 +268,7 @@ def launch_setup(context, *args, **kwargs):
             ("lidar_topic", "point_cloud/filtered")
         ],
         parameters=[
+            {"base_link_frame": "wamv/wamv/base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": color_buoy_label_mappings},
             {"color_ranges_file": color_ranges},
@@ -490,8 +491,8 @@ def launch_setup(context, *args, **kwargs):
         # buoy_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
-        # object_tracking_map_node,
-        object_tracking_map_pf_node,
+        object_tracking_map_node,
+        # object_tracking_map_pf_node,
         # object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,

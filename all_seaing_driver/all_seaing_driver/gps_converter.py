@@ -36,7 +36,8 @@ class GPSConverter(Node):
     def gpsraw_callback(self, gpsraw_msg):
         imu_msg = Imu()
         imu_msg.header = gpsraw_msg.header
-        imu_msg.header.frame_id = "base_link"
+        imu_msg.header.frame_id = "gps_link"
+        # imu_msg.header.frame_id = "base_link"
         imu_msg.orientation.z = math.sin(math.radians(-gpsraw_msg.yaw / 100 + self.yaw_offset) / 2)
         imu_msg.orientation.w = math.cos(math.radians(-gpsraw_msg.yaw / 100 + self.yaw_offset) / 2)
         if gpsraw_msg.yaw != 65535:
