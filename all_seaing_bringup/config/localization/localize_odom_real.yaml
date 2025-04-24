@@ -9,12 +9,13 @@ ekf_filter_node:
 
     odom_frame: odom
     base_link_frame: base_link
-    world_frame: odom
+    # world_frame: odom
     # map_frame: map
     publish_tf: true
     # reset_on_time_jump: true
 
-    imu0: /mavros/imu/data
+    # imu0: /mavros/imu/data
+    imu0: /zed/zed_node/imu/data
     imu0_config:
       [
         true, true, true, # X, Y, Z
@@ -23,11 +24,26 @@ ekf_filter_node:
         true,  true,  true,  # roll', pitch', yaw'
         true, true, true, # X'', Y'', Z''
       ]
-    # imu0_differential: false
-    # imu0_relative: false
-    # imu0_queue_size: 10
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 10
     imu0_remove_gravitational_acceleration: true
 
+    # imu1: /zed/zed_node/imu/data
+    # imu1: /mavros/imu/data
+    # imu1_config:
+    #   [
+    #     true, true, true, # X, Y, Z
+    #     true,  true,  true,  # roll, pitch, yaw
+    #     true, true, true, # X', Y', Z'
+    #     true,  true,  true,  # roll', pitch', yaw'
+    #     true, true, true, # X'', Y'', Z''
+    #   ]
+    # imu1_differential: false
+    # imu1_relative: false
+    # imu1_queue_size: 10
+    # imu1_remove_gravitational_acceleration: true
+    
     # imu1: /gps/imu
     # imu1_config:
     #   [

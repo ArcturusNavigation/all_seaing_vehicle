@@ -7,17 +7,18 @@ ekf_filter_node:
     print_diagnostics: false
     debug: false
 
-    # odom_frame: odom
-    # base_link_frame: base_link
-    # world_frame: map
-    # map_frame: map
     odom_frame: odom
     base_link_frame: base_link
-    world_frame: odom
+    world_frame: map
+    map_frame: map
+    # odom_frame: odom
+    # base_link_frame: base_link
+    # world_frame: odom
     publish_tf: true
-    reset_on_time_jump: true
+    # reset_on_time_jump: true
 
     imu0: /mavros/imu/data
+    # imu0: /zed/zed_node/imu/data
     imu0_config:
       [
         false, false, false, # X, Y, Z
@@ -38,18 +39,33 @@ ekf_filter_node:
     imu0_queue_size: 10
     imu0_remove_gravitational_acceleration: true
 
-    # imu1: /gps/imu
-    # imu1_config:
-    #   [
-    #     false, false, false, # X, Y, Z
-    #     false,  false,  false,  # roll, pitch, yaw
-    #     false, false, false, # X', Y', Z'
-    #     false, false, false, # roll', pitch', yaw'
-    #     false, false, false, # X'', Y'', Z''
-    #   ]
-    # imu1_differential: false
-    # imu1_relative: false
-    # imu1_queue_size: 10
+    imu1: /zed/zed_node/imu/data
+    # imu1: /mavros/imu/data
+    imu1_config:
+      [
+        false, false, false, # X, Y, Z
+        true,  true,  true,  # roll, pitch, yaw
+        false, false, false, # X', Y', Z'
+        true,  true,  true,  # roll', pitch', yaw'
+        true, true, true, # X'', Y'', Z''
+      ]
+    imu1_differential: false
+    imu1_relative: false
+    imu1_queue_size: 10
+    imu1_remove_gravitational_acceleration: true
+
+    imu2: /gps/imu
+    imu2_config:
+      [
+        false, false, false, # X, Y, Z
+        false,  false,  false,  # roll, pitch, yaw
+        false, false, false, # X', Y', Z'
+        false, false, false, # roll', pitch', yaw'
+        false, false, false, # X'', Y'', Z''
+      ]
+    imu2_differential: false
+    imu2_relative: false
+    imu2_queue_size: 10
 
     odom0: /odometry/gps
     odom0_config:
