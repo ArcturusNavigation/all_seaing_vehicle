@@ -236,26 +236,15 @@ class FollowBuoyPID(ActionServerBase):
         forward = False
         for box in self.obstacleboxes:
             area = (box.bbox_max.x - box.bbox_min.x) * (box.bbox_max.y - box.bbox_min.y)
-            # midpt = (box.bbox_max.x + box.bbox_min.x) / 2.0
-            # width = box.bbox_max.x - box.bbox_min.x
             location = box.local_point
             if box.label in self.green_labels and area > green_area:
                 green_area = area
                 green_location = location
-                # sets flag if width large enough regardless of if sees anything
-                # if width >= self.width * 0.15:
-                #     forward = True
-                #     self.forward_start = self.get_clock().now()
             elif box.label in self.red_labels and area > red_area:
                 red_area = area
                 red_location = location
-                # if width >= self.width * 0.15:
-                #     forward = True
-                #     self.forward_start = self.get_clock().now()
             elif box.label in self.yellow_labels and area > yellow_area:
                 yellow_area = area
-                # yellow_left = box.bbox_min.x
-                # yellow_right = box.bbox_max.x
                 yellow_location = location
 
         # if we only see one of red / green, rotate
@@ -294,6 +283,7 @@ class FollowBuoyPID(ActionServerBase):
         # right_x = green_center_x
         # img_ctr = self.width / 2.0
 
+        # Used when only see one buoy
         correction_value = (self.max_distance_apart + self.min_distance_apart)/2 * self.meters_feet_conversion
         waypoint_x = None
         waypoint_y = None
@@ -302,6 +292,7 @@ class FollowBuoyPID(ActionServerBase):
         green_x = None
         green_y = None
 
+        # Set imaginary location for any buoys we do not see
         if green_location == None:
             red_y = red_location.point.y
             red_x = red_location.point.x
@@ -326,22 +317,24 @@ class FollowBuoyPID(ActionServerBase):
             red_y = red_location.point.y
             red_x = red_location.point.x
 
+        # Main logic of the follow the path
+        # If no yellows, just the midpt
         if yellow_location == None:
             waypoint_y = (red_y + green_y)/2
             waypoint_x = (red_x + green_x)/2
+        # If yellow, check if relevant and have two different cases if is
         else:
-        # whether yellow buoy is in front of or behind the line connecting the red and green buoy
-
             yellow_x = yellow_location.point.x
             yellow_y = yellow_location.point.y
             front = None
-
+            # Sets whether yellow is in front or behind of the line of red, green intersection
             if self.right_color == "green":
                 front = self.ccw((green_y, green_x), (yellow_y, yellow_x), (red_y, red_x))
             else:
                 front = self.ccw((red_y, red_x), (yellow_y, yellow_x), (green_y, green_x))
-
+            # Checks if yellow is between the green and red buoys
             if (self.right_color == "green" and red_y < yellow_y < green_y) or (self.right_color == "red" and green_y < yellow_y < red_y):
+                # If in front, finds intersection of red, green buoy line and its perpendicular line passing through yellow's location
                 if front:
                     red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
                     red_to_green = (green_x - red_x, green_y - red_y)
@@ -359,6 +352,7 @@ class FollowBuoyPID(ActionServerBase):
                     else:
                         waypoint_x = (green_x + intersection_x)/2
                         waypoint_y = (green_y + intersection_y)/2
+                # If behind, then just finds largest red, yellow or green, yellow dist and takes the midpt
                 else:
                     red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
                     green_to_yellow = (yellow_x - green_x, yellow_y -green_y)
@@ -370,6 +364,7 @@ class FollowBuoyPID(ActionServerBase):
                     else:
                         waypoint_x = (green_x + yellow_x)/2
                         waypoint_y = (green_y + yellow_y)/2
+            # If not in between the red and green buoys, treats it like there is no obstacle 
             else:
                 waypoint_y = (red_y + green_y)/2
                 waypoint_x = (red_x + green_x)/2
