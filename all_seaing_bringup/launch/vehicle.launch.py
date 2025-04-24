@@ -542,7 +542,7 @@ def launch_setup(context, *args, **kwargs):
         grid_map_generator,
         central_hub,
         amcl_ld,
-        static_transforms_ld,
+        # static_transforms_ld,
         robot_state_publisher,
         calibration_publisher,
         # webcam_publisher,
