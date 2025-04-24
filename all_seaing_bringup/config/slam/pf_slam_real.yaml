@@ -27,5 +27,5 @@ object_tracking_map_pf:
     check_fov: True
     imu_predict: True
     gps_update: False
-    direct_tf: False
+    direct_tf: True
     is_sim: False
