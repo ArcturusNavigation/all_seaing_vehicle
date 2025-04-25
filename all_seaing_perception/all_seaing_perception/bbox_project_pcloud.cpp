@@ -228,7 +228,6 @@ void BBoxProjectPCloud::bb_pcl_project(
         bbox.min_y = std::max((int)bbox.min_y,0);
         bbox.max_y = std::min((int)bbox.max_y+1, cv_hsv.rows);
         RCLCPP_DEBUG(this->get_logger(), "PADDED BOUNDING BOX FOR OBJECT %d: (%d,%d), (%d, %d)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y);
-        // TODO: change order of for loops, go through each point & project, and check each bounding box and add it there if needed
         for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
             // Project 3D point onto the image plane using the intrinsic matrix.
             // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
@@ -274,7 +273,6 @@ void BBoxProjectPCloud::bb_pcl_project(
     // RCLCPP_DEBUG(this->get_logger(), "PUBLISHED PCLOUD DIMENSIONS: height: %d, width: %d", (int)all_obj_pcls_ptr->height, (int)all_obj_pcls_ptr->width);
     // RCLCPP_DEBUG(this->get_logger(), "STORED PCLOUD DIMENSIONS: objects: %d, max_length: %d", (int)obj_cloud_vec.size(), max_len);
     try{
-        // TODO: not do that and just publish whole point cloud in viz 
         for(int i = 0; i<obj_cloud_vec.size(); i++){
             for(int j = 0; j<obj_cloud_vec[i].size(); j++){
                 // all_obj_pcls_ptr->at(j,i) = obj_cloud_vec[i][j];
