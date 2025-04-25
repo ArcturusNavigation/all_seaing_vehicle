@@ -371,6 +371,8 @@ class FollowBuoyPID(ActionServerBase):
 
 
         # POINTS TO GIVE PID: waypoint_y and waypoint_x
+        self.get_logger().info(f"green x: {green_x}, green y: {green_y}")
+        self.get_logger().info(f"red x: {red_x}, red y: {red_y}")
         self.get_logger().info(f"waypoint x: {waypoint_x}, waypoint y: {waypoint_y}")
 
         self.update_pid(-waypoint_x, -waypoint_y, math.atan2(-waypoint_y, -waypoint_x))
