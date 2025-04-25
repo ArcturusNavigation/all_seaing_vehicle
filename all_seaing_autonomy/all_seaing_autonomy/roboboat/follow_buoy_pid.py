@@ -59,17 +59,17 @@ class FollowBuoyPID(ActionServerBase):
         )
 
         Kpid_x = (
-            self.declare_parameter("Kpid_x", [1.0, 0.0, 0.0])
+            self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
         Kpid_y = (
-            self.declare_parameter("Kpid_y", [1.0, 0.0, 0.0])
+            self.declare_parameter("Kpid_y", [0.75, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
         Kpid_theta = (
-            self.declare_parameter("Kpid_theta", [1.0, 0.0, 0.0])
+            self.declare_parameter("Kpid_theta", [0.75, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
@@ -294,22 +294,24 @@ class FollowBuoyPID(ActionServerBase):
 
         # Set imaginary location for any buoys we do not see
         if green_location == None:
+            self.get_logger().info("green was None")
             red_y = red_location.point.y
             red_x = red_location.point.x
             if self.right_color == "green":
-                green_y = red_y + correction_value
-                green_x = red_x
-            elif self.right_color == "red":
                 green_y = red_y - correction_value
                 green_x = red_x
+            elif self.right_color == "red":
+                green_y = red_y + correction_value
+                green_x = red_x
         elif red_location == None:
+            self.get_logger().info("red was None")
             green_y = green_location.point.y
             green_x = green_location.point.x
             if self.right_color == "green":
-                red_y = green_y - correction_value
+                red_y = green_y + correction_value
                 red_x = green_x
             if self.right_color == "red":
-                red_y = green_y + correction_value
+                red_y = green_y - correction_value
                 red_x = green_x
         else:
             green_y = green_location.point.y
