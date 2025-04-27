@@ -293,7 +293,7 @@ class FollowBuoyPID(ActionServerBase):
         green_y = None
 
         # Set imaginary location for any buoys we do not see
-        if green_location == None:
+        if green_location is None:
             self.get_logger().info("green was None")
             red_y = red_location.point.y
             red_x = red_location.point.x
@@ -303,7 +303,7 @@ class FollowBuoyPID(ActionServerBase):
             elif self.right_color == "red":
                 green_y = red_y + correction_value
                 green_x = red_x
-        elif red_location == None:
+        elif red_location is None:
             self.get_logger().info("red was None")
             green_y = green_location.point.y
             green_x = green_location.point.x
@@ -318,6 +318,7 @@ class FollowBuoyPID(ActionServerBase):
             green_x = green_location.point.x
             red_y = red_location.point.y
             red_x = red_location.point.x
+        # (CHECK) is this else statement necessary? We do check above and do different procedures than here
 
         # Main logic of the follow the path
         # If no yellows, just the midpt
@@ -345,7 +346,7 @@ class FollowBuoyPID(ActionServerBase):
                     intersection_x = red_to_green[0] * const_fact + red_x
                     intersection_y = red_to_green[1] * const_fact + red_y
 
-
+                    # square root distance?
                     square_distance_red = (intersection_y - red_y)**2 + (intersection_x - red_x)**2
                     square_distance_green = (intersection_y - green_y)**2 + (intersection_x - green_x)**2
                     if square_distance_red >= square_distance_green:
