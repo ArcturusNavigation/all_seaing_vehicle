@@ -346,9 +346,10 @@ class FollowBuoyPID(ActionServerBase):
                     intersection_x = red_to_green[0] * const_fact + red_x
                     intersection_y = red_to_green[1] * const_fact + red_y
 
-                    # square root distance?
                     square_distance_red = (intersection_y - red_y)**2 + (intersection_x - red_x)**2
+                    # square_distance_red = self.dist_squared((intersection_y - red_y), (intersection_x - red_x))
                     square_distance_green = (intersection_y - green_y)**2 + (intersection_x - green_x)**2
+                    # square_distance_green = self.dist_squared((intersection_y - red_y), (intersection_x - red_x))
                     if square_distance_red >= square_distance_green:
                         waypoint_x = (red_x + intersection_x)/2
                         waypoint_y = (red_y + intersection_y)/2
