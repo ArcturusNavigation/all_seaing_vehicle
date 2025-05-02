@@ -28,7 +28,7 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     this->declare_parameter<bool>("is_sim", false);
     m_is_sim = this->get_parameter("is_sim").as_bool();
 
-    this->declare_parameter<bool>("label_list", false);
+    this->declare_parameter<bool>("label_list", true);
     m_label_list = this->get_parameter("label_list").as_bool();
 
     this->declare_parameter<bool>("only_project", false);
