@@ -40,7 +40,7 @@ class SpeedChange(ActionServerBase):
         )
 
         self.camera_info_sub = self.create_subscription(
-            CameraInfo, "/zed/zed_node/rgb/camera_info", self.camera_info_cb, 10
+            CameraInfo, "camera_info", self.camera_info_cb, 10
         )
 
         self.bbox_sub = self.create_subscription(
@@ -380,6 +380,8 @@ class SpeedChange(ActionServerBase):
         if left_x is None: left_x = 0
         if right_x is None: right_x = self.image_size[0] - 1
 
+        self.get_logger().info(f"red buoy: {left_x}, right buoy: {right_x}, image_size: {self.image_size[0]}")
+
         gate_ctr = (left_x + right_x) / 2.0
 
         # self.image_size[0] / 2.0 is img ctr
@@ -401,7 +403,7 @@ class SpeedChange(ActionServerBase):
         self.get_logger().info(f"PID offset: {offset}, PID output: {float(yaw_rate)}")
         if not greenRight:
             control_msg.twist.angular.z *= -1
-        self.get_logger().info(f"{control_msg.twist.angular.z}")
+        # self.get_logger().info(f"angular z: {control_msg.twist.angular.z}")
         self.control_pub.publish(control_msg)
 
     def get_euler(self, quat):
