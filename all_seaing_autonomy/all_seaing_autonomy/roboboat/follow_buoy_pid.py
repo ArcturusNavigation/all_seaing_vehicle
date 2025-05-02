@@ -140,13 +140,16 @@ class FollowBuoyPID(ActionServerBase):
         self.declare_parameter("max_distance_apart", 10)
         self.declare_parameter("min_distance_apart", 6)
         self.declare_parameter("meters_feet_conversion", 0.3048)
-
+        self.declare_parameter("front_limit", 2.0)
+        self.waypoint_x = None
+        self.waypoint_y = None
         self.red_green_ratio = None
 
         self.right_color = self.get_parameter("right_color").get_parameter_value().string_value
         self.max_distance_apart = self.get_parameter("max_distance_apart").get_parameter_value().integer_value
         self.min_distance_apart = self.get_parameter("min_distance_apart").get_parameter_value().integer_value
         self.meters_feet_conversion = self.get_parameter("meters_feet_conversion").get_parameter_value().double_value
+        self.front_limit = self.get_parameter("front_limit").get_parameter_value().double_value
 
         color_label_mappings_file = self.get_parameter(
             "color_label_mappings_file"
@@ -255,18 +258,6 @@ class FollowBuoyPID(ActionServerBase):
         #         self.result = True
         #     return
 
-        yaw0 = False
-        if red_location is None and green_location is None:
-            yaw0 = True
-            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
-                self.get_logger().info("no more buoys killing")
-                # wait 1 second, then send a stopping control msg (in case we haven't fully passed the buoys)
-                time.sleep(1)
-
-                self.result = True
-            return
-        else:
-            self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
         # if red_center_x is not None and green_center_x is not None:
         #     self.red_green_ratio = red_area / green_area
@@ -285,99 +276,113 @@ class FollowBuoyPID(ActionServerBase):
 
         # Used when only see one buoy
         correction_value = (self.max_distance_apart + self.min_distance_apart)/2 * self.meters_feet_conversion
-        waypoint_x = None
-        waypoint_y = None
+        self.waypoint_x = None
+        self.waypoint_y = None
         red_x = None
         red_y = None
         green_x = None
         green_y = None
 
-        # Set imaginary location for any buoys we do not see
-        if green_location == None:
-            self.get_logger().info("green was None")
-            red_y = red_location.point.y
-            red_x = red_location.point.x
-            if self.right_color == "green":
-                green_y = red_y - correction_value
-                green_x = red_x
-            elif self.right_color == "red":
-                green_y = red_y + correction_value
-                green_x = red_x
-        elif red_location == None:
-            self.get_logger().info("red was None")
-            green_y = green_location.point.y
-            green_x = green_location.point.x
-            if self.right_color == "green":
-                red_y = green_y + correction_value
-                red_x = green_x
-            if self.right_color == "red":
-                red_y = green_y - correction_value
-                red_x = green_x
-        else:
-            green_y = green_location.point.y
-            green_x = green_location.point.x
-            red_y = red_location.point.y
-            red_x = red_location.point.x
-
-        # Main logic of the follow the path
-        # If no yellows, just the midpt
-        if yellow_location == None:
-            waypoint_y = (red_y + green_y)/2
-            waypoint_x = (red_x + green_x)/2
-        # If yellow, check if relevant and have two different cases if is
-        else:
-            yellow_x = yellow_location.point.x
-            yellow_y = yellow_location.point.y
-            front = None
-            # Sets whether yellow is in front or behind of the line of red, green intersection
-            if self.right_color == "green":
-                front = self.ccw((green_y, green_x), (yellow_y, yellow_x), (red_y, red_x))
+        if green_location is not None or red_location is not None:
+            # Set imaginary location for any buoys we do not see
+            if green_location == None:
+                self.get_logger().info("green was None")
+                red_y = red_location.point.y
+                red_x = red_location.point.x
+                if self.right_color == "green":
+                    green_y = red_y - correction_value
+                    green_x = red_x
+                elif self.right_color == "red":
+                    green_y = red_y + correction_value
+                    green_x = red_x
+            elif red_location == None:
+                self.get_logger().info("red was None")
+                green_y = green_location.point.y
+                green_x = green_location.point.x
+                if self.right_color == "green":
+                    red_y = green_y + correction_value
+                    red_x = green_x
+                if self.right_color == "red":
+                    red_y = green_y - correction_value
+                    red_x = green_x
             else:
-                front = self.ccw((red_y, red_x), (yellow_y, yellow_x), (green_y, green_x))
-            # Checks if yellow is between the green and red buoys
-            if (self.right_color == "green" and red_y < yellow_y < green_y) or (self.right_color == "red" and green_y < yellow_y < red_y):
-                # If in front, finds intersection of red, green buoy line and its perpendicular line passing through yellow's location
-                if front:
-                    red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
-                    red_to_green = (green_x - red_x, green_y - red_y)
-                    dot_prod = red_to_yellow[0] * red_to_green[0] + red_to_yellow[1] * red_to_green[1]
-                    const_fact = dot_prod / self.dist_squared(red_to_green)
-                    intersection_x = red_to_green[0] * const_fact + red_x
-                    intersection_y = red_to_green[1] * const_fact + red_y
+                green_y = green_location.point.y
+                green_x = green_location.point.x
+                red_y = red_location.point.y
+                red_x = red_location.point.x
 
-
-                    square_distance_red = (intersection_y - red_y)**2 + (intersection_x - red_x)**2
-                    square_distance_green = (intersection_y - green_y)**2 + (intersection_x - green_x)**2
-                    if square_distance_red >= square_distance_green:
-                        waypoint_x = (red_x + intersection_x)/2
-                        waypoint_y = (red_y + intersection_y)/2
-                    else:
-                        waypoint_x = (green_x + intersection_x)/2
-                        waypoint_y = (green_y + intersection_y)/2
-                # If behind, then just finds largest red, yellow or green, yellow dist and takes the midpt
+            # Main logic of the follow the path
+            # If no yellows, just the midpt
+            if yellow_location == None:
+                self.waypoint_y = (red_y + green_y)/2
+                self.waypoint_x = (red_x + green_x)/2
+            # If yellow, check if relevant and have two different cases if is
+            else:
+                yellow_x = yellow_location.point.x
+                yellow_y = yellow_location.point.y
+                front = None
+                # Sets whether yellow is in front or behind of the line of red, green intersection
+                if self.right_color == "green":
+                    front = self.ccw((green_y, green_x), (yellow_y, yellow_x), (red_y, red_x))
                 else:
-                    red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
-                    green_to_yellow = (yellow_x - green_x, yellow_y -green_y)
-                    ry_dist = self.dist_squared(red_to_yellow)
-                    gy_dist = self.dist_squared(green_to_yellow)
-                    if ry_dist >= gy_dist:
-                        waypoint_x = (red_x + yellow_x)/2
-                        waypoint_y = (red_y + yellow_y)/2
+                    front = self.ccw((red_y, red_x), (yellow_y, yellow_x), (green_y, green_x))
+                # Checks if yellow is between the green and red buoys
+                if (self.right_color == "green" and red_y < yellow_y < green_y) or (self.right_color == "red" and green_y < yellow_y < red_y):
+                    # If in front, finds intersection of red, green buoy line and its perpendicular line passing through yellow's location
+                    if front:
+                        red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
+                        red_to_green = (green_x - red_x, green_y - red_y)
+                        dot_prod = red_to_yellow[0] * red_to_green[0] + red_to_yellow[1] * red_to_green[1]
+                        const_fact = dot_prod / self.dist_squared(red_to_green)
+                        intersection_x = red_to_green[0] * const_fact + red_x
+                        intersection_y = red_to_green[1] * const_fact + red_y
+
+
+                        square_distance_red = (intersection_y - red_y)**2 + (intersection_x - red_x)**2
+                        square_distance_green = (intersection_y - green_y)**2 + (intersection_x - green_x)**2
+                        if square_distance_red >= square_distance_green:
+                            self.waypoint_x = (red_x + intersection_x)/2
+                            self.waypoint_y = (red_y + intersection_y)/2
+                        else:
+                            self.waypoint_x = (green_x + intersection_x)/2
+                            self.waypoint_y = (green_y + intersection_y)/2
+                    # If behind, then just finds largest red, yellow or green, yellow dist and takes the midpt
                     else:
-                        waypoint_x = (green_x + yellow_x)/2
-                        waypoint_y = (green_y + yellow_y)/2
-            # If not in between the red and green buoys, treats it like there is no obstacle 
-            else:
-                waypoint_y = (red_y + green_y)/2
-                waypoint_x = (red_x + green_x)/2
+                        red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
+                        green_to_yellow = (yellow_x - green_x, yellow_y -green_y)
+                        ry_dist = self.dist_squared(red_to_yellow)
+                        gy_dist = self.dist_squared(green_to_yellow)
+                        if ry_dist >= gy_dist:
+                            self.waypoint_x = (red_x + yellow_x)/2
+                            self.waypoint_y = (red_y + yellow_y)/2
+                        else:
+                            self.waypoint_x = (green_x + yellow_x)/2
+                            self.waypoint_y = (green_y + yellow_y)/2
+                # If not in between the red and green buoys, treats it like there is no obstacle
+                else:
+                    self.waypoint_y = (red_y + green_y)/2
+                    self.waypoint_x = (red_x + green_x)/2
 
 
-        # POINTS TO GIVE PID: waypoint_y and waypoint_x
+        yaw0 = False
+        if self.waypoint_x is None or (math.sqrt(self.waypoint_x**2)+ math.sqrt(self.waypoint_y**2)) < self.front_limit:
+            yaw0 = True
+            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
+                self.get_logger().info("no more buoys killing")
+                # wait 1 second, then send a stopping control msg (in case we haven't fully passed the buoys)
+                time.sleep(1)
+
+                self.result = True
+            return
+        else:
+            self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
+
+        # POINTS TO GIVE PID: self.waypoint_y and self.waypoint_x
         self.get_logger().info(f"green x: {green_x}, green y: {green_y}")
         self.get_logger().info(f"red x: {red_x}, red y: {red_y}")
-        self.get_logger().info(f"waypoint x: {waypoint_x}, waypoint y: {waypoint_y}")
+        self.get_logger().info(f"waypoint x: {self.waypoint_x}, waypoint y: {self.waypoint_y}")
 
-        self.update_pid(-waypoint_x, -waypoint_y, math.atan2(-waypoint_y, -waypoint_x))
+        self.update_pid(-self.waypoint_x, -self.waypoint_y, math.atan2(-self.waypoint_y, -self.waypoint_x))
         x_output = self.x_pid.get_effort()
         y_output = self.y_pid.get_effort()
         theta_output = self.theta_pid.get_effort()
