@@ -49,10 +49,10 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("is_sim", false);
     m_is_sim = this->get_parameter("is_sim").as_bool();
 
-    this->declare_parameter<bool>("check_fov", false);
+    this->declare_parameter<bool>("check_fov", true);
     m_check_fov = this->get_parameter("check_fov").as_bool();
 
-    this->declare_parameter<bool>("direct_tf", false);
+    this->declare_parameter<bool>("direct_tf", true);
     m_direct_tf = this->get_parameter("direct_tf").as_bool();
 
     this->declare_parameter<bool>("rotate_odom", false);
@@ -61,7 +61,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("normalize_drop_thresh", false);
     m_normalize_drop_thresh = this->get_parameter("normalize_drop_thresh").as_bool();
 
-    this->declare_parameter<bool>("include_odom_theta", false);
+    this->declare_parameter<bool>("include_odom_theta", true);
     m_include_odom_theta = this->get_parameter("include_odom_theta").as_bool();
 
     // Initialize navigation & odometry variables to 0
