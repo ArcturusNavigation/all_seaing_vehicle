@@ -283,6 +283,7 @@ class FollowBuoyPID(ActionServerBase):
         green_x = None
         green_y = None
 
+<<<<<<< HEAD
         if green_location is not None or red_location is not None:
             # Set imaginary location for any buoys we do not see
             if green_location == None:
@@ -305,12 +306,56 @@ class FollowBuoyPID(ActionServerBase):
                 if self.right_color == "red":
                     red_y = green_y - correction_value
                     red_x = green_x
+=======
+        # Set imaginary location for any buoys we do not see
+        if green_location is None:
+            self.get_logger().info("green was None")
+            red_y = red_location.point.y
+            red_x = red_location.point.x
+            if self.right_color == "green":
+                green_y = red_y - correction_value
+                green_x = red_x
+            elif self.right_color == "red":
+                green_y = red_y + correction_value
+                green_x = red_x
+        elif red_location is None:
+            self.get_logger().info("red was None")
+            green_y = green_location.point.y
+            green_x = green_location.point.x
+            if self.right_color == "green":
+                red_y = green_y + correction_value
+                red_x = green_x
+            if self.right_color == "red":
+                red_y = green_y - correction_value
+                red_x = green_x
+        else:
+            green_y = green_location.point.y
+            green_x = green_location.point.x
+            red_y = red_location.point.y
+            red_x = red_location.point.x
+        # (CHECK) is this else statement necessary? We do check above and do different procedures than here
+
+        # Main logic of the follow the path
+        # If no yellows, just the midpt
+        if yellow_location == None:
+            waypoint_y = (red_y + green_y)/2
+            waypoint_x = (red_x + green_x)/2
+        # If yellow, check if relevant and have two different cases if is
+        else:
+            yellow_x = yellow_location.point.x
+            yellow_y = yellow_location.point.y
+            front = None
+            # Sets whether yellow is in front or behind of the line of red, green intersection
+            if self.right_color == "green":
+                front = self.ccw((green_y, green_x), (yellow_y, yellow_x), (red_y, red_x))
+>>>>>>> 8ad23772541960dc91b9f0071a5d1e89302ed562
             else:
                 green_y = green_location.point.y
                 green_x = green_location.point.x
                 red_y = red_location.point.y
                 red_x = red_location.point.x
 
+<<<<<<< HEAD
             # Main logic of the follow the path
             # If no yellows, just the midpt
             if yellow_location == None:
@@ -324,6 +369,19 @@ class FollowBuoyPID(ActionServerBase):
                 # Sets whether yellow is in front or behind of the line of red, green intersection
                 if self.right_color == "green":
                     front = self.ccw((green_y, green_x), (yellow_y, yellow_x), (red_y, red_x))
+=======
+                    square_distance_red = (intersection_y - red_y)**2 + (intersection_x - red_x)**2
+                    # square_distance_red = self.dist_squared((intersection_y - red_y), (intersection_x - red_x))
+                    square_distance_green = (intersection_y - green_y)**2 + (intersection_x - green_x)**2
+                    # square_distance_green = self.dist_squared((intersection_y - red_y), (intersection_x - red_x))
+                    if square_distance_red >= square_distance_green:
+                        waypoint_x = (red_x + intersection_x)/2
+                        waypoint_y = (red_y + intersection_y)/2
+                    else:
+                        waypoint_x = (green_x + intersection_x)/2
+                        waypoint_y = (green_y + intersection_y)/2
+                # If behind, then just finds largest red, yellow or green, yellow dist and takes the midpt
+>>>>>>> 8ad23772541960dc91b9f0071a5d1e89302ed562
                 else:
                     front = self.ccw((red_y, red_x), (yellow_y, yellow_x), (green_y, green_x))
                 # Checks if yellow is between the green and red buoys
