@@ -16,6 +16,7 @@ def generate_launch_description():
                 package="mavros",
                 executable="mavros_node",
                 parameters=[
+                    {"plugin_whitelist": ["actuator_control", "command", "ftp", "global_position", "imu_pub", "setpoint_velocity"]},
                     {"fcu_url": LaunchConfiguration("port")},
                     {"imu/frame_id": "imu_link"},
                     {"global_position/frame_id": "gps_link"},

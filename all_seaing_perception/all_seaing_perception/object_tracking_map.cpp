@@ -1,5 +1,12 @@
 #include "all_seaing_perception/object_tracking_map.hpp"
 
+cv::Point2d custom_project(image_geometry::PinholeCameraModel cmodel, const cv::Point3d& xyz){
+    cv::Point2d uv_rect;
+    uv_rect.x = (cmodel.fx()*xyz.x + cmodel.Tx()) / xyz.z + cmodel.cx();
+    uv_rect.y = (cmodel.fy()*xyz.y + cmodel.Ty()) / xyz.z + cmodel.cy();
+    return uv_rect;
+}
+
 ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "map");
@@ -214,7 +221,7 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     float dt = (curr_odom_time - m_last_odom_time).seconds();
     m_last_odom_time = curr_odom_time;
 
-    RCLCPP_INFO(this->get_logger(), "IMU MESSAGE ODOM: (%lf, %lf), %lf", m_nav_vx, m_nav_vy, m_nav_omega);
+    // RCLCPP_INFO(this->get_logger(), "IMU MESSAGE ODOM: (%lf, %lf), %lf", m_nav_vx, m_nav_vy, m_nav_omega);
 
     if (!m_got_nav || !m_track_robot || !m_imu_predict || m_first_state) return;
 
@@ -237,7 +244,7 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
 
     m_state += F.transpose() * mot_const;
 
-    RCLCPP_INFO(this->get_logger(), "ROBOT PREDICTED POSE AFTER IMU UPDATE: (%lf, %lf), %lf", m_state(0), m_state(1), m_state(2));
+    // RCLCPP_INFO(this->get_logger(), "ROBOT PREDICTED POSE AFTER IMU UPDATE: (%lf, %lf), %lf", m_state(0), m_state(1), m_state(2));
     Eigen::MatrixXf G = Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) +
                         F.transpose() * mot_grad * F;
     // add a consistent amount of noise based on how much the robot moved since the last time
@@ -275,7 +282,7 @@ void ObjectTrackingMap::odom_callback() {
 
     //update odometry transforms
     //TODO: add a flag for each one that says if they succedeed, to know to continue or not
-    RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
+    // RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
     m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
     m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
@@ -293,7 +300,7 @@ void ObjectTrackingMap::odom_callback() {
     // RCLCPP_INFO(this->get_logger(), "COMPARE: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_base_link_tf.transform.translation.x, m_map_base_link_tf.transform.translation.y);
     if((!m_first_state) && (m_nav_x == m_map_base_link_tf.transform.translation.x) && (m_nav_y == m_map_base_link_tf.transform.translation.y)) return;
 
-    RCLCPP_INFO(this->get_logger(), "GOT ODOM");
+    // RCLCPP_INFO(this->get_logger(), "GOT ODOM");
     m_nav_x = m_map_base_link_tf.transform.translation.x;
     m_nav_y = m_map_base_link_tf.transform.translation.y;
     // RCLCPP_INFO(this->get_logger(), "COMPARE NEW: (%lf, %lf), (%lf, %lf)", m_nav_x, m_nav_y, m_map_base_link_tf.transform.translation.x, m_map_base_link_tf.transform.translation.y);
@@ -410,7 +417,7 @@ void ObjectTrackingMap::odom_callback() {
 }
 
 void ObjectTrackingMap::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
-    RCLCPP_INFO(this->get_logger(), "GOT CAMERA INFO");
+    // RCLCPP_INFO(this->get_logger(), "GOT CAMERA INFO");
     m_cam_model.fromCameraInfo(info_msg);
 }
 
@@ -680,7 +687,7 @@ void ObjectTrackingMap::visualize_predictions() {
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg){
     // if(msg->objects.size()==0) return;
-    RCLCPP_INFO(this->get_logger(), "GOT DATA");
+    // RCLCPP_INFO(this->get_logger(), "GOT DATA");
 
     // Set up headers and transforms
     // m_local_header = msg->objects[0].cloud.header;
@@ -692,11 +699,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
 
-    RCLCPP_INFO(this->get_logger(), "BEFORE GETTING ODOMETRY TF");
+    // RCLCPP_INFO(this->get_logger(), "BEFORE GETTING ODOMETRY TF");
     m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
     m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
-    RCLCPP_INFO(this->get_logger(), "LOCAL FRAME: %s, GLOBAL FRAME: %s", m_local_frame_id.c_str(), m_global_frame_id.c_str());
-    RCLCPP_INFO(this->get_logger(), "GOT ODOMETRY TF");
+    // RCLCPP_INFO(this->get_logger(), "LOCAL FRAME: %s, GLOBAL FRAME: %s", m_local_frame_id.c_str(), m_global_frame_id.c_str());
+    // RCLCPP_INFO(this->get_logger(), "GOT ODOMETRY TF");
 
     if(m_track_robot && m_first_state) return;
 
@@ -747,7 +754,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         {0, m_bearing_std},
     };
     std::vector<std::vector<float>> p;
-    RCLCPP_INFO(this->get_logger(), "COMPUTE WITH UNKNOWN CORRESPONDENCE");
+    // RCLCPP_INFO(this->get_logger(), "COMPUTE WITH UNKNOWN CORRESPONDENCE");
     for (std::shared_ptr<all_seaing_perception::ObjectCloud> det_obs : detected_obstacles) {
         float range, bearing;
         int signature;
@@ -805,7 +812,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
 
     // Update vectors, now with known correspondence
-     RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN CORRESPONDENCE");
+    //  RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN CORRESPONDENCE");
     for (size_t i = 0; i < detected_obstacles.size(); i++) {
         float range, bearing;
         int signature;
@@ -914,9 +921,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             lidar_point; // ALREADY IN THE SAME FRAME, WAS TRANSFORMED BEFORE BEING PUBLISHED BY
                          // bbox_project_pcloud.cpp
         cv::Point2d xy_rect =
-            m_is_sim ? m_cam_model.project3dToPixel(
+            m_is_sim ? custom_project(m_cam_model,
                            cv::Point3d(camera_point.y, camera_point.z, -camera_point.x))
-                     : m_cam_model.project3dToPixel(
+                     : custom_project(m_cam_model,
                            cv::Point3d(camera_point.x, camera_point.y, camera_point.z));
         ;
         // RCLCPP_INFO(this->get_logger(), "OBSTACLE ID %d (%lf, %lf, %lf)->(%lf, %lf)",
