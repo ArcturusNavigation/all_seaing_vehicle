@@ -137,10 +137,10 @@ class FollowBuoyPID(ActionServerBase):
         )
         self.declare_parameter("right_color", "green")
         # Integers, feet apart
-        self.declare_parameter("max_distance_apart", 10)
-        self.declare_parameter("min_distance_apart", 6)
+        self.declare_parameter("max_distance_apart", 3)
+        self.declare_parameter("min_distance_apart", 2)
         self.declare_parameter("meters_feet_conversion", 0.3048)
-        self.declare_parameter("front_limit", 2.0)
+        self.declare_parameter("front_limit", 0.0)
         self.waypoint_x = None
         self.waypoint_y = None
         self.red_green_ratio = None
@@ -157,12 +157,15 @@ class FollowBuoyPID(ActionServerBase):
         with open(color_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
         # hardcoded from reading YAML
-        self.green_labels.add(label_mappings["green"])
-        self.red_labels.add(label_mappings["red"])
+        
         if self.is_sim:
+            self.green_labels.add(label_mappings["green"])
+            self.red_labels.add(label_mappings["red"])
             self.yellow_labels.add(label_mappings["black"])
         else:
-            self.yellow_labels.add(label_mappings["yellow"])
+            self.green_labels.add(label_mappings["green_buoy"])
+            self.red_labels.add(label_mappings["red_buoy"])
+            self.yellow_labels.add(label_mappings["yellow_buoy"])
 
 
 
@@ -213,9 +216,9 @@ class FollowBuoyPID(ActionServerBase):
         self.obstacleboxes = msg.obstacles
 
     def control_loop(self):
-        if self.width is None or len(self.obstacleboxes) == 0:
-            self.get_logger().info(f"no obstalces or zero width {self.width}, {len(self.obstacleboxes)}")
-            return
+        # if self.width is None or len(self.obstacleboxes) == 0:
+        #     self.get_logger().info(f"no obstalces or zero width {self.width}, {len(self.obstacleboxes)}")
+        #     return
 
         # Access point through name.point.x, etc.?
         red_location = None
@@ -241,9 +244,11 @@ class FollowBuoyPID(ActionServerBase):
             area = (box.bbox_max.x - box.bbox_min.x) * (box.bbox_max.y - box.bbox_min.y)
             location = box.local_point
             if box.label in self.green_labels and area > green_area:
+                self.get_logger().info('GREEN THERE')
                 green_area = area
                 green_location = location
             elif box.label in self.red_labels and area > red_area:
+                self.get_logger().info('RED THERE')
                 red_area = area
                 red_location = location
             elif box.label in self.yellow_labels and area > yellow_area:
@@ -285,7 +290,7 @@ class FollowBuoyPID(ActionServerBase):
 
         if green_location is not None or red_location is not None:
             # Set imaginary location for any buoys we do not see
-            if green_location == None:
+            if green_location is None:
                 self.get_logger().info("green was None")
                 red_y = red_location.point.y
                 red_x = red_location.point.x
@@ -295,7 +300,7 @@ class FollowBuoyPID(ActionServerBase):
                 elif self.right_color == "red":
                     green_y = red_y + correction_value
                     green_x = red_x
-            elif red_location == None:
+            elif red_location is None:
                 self.get_logger().info("red was None")
                 green_y = green_location.point.y
                 green_x = green_location.point.x
@@ -365,14 +370,20 @@ class FollowBuoyPID(ActionServerBase):
 
 
         yaw0 = False
-        if self.waypoint_x is None or (math.sqrt(self.waypoint_x**2)+ math.sqrt(self.waypoint_y**2)) < self.front_limit:
+        # if self.waypoint_x is None or (math.sqrt(self.waypoint_x**2)+ math.sqrt(self.waypoint_y**2)) < self.front_limit:
+        if green_x is None and red_x is None:
             yaw0 = True
-            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 1.0:
+            if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 100.0:
                 self.get_logger().info("no more buoys killing")
                 # wait 1 second, then send a stopping control msg (in case we haven't fully passed the buoys)
                 time.sleep(1)
 
                 self.result = True
+            self.get_logger().info('KILLING THRUSTERS')
+            control_msg = ControlOption()
+            control_msg.priority = 1
+            self.get_logger().info(f'SENDING COMMAND: {control_msg}')
+            self.control_pub.publish(control_msg)
             return
         else:
             self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9

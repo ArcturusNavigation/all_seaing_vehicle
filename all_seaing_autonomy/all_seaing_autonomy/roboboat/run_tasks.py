@@ -20,7 +20,7 @@ class RunTasks(Node):
         self.task_list = [
             ActionClient(self, Task, "task_init"),
             ActionClient(self, Task, "follow_buoy_pid"),
-            ActionClient(self, Task, "speed_challenge_pid"),
+            # ActionClient(self, Task, "speed_challenge_pid"),
         ]
         self.current_task = None
         self.idle_index = 0
