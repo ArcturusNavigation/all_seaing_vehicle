@@ -1,0 +1,18 @@
+/mavros/**:
+  ros__parameters:
+    plugin_denylist:
+    - '*'
+    plugin_allowlist: 
+      - actuator_control
+      - command
+      - ftp
+      - hil
+      - global_position
+      - imu
+      - setpoint_velocity
+/**/imu:
+  ros__parameters:
+    frame_id: "imu_link"
+/**/global_position:
+  ros__parameters:
+    child_frame_id: "gps_link"
