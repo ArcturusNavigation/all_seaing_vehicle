@@ -1003,7 +1003,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     this->publish_maps();
 
-    RCLCPP_INFO(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
+    // RCLCPP_INFO(this->get_logger(), "AFTER TRACKED MAP PUBLISHING");
     if(m_got_nav){
         this->visualize_predictions();
     }
