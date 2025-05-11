@@ -115,8 +115,8 @@ def launch_setup(context, *args, **kwargs):
             {"new_tf_topic": "/tf"},
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
-            # {"child_frames_to_remove": ["zed_camera_link"]},
-            {"parent_frames_to_remove": ["base_link"]},
+            {"child_frames_to_remove": ["slam_map"]},
+            # {"parent_frames_to_remove": ["base_link"]},
         ]
     )
 
@@ -322,16 +322,16 @@ def launch_setup(context, *args, **kwargs):
 
     return [
         # set_use_sim_time,
-        ekf_node,
-        navsat_node,
-        keyboard_ld,
+        # ekf_node,
+        # navsat_node,
+        # keyboard_ld,
         static_transforms_ld,
         tf_filtering,
-        odom_transformer,
+        # odom_transformer,
         # run_tasks,
         # task_init_server, 
         # follow_buoy_path,
-        buoy_yolo_node,
+        # buoy_yolo_node,
         # shape_yolo_node,
         # static_shape_yolo_node,
         bbox_project_pcloud_node,

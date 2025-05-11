@@ -1,5 +1,12 @@
 #include "all_seaing_perception/object_tracking_map.hpp"
 
+cv::Point2d custom_project(image_geometry::PinholeCameraModel cmodel, const cv::Point3d& xyz){
+    cv::Point2d uv_rect;
+    uv_rect.x = (cmodel.fx()*xyz.x + cmodel.Tx()) / xyz.z + cmodel.cx();
+    uv_rect.y = (cmodel.fy()*xyz.y + cmodel.Ty()) / xyz.z + cmodel.cy();
+    return uv_rect;
+}
+
 ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "map");
@@ -914,9 +921,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             lidar_point; // ALREADY IN THE SAME FRAME, WAS TRANSFORMED BEFORE BEING PUBLISHED BY
                          // bbox_project_pcloud.cpp
         cv::Point2d xy_rect =
-            m_is_sim ? m_cam_model.project3dToPixel(
+            m_is_sim ? custom_project(m_cam_model,
                            cv::Point3d(camera_point.y, camera_point.z, -camera_point.x))
-                     : m_cam_model.project3dToPixel(
+                     : custom_project(m_cam_model,
                            cv::Point3d(camera_point.x, camera_point.y, camera_point.z));
         ;
         // RCLCPP_INFO(this->get_logger(), "OBSTACLE ID %d (%lf, %lf, %lf)->(%lf, %lf)",
