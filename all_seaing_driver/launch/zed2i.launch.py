@@ -24,7 +24,9 @@ def generate_launch_description():
                 ),
                 launch_arguments={
                     "camera_model": "zed2i",
-                    "ros_params_override_path": zed_params 
+                    "ros_params_override_path": zed_params,
+                    "use_sim_time": "false",
+                    # "publish_urdf": "false",
                 }.items(),
             )
         ]

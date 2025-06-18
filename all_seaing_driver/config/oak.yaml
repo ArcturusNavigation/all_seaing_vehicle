@@ -1,0 +1,23 @@
+/back_left_oak:
+  ros__parameters:
+    camera:
+      i_mx_id: 14442C10A1BE1ED000
+      i_tf_parent_frame: back-left-oak-base-frame
+      i_nn_type: none
+      i_pipeline_type: rgb
+    rgb:
+      i_sensor_img_orientation: "NORMAL"
+      i_resolution: '13MP'
+      i_set_isp_scale: false
+
+/back_right_oak:
+  ros__parameters:
+    camera:
+      i_mx_id: 14442C1061BA20D000
+      i_tf_parent_frame: back-right-oak-base-frame
+      i_nn_type: none
+      i_pipeline_type: rgb
+    rgb:
+      i_sensor_img_orientation: "NORMAL"
+      i_resolution: '13MP'
+      i_set_isp_scale: false

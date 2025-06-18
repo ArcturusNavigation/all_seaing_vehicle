@@ -1,7 +1,7 @@
-/**:
-    ros__parameters:
-        pos_tracking:
-            pos_tracking_enabled: false
-            publish_tf: false
-            publish_map_tf: false
-            reset_odom_with_loop_closure: false
+# general:
+#     grab_resolution: 'HD720'
+pos_tracking:
+    pos_tracking_enabled: false
+    publish_tf: false
+    publish_map_tf: false
+    reset_odom_with_loop_closure: false
