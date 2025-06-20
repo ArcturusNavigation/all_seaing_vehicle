@@ -4,4 +4,5 @@ pos_tracking:
     pos_tracking_enabled: false
     publish_tf: false
     publish_map_tf: false
+    # publish_urdf: false
     reset_odom_with_loop_closure: false

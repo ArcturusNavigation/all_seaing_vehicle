@@ -5,9 +5,10 @@
       i_tf_parent_frame: back-left-oak-base-frame
       i_nn_type: none
       i_pipeline_type: rgb
+      i_publish_tf_from_calibration: false
     rgb:
       i_sensor_img_orientation: "NORMAL"
-      i_resolution: '13MP'
+      i_resolution: '1080P'
       i_set_isp_scale: false
 
 /back_right_oak:
@@ -17,7 +18,8 @@
       i_tf_parent_frame: back-right-oak-base-frame
       i_nn_type: none
       i_pipeline_type: rgb
+      i_publish_tf_from_calibration: false
     rgb:
       i_sensor_img_orientation: "NORMAL"
-      i_resolution: '13MP'
+      i_resolution: '1080P'
       i_set_isp_scale: false

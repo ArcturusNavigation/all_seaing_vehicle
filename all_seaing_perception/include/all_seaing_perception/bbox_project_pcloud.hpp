@@ -60,6 +60,7 @@ private:
     rclcpp::Publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_refined_object_pcl_segment_pub;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_refined_object_pcl_viz_pub;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_refined_object_segment_viz_pub;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_pcl_img_pub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> m_cloud_sub;
