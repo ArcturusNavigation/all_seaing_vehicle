@@ -23,6 +23,12 @@ def launch_setup(context, *args, **kwargs):
     robot_urdf_file = os.path.join(
         description_prefix, "urdf", "fish_and_chips", "robot.urdf.xacro"
     )
+    robot_localization_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_real.yaml"
+    )
+    robot_localization_odom_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_odom_real.yaml"
+    )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -50,11 +56,38 @@ def launch_setup(context, *args, **kwargs):
 
     set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
-    robot_localization_params = os.path.join(
-        bringup_prefix, "config", "localization", "localize_real.yaml"
-    )
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
+    )
+    locations_file = os.path.join(
+        bringup_prefix, "config", "localization", "locations.yaml"
+    )
+
+    ekf_node = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_params]
+    )
+
+    ekf_odom_node = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_odom_params]
+    )
+    with open(locations_file, "r") as f:
+        locations = yaml.safe_load(f)
+
+    location = context.perform_substitution(LaunchConfiguration("location"))
+
+    lat = locations[location]["lat"]
+    lon = locations[location]["lon"]
+    navsat_node = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="navsat_transform_node",
+        parameters=[
+            robot_localization_params,
+            {"datum": [lat, lon, 0.0]},
+        ]
     )
 
     oak_ld = GroupAction(
@@ -179,6 +212,7 @@ def launch_setup(context, *args, **kwargs):
             ("/refined_object_segments_viz", "/refined_object_segments_viz/back_left"),
             ("/object_point_clouds_viz", "/object_point_clouds_viz/back_left"),
             ("/refined_object_point_clouds_viz", "/refined_object_point_clouds_viz/back_left"),
+            ("/refined_object_point_clouds_segments", "/refined_object_point_clouds_segments/back_left"),
         ],
         parameters=[
             # {"base_link_frame": "actual_base_link"},
@@ -207,6 +241,7 @@ def launch_setup(context, *args, **kwargs):
             ("/refined_object_segments_viz", "/refined_object_segments_viz/back_right"),
             ("/object_point_clouds_viz", "/object_point_clouds_viz/back_right"),
             ("/refined_object_point_clouds_viz", "/refined_object_point_clouds_viz/back_right"),
+            ("/refined_object_point_clouds_segments", "/refined_object_point_clouds_segments/back_right"),
         ],
         parameters=[
             # {"base_link_frame": "actual_base_link"},
@@ -223,14 +258,28 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    multicam_detection_merge_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="multicam_detection_merge.py",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings = [
+
+        ],
+        parameters = [
+
+        ]
+    )
+
     object_tracking_map_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="object_tracking_map",
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
+            ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-            ("odometry/filtered", "odometry_correct/filtered")
+            # ("odometry/filtered", "odometry_correct/filtered")
         ],
         parameters=[slam_params]
     )
@@ -273,7 +322,20 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{'robot_description': robot_urdf}]
     )
 
+    static_transforms_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                description_prefix,
+                "/launch/static_transforms.launch.py",
+            ]
+        )
+    )
+
     return [
+        mavros_ld,
+        ekf_node,
+        # ekf_odom_node,
+        navsat_node,
         oak_ld,
         buoy_yolo_node,
         buoy_yolo_node_back_left,
@@ -282,16 +344,18 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node,
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,
+        multicam_detection_merge_node,
         object_tracking_map_node,
         lidar_ld,
         zed_ld,
-        mavros_ld,
         robot_state_publisher,
+        static_transforms_ld
     ]
 
 def generate_launch_description():
     return LaunchDescription(
         [
+            DeclareLaunchArgument("location", default_value="boathouse"),
             DeclareLaunchArgument('use_sim_time', default_value='true'),
             OpaqueFunction(function=launch_setup),
         ]

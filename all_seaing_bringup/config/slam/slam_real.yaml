@@ -18,7 +18,7 @@ object_tracking_map:
     init_xy_noise: 0.5
     init_theta_noise: 1.0
     init_new_cov: 50.0
-    check_fov: True
+    check_fov: False
     track_robot: True
     imu_predict: True
     gps_update: False
