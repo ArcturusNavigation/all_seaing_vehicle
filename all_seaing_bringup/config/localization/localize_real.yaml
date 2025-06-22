@@ -7,15 +7,11 @@ ekf_filter_node:
     print_diagnostics: false
     debug: false
 
-    # odom_frame: odom
-    # base_link_frame: base_link
-    # world_frame: map
     # map_frame: map
     odom_frame: odom
     base_link_frame: base_link
     world_frame: odom
     publish_tf: true
-    # publish_tf: false
     reset_on_time_jump: true
 
     imu0: /mavros/imu/data
