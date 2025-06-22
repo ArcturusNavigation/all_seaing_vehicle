@@ -3,7 +3,6 @@
     <link name="base_link"></link>
     <link name="gps_link"></link>
     <link name="imu_link"></link>
-    <!-- <link name="zed_camera_link"></link> -->
     <link name="velodyne"></link>
     <link name="zed_left_camera_optical_frame"></link>
     <link name="back_left_oak_rgb_camera_optical_frame"></link>
