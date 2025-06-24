@@ -313,9 +313,9 @@ void ObjectTrackingMap::odom_callback() {
         // initialize mean and cov robot pose
         m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
         Eigen::Matrix3f init_pose_noise{
-            {m_init_xy_noise, 0, 0},
-            {0, m_init_xy_noise, 0},
-            {0, 0, m_init_theta_noise},
+            {m_init_xy_noise*m_init_xy_noise, 0, 0},
+            {0, m_init_xy_noise*m_init_xy_noise, 0},
+            {0, 0, m_init_theta_noise*m_init_xy_noise},
         };
         m_cov = init_pose_noise;
         // m_cov = Eigen::Matrix3f::Zero();
@@ -354,17 +354,17 @@ void ObjectTrackingMap::odom_callback() {
                             F.transpose() * mot_grad * F;
         // add a consistent amount of noise based on how much the robot moved since the last time
         Eigen::Matrix3f motion_noise{
-            {m_gps_xy_noise * abs(mot_const[0]), 0, 0},
-            {0, m_gps_xy_noise * abs(mot_const[1]), 0},
-            {0, 0, m_gps_theta_noise * abs(mot_const[2])},
+            {(m_gps_xy_noise* abs(mot_const[0]))*(m_gps_xy_noise* abs(mot_const[0])), 0, 0},
+            {0, (m_gps_xy_noise * abs(mot_const[1]))*(m_gps_xy_noise* abs(mot_const[1])), 0},
+            {0, 0, (m_gps_theta_noise * abs(mot_const[2]))*(m_gps_theta_noise * abs(mot_const[2]))},
         };
         m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
     }else if (m_gps_update){
         if(!m_include_odom_theta){
             // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
             Eigen::Matrix2f Q{
-                {m_update_gps_xy_uncertainty, 0},
-                {0, m_update_gps_xy_uncertainty},
+                {m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty, 0},
+                {0, m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty},
             };
             Eigen::Vector2f xy_actual(m_nav_x, m_nav_y);
             Eigen::Vector2f xy_pred(m_state(0), m_state(1));
@@ -382,9 +382,9 @@ void ObjectTrackingMap::odom_callback() {
         }else{
             // Include theta, since that's provided by the IMU compass usually
             Eigen::Matrix3f Q{
-                {m_update_gps_xy_uncertainty, 0, 0},
-                {0, m_update_gps_xy_uncertainty, 0},
-                {0, 0, m_update_odom_theta_uncertainty},
+                {m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty, 0, 0},
+                {0, m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty, 0},
+                {0, 0, m_update_odom_theta_uncertainty*m_update_odom_theta_uncertainty},
             };
             Eigen::Vector3f xyth_actual(m_nav_x, m_nav_y, m_nav_heading);
             Eigen::Vector3f xyth_pred(m_state(0), m_state(1), m_state(2));
@@ -750,8 +750,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
 
     Eigen::Matrix<float, 2, 2> Q{
-        {m_range_std, 0},
-        {0, m_bearing_std},
+        {m_range_std*m_range_std, 0},
+        {0, m_bearing_std*m_bearing_std},
     };
     std::vector<std::vector<float>> p;
     // RCLCPP_INFO(this->get_logger(), "COMPUTE WITH UNKNOWN CORRESPONDENCE");
@@ -826,8 +826,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             detected_obstacles[i]->id = m_obstacle_id++;
             m_tracked_obstacles.push_back(detected_obstacles[i]);
             Eigen::Matrix<float, 2, 2> init_new_cov{
-                {(float)m_init_new_cov, 0},
-                {0, (float)m_init_new_cov},
+                {(float)m_init_new_cov*m_init_new_cov, 0},
+                {0, (float)m_init_new_cov*m_init_new_cov},
             };
             if (m_track_robot) {
                 m_state.conservativeResize(3 + 2 * m_num_obj);

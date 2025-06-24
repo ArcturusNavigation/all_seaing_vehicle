@@ -7,7 +7,7 @@
       i_pipeline_type: rgb
       i_publish_tf_from_calibration: false
     rgb:
-      i_sensor_img_orientation: "NORMAL"
+      # i_sensor_img_orientation: "NORMAL"
       i_resolution: '1080P'
       i_set_isp_scale: false
 
@@ -20,6 +20,6 @@
       i_pipeline_type: rgb
       i_publish_tf_from_calibration: false
     rgb:
-      i_sensor_img_orientation: "NORMAL"
+      # i_sensor_img_orientation: "NORMAL"
       i_resolution: '1080P'
       i_set_isp_scale: false
