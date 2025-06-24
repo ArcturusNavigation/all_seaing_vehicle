@@ -23,6 +23,9 @@ def launch_setup(context, *args, **kwargs):
     robot_urdf_file = os.path.join(
         description_prefix, "urdf", "fish_and_chips", "robot.urdf.xacro"
     )
+    robot_localization_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_real.yaml"
+    )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -57,6 +60,11 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
 
+    ekf_node = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_params]
+    )
 
     buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
@@ -194,8 +202,9 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
+            ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-            ("odometry/filtered", "odometry_correct/filtered")
+            # ("odometry/filtered", "odometry_correct/filtered")
         ],
         parameters=[slam_params]
     )
@@ -208,8 +217,8 @@ def launch_setup(context, *args, **kwargs):
             {"new_tf_topic": "/tf"},
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
-            # {"child_frames_to_remove": ["slam_map"]},
-            {"parent_frames_to_remove": ["velodyne"]},
+            {"child_frames_to_remove": ["slam_map"]},
+            # {"parent_frames_to_remove": ["velodyne"]},
         ]
     )
 
@@ -222,15 +231,16 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
+        # ekf_node,
         # buoy_yolo_node,
         # buoy_yolo_node_back_left,
         # buoy_yolo_node_back_right,
-        bbox_project_pcloud_node,
-        bbox_project_pcloud_node_back_left,
-        bbox_project_pcloud_node_back_right,
-        # object_tracking_map_node,
+        # bbox_project_pcloud_node,
+        # bbox_project_pcloud_node_back_left,
+        # bbox_project_pcloud_node_back_right,
+        object_tracking_map_node,
         tf_filtering,
-        robot_state_publisher,
+        # robot_state_publisher,
     ]
 
 def generate_launch_description():
