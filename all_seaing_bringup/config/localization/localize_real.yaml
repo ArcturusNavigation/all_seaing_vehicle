@@ -17,26 +17,19 @@ ekf_filter_node:
     publish_tf: true
     reset_on_time_jump: true
 
-    imu0: /mavros/imu/data
-    imu0_config:
-      [
-        false, false, false, # X, Y, Z
-        true,  true,  true,  # roll, pitch, yaw
-        false, false, false, # X', Y', Z'
-        true,  true,  true,  # roll', pitch', yaw'
-        true, true, true, # X'', Y'', Z''
-      ]
-      # [
-      #   true, true, true, # X, Y, Z
-      #   true,  true,  true,  # roll, pitch, yaw
-      #   true, true, true, # X', Y', Z'
-      #   true,  true,  true,  # roll', pitch', yaw'
-      #   true, true, true, # X'', Y'', Z''
-      # ]
-    imu0_differential: false
-    imu0_relative: false
-    imu0_queue_size: 10
-    imu0_remove_gravitational_acceleration: true
+    # imu0: /mavros/imu/data
+    # imu0_config:
+    #   [
+    #     false, false, false, # X, Y, Z
+    #     true,  true,  true,  # roll, pitch, yaw
+    #     false, false, false, # X', Y', Z'
+    #     true,  true,  true,  # roll', pitch', yaw'
+    #     true, true, true, # X'', Y'', Z''
+    #   ]
+    # imu0_differential: false
+    # imu0_relative: false
+    # imu0_queue_size: 10
+    # imu0_remove_gravitational_acceleration: true
 
     # imu1: /gps/imu
     # imu1_config:
@@ -64,26 +57,20 @@ ekf_filter_node:
     odom0_relative: false
     odom0_queue_size: 10
 
-    use_control: false
+    odom1: /mavros/local_position/odom
+    odom1_config:
+      [
+        false, false, false, # X, Y, Z
+        true,  true,  true,  # roll, pitch, yaw
+        true, true, true, # X', Y', Z'
+        true,  true,  true,  # roll', pitch', yaw'
+        false, false, false, # X'', Y'', Z''
+      ]
+    odom1_differential: false
+    odom1_relative: false
+    odom1_queue_size: 10
 
-    # process_noise_covariance: 
-    #   [
-    #     10.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 10.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 1e-3, 0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.3, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.3, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.0,
-    #     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3
-    #   ]
+    use_control: false
 
     process_noise_covariance: 
       [

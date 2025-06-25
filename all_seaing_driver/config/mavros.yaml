@@ -7,6 +7,7 @@
       - command
       - ftp
       - hil
+      - local_position
       - global_position
       - imu
       - setpoint_velocity
@@ -16,3 +17,6 @@
 /**/global_position:
   ros__parameters:
     child_frame_id: "gps_link"
+/**/local_position:
+  ros__parameters:
+    frame_id: "imu_link"
