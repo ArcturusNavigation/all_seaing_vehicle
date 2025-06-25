@@ -109,7 +109,7 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource(
             [
                 description_prefix,
-                "/launch/static_transforms_rosbag.launch.py",
+                "/launch/static_transforms.launch.py",
             ]
         ),
     )
