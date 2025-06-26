@@ -8,7 +8,7 @@
       i_publish_tf_from_calibration: false
     rgb:
       # i_sensor_img_orientation: "NORMAL"
-      i_resolution: '1080P'
+      i_resolution: '1080P' # may need to use 13MP to not lose FoV
       i_set_isp_scale: false
 
 /back_right_oak:
@@ -21,5 +21,5 @@
       i_publish_tf_from_calibration: false
     rgb:
       # i_sensor_img_orientation: "NORMAL"
-      i_resolution: '1080P'
+      i_resolution: '1080P' # may need to use 13MP to not lose FoV
       i_set_isp_scale: false

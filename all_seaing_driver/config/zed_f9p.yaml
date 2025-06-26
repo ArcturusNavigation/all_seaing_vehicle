@@ -10,7 +10,7 @@ ublox_gps_node:
       beidou: false
       gps: true
       qzss: false
-      galileo: false
+      galileo: false # TODO: check it out?
       imes: false
     # TMODE3 Config
     tmode3: 1                   # Survey-In Mode

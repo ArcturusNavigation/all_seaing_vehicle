@@ -107,4 +107,4 @@ navsat_transform_node:
     publish_filtered_gps: true
     use_odometry_yaw: false
     wait_for_datum: true
-    datum: [42.3599, -71.1046, 0.0]
+    datum: [42.3599, -71.1046, 0.0, odom, base_link]

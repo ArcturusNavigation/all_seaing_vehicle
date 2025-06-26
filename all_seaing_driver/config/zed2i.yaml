@@ -1,5 +1,5 @@
 # general:
-#     grab_resolution: 'HD720'
+#     grab_resolution: 'HD720' # TODO: check out how to get full/higher resolution?
 pos_tracking:
     pos_tracking_enabled: false
     publish_tf: false
