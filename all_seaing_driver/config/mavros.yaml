@@ -11,6 +11,7 @@
       - global_position
       - imu
       - setpoint_velocity
+      - sys_status
 /**/imu:
   ros__parameters:
     frame_id: "imu_link"
