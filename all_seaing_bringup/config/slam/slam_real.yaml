@@ -17,7 +17,7 @@ object_tracking_map:
     new_object_slam_threshold: 5.0
     init_xy_noise: 0.7
     init_theta_noise: 1.0
-    init_new_cov: 7.0
+    init_new_cov: 100.0
     check_fov: False
     track_robot: True
     imu_predict: True
