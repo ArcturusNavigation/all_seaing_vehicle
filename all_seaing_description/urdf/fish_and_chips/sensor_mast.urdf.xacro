@@ -3,13 +3,14 @@
     <link name="base_link"></link>
     <link name="gps_link"></link>
     <link name="imu_link"></link>
+    <link name="imu_link_fake"></link>
     <link name="velodyne"></link>
     <link name="zed_left_camera_optical_frame"></link>
     <link name="back_left_oak_rgb_camera_optical_frame"></link>
     <link name="back_right_oak_rgb_camera_optical_frame"></link>
 
     <joint name="base_to_velodyne" type="fixed">
-        <origin xyz="0.0 0.0 0.0" rpy="0 0 -${pi/2}"/>
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
         <parent link="base_link"/>
         <child link="velodyne"/>
     </joint>
@@ -21,9 +22,15 @@
     </joint>
 
     <joint name="base_to_imu" type="fixed">
-        <origin xyz="0.0 0.0 0.0" rpy="0 0 -${pi/2}"/>
+        <origin xyz="0.0 0.0 0.0" rpy="0 ${pi} -${pi/2}"/>
         <parent link="base_link"/>
         <child link="imu_link"/>
+    </joint>
+
+    <joint name="base_to_imu_fake" type="fixed">
+        <origin xyz="0.0 0.0 0.0" rpy="0 ${pi} ${pi/2}"/>
+        <parent link="base_link"/>
+        <child link="imu_link_fake"/>
     </joint>
 
     <joint name="velodyne_to_zed" type="fixed">

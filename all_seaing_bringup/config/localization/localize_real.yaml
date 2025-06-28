@@ -20,11 +20,18 @@ ekf_filter_node:
     imu0: /mavros/imu/data
     imu0_config:
       [
+        # without mavros EKF output (mavros/local_position/odom)
         false, false, false, # X, Y, Z
         true,  true,  true,  # roll, pitch, yaw
         false, false, false, # X', Y', Z'
         true,  true,  true,  # roll', pitch', yaw'
         true, true, true, # X'', Y'', Z''
+        # with mavros local_position odom
+        # false, false, false, # X, Y, Z
+        # false,  false,  false,  # roll, pitch, yaw
+        # false, false, false, # X', Y', Z'
+        # false,  false,  false,  # roll', pitch', yaw'
+        # true, true, true, # X'', Y'', Z''
       ]
     imu0_differential: false
     imu0_relative: false
@@ -44,18 +51,18 @@ ekf_filter_node:
     odom0_relative: false
     odom0_queue_size: 10
 
-    odom1: /mavros/local_position/odom
-    odom1_config:
-      [
-        false, false, false, # X, Y, Z
-        true,  true,  true,  # roll, pitch, yaw
-        true, true, true, # X', Y', Z'
-        true,  true,  true,  # roll', pitch', yaw'
-        false, false, false, # X'', Y'', Z''
-      ]
-    odom1_differential: false
-    odom1_relative: false
-    odom1_queue_size: 10
+    # odom1: /mavros/local_position/odom/reframed # for compass, and maybe positional/velocity, data
+    # odom1_config:
+    #   [
+    #     false, false, false, # X, Y, Z
+    #     true,  true,  true,  # roll, pitch, yaw
+    #     true, true, true, # X', Y', Z'
+    #     true,  true,  true,  # roll', pitch', yaw'
+    #     false, false, false, # X'', Y'', Z''
+    #   ]
+    # odom1_differential: false
+    # odom1_relative: false
+    # odom1_queue_size: 10
 
     use_control: false
 
@@ -107,4 +114,4 @@ navsat_transform_node:
     publish_filtered_gps: true
     use_odometry_yaw: false
     wait_for_datum: true
-    datum: [42.3599, -71.1046, 0.0, odom, base_link]
+    datum: [42.3599, -71.1046, 0.0]

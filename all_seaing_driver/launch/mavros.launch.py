@@ -39,5 +39,16 @@ def generate_launch_description():
                 package="all_seaing_driver",
                 executable="gps_converter.py",
             ),
+            launch_ros.actions.Node(
+                package="all_seaing_driver",
+                executable="odom_reframe.py",
+                parameters=[
+                    {"target_child_frame_id": "imu_link_fake"}
+                ],
+                remappings=[
+                    ("odom_topic", "/mavros/local_position/odom"),
+                    ("new_odom_topic", "/mavros/local_position/odom/reframed")
+                ]
+            ),
         ]
     )

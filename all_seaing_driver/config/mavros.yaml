@@ -20,4 +20,6 @@
     child_frame_id: "gps_link"
 /**/local_position:
   ros__parameters:
-    frame_id: "imu_link"
+    frame_id: "odom"
+    tf:
+      child_frame_id: "base_link"
