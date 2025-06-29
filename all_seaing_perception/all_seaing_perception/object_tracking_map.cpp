@@ -429,14 +429,14 @@ T ObjectTrackingMap::convert_to_global(T point, bool untracked) {
     lc_pt_msg.y = point.y;
     lc_pt_msg.z = point.z;
     geometry_msgs::msg::Point gb_pt_msg;
-    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_base_link_map_tf);
+    tf2::doTransform<geometry_msgs::msg::Point>(lc_pt_msg, gb_pt_msg, m_map_base_link_tf);
     new_point.x = gb_pt_msg.x;
     new_point.y = gb_pt_msg.y;
     new_point.z = gb_pt_msg.z;
     T act_point = new_point;
     if(m_track_robot && (!untracked)){
         // point initially in map frame
-        // want slam_map->map (then will compose it with slam->point)
+        // want slam_map->map (then will compose it with map->point)
         // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
         std::tuple<double, double, double> slam_to_map_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)),all_seaing_perception::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
         double th; //uselesss
@@ -453,7 +453,7 @@ T ObjectTrackingMap::convert_to_local(T point, bool untracked) {
         // point initially in slam_map frame
         // want map->slam_map (then will compose it with slam->point)
         // (map->robot)@(robot->slam_map) = (map->robot)@inv(slam_map->robot)
-        std::tuple<double, double, double> map_to_slam_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading),all_seaing_perception:: compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0));
+        std::tuple<double, double, double> map_to_slam_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading),all_seaing_perception::compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0));
         double th; //uselesss
         std::tie(act_point.x, act_point.y, th) =all_seaing_perception::compose_transforms(map_to_slam_transform, std::make_tuple(new_point.x, new_point.y, 0));
     }
@@ -462,7 +462,7 @@ T ObjectTrackingMap::convert_to_local(T point, bool untracked) {
     gb_pt_msg.y = act_point.y;
     gb_pt_msg.z = act_point.z;
     geometry_msgs::msg::Point lc_pt_msg;
-    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_map_base_link_tf);
+    tf2::doTransform<geometry_msgs::msg::Point>(gb_pt_msg, lc_pt_msg, m_base_link_map_tf);
     new_point.x = lc_pt_msg.x;
     new_point.y = lc_pt_msg.y;
     new_point.z = lc_pt_msg.z;
@@ -700,8 +700,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     m_got_local_frame = true;
 
     // RCLCPP_INFO(this->get_logger(), "BEFORE GETTING ODOMETRY TF");
-    m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
-    m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
     // RCLCPP_INFO(this->get_logger(), "LOCAL FRAME: %s, GLOBAL FRAME: %s", m_local_frame_id.c_str(), m_global_frame_id.c_str());
     // RCLCPP_INFO(this->get_logger(), "GOT ODOMETRY TF");
 
@@ -740,7 +740,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::iota(std::begin(ind), std::end(ind), 0); 
         std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
             new all_seaing_perception::Obstacle(m_local_header, m_global_untracked_header, raw_cloud, ind,
-                                                m_obstacle_id++, m_base_link_map_tf));
+                                                m_obstacle_id++, m_map_base_link_tf));
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
     }
