@@ -292,6 +292,9 @@ void ObjectTrackingMap::odom_callback() {
     tf2::Matrix3x3 m(quat);
     double r, p, y;
     m.getRPY(r, p, y);
+    if(r > M_PI/2 || p > M_PI/2){ // to discard weird RPY solutions
+        m.getRPY(r, p, y, 2);
+    }
     m_nav_heading = y;
 
     m_got_nav = true;
@@ -392,6 +395,7 @@ void ObjectTrackingMap::odom_callback() {
             Eigen::MatrixXf H = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
             H.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
             Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
+            xyth_actual(2) = xyth_pred(2)+all_seaing_perception::angle_to_pi_range(xyth_actual(2)-xyth_pred(2));
             m_state += K * (xyth_actual - xyth_pred);
             m_cov =
                 (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
@@ -561,7 +565,8 @@ void ObjectTrackingMap::visualize_predictions() {
         Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
         tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
         tf2::Quaternion quat_rot;
-        rot_mat.getRotation(quat_rot);
+        // rot_mat.getRotation(quat_rot);
+        quat_rot.setRPY(0,0,std::atan2(axis_x(1), axis_x(0)));
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
         ellipse.pose.position.x = robot_mean(0);
@@ -625,12 +630,14 @@ void ObjectTrackingMap::visualize_predictions() {
         double a_x = eigen_solver.eigenvalues()(0);
         double a_y = eigen_solver.eigenvalues()(1);
         // RCLCPP_INFO(this->get_logger(), "OBJECT %d COVARIANCE AXES LENGTHS: (%lf, %lf)", i, a_x, a_y);
+        // TODO: check if the resulting orientation is clipping somewhere because it results being aligned to x or y axis
         Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
         Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
         double cov_scale = m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
         tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
         tf2::Quaternion quat_rot;
-        rot_mat.getRotation(quat_rot);
+        // rot_mat.getRotation(quat_rot);
+        quat_rot.setRPY(0,0,std::atan2(axis_x(1), axis_x(0)));
         visualization_msgs::msg::Marker ellipse;
         ellipse.type = visualization_msgs::msg::Marker::SPHERE;
 
@@ -755,11 +762,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     };
     std::vector<std::vector<float>> p;
     // RCLCPP_INFO(this->get_logger(), "COMPUTE WITH UNKNOWN CORRESPONDENCE");
+    // RCLCPP_INFO(this->get_logger(), "ROBOT'S PREDICTED POSITION: (%lf, %lf, %lf)", m_state(0), m_state(1), m_state(2));
     for (std::shared_ptr<all_seaing_perception::ObjectCloud> det_obs : detected_obstacles) {
         float range, bearing;
         int signature;
         std::tie(range, bearing, signature) =
             all_seaing_perception::local_to_range_bearing_signature(det_obs->local_centroid, det_obs->label);
+        // RCLCPP_INFO(this->get_logger(), "DETECTION'S X, Y -> RANGE, BEARING: (%lf, %lf)->(%lf, %lf)", det_obs->local_centroid.x, det_obs->local_centroid.y, range, bearing);
         p.push_back(std::vector<float>());
         Eigen::Vector2f z_pred;
         Eigen::MatrixXf Psi;
@@ -768,7 +777,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
                 float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);
                 float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_state(2));
+                z_pred = Eigen::Vector2f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)));
+                // RCLCPP_INFO(this->get_logger(), "OBSTACLE'S X, Y -> RANGE, BEARING: (%lf, %lf)->(%lf, %lf)", m_state(3 + 2 * tracked_id), m_state(3 + 2 * tracked_id + 1), z_pred(0), z_pred(1));
                 Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, 3 + 2 * m_num_obj);
                 F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
                 F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
@@ -786,7 +796,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_nav_x;
                 float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_nav_y;
                 float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector2f(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
+                z_pred = Eigen::Vector2f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading));
                 // Eigen::MatrixXf F = Eigen::MatrixXf::Zero(2, 2*m_num_obj);
                 // F.block(0, 2*tracked_id, 2, 2) = Eigen::MatrixXf::Identity(2,2);
                 Eigen::Matrix<float, 2, 2> h{
@@ -802,6 +812,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
             Eigen::Vector2f z_actual(range, bearing);
 
+            z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
             p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
                                (z_actual - z_pred));
         }
@@ -855,12 +866,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                  std::sqrt(q) * d_y},
                 {d_y, -d_x, -1, -d_y, d_x},
             };
-            Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_state(2));
+            Eigen::Vector2f z_pred(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)));
             Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, 3 + 2 * m_num_obj);
             F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
             F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
             Eigen::MatrixXf H = h * F / q;
             Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
+            z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
             m_state += K * (z_actual - z_pred);
             m_cov =
                 (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
@@ -872,11 +884,12 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 {std::sqrt(q) * d_x, std::sqrt(q) * d_y},
                 {-d_y, d_x},
             };
-            Eigen::Vector2f z_pred(std::sqrt(q), std::atan2(d_y, d_x) - m_nav_heading);
+            Eigen::Vector2f z_pred(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading));
             Eigen::MatrixXf H = h / q;
             Eigen::MatrixXf K =
                 m_tracked_obstacles[tracked_id]->cov * H.transpose() *
                 (H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q).inverse();
+            z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
             m_tracked_obstacles[tracked_id]->mean_pred += K * (z_actual - z_pred);
             m_tracked_obstacles[tracked_id]->cov =
                 (Eigen::Matrix2f::Identity() - K * H) * m_tracked_obstacles[tracked_id]->cov;

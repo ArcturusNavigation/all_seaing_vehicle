@@ -8,6 +8,7 @@
 #include <vector>
 #include <tuple>
 #include <chrono>
+#include <math.h>
 
 #include "rclcpp/rclcpp.hpp"
 

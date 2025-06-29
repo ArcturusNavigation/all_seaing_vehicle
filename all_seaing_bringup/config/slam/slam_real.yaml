@@ -4,13 +4,13 @@ object_tracking_map:
     slam_frame_id: "slam_map"
     obstacle_drop_thresh: 2.0
     normalize_drop_thresh: False
-    range_uncertainty: 2.5
+    range_uncertainty: 1.0
     bearing_uncertainty: 0.2
     motion_gps_xy_noise: 1.0
     motion_gps_theta_noise: 0.1
     motion_imu_xy_noise: 1.0
     motion_imu_theta_noise: 0.05
-    update_gps_xy_uncertainty: 5.0
+    update_gps_xy_uncertainty: 10.0
     include_odom_theta: True
     rotate_odom: False
     update_odom_theta_uncertainty: 0.2
