@@ -10,6 +10,7 @@ object_tracking_map:
     motion_gps_theta_noise: 0.1
     motion_imu_xy_noise: 1.0
     motion_imu_theta_noise: 0.05
+    odom_refresh_rate: 10.0
     update_gps_xy_uncertainty: 10.0
     include_odom_theta: True
     rotate_odom: False
