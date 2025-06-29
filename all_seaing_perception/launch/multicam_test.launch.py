@@ -335,7 +335,7 @@ def launch_setup(context, *args, **kwargs):
         mavros_ld,
         ekf_node,
         # ekf_odom_node,
-        navsat_node,
+        # navsat_node,
         oak_ld,
         buoy_yolo_node,
         buoy_yolo_node_back_left,

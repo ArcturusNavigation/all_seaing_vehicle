@@ -438,7 +438,7 @@ T ObjectTrackingMap::convert_to_global(T point, bool untracked) {
         // point initially in map frame
         // want slam_map->map (then will compose it with slam->point)
         // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
-        std::tuple<double, double, double> slam_to_map_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)),all_seaing_perception:: compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+        std::tuple<double, double, double> slam_to_map_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)),all_seaing_perception::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
         double th; //uselesss
         std::tie(act_point.x, act_point.y, th) =all_seaing_perception::compose_transforms(slam_to_map_transform, std::make_tuple(new_point.x, new_point.y, 0));
     }
