@@ -4,11 +4,13 @@ from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     OpaqueFunction,
+    GroupAction
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 import launch_ros
+from launch_ros.actions import SetRemap
 import os
 import yaml
 import xacro
@@ -23,9 +25,7 @@ def launch_setup(context, *args, **kwargs):
     robot_urdf_file = os.path.join(
         description_prefix, "urdf", "fish_and_chips", "robot.urdf.xacro"
     )
-    # lidar_camera_calibration_file = os.path.join(
-    #     description_prefix, "urdf", "fish_and_chips", "lidar_camera.urdf.xacro"
-    # )
+    
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
@@ -38,9 +38,7 @@ def launch_setup(context, *args, **kwargs):
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
-    pf_slam_params = os.path.join(
-        bringup_prefix, "config", "slam", "pf_slam_real.yaml"
-    )
+    
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
     )
@@ -335,6 +333,40 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    buoy_yolo_node_back_left = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"label_config": "buoy_label_mappings"},
+            {"conf": 0.6},
+            {"use_color_names": False},
+        ],
+        remappings=[
+            ("image", "/back_left_oak/rgb/image_rect"),
+            ("annotated_image", "annotated_image/buoy/back_left"),
+            ("bounding_boxes", "bounding_boxes/back_left"),
+        ],
+        output="screen",
+    )
+
+    buoy_yolo_node_back_right = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"label_config": "buoy_label_mappings"},
+            {"conf": 0.6},
+            {"use_color_names": False},
+        ],
+        remappings=[
+            ("image", "/back_right_oak/rgb/image_rect"),
+            ("annotated_image", "annotated_image/buoy/back_right"),
+            ("bounding_boxes", "bounding_boxes/back_right"),
+        ],
+        output="screen",
+    )
+
     shape_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
@@ -383,12 +415,83 @@ def launch_setup(context, *args, **kwargs):
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
-            {"obstacle_size_max": 60},
-            {"clustering_distance": 1.0},
+            {"obstacle_size_max": 1000},
+            {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
             {"is_sim": False},
             {"label_list": True},
+        ]
+    )
+
+    bbox_project_pcloud_node_back_left = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/back_left_oak/rgb/camera_info"),
+            ("camera_topic", "/back_left_oak/rgb/image_rect"),
+            ("lidar_topic", "/point_cloud/filtered"),
+            ("bounding_boxes", "bounding_boxes/back_left"),
+            ("/refined_object_segments_viz", "/refined_object_segments_viz/back_left"),
+            ("/object_point_clouds_viz", "/object_point_clouds_viz/back_left"),
+            ("/refined_object_point_clouds_viz", "/refined_object_point_clouds_viz/back_left"),
+            ("/refined_object_point_clouds_segments", "/refined_object_point_clouds_segments/back_left"),
+        ],
+        parameters=[
+            # {"base_link_frame": "actual_base_link"},
+            {"base_link_frame": "base_link"},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 1000},
+            {"clustering_distance": 0.1},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": False},
+            {"label_list": True},
+        ]
+    )
+
+    bbox_project_pcloud_node_back_right = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/back_right_oak/rgb/camera_info"),
+            ("camera_topic", "/back_right_oak/rgb/image_rect"),
+            ("lidar_topic", "/point_cloud/filtered"),
+            ("bounding_boxes", "bounding_boxes/back_right"),
+            ("/refined_object_segments_viz", "/refined_object_segments_viz/back_right"),
+            ("/object_point_clouds_viz", "/object_point_clouds_viz/back_right"),
+            ("/refined_object_point_clouds_viz", "/refined_object_point_clouds_viz/back_right"),
+            ("/refined_object_point_clouds_segments", "/refined_object_point_clouds_segments/back_right"),
+        ],
+        parameters=[
+            # {"base_link_frame": "actual_base_link"},
+            {"base_link_frame": "base_link"},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 1000},
+            {"clustering_distance": 0.1},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": False},
+            {"label_list": True},
+        ]
+    )
+
+    multicam_detection_merge_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="multicam_detection_merge.py",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings = [
+
+        ],
+        parameters = [
+
         ]
     )
 
@@ -398,37 +501,11 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
+            ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
+            # ("odometry/filtered", "odometry_correct/filtered")
         ],
-        parameters=[slam_params],
-    )
-
-    object_tracking_map_pf_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="object_tracking_map_pf",
-        output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
-        remappings=[
-            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-        ],
-        parameters=[pf_slam_params],
-    )
-
-    object_tracking_map_euclidean_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="object_tracking_map_euclidean",
-        output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
-        remappings=[
-            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-        ],
-        parameters=[
-            {"global_frame_id": "map"},
-            {"obstacle_seg_thresh": 10.0},
-            {"obstacle_drop_thresh": 1.0},
-            {"check_fov": False},
-            {"is_sim": True},
-        ]
+        parameters=[slam_params]
     )
 
     navigation_server = launch_ros.actions.Node(
@@ -490,6 +567,21 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(use_bag),
     )
 
+    oak_ld = GroupAction(
+        actions=[
+            SetRemap(src='/tf',dst='/tf_trash'),
+            SetRemap(src='/tf_static',dst='/tf_static_trash'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        driver_prefix,
+                        "/launch/oak.launch.py",
+                    ]
+                ),
+            )
+        ]
+    )
+
     static_transforms_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -510,14 +602,6 @@ def launch_setup(context, *args, **kwargs):
         output='screen',
         parameters=[{'robot_description': robot_urdf}]
     )
-
-    # lidar_camera_urdf = xacro.process_file(lidar_camera_calibration_file).toxml()
-    # calibration_publisher = launch_ros.actions.Node(
-    #     package='robot_state_publisher',
-    #     executable='robot_state_publisher',
-    #     output='screen',
-    #     parameters=[{'robot_description': lidar_camera_urdf}]
-    # )
 
     amcl_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -542,22 +626,26 @@ def launch_setup(context, *args, **kwargs):
         controller_server,
         ekf_node,
         # ekf_odom_node,
-        navsat_node,
+        # navsat_node,
         navigation_server,
-        obstacle_bbox_overlay_node,
-        obstacle_bbox_visualizer_node,
-        obstacle_detector_node,
+        # obstacle_bbox_overlay_node,
+        # obstacle_bbox_visualizer_node,
+        # obstacle_detector_node,
         point_cloud_filter_node,
         rover_custom_controller,
         rover_lora_controller,
         rviz_waypoint_sender,
         thrust_commander_node,
         buoy_yolo_node,
+        buoy_yolo_node_back_left,
+        buoy_yolo_node_back_right,
         # shape_yolo_node,
         # static_shape_yolo_node,
-        # bbox_project_pcloud_node,
-        # object_tracking_map_node,
-        # object_tracking_map_pf_node,
+        bbox_project_pcloud_node,
+        bbox_project_pcloud_node_back_left,
+        bbox_project_pcloud_node_back_right,
+        multicam_detection_merge_node,
+        object_tracking_map_node,
         run_tasks,
         task_init_server, 
         # follow_buoy_path,
@@ -567,11 +655,11 @@ def launch_setup(context, *args, **kwargs):
         # amcl_ld,
         static_transforms_ld,
         robot_state_publisher,
-        # calibration_publisher,
         # webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,
+        oak_ld,
     ]
 
 
