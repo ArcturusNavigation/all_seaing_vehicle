@@ -83,6 +83,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/yolov5_node.py
     ${PROJECT_NAME}/yolov8_node.py
     ${PROJECT_NAME}/perception_eval.py
+    ${PROJECT_NAME}/multicam_detection_merge.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

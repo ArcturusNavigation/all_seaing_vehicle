@@ -86,6 +86,9 @@ namespace all_seaing_perception {
 
     std::vector<std::shared_ptr<ObjectCloud>> clone(std::vector<std::shared_ptr<ObjectCloud>> orig);
 
+    double mod_2pi(double angle);
+    double angle_to_pi_range(double angle);
+
     std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZ point, int label);
 
     // Get transform from source frame to target frame

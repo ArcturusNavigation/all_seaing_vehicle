@@ -70,10 +70,18 @@ namespace all_seaing_perception{
         return compose_transforms(std::make_tuple(to_x, to_y, to_theta), local_rel);
     }
 
+    double mod_2pi(double angle){ // pushes angle to [0,2pi) range
+        return angle >= 2*M_PI?angle-floor(angle/(2*M_PI))*2*M_PI:angle+ceil(-angle/(2*M_PI))*2*M_PI;
+    }
+
+    double angle_to_pi_range(double angle){ // pushes angle to [-pi, pi) range
+        return mod_2pi(angle+M_PI)-M_PI;
+    }
+
     //(range, bearing, signature)
     std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZ point, int label) {
         double range = std::hypot(point.x, point.y);
-        double bearing = std::atan2(point.y, point.x);
+        double bearing = mod_2pi(std::atan2(point.y, point.x));
         // RCLCPP_INFO(this->get_logger(), "LOCAL: (%lf, %lf) -> RBS: (%lf, %lf, %d)", point.x, point.y,
         // range, bearing, label);
         return std::make_tuple(range, bearing, label);

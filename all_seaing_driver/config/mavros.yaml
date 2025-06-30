@@ -7,12 +7,20 @@
       - command
       - ftp
       - hil
+      - local_position
       - global_position
       - imu
       - setpoint_velocity
+      - sys_status
 /**/imu:
   ros__parameters:
-    frame_id: "imu_link"
+    frame_id: "imu_link_accel"
 /**/global_position:
   ros__parameters:
     child_frame_id: "gps_link"
+/**/local_position:
+  ros__parameters:
+    frame_id: "odom"
+    tf:
+      # send: true
+      child_frame_id: "base_link"

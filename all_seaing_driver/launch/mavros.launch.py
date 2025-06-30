@@ -25,7 +25,7 @@ def generate_launch_description():
                     # {"plugin_blacklist": ["*"]},
                     # {"plugin_whitelist": ["actuator_control", "command", "ftp", "global_position", "imu_pub", "setpoint_velocity"]},
                     {"fcu_url": LaunchConfiguration("port")},
-                    # {"imu/frame_id": "imu_link"},
+                    # {"imu/frame_id": "imu_link_accel"},
                     # {"global_position/frame_id": "gps_link"},
                     # {"global_position/tf/frame_id": "gps_world"},
                     # {"global_position/tf/child_frame_id": "gps_link"},
@@ -33,11 +33,25 @@ def generate_launch_description():
                     # {"local_position/tf/frame_id": "odom"},
                     # {"local_position/tf/child_frame_id": "base_link"},
                 ],
+                remappings=[
+                    # ("mavros/local_position/odom", "odometry/filtered") # to just use the internal EKF
+                ],
                 output="both",
             ),
             launch_ros.actions.Node(
                 package="all_seaing_driver",
                 executable="gps_converter.py",
+            ),
+            launch_ros.actions.Node(
+                package="all_seaing_driver",
+                executable="odom_reframe.py",
+                parameters=[
+                    {"target_child_frame_id": "imu_link_odom"}
+                ],
+                remappings=[
+                    ("odom_topic", "/mavros/local_position/odom"),
+                    ("new_odom_topic", "/mavros/local_position/odom/reframed")
+                ]
             ),
         ]
     )

@@ -5,6 +5,7 @@ cv::Point2d custom_project(image_geometry::PinholeCameraModel cmodel, const cv::
     uv_rect.x = (cmodel.fx()*xyz.x + cmodel.Tx()) / xyz.z + cmodel.cx();
     uv_rect.y = (cmodel.fy()*xyz.y + cmodel.Ty()) / xyz.z + cmodel.cy();
     return uv_rect;
+    // return cmodel.project3dToPixel(xyz);
 }
 
 BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
@@ -68,6 +69,7 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     m_refined_object_pcl_segment_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>("refined_object_point_clouds_segments", 5);
     m_refined_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("refined_object_point_clouds_viz", 5);
     m_refined_object_segment_viz_pub = this->create_publisher<sensor_msgs::msg::Image>("refined_object_segments_viz", 5);
+    m_pcl_img_pub = this->create_publisher<sensor_msgs::msg::Image>("pcl_img", 10);
 
     // get color label mappings from yaml
     RCLCPP_DEBUG(this->get_logger(), "READING COLOR LABEL MAPPINGS");
@@ -188,6 +190,7 @@ void BBoxProjectPCloud::bb_pcl_project(
 
     auto object_pcls = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
     std::vector<pcl::PointCloud<pcl::PointXYZHSV>> obj_cloud_vec;
+    cv::Mat pcl_img(m_cam_model.cameraInfo().height,m_cam_model.cameraInfo().width, CV_8UC3, cv::Scalar(0,0,0));
     // int max_len = 0;
     // Just use the same pcloud to image projection, but check if it's within some binding box and assign it to that detection
     int obj = 0;
@@ -228,6 +231,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         bbox.min_y = std::max((int)bbox.min_y,0);
         bbox.max_y = std::min((int)bbox.max_y+1, cv_hsv.rows);
         RCLCPP_DEBUG(this->get_logger(), "PADDED BOUNDING BOX FOR OBJECT %d: (%d,%d), (%d, %d)", obj, bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y);
+        cv::rectangle(pcl_img, cv::Point((int)bbox.min_y, (int)bbox.min_x), cv::Point((int)bbox.max_y, (int)bbox.max_x), cv::Scalar(0, 0, 255), 10);
         for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
             // Project 3D point onto the image plane using the intrinsic matrix.
             // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
@@ -240,7 +244,8 @@ void BBoxProjectPCloud::bb_pcl_project(
             // Check if within bounds & in front of the boat
             float actual_z = m_is_sim? point_tf.x : point_tf.z;
             if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-                (xy_rect.y < m_cam_model.cameraInfo().height) && (actual_z >= 0)) {          
+                (xy_rect.y < m_cam_model.cameraInfo().height) && (actual_z >= 0)) {      
+                cv::circle(pcl_img, cv::Point((int)xy_rect.y, (int)xy_rect.x),10, cv::Scalar(255, 255, 255), cv::FILLED);    
                 // Check if point is in bbox
                 if(xy_rect.x >= bbox.min_x && xy_rect.x <= bbox.max_x && xy_rect.y >= bbox.min_y && xy_rect.y <= bbox.max_y){
                     cv::Vec3b hsv_vec3b = cv_hsv.at<cv::Vec3b>(xy_rect);
@@ -263,6 +268,8 @@ void BBoxProjectPCloud::bb_pcl_project(
         RCLCPP_DEBUG(this->get_logger(), "%d POINTS IN OBJECT %d", obj_cloud_ptr->size(), obj);
         // max_len = std::max(max_len, (int)obj_cloud_ptr->size());
     }
+    cv_bridge::CvImagePtr pcl_img_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, pcl_img));
+    m_pcl_img_pub->publish(*pcl_img_ptr->toImageMsg());
     RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND OBJECT POINT CLOUDS");
     m_object_pcl_pub->publish(object_pcls);
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
