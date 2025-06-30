@@ -602,7 +602,7 @@ void ObjectTrackingMap::visualize_predictions() {
         //     nav_quat.setRPY(0,0,m_nav_heading);
         //     ellipse.pose.orientation = tf2::toMsg(nav_quat);
         // }
-        angle_marker.scale.x = m_cov(2, 2);
+        angle_marker.scale.x = sqrt(m_cov(2, 2));
         angle_marker.scale.y = 0.2;
         angle_marker.scale.z = 0.2;
         angle_marker.color.a = 1;
@@ -630,10 +630,9 @@ void ObjectTrackingMap::visualize_predictions() {
         double a_x = eigen_solver.eigenvalues()(0);
         double a_y = eigen_solver.eigenvalues()(1);
         // RCLCPP_INFO(this->get_logger(), "OBJECT %d COVARIANCE AXES LENGTHS: (%lf, %lf)", i, a_x, a_y);
-        // TODO: check if the resulting orientation is clipping somewhere because it results being aligned to x or y axis
         Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
         Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
-        double cov_scale = m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
+        // double cov_scale = m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
         tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
         tf2::Quaternion quat_rot;
         // rot_mat.getRotation(quat_rot);
@@ -659,8 +658,8 @@ void ObjectTrackingMap::visualize_predictions() {
         // }
         
         ellipse.pose.position.z = 0;
-        ellipse.scale.x = cov_scale * sqrt(a_x);
-        ellipse.scale.y = cov_scale * sqrt(a_y);
+        ellipse.scale.x = sqrt(a_x);
+        ellipse.scale.y = sqrt(a_y);
         ellipse.scale.z = 1;
         ellipse.color.a = 0.2;
         ellipse.color.r = 1;
@@ -1011,6 +1010,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     }
 
     if (m_track_robot) {
+        // TODO: make the trace only keep a # of points specified by a param
         m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
     }
 
