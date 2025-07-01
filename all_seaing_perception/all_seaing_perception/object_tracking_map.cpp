@@ -71,6 +71,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("include_odom_theta", true);
     m_include_odom_theta = this->get_parameter("include_odom_theta").as_bool();
 
+    this->declare_parameter<bool>("include_odom_only_theta", true);
+    m_include_odom_only_theta = this->get_parameter("include_odom_only_theta").as_bool();
+
     // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
@@ -363,7 +366,20 @@ void ObjectTrackingMap::odom_callback() {
         };
         m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
     }else if (m_gps_update){
-        if(!m_include_odom_theta){
+        if(m_include_odom_only_theta){
+            // Include only theta, since that's provided by the IMU compass and is accurate
+            float Q = m_update_odom_theta_uncertainty*m_update_odom_theta_uncertainty;
+            float th_actual = m_nav_heading;
+            float th_pred = m_state(2);
+            //gradient of measurement update model, identity since it's centered at the initial state
+            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(1, 3 + 2 * m_num_obj);
+            H(0,2) = 1;
+            Eigen::MatrixXf K = m_cov * H.transpose() / (m_cov(2,2) + Q);
+            th_actual = th_pred+all_seaing_perception::angle_to_pi_range(th_actual-th_pred);
+            m_state += K * (th_actual - th_pred);
+            m_cov =
+                (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
+        }else if(!m_include_odom_theta){
             // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
             Eigen::Matrix2f Q{
                 {m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty, 0},

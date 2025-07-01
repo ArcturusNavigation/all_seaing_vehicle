@@ -133,7 +133,7 @@ private:
     bool m_check_fov;
     bool m_direct_tf;
     bool m_normalize_drop_thresh;
-    bool m_include_odom_theta;
+    bool m_include_odom_theta, m_include_odom_only_theta;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();

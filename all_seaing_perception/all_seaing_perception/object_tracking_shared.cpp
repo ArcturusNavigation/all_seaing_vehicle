@@ -115,7 +115,6 @@ namespace all_seaing_perception{
                     if (chosen_tracked.count(tracked_id) ||
                         tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
                         continue;
-                    // RCLCPP_INFO(this->get_logger(), "P(%d, %d)=%lf", i, tracked_id, p[i][tracked_id]);
                     if (p[i][tracked_id] < min_p) {
                         best_match = std::make_pair(i, tracked_id);
                         min_p = p[i][tracked_id];
@@ -123,10 +122,36 @@ namespace all_seaing_perception{
                 }
             }
             if (min_p < new_obj_thres) {
-                // RCLCPP_INFO(this->get_logger(), "MATCHING (%d, %d), with p: %lf", best_match.first, best_match.second, p[best_match.first][best_match.second]);
                 match[best_match.first] = best_match.second;
                 chosen_tracked.insert(best_match.second);
                 chosen_detected.insert(best_match.first);
+            }
+        }
+        return std::make_tuple(match, chosen_detected, chosen_tracked);
+    }
+
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres){
+        // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
+        std::vector<int> match(detected_obstacles.size(), -1);
+        float min_p = 0;
+        std::unordered_set<int> chosen_detected, chosen_tracked;
+        for (size_t i = 0; i < detected_obstacles.size(); i++) {
+            min_p = new_obj_thres;
+            int best_match = -1;
+            for (int tracked_id = 0; tracked_id < tracked_obstacles.size(); tracked_id++) {
+                if (tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
+                    continue;
+                if (p[i][tracked_id] < min_p) {
+                    best_match = tracked_id;
+                    min_p = p[i][tracked_id];
+                }
+            }
+            if (min_p < new_obj_thres) {
+                match[i] = best_match;
+                chosen_tracked.insert(best_match);
+                chosen_detected.insert(i);
             }
         }
         return std::make_tuple(match, chosen_detected, chosen_tracked);
