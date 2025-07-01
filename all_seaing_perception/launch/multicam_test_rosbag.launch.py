@@ -196,6 +196,24 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    multicam_detection_merge_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="multicam_detection_merge.py",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings = [
+
+        ],
+        parameters = [
+            {"enable_front": True},
+            {"enable_back_left": True},
+            {"enable_back_right": True},
+            {"individual": False},
+            {"approximate": False},
+            {"delay": 0.1},
+        ]
+    )
+
     object_tracking_map_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="object_tracking_map",
@@ -238,6 +256,7 @@ def launch_setup(context, *args, **kwargs):
         # bbox_project_pcloud_node,
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
+        multicam_detection_merge_node,
         object_tracking_map_node,
         tf_filtering,
         # robot_state_publisher,

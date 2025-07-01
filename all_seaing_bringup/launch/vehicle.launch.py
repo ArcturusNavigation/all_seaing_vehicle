@@ -491,7 +491,12 @@ def launch_setup(context, *args, **kwargs):
 
         ],
         parameters = [
-
+            {"enable_front": True},
+            {"enable_back_left": True},
+            {"enable_back_right": True},
+            {"individual": False},
+            {"approximate": False},
+            {"delay": 0.1},
         ]
     )
 
