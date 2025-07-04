@@ -74,6 +74,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("include_odom_only_theta", true);
     m_include_odom_only_theta = this->get_parameter("include_odom_only_theta").as_bool();
 
+    this->declare_parameter<std::string>("data_association", "greedy_exclusive");
+    m_data_association_algo = this->get_parameter("data_association").as_string();
+
     // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
@@ -820,7 +823,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 };
                 // Do not store vectors, since they don't compute covariance with other obstacles in
                 // the same detection batch
-                //  Eigen::MatrixXf H = h*F/q;
+                // Eigen::MatrixXf H = h*F/q;
                 Eigen::MatrixXf H = h / q;
                 Psi = H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q;
             }
@@ -835,7 +838,17 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     std::vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
-    std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    if (m_data_association_algo == "greedy_exclusive"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }else if (m_data_association_algo == "greedy_individual"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::indiv_greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }else if (m_data_association_algo == "linear_sum_assignment"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }else if (m_data_association_algo == "linear_sum_assignment_sqrt"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres, true);
+    }else{
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }
 
     // Update vectors, now with known correspondence
     //  RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN CORRESPONDENCE");

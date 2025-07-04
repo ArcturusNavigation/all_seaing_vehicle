@@ -61,6 +61,8 @@
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 
+#include "all_seaing_perception/Hungarian.h"
+
 namespace all_seaing_perception {
     //custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)
     struct ObjectCloud{
@@ -106,6 +108,9 @@ namespace all_seaing_perception {
     std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
         std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
         std::vector<std::vector<float>> p, float new_obj_thres);
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres, bool sqrt=false);
 
     // Similar to the greedy_data_association function but returning the computed weight as well
     std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
