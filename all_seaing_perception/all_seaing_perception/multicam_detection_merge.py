@@ -3,26 +3,58 @@ import rclpy
 from rclpy.node import Node
 from all_seaing_interfaces.msg import LabeledObjectPointCloudArray, LabeledObjectPointCloud
 from rclpy.qos import qos_profile_sensor_data
-from message_filters import Subscriber, TimeSynchronizer
+from message_filters import Subscriber, TimeSynchronizer, ApproximateTimeSynchronizer
 
 class MulticamDetectionMerge(Node):
     def __init__(self):
         super().__init__("multicam_detection_merge")
-        self.detection_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments")
-        self.detection_back_left_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_left")
-        self.detection_back_right_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_right")
-        self.merged_detection_pub = self.create_publisher(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/merged", 10)
 
-        self.sync = TimeSynchronizer([self.detection_sub, self.detection_back_left_sub, self.detection_back_right_sub], 10)
-        self.sync.registerCallback(self.detection_sync_callback)
+        self.declare_parameter("enable_front", True)
+        self.declare_parameter("enable_back_left", True)
+        self.declare_parameter("enable_back_right", True)
+        self.declare_parameter("individual", False)
+        self.declare_parameter("approximate", False)
+        self.declare_parameter("delay", 0.1) # only if not individual and also approximate
+
+        self.enable_front = self.get_parameter("enable_front").get_parameter_value().bool_value
+        self.enable_back_left = self.get_parameter("enable_back_left").get_parameter_value().bool_value
+        self.enable_back_right = self.get_parameter("enable_back_right").get_parameter_value().bool_value
+        self.individual = self.get_parameter("individual").get_parameter_value().bool_value
+        self.approximate = self.get_parameter("approximate").get_parameter_value().bool_value
+        self.delay = self.get_parameter("delay").get_parameter_value().double_value
     
-    def detection_sync_callback(self, detections, detections_back_left, detections_back_right):
+        if not self.individual:
+            self.detection_subs = []
+            if self.enable_front:
+                self.detection_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments")
+                self.detection_subs.append(self.detection_sub)
+            if self.enable_back_left:
+                self.detection_back_left_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_left")
+                self.detection_subs.append(self.detection_back_left_sub)
+            if self.enable_back_right:
+                self.detection_back_right_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_right")
+                self.detection_subs.append(self.detection_back_right_sub)
+            if not self.approximate:
+                self.sync = TimeSynchronizer(self.detection_subs, 10)
+            else:
+                self.sync = ApproximateTimeSynchronizer(self.detection_subs, 10, self.delay)
+            self.sync.registerCallback(self.detection_sync_callback)
+        else:
+            if self.enable_front:
+                self.detection_sub = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments", self.detection_sync_callback, 10)
+            if self.enable_back_left:
+                self.detection_sub_back_left = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_left", self.detection_sync_callback, 10)
+            if self.enable_back_right:
+                self.detection_sub_back_right = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_right", self.detection_sync_callback, 10)
+        
+        self.merged_detection_pub = self.create_publisher(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/merged", 10)
+    
+    def detection_sync_callback(self, *args):
         # we assume all the detections are on the same frame (base_link or something equivalent)
         merged_detections = LabeledObjectPointCloudArray()
-        merged_detections.header = detections.header
-        merged_detections.objects.extend(detections.objects)
-        merged_detections.objects.extend(detections_back_left.objects)
-        merged_detections.objects.extend(detections_back_right.objects)
+        for detections in args:
+            merged_detections.header = detections.header
+            merged_detections.objects.extend(detections.objects)
         self.merged_detection_pub.publish(merged_detections)
         
 def main():

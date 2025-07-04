@@ -50,6 +50,9 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     matching_weights_file = this->get_parameter("matching_weights_file").as_string();
     contour_matching_color_ranges_file = this->get_parameter("contour_matching_color_ranges_file").as_string();
 
+    this->declare_parameter("include_image_segment", false);
+    m_inc_segment = this->get_parameter("include_image_segment").as_bool();
+
     // Subscriptions
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
         "camera_info_topic", 10, std::bind(&BBoxProjectPCloud::intrinsics_cb, this, std::placeholders::_1));
@@ -68,8 +71,8 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     m_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("object_point_clouds_viz", 5);
     m_refined_object_pcl_segment_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>("refined_object_point_clouds_segments", 5);
     m_refined_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("refined_object_point_clouds_viz", 5);
-    m_refined_object_segment_viz_pub = this->create_publisher<sensor_msgs::msg::Image>("refined_object_segments_viz", 5);
-    m_pcl_img_pub = this->create_publisher<sensor_msgs::msg::Image>("pcl_img", 10);
+    // m_refined_object_segment_viz_pub = this->create_publisher<sensor_msgs::msg::Image>("refined_object_segments_viz", 5);
+    // m_pcl_img_pub = this->create_publisher<sensor_msgs::msg::Image>("pcl_img", 10);
 
     // get color label mappings from yaml
     RCLCPP_DEBUG(this->get_logger(), "READING COLOR LABEL MAPPINGS");
@@ -268,8 +271,8 @@ void BBoxProjectPCloud::bb_pcl_project(
         RCLCPP_DEBUG(this->get_logger(), "%d POINTS IN OBJECT %d", obj_cloud_ptr->size(), obj);
         // max_len = std::max(max_len, (int)obj_cloud_ptr->size());
     }
-    cv_bridge::CvImagePtr pcl_img_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, pcl_img));
-    m_pcl_img_pub->publish(*pcl_img_ptr->toImageMsg());
+    // cv_bridge::CvImagePtr pcl_img_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, pcl_img));
+    // m_pcl_img_pub->publish(*pcl_img_ptr->toImageMsg());
     RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND OBJECT POINT CLOUDS");
     m_object_pcl_pub->publish(object_pcls);
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
@@ -526,10 +529,14 @@ void BBoxProjectPCloud::bb_pcl_project(
         refined_pcl_segments.label = bbox.label;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         refined_cloud_ptr->header = pcloud_ptr->header;
-        cv::Mat refined_obj_contour_mat = cv::Mat::zeros(img_sz, CV_8UC3);
-        for (cv::Point image_pt : in_contours[opt_contour_id]){
-            refined_obj_contour_mat.at<cv::Vec3b>(image_pt) = cv::Vec3b(255,255,255);
-            mat_opt_contour.at<cv::Vec3b>(image_pt-bbox_offset) = int_to_bgr(opt_contour_id, in_contours.size());
+        if(m_inc_segment){
+            cv::Mat refined_obj_contour_mat = cv::Mat::zeros(img_sz, CV_8UC3);
+            for (cv::Point image_pt : in_contours[opt_contour_id]){
+                refined_obj_contour_mat.at<cv::Vec3b>(image_pt) = cv::Vec3b(255,255,255);
+                mat_opt_contour.at<cv::Vec3b>(image_pt-bbox_offset) = int_to_bgr(opt_contour_id, in_contours.size());
+            }
+            cv_bridge::CvImagePtr refined_obj_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, refined_obj_contour_mat));
+            refined_pcl_segments.segment = *refined_obj_contour_ptr->toImageMsg();
         }
         for (pcl::index_t ind : clusters_indices[opt_cluster_id].indices){
             pcl::PointXYZHSV pt = pcloud_ptr->points[ind];
@@ -538,42 +545,18 @@ void BBoxProjectPCloud::bb_pcl_project(
             mat_opt_cluster.at<cv::Vec3b>((cv::Point)cloud_pt_xy-bbox_offset) = int_to_bgr(opt_cluster_id, clusters_indices.size());
         }
         auto pcls_camera_msg = sensor_msgs::msg::PointCloud2();
-        // RCLCPP_INFO(this->get_logger(), "BEFORE TRANSFORMING TO BASE_LINK");
         pcl::toROSMsg(*refined_cloud_ptr, pcls_camera_msg);
         tf2::doTransform<sensor_msgs::msg::PointCloud2>(pcls_camera_msg, refined_pcl_segments.cloud, m_cam_base_link_tf);
-        // RCLCPP_INFO(this->get_logger(), "AFTER TRANSFORMING TO BASE_LINK");
         refined_pcl_segments.cloud.header.stamp = in_cloud_msg->header.stamp;
-        cv_bridge::CvImagePtr refined_obj_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, refined_obj_contour_mat));
-        // cv::imshow("Object contour image to be published:", refined_obj_contour_mat);
-        // cv::waitKey();
-        refined_pcl_segments.segment = *refined_obj_contour_ptr->toImageMsg();
         refined_objects_pub.objects.push_back(refined_pcl_segments);
         refined_cloud_contour_vec.push_back(std::make_pair(*refined_cloud_ptr,in_contours[opt_contour_id]));
-        // max_refined_len = std::max(max_refined_len, (int)refined_cloud_ptr->size());
-
-        //show clusters & contours & respective matching (split image)
-        // cv::Mat clust_cont_arr[] = {mat_clusters, mat_contours};
-        // cv::Mat opt_clust_cont_arr[] = {mat_opt_cluster, mat_opt_contour};
-        // cv::Mat clust_cont;
-        // cv::Mat opt_clust_cont;
-        // cv::hconcat(clust_cont_arr, 2, clust_cont);
-        // cv::hconcat(opt_clust_cont_arr, 2, opt_clust_cont);
-        // cv::Mat clust_cont_all_arr[] = {clust_cont, opt_clust_cont};
-        // cv::Mat clust_cont_all;
-        // cv::vconcat(clust_cont_all_arr, 2, clust_cont_all);
-        // cv::Mat upscaled;
-        // cv::resize(clust_cont_all, upscaled, cv::Size(), 5, 5, cv::INTER_CUBIC);
-        // cv::imshow("Clusters & contours & matching", upscaled);
-        // cv::waitKey();
     }
-    // RCLCPP_DEBUG(this->get_logger(), "WILL NOW SEND REFINED OBJECT POINT CLOUDS & CONTOURS");
     m_refined_object_pcl_segment_pub->publish(refined_objects_pub);
-    // RCLCPP_DEBUG(this->get_logger(), "PUBLISHED REFINED OBJECT POINT CLOUDS & CONTOURS");
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
     all_obj_refined_pcls_ptr->header = in_cloud_tf_ptr->header;
     //convert vector of PointCloud to a single PointCloud with channels
     // all_obj_refined_pcls_ptr->resize((pcl::uindex_t)max_refined_len, (pcl::uindex_t)refined_cloud_contour_vec.size());
-    cv::Mat all_obj_refined_contours = cv::Mat::zeros(cv_ptr->image.size(), CV_8UC3);
+    // cv::Mat all_obj_refined_contours = cv::Mat::zeros(cv_ptr->image.size(), CV_8UC3);
     try{
         for(int i = 0; i<refined_cloud_contour_vec.size(); i++){
             RCLCPP_DEBUG(this->get_logger(), "BBOX %d/%d", i, refined_cloud_contour_vec.size());
@@ -581,9 +564,9 @@ void BBoxProjectPCloud::bb_pcl_project(
                 // all_obj_refined_pcls_ptr->at(j,i) = refined_cloud_contour_vec[i].first[j];
                 all_obj_refined_pcls_ptr->push_back(refined_cloud_contour_vec[i].first[j]);
             }
-            for(cv::Point pt : refined_cloud_contour_vec[i].second){
-                all_obj_refined_contours.at<cv::Vec3b>(pt)=cv::Vec3b(255, 255, 255);
-            }
+            // for(cv::Point pt : refined_cloud_contour_vec[i].second){
+            //     all_obj_refined_contours.at<cv::Vec3b>(pt)=cv::Vec3b(255, 255, 255);
+            // }
         }
     }catch(std::exception &ex){
         RCLCPP_ERROR(this->get_logger(), "REFINED POINT CLOUD PUBLISHING ERROR: %s", ex.what());
@@ -593,10 +576,10 @@ void BBoxProjectPCloud::bb_pcl_project(
     pcl::toROSMsg(*all_obj_refined_pcls_ptr, obj_refined_pcls_msg);
     obj_refined_pcls_msg.header.stamp = in_cloud_msg->header.stamp;
     m_refined_object_pcl_viz_pub->publish(obj_refined_pcls_msg);
-    cv_bridge::CvImagePtr all_obj_refined_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, all_obj_refined_contours));
+    // cv_bridge::CvImagePtr all_obj_refined_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, all_obj_refined_contours));
     // cv::imshow("Object contour image to be published:", all_obj_refined_contours);
     // cv::waitKey();
-    m_refined_object_segment_viz_pub->publish(*all_obj_refined_contour_ptr->toImageMsg());
+    // m_refined_object_segment_viz_pub->publish(*all_obj_refined_contour_ptr->toImageMsg());
     // RCLCPP_DEBUG(this->get_logger(), "SENT OBJECT POINT CLOUDS FOR VISUALIZATION");
 }
 

@@ -59,8 +59,8 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_object_pcl_viz_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_refined_object_pcl_segment_pub;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_refined_object_pcl_viz_pub;
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_refined_object_segment_viz_pub;
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_pcl_img_pub;
+    // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_refined_object_segment_viz_pub;
+    // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_pcl_img_pub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> m_cloud_sub;
@@ -130,6 +130,7 @@ private:
 
     bool m_is_sim, m_label_list, m_only_project;
     double m_bbox_margin;
+    bool m_inc_segment;
 
 public:
     BBoxProjectPCloud();

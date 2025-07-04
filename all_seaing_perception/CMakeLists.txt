@@ -44,6 +44,7 @@ ament_auto_add_executable(
     ${PROJECT_NAME}/object_tracking_map.cpp
     ${PROJECT_NAME}/obstacle.cpp
     ${PROJECT_NAME}/object_tracking_shared.cpp
+    ${PROJECT_NAME}/Hungarian.cpp
 )
 ament_auto_add_executable(
     object_tracking_map_euclidean
@@ -55,6 +56,7 @@ ament_auto_add_executable(
     ${PROJECT_NAME}/object_tracking_map_pf.cpp
     ${PROJECT_NAME}/obstacle.cpp
     ${PROJECT_NAME}/object_tracking_shared.cpp
+    ${PROJECT_NAME}/Hungarian.cpp
 )
 
 target_link_libraries(obstacle_bbox_visualizer yaml-cpp)

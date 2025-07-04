@@ -267,7 +267,12 @@ def launch_setup(context, *args, **kwargs):
 
         ],
         parameters = [
-
+            {"enable_front": True},
+            {"enable_back_left": True},
+            {"enable_back_right": True},
+            {"individual": False},
+            {"approximate": False},
+            {"delay": 0.1},
         ]
     )
 
@@ -344,8 +349,8 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node,
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,
-        multicam_detection_merge_node,
-        object_tracking_map_node,
+        # multicam_detection_merge_node,
+        # object_tracking_map_node,
         lidar_ld,
         zed_ld,
         robot_state_publisher,

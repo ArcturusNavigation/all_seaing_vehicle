@@ -108,14 +108,13 @@ namespace all_seaing_perception{
         while (min_p < new_obj_thres) {
             min_p = new_obj_thres;
             std::pair<int, int> best_match = std::make_pair(-1, -1);
-            for (size_t i = 0; i < detected_obstacles.size(); i++) {
+            for (int i = 0; i < detected_obstacles.size(); i++) {
                 if (chosen_detected.count(i))
                     continue;
                 for (int tracked_id = 0; tracked_id < tracked_obstacles.size(); tracked_id++) {
                     if (chosen_tracked.count(tracked_id) ||
                         tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
                         continue;
-                    // RCLCPP_INFO(this->get_logger(), "P(%d, %d)=%lf", i, tracked_id, p[i][tracked_id]);
                     if (p[i][tracked_id] < min_p) {
                         best_match = std::make_pair(i, tracked_id);
                         min_p = p[i][tracked_id];
@@ -123,12 +122,89 @@ namespace all_seaing_perception{
                 }
             }
             if (min_p < new_obj_thres) {
-                // RCLCPP_INFO(this->get_logger(), "MATCHING (%d, %d), with p: %lf", best_match.first, best_match.second, p[best_match.first][best_match.second]);
                 match[best_match.first] = best_match.second;
                 chosen_tracked.insert(best_match.second);
                 chosen_detected.insert(best_match.first);
             }
         }
+        return std::make_tuple(match, chosen_detected, chosen_tracked);
+    }
+
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres){
+        // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
+        std::vector<int> match(detected_obstacles.size(), -1);
+        float min_p = 0;
+        std::unordered_set<int> chosen_detected, chosen_tracked;
+        for (int i = 0; i < detected_obstacles.size(); i++) {
+            min_p = new_obj_thres;
+            int best_match = -1;
+            for (int tracked_id = 0; tracked_id < tracked_obstacles.size(); tracked_id++) {
+                if (tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
+                    continue;
+                if (p[i][tracked_id] < min_p) {
+                    best_match = tracked_id;
+                    min_p = p[i][tracked_id];
+                }
+            }
+            if (min_p < new_obj_thres) {
+                match[i] = best_match;
+                chosen_tracked.insert(best_match);
+                chosen_detected.insert(i);
+            }
+        }
+        return std::make_tuple(match, chosen_detected, chosen_tracked);
+    }
+
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres, bool sqrt){
+        // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
+        // sqrt is whether we are using the Mahalanobis distances (sqrt of p values) and not their squares (p values)
+        std::vector<int> match(detected_obstacles.size(), -1);
+        std::unordered_set<int> chosen_detected, chosen_tracked;
+        int num_det = detected_obstacles.size();
+        int num_obj = tracked_obstacles.size();
+        const int INF = 1e9;
+        Eigen::MatrixXf cost_matrix = Eigen::MatrixXf::Zero(num_det+num_obj, num_obj+num_det); // first dim detections + non-assignments of obstacles, second dim obstacles + non-assignments of detections
+        float max_val = 0;
+        for (int i = 0; i < num_det; i++) {
+            for (int tracked_id = 0; tracked_id < num_obj; tracked_id++) {
+                if (tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label || p[i][tracked_id] >= new_obj_thres){
+                    cost_matrix(i,tracked_id) = INF;
+                }else{
+                    cost_matrix(i,tracked_id) = sqrt ? std::sqrt(p[i][tracked_id]) : p[i][tracked_id];
+                    max_val = std::max(max_val, cost_matrix(i,tracked_id));
+                }
+            }
+        }
+        cost_matrix.block(num_det, 0, num_obj, num_obj).fill(max_val+1);
+        cost_matrix.block(0, num_obj, num_det+num_obj, num_det).fill(max_val+1);
+
+        // now we have an appropriate cost matrix
+        // run the Hungarian algorithm or JVC which is faster
+
+        // convert to vector of vectors
+        std::vector<std::vector<double>> cost_matrix_vec;
+        for (int i = 0; i < num_det + num_obj; i++) {
+            cost_matrix_vec.push_back(std::vector<double>());
+            for (int j = 0; j < num_obj + num_det; j++){
+                cost_matrix_vec[i].push_back(cost_matrix(i,j));
+            }
+        }
+
+        HungarianAlgorithm HungAlgo;
+        vector<int> assignment;
+
+        double cost = HungAlgo.Solve(cost_matrix_vec, assignment);
+
+        for (int i = 0; i < num_det; i++){
+            if (assignment[i] < num_obj && cost_matrix(i, assignment[i]) != INF){
+                match[i] = assignment[i];
+            }
+        }
+
         return std::make_tuple(match, chosen_detected, chosen_tracked);
     }
     

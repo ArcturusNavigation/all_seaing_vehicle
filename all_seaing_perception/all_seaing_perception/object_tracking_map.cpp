@@ -71,6 +71,12 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("include_odom_theta", true);
     m_include_odom_theta = this->get_parameter("include_odom_theta").as_bool();
 
+    this->declare_parameter<bool>("include_odom_only_theta", true);
+    m_include_odom_only_theta = this->get_parameter("include_odom_only_theta").as_bool();
+
+    this->declare_parameter<std::string>("data_association", "greedy_exclusive");
+    m_data_association_algo = this->get_parameter("data_association").as_string();
+
     // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
@@ -363,7 +369,20 @@ void ObjectTrackingMap::odom_callback() {
         };
         m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
     }else if (m_gps_update){
-        if(!m_include_odom_theta){
+        if(m_include_odom_only_theta){
+            // Include only theta, since that's provided by the IMU compass and is accurate
+            float Q = m_update_odom_theta_uncertainty*m_update_odom_theta_uncertainty;
+            float th_actual = m_nav_heading;
+            float th_pred = m_state(2);
+            //gradient of measurement update model, identity since it's centered at the initial state
+            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(1, 3 + 2 * m_num_obj);
+            H(0,2) = 1;
+            Eigen::MatrixXf K = m_cov * H.transpose() / (m_cov(2,2) + Q);
+            th_actual = th_pred+all_seaing_perception::angle_to_pi_range(th_actual-th_pred);
+            m_state += K * (th_actual - th_pred);
+            m_cov =
+                (Eigen::MatrixXf::Identity(3 + 2 * m_num_obj, 3 + 2 * m_num_obj) - K * H) * m_cov;
+        }else if(!m_include_odom_theta){
             // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
             Eigen::Matrix2f Q{
                 {m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty, 0},
@@ -602,7 +621,7 @@ void ObjectTrackingMap::visualize_predictions() {
         //     nav_quat.setRPY(0,0,m_nav_heading);
         //     ellipse.pose.orientation = tf2::toMsg(nav_quat);
         // }
-        angle_marker.scale.x = m_cov(2, 2);
+        angle_marker.scale.x = sqrt(m_cov(2, 2));
         angle_marker.scale.y = 0.2;
         angle_marker.scale.z = 0.2;
         angle_marker.color.a = 1;
@@ -630,10 +649,9 @@ void ObjectTrackingMap::visualize_predictions() {
         double a_x = eigen_solver.eigenvalues()(0);
         double a_y = eigen_solver.eigenvalues()(1);
         // RCLCPP_INFO(this->get_logger(), "OBJECT %d COVARIANCE AXES LENGTHS: (%lf, %lf)", i, a_x, a_y);
-        // TODO: check if the resulting orientation is clipping somewhere because it results being aligned to x or y axis
         Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
         Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
-        double cov_scale = m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
+        // double cov_scale = m_new_obj_slam_thres; // to visualize the threshold where new obstacles are added
         tf2::Matrix3x3 rot_mat(axis_x(0), axis_y(0), 0, axis_x(1), axis_y(1), 0, 0, 0, 1);
         tf2::Quaternion quat_rot;
         // rot_mat.getRotation(quat_rot);
@@ -659,8 +677,8 @@ void ObjectTrackingMap::visualize_predictions() {
         // }
         
         ellipse.pose.position.z = 0;
-        ellipse.scale.x = cov_scale * sqrt(a_x);
-        ellipse.scale.y = cov_scale * sqrt(a_y);
+        ellipse.scale.x = sqrt(a_x);
+        ellipse.scale.y = sqrt(a_y);
         ellipse.scale.z = 1;
         ellipse.color.a = 0.2;
         ellipse.color.r = 1;
@@ -805,7 +823,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 };
                 // Do not store vectors, since they don't compute covariance with other obstacles in
                 // the same detection batch
-                //  Eigen::MatrixXf H = h*F/q;
+                // Eigen::MatrixXf H = h*F/q;
                 Eigen::MatrixXf H = h / q;
                 Psi = H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q;
             }
@@ -820,7 +838,17 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     std::vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
-    std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    if (m_data_association_algo == "greedy_exclusive"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }else if (m_data_association_algo == "greedy_individual"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::indiv_greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }else if (m_data_association_algo == "linear_sum_assignment"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }else if (m_data_association_algo == "linear_sum_assignment_sqrt"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres, true);
+    }else{
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }
 
     // Update vectors, now with known correspondence
     //  RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN CORRESPONDENCE");
@@ -1011,6 +1039,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     }
 
     if (m_track_robot) {
+        // TODO: make the trace only keep a # of points specified by a param
         m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
     }
 
