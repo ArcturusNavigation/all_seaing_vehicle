@@ -9,6 +9,7 @@
 #include <tuple>
 #include <chrono>
 #include <math.h>
+#include <deque>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -97,7 +98,7 @@ private:
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
     
-    std::vector<std::pair<float, float>> m_trace;
+    std::deque<std::tuple<float, float, float>> m_trace; // (x,y,time)
 
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_untracked_map_pub;
@@ -135,6 +136,7 @@ private:
     bool m_normalize_drop_thresh;
     bool m_include_odom_theta, m_include_odom_only_theta;
     std::string m_data_association_algo;
+    double m_trace_time;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();

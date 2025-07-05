@@ -14,7 +14,6 @@ class OdomReframe(Node):
         self.odom_pub = self.create_publisher(Odometry, "new_odom_topic", qos_profile_sensor_data)
 
     def odom_cb(self, odom_msg):
-        # TODO: may need to change the compass heading, maybe that fused with the imu data causes issues
         odom_msg.child_frame_id = self.target_child_frame_id
         self.odom_pub.publish(odom_msg)
 

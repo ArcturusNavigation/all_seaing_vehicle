@@ -77,6 +77,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<std::string>("data_association", "greedy_exclusive");
     m_data_association_algo = this->get_parameter("data_association").as_string();
 
+    this->declare_parameter<double>("trace_time", 5.0);
+    m_trace_time = this->get_parameter("trace_time").as_double();
+
     // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
@@ -267,7 +270,7 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
 
     if (m_track_robot) {
-        m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
+        m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(msg.header.stamp).seconds()));
     }
 
     this->publish_maps();
@@ -422,7 +425,7 @@ void ObjectTrackingMap::odom_callback() {
     }
 
     if (m_track_robot) {
-        m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
+        m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(m_map_base_link_tf.header.stamp).seconds()));
     }
 
     this->publish_maps();
@@ -699,10 +702,14 @@ void ObjectTrackingMap::visualize_predictions() {
     trace.color.a = 1;
     trace.color.r = 1;
     trace.color.g = 1;
-    for (std::pair<float, float> p : m_trace){
+    // clean up old points from trace
+    while(!m_trace.empty() && (std::get<2>(m_trace.back()) - std::get<2>(m_trace.front())) > m_trace_time){
+        m_trace.pop_front();
+    }
+    for (std::tuple<float, float, float> p : m_trace){
         geometry_msgs::msg::Point pt = geometry_msgs::msg::Point();
-        pt.x = p.first;
-        pt.y = p.second;
+        float time;
+        std::tie(pt.x, pt.y, time) = p;
         trace.points.push_back(pt);
     }
     ellipse_arr.markers.push_back(trace);
@@ -1039,8 +1046,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     }
 
     if (m_track_robot) {
-        // TODO: make the trace only keep a # of points specified by a param
-        m_trace.push_back(std::make_pair(m_state(0), m_state(1)));
+        // make the trace only keep a # of points specified by a param
+        m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(m_local_header.stamp).seconds()));
     }
 
     this->publish_maps();
