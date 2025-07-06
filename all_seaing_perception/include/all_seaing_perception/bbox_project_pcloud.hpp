@@ -131,6 +131,7 @@ private:
     bool m_is_sim, m_label_list, m_only_project;
     double m_bbox_margin;
     bool m_inc_segment;
+    std::string m_camera_name;
 
 public:
     BBoxProjectPCloud();

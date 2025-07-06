@@ -391,6 +391,7 @@ def launch_setup(context, *args, **kwargs):
             ("lidar_topic", "/point_cloud/filtered")
         ],
         parameters=[
+            {"camera_name": "front"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
@@ -413,13 +414,9 @@ def launch_setup(context, *args, **kwargs):
             ("camera_topic", "/back_left_oak/rgb/image_rect"),
             ("lidar_topic", "/point_cloud/filtered"),
             ("bounding_boxes", "bounding_boxes/back_left"),
-            ("/refined_object_segments_viz", "/refined_object_segments_viz/back_left"),
-            ("/object_point_clouds_viz", "/object_point_clouds_viz/back_left"),
-            ("/refined_object_point_clouds_viz", "/refined_object_point_clouds_viz/back_left"),
-            ("/refined_object_point_clouds_segments", "/refined_object_point_clouds_segments/back_left"),
         ],
         parameters=[
-            # {"base_link_frame": "actual_base_link"},
+            {"camera_name": "back_left"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
@@ -442,12 +439,9 @@ def launch_setup(context, *args, **kwargs):
             ("camera_topic", "/back_right_oak/rgb/image_rect"),
             ("lidar_topic", "/point_cloud/filtered"),
             ("bounding_boxes", "bounding_boxes/back_right"),
-            ("/refined_object_segments_viz", "/refined_object_segments_viz/back_right"),
-            ("/object_point_clouds_viz", "/object_point_clouds_viz/back_right"),
-            ("/refined_object_point_clouds_viz", "/refined_object_point_clouds_viz/back_right"),
-            ("/refined_object_point_clouds_segments", "/refined_object_point_clouds_segments/back_right"),
         ],
         parameters=[
+            {"camera_name": "back_right"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},

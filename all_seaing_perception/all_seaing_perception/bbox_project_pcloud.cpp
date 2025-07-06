@@ -53,6 +53,9 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     this->declare_parameter("include_image_segment", false);
     m_inc_segment = this->get_parameter("include_image_segment").as_bool();
 
+    this->declare_parameter<std::string>("camera_name", "");
+    m_camera_name = this->get_parameter("camera_name").as_string();
+
     // Subscriptions
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
         "camera_info_topic", 10, std::bind(&BBoxProjectPCloud::intrinsics_cb, this, std::placeholders::_1));
@@ -67,10 +70,10 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
                                               std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     // Publishers
-    m_object_pcl_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>("labeled_object_point_clouds", 5);
-    m_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("object_point_clouds_viz", 5);
-    m_refined_object_pcl_segment_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>("refined_object_point_clouds_segments", 5);
-    m_refined_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("refined_object_point_clouds_viz", 5);
+    m_object_pcl_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>(m_camera_name!=""?std::string("labeled_object_point_clouds/")+m_camera_name:"labeled_object_point_clouds", 5);
+    m_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(m_camera_name!=""?std::string("object_point_clouds_viz/")+m_camera_name:"object_point_clouds_viz", 5);
+    m_refined_object_pcl_segment_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>(m_camera_name!=""?std::string("refined_object_point_clouds_segments/")+m_camera_name:"refined_object_point_clouds_segments", 5);
+    m_refined_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(m_camera_name!=""?std::string("refined_object_point_clouds_viz/")+m_camera_name:"refined_object_point_clouds_viz", 5);
 
     // get color label mappings from yaml
     std::ifstream label_yaml(color_label_mappings_file);
@@ -200,6 +203,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         labeled_pcl.time = in_cloud_msg->header.stamp;
         labeled_pcl.label = bbox.label;
+        labeled_pcl.camera_name = m_camera_name;
         obj_cloud_ptr->header = in_cloud_tf_ptr->header;
         // Add padding to bbox
         bbox.min_x -= m_bbox_margin;
@@ -471,6 +475,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         auto refined_pcl_segments = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         refined_pcl_segments.time = in_cloud_msg->header.stamp;
         refined_pcl_segments.label = bbox.label;
+        refined_pcl_segments.camera_name = m_camera_name;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         refined_cloud_ptr->header = pcloud_ptr->header;
         if(m_inc_segment){

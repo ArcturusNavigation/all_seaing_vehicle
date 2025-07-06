@@ -26,7 +26,7 @@ class MulticamDetectionMerge(Node):
         if not self.individual:
             self.detection_subs = []
             if self.enable_front:
-                self.detection_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments")
+                self.detection_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/front")
                 self.detection_subs.append(self.detection_sub)
             if self.enable_back_left:
                 self.detection_back_left_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_left")
@@ -41,7 +41,7 @@ class MulticamDetectionMerge(Node):
             self.sync.registerCallback(self.detection_sync_callback)
         else:
             if self.enable_front:
-                self.detection_sub = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments", self.detection_sync_callback, 10)
+                self.detection_sub = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/front", self.detection_sync_callback, 10)
             if self.enable_back_left:
                 self.detection_sub_back_left = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_left", self.detection_sync_callback, 10)
             if self.enable_back_right:
