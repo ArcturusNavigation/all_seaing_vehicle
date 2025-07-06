@@ -56,9 +56,6 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("is_sim", false);
     m_is_sim = this->get_parameter("is_sim").as_bool();
 
-    this->declare_parameter<bool>("check_fov", true);
-    m_check_fov = this->get_parameter("check_fov").as_bool();
-
     this->declare_parameter<bool>("direct_tf", true);
     m_direct_tf = this->get_parameter("direct_tf").as_bool();
 
@@ -101,9 +98,6 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
         this->create_subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>(
             "refined_object_point_clouds_segments", 10,
             std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
-    m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        "camera_info_topic", 10,
-        std::bind(&ObjectTrackingMap::intrinsics_cb, this, std::placeholders::_1));
 
     // Initialize tf_listener pointer
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -406,10 +400,6 @@ void ObjectTrackingMap::odom_callback() {
 
     this->update_maps();
     this->publish_maps();
-}
-
-void ObjectTrackingMap::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
-    m_cam_model.fromCameraInfo(info_msg);
 }
 
 template <typename T>
@@ -872,44 +862,26 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 to_keep_flat.insert(to_keep_flat.end(),
                                     {3 + 2 * tracked_id, 3 + 2 * tracked_id + 1});
             }
+            m_tracked_obstacles[tracked_id]->is_dead = false;
             continue;
         }
-        // Check if in FoV (which'll mean it's dead, at least temporarily)
-        geometry_msgs::msg::Point lidar_point;
-        lidar_point.x = m_tracked_obstacles[tracked_id]->local_centroid.x;
-        lidar_point.y = m_tracked_obstacles[tracked_id]->local_centroid.y;
-        lidar_point.z = m_tracked_obstacles[tracked_id]->local_centroid.z;
-        geometry_msgs::msg::Point camera_point =
-            lidar_point; // ALREADY IN THE SAME FRAME, WAS TRANSFORMED BEFORE BEING PUBLISHED BY
-                         // bbox_project_pcloud.cpp
-        cv::Point2d xy_rect =
-            m_is_sim ? custom_project(m_cam_model,
-                           cv::Point3d(camera_point.y, camera_point.z, -camera_point.x))
-                     : custom_project(m_cam_model,
-                           cv::Point3d(camera_point.x, camera_point.y, camera_point.z));
-        if (((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-             (xy_rect.y < m_cam_model.cameraInfo().height) && (lidar_point.x >= 0)) ||
-            !m_check_fov) {
-            // Dead
-            if (m_tracked_obstacles[tracked_id]->is_dead) {
-                // Was also dead before, add time dead
-                m_tracked_obstacles[tracked_id]->time_dead =
-                    rclcpp::Time(m_local_header.stamp) -
-                    m_tracked_obstacles[tracked_id]->last_dead +
-                    m_tracked_obstacles[tracked_id]->time_dead;
-                if (m_tracked_obstacles[tracked_id]->time_dead.seconds() >
-                    (m_normalize_drop_thresh ? (m_obstacle_drop_thresh * (pcl::euclideanDistance(p0,
-                                                m_tracked_obstacles[tracked_id]->local_centroid) / avg_dist) *
-                                                m_normalize_drop_dist) : m_obstacle_drop_thresh)) {
-                    to_remove.push_back(tracked_id);
-                    continue;
-                }
+        // Dead
+        if (m_tracked_obstacles[tracked_id]->is_dead) {
+            // Was also dead before, add time dead
+            m_tracked_obstacles[tracked_id]->time_dead =
+                rclcpp::Time(m_local_header.stamp) -
+                m_tracked_obstacles[tracked_id]->last_dead +
+                m_tracked_obstacles[tracked_id]->time_dead;
+            if (m_tracked_obstacles[tracked_id]->time_dead.seconds() >
+                (m_normalize_drop_thresh ? (m_obstacle_drop_thresh * (pcl::euclideanDistance(p0,
+                                            m_tracked_obstacles[tracked_id]->local_centroid) / avg_dist) *
+                                            m_normalize_drop_dist) : m_obstacle_drop_thresh)) {
+                to_remove.push_back(tracked_id);
+                continue;
             }
-            m_tracked_obstacles[tracked_id]->is_dead = true;
-            m_tracked_obstacles[tracked_id]->last_dead = m_local_header.stamp;
-        } else {
-            m_tracked_obstacles[tracked_id]->is_dead = false;
         }
+        m_tracked_obstacles[tracked_id]->is_dead = true;
+        m_tracked_obstacles[tracked_id]->last_dead = m_local_header.stamp;
         to_keep.push_back(tracked_id);
         if (m_track_robot) {
             to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * tracked_id, 3 + 2 * tracked_id + 1});

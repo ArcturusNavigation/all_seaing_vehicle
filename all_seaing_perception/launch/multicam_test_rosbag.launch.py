@@ -215,8 +215,6 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
-            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-            # ("odometry/filtered", "odometry_correct/filtered")
         ],
         parameters=[slam_params]
     )
@@ -247,10 +245,10 @@ def launch_setup(context, *args, **kwargs):
         # buoy_yolo_node,
         # buoy_yolo_node_back_left,
         # buoy_yolo_node_back_right,
-        bbox_project_pcloud_node,
-        bbox_project_pcloud_node_back_left,
-        bbox_project_pcloud_node_back_right,
-        multicam_detection_merge_node,
+        # bbox_project_pcloud_node,
+        # bbox_project_pcloud_node_back_left,
+        # bbox_project_pcloud_node_back_right,
+        # multicam_detection_merge_node,
         object_tracking_map_node,
         tf_filtering,
         # robot_state_publisher,

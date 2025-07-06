@@ -256,7 +256,6 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
             ("obstacle_map/refined_untracked", "obstacle_map/local"),
             ("obstacle_map/refined_tracked", "obstacle_map/global"),
         ],

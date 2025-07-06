@@ -275,7 +275,6 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
-            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
         ],
         parameters=[slam_params]
     )
