@@ -47,7 +47,6 @@ namespace all_seaing_perception{
         double dx = cos(from_theta)*(to_x-from_x)+sin(from_theta)*(to_y-from_y);
         double dy = -sin(from_theta)*(to_x-from_x)+cos(from_theta)*(to_y-from_y);
         double dtheta = to_theta - from_theta;
-        // RCLCPP_INFO(this->get_logger(), "(%lf, %lf, %lf) -> (%lf, %lf, %lf): (%lf, %lf, %lf)", from_x, from_y, from_theta, to_x, to_y, to_theta, dx, dy, dtheta);
         return std::make_tuple(dx, dy, dtheta);
     }
 
@@ -59,7 +58,6 @@ namespace all_seaing_perception{
         double t_dx = t1_dx+cos(t1_dtheta)*t2_dx-sin(t1_dtheta)*t2_dy;
         double t_dy = t1_dy+sin(t1_dtheta)*t2_dx+cos(t1_dtheta)*t2_dy;
         double t_dtheta = t1_dtheta+t2_dtheta;
-        // RCLCPP_INFO(this->get_logger(), "(%lf, %lf, %lf)@(%lf, %lf, %lf)=(%lf, %lf, %lf)", t1_dx, t1_dy, t1_dtheta, t2_dx, t2_dy, t2_dtheta, t_dx, t_dy, t_dtheta);
         return std::make_tuple(t_dx, t_dy, t_dtheta);
     }
 
@@ -82,8 +80,6 @@ namespace all_seaing_perception{
     std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZ point, int label) {
         double range = std::hypot(point.x, point.y);
         double bearing = mod_2pi(std::atan2(point.y, point.x));
-        // RCLCPP_INFO(this->get_logger(), "LOCAL: (%lf, %lf) -> RBS: (%lf, %lf, %d)", point.x, point.y,
-        // range, bearing, label);
         return std::make_tuple(range, bearing, label);
     }
 
