@@ -323,7 +323,6 @@ void BBoxProjectPCloud::bb_pcl_project(
             cv::Mat mask2;
             std::vector<int> lims2 = contour_matching_color_range_map["red2"];
             int h_min2=lims2[0], h_max2=lims2[1], s_min2=lims2[2], s_max2=lims2[3], v_min2=lims2[4], v_max2=lims2[5];
-            cv::Mat mask;
             cv::inRange(hsv_img, cv::Scalar(h_min2, s_min2, v_min2), cv::Scalar(h_max2, s_max2, v_max2), mask2);
             mask += mask2;
         }
