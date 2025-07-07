@@ -1,7 +1,7 @@
 object_tracking_map:
   ros__parameters:
-    global_frame_id: "map"
-    slam_frame_id: "slam_map"
+    global_frame_id: "odom"
+    slam_frame_id: "map"
     obstacle_drop_thresh: 30.0
     normalize_drop_thresh: False
     range_uncertainty: 10.0
@@ -23,7 +23,7 @@ object_tracking_map:
     track_robot: True
     imu_predict: True
     gps_update: True
-    direct_tf: True
+    direct_tf: False
     is_sim: False
     data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0

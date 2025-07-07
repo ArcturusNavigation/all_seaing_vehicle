@@ -109,7 +109,7 @@ def launch_setup(context, *args, **kwargs):
         executable="xdrive_controller.py",
         parameters=[
             {
-                "global_frame_id": "slam_map",
+                "global_frame_id": "map",
                 "front_right_xy": [0.27, -0.27],
                 "back_left_xy": [-0.27, 0.27],
                 "front_left_xy": [0.27, 0.27],
@@ -219,7 +219,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"range_radius": [0.5, 60.0]},
         ],
         condition=UnlessCondition(use_bag),
@@ -232,7 +232,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"obstacle_size_min": 5},
             {"obstacle_size_max": 300},
             {"clustering_distance": 0.1},
@@ -290,7 +290,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"default_range": 60},
@@ -490,7 +490,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="navigation_server.py",
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
         ],
         output="screen",
@@ -630,7 +630,7 @@ def launch_setup(context, *args, **kwargs):
         grid_map_generator,
         central_hub,
         # amcl_ld,
-        static_transforms_ld,
+        # static_transforms_ld,
         robot_state_publisher,
         # webcam_publisher,
         lidar_ld,

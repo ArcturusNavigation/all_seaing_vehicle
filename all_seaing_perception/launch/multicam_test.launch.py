@@ -344,7 +344,7 @@ def launch_setup(context, *args, **kwargs):
         lidar_ld,
         zed_ld,
         robot_state_publisher,
-        static_transforms_ld
+        # static_transforms_ld
     ]
 
 def generate_launch_description():

@@ -203,7 +203,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"range_x": [0.0, 100000.0]},
             {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
@@ -219,7 +219,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
@@ -285,7 +285,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
             {"Kpid_x": [1.0, 0.0, 0.0]},
             {"Kpid_y": [1.0, 0.0, 0.0]},
@@ -299,7 +299,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="navigation_server.py",
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
         ],
         output="screen",
@@ -309,7 +309,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
         parameters=[
-            {"global_frame_id": "slam_map"},
+            {"global_frame_id": "map"},
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"grid_resolution": 0.3},
@@ -454,7 +454,7 @@ def launch_setup(context, *args, **kwargs):
         # follow_buoy_pid,
         # speed_challenge_pid,
         rviz_waypoint_sender,
-        map_to_odom,
+        # map_to_odom,
         keyboard_ld,
         sim_ld,
         # perception_eval_node,
