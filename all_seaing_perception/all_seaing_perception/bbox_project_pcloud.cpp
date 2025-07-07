@@ -1,13 +1,5 @@
 #include "all_seaing_perception/bbox_project_pcloud.hpp"
 
-cv::Point2d custom_project(image_geometry::PinholeCameraModel cmodel, const cv::Point3d& xyz){
-    cv::Point2d uv_rect;
-    uv_rect.x = (cmodel.fx()*xyz.x + cmodel.Tx()) / xyz.z + cmodel.cx();
-    uv_rect.y = (cmodel.fy()*xyz.y + cmodel.Ty()) / xyz.z + cmodel.cy();
-    return uv_rect;
-    // return cmodel.project3dToPixel(xyz);
-}
-
 BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     // Initialize tf_listener pointer
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -220,7 +212,7 @@ void BBoxProjectPCloud::bb_pcl_project(
             // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
             cv::Point2d xy_rect;
             try{    
-                xy_rect = m_is_sim? custom_project(m_cam_model,cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : custom_project(m_cam_model,cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
+                xy_rect = m_is_sim? all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
             }catch(image_geometry::Exception &e){
                 // RCLCPP_DEBUG(this->get_logger(), "Projection exception: %s", e.what());
             }
@@ -311,7 +303,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         int clust_id = 0;
         for(auto ind_set : clusters_indices){
             for(pcl::index_t ind : ind_set.indices){
-                cv::Point2d cloud_pt_xy = m_is_sim ? custom_project(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : custom_project(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
+                cv::Point2d cloud_pt_xy = m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
             }
             clust_id++;
         }
@@ -400,7 +392,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 if (label_color_map[bbox.label]=="red"){
                     cloud_pt_hsv[0]=(cloud_pt_hsv[0]+90)%180; // shift the scale so that red values are close to one another -> invert colors, red is cyan now
                 }
-                cv::Point2d cloud_pt_xy = m_is_sim ? custom_project(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : custom_project(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
+                cv::Point2d cloud_pt_xy = m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
                 cluster_pts.push_back(std::make_pair(cloud_pt_xy, cloud_pt_hsv));
                 // store sums
                 cluster_qts.first.first.x+=cloud_pt_xy.x;
@@ -489,7 +481,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         for (pcl::index_t ind : clusters_indices[opt_cluster_id].indices){
             pcl::PointXYZHSV pt = pcloud_ptr->points[ind];
             refined_cloud_ptr->push_back(pt);
-            cv::Point2d cloud_pt_xy = m_is_sim ? custom_project(m_cam_model,cv::Point3d(pt.y, pt.z, -pt.x)) : custom_project(m_cam_model,cv::Point3d(pt.x, pt.y, pt.z));
+            cv::Point2d cloud_pt_xy = m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pt.y, pt.z, -pt.x)) : all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pt.x, pt.y, pt.z));
         }
         auto pcls_camera_msg = sensor_msgs::msg::PointCloud2();
         pcl::toROSMsg(*refined_cloud_ptr, pcls_camera_msg);

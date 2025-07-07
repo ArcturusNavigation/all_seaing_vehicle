@@ -105,9 +105,9 @@ private:
 
             // Find the centroid and display it.
             cv::Point2d pixel_centroid =
-                m_is_sim ? m_cam_model.project3dToPixel(
+                m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model, 
                                cv::Point3d(camera_point.y, camera_point.z, -camera_point.x))
-                         : m_cam_model.project3dToPixel(
+                         : all_seaing_perception::project3dToPixel(m_cam_model, 
                                cv::Point3d(camera_point.x, camera_point.y, camera_point.z));
             if (pixel_centroid.x >= 0 && pixel_centroid.x < cv_ptr->image.cols &&
                 pixel_centroid.y >= 0 && pixel_centroid.y < cv_ptr->image.rows) {
@@ -127,14 +127,14 @@ private:
             tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_max, camera_bbox_max,
                                                         m_pc_cam_tf);
             cv::Point pt1 =
-                m_is_sim ? m_cam_model.project3dToPixel(
+                m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model, 
                                cv::Point3d(camera_bbox_min.y, camera_bbox_min.z, -camera_bbox_min.x))
-                         : m_cam_model.project3dToPixel(
+                         : all_seaing_perception::project3dToPixel(m_cam_model, 
                                cv::Point3d(camera_bbox_min.x, camera_bbox_min.y, camera_bbox_min.z));
             cv::Point pt2 =
-                m_is_sim ? m_cam_model.project3dToPixel(
+                m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model, 
                                cv::Point3d(camera_bbox_max.y, camera_bbox_max.z, -camera_bbox_max.x))
-                         : m_cam_model.project3dToPixel(
+                         : all_seaing_perception::project3dToPixel(m_cam_model, 
                                cv::Point3d(camera_bbox_max.x, camera_bbox_max.y, camera_bbox_max.z));
             cv::Scalar color(0, 255, 255);
             cv::rectangle(cv_ptr->image, pt1, pt2, color, 2);

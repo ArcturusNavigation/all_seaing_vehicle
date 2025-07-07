@@ -1,12 +1,5 @@
 #include "all_seaing_perception/object_tracking_map.hpp"
 
-cv::Point2d custom_project(image_geometry::PinholeCameraModel cmodel, const cv::Point3d& xyz){
-    cv::Point2d uv_rect;
-    uv_rect.x = (cmodel.fx()*xyz.x + cmodel.Tx()) / xyz.z + cmodel.cx();
-    uv_rect.y = (cmodel.fy()*xyz.y + cmodel.Ty()) / xyz.z + cmodel.cy();
-    return uv_rect;
-}
-
 ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "map");

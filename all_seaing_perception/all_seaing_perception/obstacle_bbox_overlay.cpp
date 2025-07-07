@@ -11,13 +11,6 @@ bool in_bounds(const cv::Point2d &point, sensor_msgs::msg::CameraInfo camera_inf
            point.y < camera_info.height;
 }
 
-cv::Point2d custom_project(image_geometry::PinholeCameraModel cmodel, const cv::Point3d& xyz){
-    cv::Point2d uv_rect;
-    uv_rect.x = (cmodel.fx()*xyz.x + cmodel.Tx()) / xyz.z + cmodel.cx();
-    uv_rect.y = (cmodel.fy()*xyz.y + cmodel.Ty()) / xyz.z + cmodel.cy();
-    return uv_rect;
-}
-
 int ObstacleBboxOverlay::get_matching_obstacle_iou(
     const all_seaing_interfaces::msg::Obstacle &obstacle,
     const std::unordered_set<int> &chosen_indices,
@@ -28,14 +21,14 @@ int ObstacleBboxOverlay::get_matching_obstacle_iou(
     tf2::doTransform<geometry_msgs::msg::Point>(obstacle.bbox_max, bbox_max_cam, m_pc_cam_tf);
 
     cv::Point2d bbox1_xy = m_is_sim
-                               ? custom_project(m_cam_model,
+                               ? all_seaing_perception::project3dToPixel(m_cam_model,
                                      cv::Point3d(bbox_min_cam.y, bbox_min_cam.z, -bbox_min_cam.x))
-                               : custom_project(m_cam_model,
+                               : all_seaing_perception::project3dToPixel(m_cam_model,
                                      cv::Point3d(bbox_min_cam.x, bbox_min_cam.y, bbox_min_cam.z));
     cv::Point2d bbox2_xy = m_is_sim
-                               ? custom_project(m_cam_model,
+                               ? all_seaing_perception::project3dToPixel(m_cam_model,
                                      cv::Point3d(bbox_max_cam.y, bbox_max_cam.z, -bbox_max_cam.x))
-                               : custom_project(m_cam_model,
+                               : all_seaing_perception::project3dToPixel(m_cam_model,
                                      cv::Point3d(bbox_max_cam.x, bbox_max_cam.y, bbox_max_cam.z));
 
     // mins / max become strange due to coordinate system. need to recalculate

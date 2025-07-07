@@ -47,8 +47,8 @@ void PclImageOverlay::pc_image_fusion_cb(
         // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
         cv::Point2d xy_rect =
             m_is_sim
-                ? m_cam_model.project3dToPixel(cv::Point3d(point_tf.y, point_tf.z, -point_tf.x))
-                : m_cam_model.project3dToPixel(cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
+                ? all_seaing_perception::project3dToPixel(m_cam_model, cv::Point3d(point_tf.y, point_tf.z, -point_tf.x))
+                : all_seaing_perception::project3dToPixel(m_cam_model, cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
 
         // Plot projected point onto image if within bounds and in front of the boat
         if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
