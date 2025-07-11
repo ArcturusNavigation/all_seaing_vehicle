@@ -198,17 +198,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         obj_cloud_ptr->header = in_cloud_tf_ptr->header;
         // Add padding to bbox
         all_seaing_perception::addBBoxPadding(bbox, m_bbox_margin, cv_hsv.rows, cv_hsv.cols);
-        for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
-            cv::Point2d xy_rect = all_seaing_perception::projectPCLPtToPixel(m_cam_model, point_tf, m_is_sim);
-            // Check if within bounds & in front of the boat
-            if (all_seaing_perception::inBounds(m_cam_model, xy_rect) && (m_is_sim? point_tf.x : point_tf.z) >= 0) {      
-                // Check if point is in bbox
-                if(all_seaing_perception::inBBox(xy_rect, bbox)){
-                    std::vector<float> hsv_pcl = all_seaing_perception::HSVOpenCVToPCL<float>(cv_hsv.at<cv::Vec3b>(xy_rect));
-                    obj_cloud_ptr->push_back(pcl::PointXYZHSV(point_tf.x, point_tf.y, point_tf.z, hsv_pcl[0], hsv_pcl[1], hsv_pcl[2]));
-                }
-            }
-        }
+        all_seaing_perception::PCLInBBoxHSV(in_cloud_tf_ptr, obj_cloud_ptr, bbox, cv_hsv, m_cam_model, m_is_sim);
         pcl::toROSMsg(*obj_cloud_ptr, labeled_pcl.cloud);
         labeled_pcl.cloud.header.stamp = in_cloud_msg->header.stamp;
         object_pcls.objects.push_back(labeled_pcl);
@@ -258,15 +248,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         std::vector<pcl::PointIndices> clusters_indices;
 
         // CONDITIONAL (WITH HSV-BASED CONDITION) EUCLIDEAN CLUSTERING
-        pcl::ConditionalEuclideanClustering<pcl::PointXYZHSV> cec;
-        cec.setClusterTolerance(m_clustering_distance);
-        cec.setMinClusterSize(m_obstacle_size_min);
-        cec.setMaxClusterSize(m_obstacle_size_max);
-        cec.setSearchMethod(tree);
-        cec.setInputCloud(pcloud_ptr);
-        std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func = std::bind(&hsv_diff_condition, m_clustering_color_weights, m_clustering_color_thres, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-        cec.setConditionFunction(cond_func);
-        cec.segment(clusters_indices);
+        all_seaing_perception::euclideanClustering(pcloud_ptr, clusters_indices, m_clustering_distance, m_obstacle_size_min, m_obstacle_size_max, true, std::bind(&hsv_diff_condition, m_clustering_color_weights, m_clustering_color_thres, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
         if (label_color_map[bbox.label]=="red"){
             // invert colors back

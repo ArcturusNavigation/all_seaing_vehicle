@@ -74,6 +74,15 @@ namespace all_seaing_perception{
 
     // Find points inside a contour
     std::vector<cv::Point> inContour(std::vector<cv::Point>& contour);
+
+    // Euclidean clustering
+    void euclideanClustering(pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance = 0.0f, int obstacle_sz_min = 1, int obstacle_sz_max = std::numeric_limits<int>::max (), bool conditional = false, std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func = std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)>());
+
+    // @overload
+    void euclideanClustering(pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance = 0.0f, int obstacle_sz_min = 1, int obstacle_sz_max = std::numeric_limits<int>::max (), bool conditional = false, std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)> cond_func = std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)>());
+
+    // project bbox to point cloud and assign HSV colors
+    void PCLInBBoxHSV(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim = false);
 } // namespace all_seaing_perception
 
 #endif // ALL_SEAING_PERCEPTION__PERCEPTION_UTILITIES_HPP

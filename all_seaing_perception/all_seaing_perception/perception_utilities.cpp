@@ -65,4 +65,72 @@ namespace all_seaing_perception{
         }
         return in_contour;
     }
+
+    void euclideanClustering(pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance, int obstacle_sz_min, int obstacle_sz_max, bool conditional, std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func){
+        // extract clusters
+        pcl::search::KdTree<pcl::PointXYZHSV>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZHSV>);
+        if (!pcloud_ptr->points.empty())
+            tree->setInputCloud(pcloud_ptr);
+    
+        // EUCLIDEAN CLUSTERING
+        if (conditional){
+            pcl::ConditionalEuclideanClustering<pcl::PointXYZHSV> ec;
+            ec.setClusterTolerance(clustering_distance);
+            ec.setMinClusterSize(obstacle_sz_min);
+            ec.setMaxClusterSize(obstacle_sz_max);
+            ec.setSearchMethod(tree);
+            ec.setInputCloud(pcloud_ptr);
+            ec.setConditionFunction(cond_func);
+            ec.segment(clusters_indices);
+        }else{
+            pcl::EuclideanClusterExtraction<pcl::PointXYZHSV> ec;
+            ec.setClusterTolerance(clustering_distance);
+            ec.setMinClusterSize(obstacle_sz_min);
+            ec.setMaxClusterSize(obstacle_sz_max);
+            ec.setSearchMethod(tree);
+            ec.setInputCloud(pcloud_ptr);
+            ec.extract(clusters_indices);
+        }
+    }
+
+    void euclideanClustering(pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance, int obstacle_sz_min, int obstacle_sz_max, bool conditional, std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)> cond_func){
+        // extract clusters
+        pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>);
+        if (!pcloud_ptr->points.empty())
+            tree->setInputCloud(pcloud_ptr);
+    
+        // EUCLIDEAN CLUSTERING
+        if (conditional){
+            pcl::ConditionalEuclideanClustering<pcl::PointXYZI> ec;
+            ec.setClusterTolerance(clustering_distance);
+            ec.setMinClusterSize(obstacle_sz_min);
+            ec.setMaxClusterSize(obstacle_sz_max);
+            ec.setSearchMethod(tree);
+            ec.setInputCloud(pcloud_ptr);
+            ec.setConditionFunction(cond_func);
+            ec.segment(clusters_indices);
+        }else{
+            pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
+            ec.setClusterTolerance(clustering_distance);
+            ec.setMinClusterSize(obstacle_sz_min);
+            ec.setMaxClusterSize(obstacle_sz_max);
+            ec.setSearchMethod(tree);
+            ec.setInputCloud(pcloud_ptr);
+            ec.extract(clusters_indices);
+        }
+    }
+
+    void PCLInBBoxHSV(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim){
+        for (pcl::PointXYZI &point_tf : cloud->points) {
+            cv::Point2d xy_rect = all_seaing_perception::projectPCLPtToPixel(cmodel, point_tf, is_sim);
+            // Check if within bounds & in front of the boat
+            if (all_seaing_perception::inBounds(cmodel, xy_rect) && (is_sim? point_tf.x : point_tf.z) >= 0) {      
+                // Check if point is in bbox
+                if(all_seaing_perception::inBBox(xy_rect, bbox)){
+                    std::vector<float> hsv_pcl = all_seaing_perception::HSVOpenCVToPCL<float>(img.at<cv::Vec3b>(xy_rect));
+                    obj_cloud_ptr->push_back(pcl::PointXYZHSV(point_tf.x, point_tf.y, point_tf.z, hsv_pcl[0], hsv_pcl[1], hsv_pcl[2]));
+                }
+            }
+        }
+    }
 }
