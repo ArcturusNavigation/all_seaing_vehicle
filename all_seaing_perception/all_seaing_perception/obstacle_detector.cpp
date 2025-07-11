@@ -59,7 +59,7 @@ private:
 
         // Extract clusters from point cloud and save indices in obstacle_indices
         std::vector<pcl::PointIndices> obstacles_indices;
-        all_seaing_perception::euclideanClustering(in_cloud_ptr, obstacles_indices, m_clustering_distance, m_obstacle_size_min, m_obstacle_size_max);
+        all_seaing_perception::euclideanClustering(cloud_2d, obstacles_indices, m_clustering_distance, m_obstacle_size_min, m_obstacle_size_max);
 
         // Cluster points into obstacles
         std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> obstacles;
