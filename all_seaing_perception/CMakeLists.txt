@@ -18,6 +18,7 @@ ament_auto_add_executable(
     obstacle_detector
     ${PROJECT_NAME}/obstacle_detector.cpp
     ${PROJECT_NAME}/obstacle.cpp
+    ${PROJECT_NAME}/perception_utilities.cpp
 )
 
 ament_auto_add_executable(
