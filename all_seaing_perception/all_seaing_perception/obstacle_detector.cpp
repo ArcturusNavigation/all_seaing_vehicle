@@ -1,5 +1,6 @@
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
 #include "all_seaing_perception/obstacle.hpp"
+#include "all_seaing_perception/perception_utilities.hpp"
 
 #include <pcl/common/distances.h>
 #include <pcl/common/io.h>
@@ -57,17 +58,8 @@ private:
             cloud_2d->points[i].z = 0;
 
         // Extract clusters from point cloud and save indices in obstacle_indices
-        pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>());
-        if (!cloud_2d->points.empty())
-            tree->setInputCloud(cloud_2d);
         std::vector<pcl::PointIndices> obstacles_indices;
-        pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
-        ec.setClusterTolerance(m_clustering_distance);
-        ec.setMinClusterSize(m_obstacle_size_min);
-        ec.setMaxClusterSize(m_obstacle_size_max);
-        ec.setSearchMethod(tree);
-        ec.setInputCloud(cloud_2d);
-        ec.extract(obstacles_indices);
+        all_seaing_perception::euclideanClustering(cloud_2d, obstacles_indices, m_clustering_distance, m_obstacle_size_min, m_obstacle_size_max);
 
         // Cluster points into obstacles
         std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> obstacles;

@@ -172,7 +172,6 @@ void BBoxProjectPCloud::bb_pcl_project(
 
     auto object_pcls = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
     std::vector<pcl::PointCloud<pcl::PointXYZHSV>> obj_cloud_vec;
-    cv::Mat pcl_img(m_cam_model.cameraInfo().height,m_cam_model.cameraInfo().width, CV_8UC3, cv::Scalar(0,0,0));
     // Just use the same pcloud to image projection, but check if it's within some binding box and assign it to that detection
     int obj = 0;
     // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
@@ -198,37 +197,8 @@ void BBoxProjectPCloud::bb_pcl_project(
         labeled_pcl.camera_name = m_camera_name;
         obj_cloud_ptr->header = in_cloud_tf_ptr->header;
         // Add padding to bbox
-        bbox.min_x -= m_bbox_margin;
-        bbox.max_x += m_bbox_margin;
-        bbox.min_y -= m_bbox_margin;
-        bbox.max_y += m_bbox_margin;
-        bbox.min_x = std::max((int)bbox.min_x,0);
-        bbox.max_x = std::min((int)bbox.max_x+1, cv_hsv.cols);
-        bbox.min_y = std::max((int)bbox.min_y,0);
-        bbox.max_y = std::min((int)bbox.max_y+1, cv_hsv.rows);
-        cv::rectangle(pcl_img, cv::Point((int)bbox.min_y, (int)bbox.min_x), cv::Point((int)bbox.max_y, (int)bbox.max_x), cv::Scalar(0, 0, 255), 10);
-        for (pcl::PointXYZI &point_tf : in_cloud_tf_ptr->points) {
-            // Project 3D point onto the image plane using the intrinsic matrix.
-            // Gazebo has a different coordinate system, so the y, z, and x coordinates are modified.
-            cv::Point2d xy_rect;
-            try{    
-                xy_rect = m_is_sim? all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(point_tf.y, point_tf.z, -point_tf.x)) : all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(point_tf.x, point_tf.y, point_tf.z));
-            }catch(image_geometry::Exception &e){
-                // RCLCPP_DEBUG(this->get_logger(), "Projection exception: %s", e.what());
-            }
-            // Check if within bounds & in front of the boat
-            float actual_z = m_is_sim? point_tf.x : point_tf.z;
-            if ((xy_rect.x >= 0) && (xy_rect.x < m_cam_model.cameraInfo().width) && (xy_rect.y >= 0) &&
-                (xy_rect.y < m_cam_model.cameraInfo().height) && (actual_z >= 0)) {      
-                cv::circle(pcl_img, cv::Point((int)xy_rect.y, (int)xy_rect.x),10, cv::Scalar(255, 255, 255), cv::FILLED);    
-                // Check if point is in bbox
-                if(xy_rect.x >= bbox.min_x && xy_rect.x <= bbox.max_x && xy_rect.y >= bbox.min_y && xy_rect.y <= bbox.max_y){
-                    cv::Vec3b hsv_vec3b = cv_hsv.at<cv::Vec3b>(xy_rect);
-                    std::vector<long long> hsv = {(long long)hsv_vec3b[0], (long long)hsv_vec3b[1], (long long)hsv_vec3b[2]};
-                    obj_cloud_ptr->push_back(pcl::PointXYZHSV(point_tf.x, point_tf.y, point_tf.z, ((float)hsv[0])*2, ((float)hsv[1])/((float)255.0), ((float)hsv[2])/((float)255.0)));
-                }
-            }
-        }
+        all_seaing_perception::addBBoxPadding(bbox, m_bbox_margin, cv_hsv.rows, cv_hsv.cols);
+        all_seaing_perception::PCLInBBoxHSV(in_cloud_tf_ptr, obj_cloud_ptr, bbox, cv_hsv, m_cam_model, m_is_sim);
         pcl::toROSMsg(*obj_cloud_ptr, labeled_pcl.cloud);
         labeled_pcl.cloud.header.stamp = in_cloud_msg->header.stamp;
         object_pcls.objects.push_back(labeled_pcl);
@@ -257,13 +227,8 @@ void BBoxProjectPCloud::bb_pcl_project(
 
         // image & bbox relation & adjustment (make sure in-bounds)
         if(bbox.min_x > bbox.max_x || bbox.min_y > bbox.max_y) continue;
-        // make sure bbox coords are inside image
-        int adj_min_x = std::max((int)bbox.min_x,0);
-        int adj_max_x = std::min((int)bbox.max_x+1, cv_hsv.cols);
-        int adj_min_y = std::max((int)bbox.min_y,0);
-        int adj_max_y = std::min((int)bbox.max_y+1, cv_hsv.rows);
-        cv::Mat cv_hsv_copy = cv_hsv.clone();
-        cv::Mat hsv_img(cv_hsv, cv::Range(adj_min_y, adj_max_y), cv::Range(adj_min_x, adj_max_x));
+
+        cv::Mat hsv_img(cv_hsv, cv::Range(bbox.min_y, bbox.max_y), cv::Range(bbox.min_x, bbox.max_x));
         cv::Size img_sz;
         cv::Point bbox_offset;
         hsv_img.locateROI(img_sz, bbox_offset);
@@ -272,7 +237,7 @@ void BBoxProjectPCloud::bb_pcl_project(
             // invert colors of cloud if the label is red, to have red (now cyan) points close to each other in HSV range
             // PCL color range: (360,1,1)
             for (pcl::PointXYZHSV& pt : pcloud_ptr->points){
-                pt.h = ((int)pt.h+180)%360;
+                all_seaing_perception::invertHSVPCL(pt);
             }
         }
 
@@ -283,64 +248,23 @@ void BBoxProjectPCloud::bb_pcl_project(
         std::vector<pcl::PointIndices> clusters_indices;
 
         // CONDITIONAL (WITH HSV-BASED CONDITION) EUCLIDEAN CLUSTERING
-        pcl::ConditionalEuclideanClustering<pcl::PointXYZHSV> cec;
-        cec.setClusterTolerance(m_clustering_distance);
-        cec.setMinClusterSize(m_obstacle_size_min);
-        cec.setMaxClusterSize(m_obstacle_size_max);
-        cec.setSearchMethod(tree);
-        cec.setInputCloud(pcloud_ptr);
-        std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func = std::bind(&hsv_diff_condition, m_clustering_color_weights, m_clustering_color_thres, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-        cec.setConditionFunction(cond_func);
-        cec.segment(clusters_indices);
+        all_seaing_perception::euclideanClustering(pcloud_ptr, clusters_indices, m_clustering_distance, m_obstacle_size_min, m_obstacle_size_max, true, std::bind(&hsv_diff_condition, m_clustering_color_weights, m_clustering_color_thres, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
         if (label_color_map[bbox.label]=="red"){
             // invert colors back
             for (pcl::PointXYZHSV& pt : pcloud_ptr->points){
-                pt.h = ((int)pt.h+180)%360;
+                all_seaing_perception::invertHSVPCL(pt);
             }
         }
 
-        int clust_id = 0;
-        for(auto ind_set : clusters_indices){
-            for(pcl::index_t ind : ind_set.indices){
-                cv::Point2d cloud_pt_xy = m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
-            }
-            clust_id++;
-        }
-
-        // color segmentation using the color label
-        std::vector<int> lims = contour_matching_color_range_map[label_color_map[bbox.label]];
-        int h_min=lims[0], h_max=lims[1], s_min=lims[2], s_max=lims[3], v_min=lims[4], v_max=lims[5];
-        // cv::Scalar bbox_mean_hsv = cv::mean(hsv_img);
+        // color segmentation
         cv::Mat mask;
-        cv::inRange(hsv_img, cv::Scalar(h_min, s_min, v_min), cv::Scalar(h_max, s_max, v_max), mask);
-        if (label_color_map[bbox.label]=="red"){
-            // add the pixels that have the other side of the red H range
-            cv::Mat mask2;
-            std::vector<int> lims2 = contour_matching_color_range_map["red2"];
-            int h_min2=lims2[0], h_max2=lims2[1], s_min2=lims2[2], s_max2=lims2[3], v_min2=lims2[4], v_max2=lims2[5];
-            cv::inRange(hsv_img, cv::Scalar(h_min2, s_min2, v_min2), cv::Scalar(h_max2, s_max2, v_max2), mask2);
-            mask += mask2;
-        }
-        cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5)));
-        cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7)));
         std::vector<std::vector<cv::Point>> contours;
-        cv::findContours(mask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+        std::tie(mask, contours) = all_seaing_perception::colorSegmentationHSV(hsv_img, contour_matching_color_range_map[label_color_map[bbox.label]], 5, 7, label_color_map[bbox.label]=="red", contour_matching_color_range_map.count("red2")?contour_matching_color_range_map["red2"]:std::vector<int>());
         std::vector<std::vector<cv::Point>> in_contours;
         // Get image points inside contour, put them into a vector, will then process those (not the contours themselves, they are just a boundary)
         for(std::vector<cv::Point> contour : contours){
-            // TAKE THE BOUNDING BOX (BOUNDINGRECT), TAKE ALL THE PIXELS IN IT (NOT NOT CHECK EVERY PIXEL IN THE IMAGE) AND CHECK IF IT'S INSIDE THE CONTOUR USING POINTPOLYGONTEST
-            cv::Rect cont_bbox = cv::boundingRect(contour);
-            std::vector<cv::Point> in_contour;
-            for(int x = cont_bbox.x; x < cont_bbox.x + cont_bbox.width; x++){
-                for(int y = cont_bbox.y; y < cont_bbox.y + cont_bbox.height; y++){
-                    cv::Point pt = cv::Point(x,y);
-                    if(cv::pointPolygonTest(contour, pt, false)>=0){
-                        in_contour.push_back(pt);
-                    }
-                }
-            }
-            in_contours.push_back(in_contour);
+            in_contours.push_back(all_seaing_perception::inContour(contour));
         }
         // Convert the contour points to fit the original image (using image_sz and bbox_offset -> just bbox_offset+pt_coords) to be able to use it with the LiDAR (projected) points
         for(int ctr = 0; ctr < in_contours.size(); ctr++){
@@ -360,7 +284,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 cv::Vec3b image_pt_hsv_vec3b = cv_hsv.at<cv::Vec3b>(image_pt);
                 std::vector<long long> image_pt_hsv = {(long long)image_pt_hsv_vec3b[0], (long long)image_pt_hsv_vec3b[1], (long long)image_pt_hsv_vec3b[2]};
                 if (label_color_map[bbox.label]=="red"){
-                    image_pt_hsv[0]=(image_pt_hsv[0]+90)%180; // shift the scale so that red values are close to one another -> invert colors, red is cyan now
+                    all_seaing_perception::invertHSVOpenCV(image_pt_hsv); // shift the scale so that red values are close to one another -> invert colors, red is cyan now
                 }
                 cv::Point2d image_pt_xy = cv::Point2d(image_pt.x, image_pt.y);
                 contour_pts.push_back(std::make_pair(image_pt_xy, image_pt_hsv));
@@ -388,11 +312,11 @@ void BBoxProjectPCloud::bb_pcl_project(
             cluster_qts.first.second = cluster_qts.second.second = {0,0,0};
             for(pcl::index_t ind : cluster.indices){
                 // transform to OpenCV HSV (180, 255, 255)
-                std::vector<long long> cloud_pt_hsv = {pcloud_ptr->points[ind].h/2, pcloud_ptr->points[ind].s*((float)255.0), pcloud_ptr->points[ind].v*((float)255.0)};
+                std::vector<long long> cloud_pt_hsv = all_seaing_perception::HSVPCLToOpenCV<long long>(pcloud_ptr->points[ind]);
                 if (label_color_map[bbox.label]=="red"){
-                    cloud_pt_hsv[0]=(cloud_pt_hsv[0]+90)%180; // shift the scale so that red values are close to one another -> invert colors, red is cyan now
+                    all_seaing_perception::invertHSVOpenCV(cloud_pt_hsv); // shift the scale so that red values are close to one another -> invert colors, red is cyan now
                 }
-                cv::Point2d cloud_pt_xy = m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z, -pcloud_ptr->points[ind].x)) : all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pcloud_ptr->points[ind].x, pcloud_ptr->points[ind].y, pcloud_ptr->points[ind].z));
+                cv::Point2d cloud_pt_xy = all_seaing_perception::projectPCLPtToPixel(m_cam_model, pcloud_ptr->points[ind], m_is_sim);
                 cluster_pts.push_back(std::make_pair(cloud_pt_xy, cloud_pt_hsv));
                 // store sums
                 cluster_qts.first.first.x+=cloud_pt_xy.x;
@@ -481,7 +405,6 @@ void BBoxProjectPCloud::bb_pcl_project(
         for (pcl::index_t ind : clusters_indices[opt_cluster_id].indices){
             pcl::PointXYZHSV pt = pcloud_ptr->points[ind];
             refined_cloud_ptr->push_back(pt);
-            cv::Point2d cloud_pt_xy = m_is_sim ? all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pt.y, pt.z, -pt.x)) : all_seaing_perception::project3dToPixel(m_cam_model,cv::Point3d(pt.x, pt.y, pt.z));
         }
         auto pcls_camera_msg = sensor_msgs::msg::PointCloud2();
         pcl::toROSMsg(*refined_cloud_ptr, pcls_camera_msg);
