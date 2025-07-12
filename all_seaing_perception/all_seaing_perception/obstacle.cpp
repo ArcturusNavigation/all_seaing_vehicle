@@ -98,72 +98,28 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
     m_id = in_id;
     m_lidar_map_tf = lidar_map_tf;
 
-    // Fill cluster point by point
-    typename pcl::PointCloud<PointT>::Ptr local_cluster_pc(new typename pcl::PointCloud<PointT>);
+    // Calculate min, max, and average point
     PointT local_min, local_max, local_avg, global_min, global_max, global_avg;
-    local_min.x = std::numeric_limits<float>::max();
-    local_min.y = std::numeric_limits<float>::max();
-    local_min.z = std::numeric_limits<float>::max();
-    local_max.x = std::numeric_limits<float>::lowest();
-    local_max.y = std::numeric_limits<float>::lowest();
-    local_max.z = std::numeric_limits<float>::lowest();
-    global_min.x = std::numeric_limits<float>::max();
-    global_min.y = std::numeric_limits<float>::max();
-    global_min.z = std::numeric_limits<float>::max();
-    global_max.x = std::numeric_limits<float>::lowest();
-    global_max.y = std::numeric_limits<float>::lowest();
-    global_max.z = std::numeric_limits<float>::lowest();
-    for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); pit++) {
-        PointT local_p, global_p;
-        local_p = in_cloud_ptr->points[*pit];
+    typename pcl::PointCloud<PointT>::Ptr local_cloud_ptr(new typename pcl::PointCloud<PointT>);
+    pcl::copyPointCloud(*in_cloud_ptr, in_cluster_indices, *local_cloud_ptr);
+    pcl::getMinMax3D(*local_cloud_ptr, local_min, local_max);
+    pcl::computeCentroid(*local_cloud_ptr, local_avg);
 
-        local_min.x = std::min(local_p.x, local_min.x);
-        local_min.y = std::min(local_p.y, local_min.y);
-        local_min.z = std::min(local_p.z, local_min.z);
-        local_max.x = std::max(local_p.x, local_max.x);
-        local_max.y = std::max(local_p.y, local_max.y);
-        local_max.z = std::max(local_p.z, local_max.z);
+    // Transform local to global point cloud
+    sensor_msgs::msg::PointCloud2 local_pcl_msg, global_pcl_msg;
+    typename pcl::PointCloud<PointT>::Ptr global_cloud_ptr(new typename pcl::PointCloud<PointT>);
+    pcl::toROSMsg(*local_cloud_ptr, local_pcl_msg);
+    tf2::doTransform<sensor_msgs::msg::PointCloud2>(local_pcl_msg, global_pcl_msg, m_lidar_map_tf);
+    pcl::fromROSMsg(global_pcl_msg, *global_cloud_ptr);
 
-        local_avg.x += local_p.x;
-        local_avg.y += local_p.y;
-        local_avg.z += local_p.z;
-        local_cluster_pc->points.push_back(local_p);
-
-        // Convert point to global frame
-        geometry_msgs::msg::Point p_msg;
-        geometry_msgs::msg::Point p_tf;
-        p_msg.x = local_p.x;
-        p_msg.y = local_p.y;
-        p_msg.z = local_p.z;
-        tf2::doTransform<geometry_msgs::msg::Point>(p_msg, p_tf, m_lidar_map_tf);
-        global_p.x = p_tf.x;
-        global_p.y = p_tf.y;
-        global_p.z = p_tf.z;
-
-        global_min.x = std::min(global_p.x, global_min.x);
-        global_min.y = std::min(global_p.y, global_min.y);
-        global_min.z = std::min(global_p.z, global_min.z);
-        global_max.x = std::max(global_p.x, global_max.x);
-        global_max.y = std::max(global_p.y, global_max.y);
-        global_max.z = std::max(global_p.z, global_max.z);
-
-        global_avg.x += global_p.x;
-        global_avg.y += global_p.y;
-        global_avg.z += global_p.z;
-    }
+    // Calculate global min, max, and average point
+    pcl::getMinMax3D(*global_cloud_ptr, global_min, global_max);
+    pcl::computeCentroid(*global_cloud_ptr, global_avg);
 
     // Specify that all points are finite
-    local_cluster_pc->is_dense = true;
+    local_cloud_ptr->is_dense = true;
+    global_cloud_ptr->is_dense = true;
 
-    // Calculate average local point
-    if (in_cluster_indices.size() > 0) {
-        local_avg.x /= in_cluster_indices.size();
-        local_avg.y /= in_cluster_indices.size();
-        local_avg.z /= in_cluster_indices.size();
-        global_avg.x /= in_cluster_indices.size();
-        global_avg.y /= in_cluster_indices.size();
-        global_avg.z /= in_cluster_indices.size();
-    }
     m_local_point = local_avg;
     m_global_point = global_avg;
     m_bbox_min = local_min;
@@ -172,17 +128,17 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
     m_global_bbox_max = global_max;
 
     // Skip chull calculation if less than 3 points
-    if (local_cluster_pc->points.size() < 3) return;
+    if (local_cloud_ptr->points.size() < 3) return;
 
     // Flatten cluster point cloud to 2D
     typename pcl::PointCloud<PointT>::Ptr cloud_2d(new typename pcl::PointCloud<PointT>);
-    pcl::copyPointCloud(*local_cluster_pc, *cloud_2d);
+    pcl::copyPointCloud(*local_cloud_ptr, *cloud_2d);
     for (size_t i = 0; i < cloud_2d->points.size(); i++)
         cloud_2d->points[i].z = local_min.z;
 
     // Calculate convex hull polygon
     typename pcl::PointCloud<PointT>::Ptr hull_cloud(new typename pcl::PointCloud<PointT>);
-    pcl::ConvexHull<PointT> chull;
+    typename pcl::ConvexHull<PointT> chull;
     chull.setInputCloud(cloud_2d);
     chull.reconstruct(*hull_cloud);
     m_area = pcl::calculatePolygonArea(*hull_cloud);
@@ -211,61 +167,17 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
     m_global_header = global_header;
     m_id = in_id;
 
-    // Fill cluster point by point
+    // Calculate min, max, and average point
     PointT local_min, local_max, local_avg, global_min, global_max, global_avg;
-    local_min.x = std::numeric_limits<float>::max();
-    local_min.y = std::numeric_limits<float>::max();
-    local_min.z = std::numeric_limits<float>::max();
-    local_max.x = std::numeric_limits<float>::lowest();
-    local_max.y = std::numeric_limits<float>::lowest();
-    local_max.z = std::numeric_limits<float>::lowest();
-
-    for (PointT local_p: local_pcloud->points) {
-        local_min.x = std::min(local_p.x, local_min.x);
-        local_min.y = std::min(local_p.y, local_min.y);
-        local_min.z = std::min(local_p.z, local_min.z);
-        local_max.x = std::max(local_p.x, local_max.x);
-        local_max.y = std::max(local_p.y, local_max.y);
-        local_max.z = std::max(local_p.z, local_max.z);
-
-        local_avg.x += local_p.x;
-        local_avg.y += local_p.y;
-        local_avg.z += local_p.z;
-    }
-
-    global_min.x = std::numeric_limits<float>::max();
-    global_min.y = std::numeric_limits<float>::max();
-    global_min.z = std::numeric_limits<float>::max();
-    global_max.x = std::numeric_limits<float>::lowest();
-    global_max.y = std::numeric_limits<float>::lowest();
-    global_max.z = std::numeric_limits<float>::lowest();
-
-    for (PointT global_p: global_pcloud->points) {
-        global_min.x = std::min(global_p.x, global_min.x);
-        global_min.y = std::min(global_p.y, global_min.y);
-        global_min.z = std::min(global_p.z, global_min.z);
-        global_max.x = std::max(global_p.x, global_max.x);
-        global_max.y = std::max(global_p.y, global_max.y);
-        global_max.z = std::max(global_p.z, global_max.z);
-
-        global_avg.x += global_p.x;
-        global_avg.y += global_p.y;
-        global_avg.z += global_p.z;
-    }
+    pcl::getMinMax3D(*global_pcloud, global_min, global_max);
+    pcl::computeCentroid(*global_pcloud, global_avg);
+    pcl::getMinMax3D(*local_pcloud, local_min, local_max);
+    pcl::computeCentroid(*local_pcloud, local_avg);
 
     // Specify that all points are finite
     local_pcloud->is_dense = true;
     global_pcloud->is_dense = true;
 
-    // Calculate average local point
-    if (local_pcloud->points.size() > 0) {
-        local_avg.x /= local_pcloud->points.size();
-        local_avg.y /= local_pcloud->points.size();
-        local_avg.z /= local_pcloud->points.size();
-        global_avg.x /= global_pcloud->points.size();
-        global_avg.y /= global_pcloud->points.size();
-        global_avg.z /= global_pcloud->points.size();
-    }
 
     m_local_point = local_avg;
     m_global_point = global_avg;
@@ -286,7 +198,7 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
             cloud_2d->points[i].z = local_min.z;
 
         // Calculate convex hull polygon
-        pcl::ConvexHull<PointT> chull;
+        typename pcl::ConvexHull<PointT> chull;
         chull.setInputCloud(cloud_2d);
         chull.reconstruct(*local_hull_cloud);
         m_area = pcl::calculatePolygonArea(*local_hull_cloud);
@@ -297,10 +209,10 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
         typename pcl::PointCloud<PointT>::Ptr cloud_2d(new typename pcl::PointCloud<PointT>);
         pcl::copyPointCloud(*global_pcloud, *cloud_2d);
         for (size_t i = 0; i < cloud_2d->points.size(); i++)
-            cloud_2d->points[i].z = local_min.z;
+            cloud_2d->points[i].z = global_min.z;
 
         // Calculate convex hull polygon
-        pcl::ConvexHull<PointT> chull;
+        typename pcl::ConvexHull<PointT> chull;
         chull.setInputCloud(cloud_2d);
         chull.reconstruct(*global_hull_cloud);
     }
@@ -320,6 +232,94 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
         global_p.y = global_hull_cloud->points[i].y;
         global_p.z = global_min.z;
         m_global_chull.polygon.points.push_back(global_p);
+    }
+}
+
+template<typename PointT>
+Obstacle<PointT>::Obstacle(std_msgs::msg::Header header,
+                    const typename pcl::PointCloud<PointT>::Ptr pcloud,
+                    int in_id,
+                    bool global) {
+
+    // Set id, header, and tf
+    if (global){
+        m_global_header = header;
+        m_id = in_id;
+
+        // Calculate min, max, and average point
+        PointT global_min, global_max, global_avg;
+        pcl::getMinMax3D(*pcloud, global_min, global_max);
+        pcl::computeCentroid(*pcloud, global_avg);
+
+        // Specify that all points are finite
+        pcloud->is_dense = true;
+
+        m_global_point = global_avg;
+        m_global_bbox_min = global_min;
+        m_global_bbox_max = global_max;
+
+        typename pcl::PointCloud<PointT>::Ptr global_hull_cloud(new typename pcl::PointCloud<PointT>);
+
+        // Skip chull calculation if less than 3 points
+        if (pcloud->points.size() >= 3){
+            // Flatten cluster point cloud to 2D
+            typename pcl::PointCloud<PointT>::Ptr cloud_2d(new typename pcl::PointCloud<PointT>);
+            pcl::copyPointCloud(*pcloud, *cloud_2d);
+            for (size_t i = 0; i < cloud_2d->points.size(); i++)
+                cloud_2d->points[i].z = global_min.z;
+
+            // Calculate convex hull polygon
+            typename pcl::ConvexHull<PointT> chull;
+            chull.setInputCloud(cloud_2d);
+            chull.reconstruct(*global_hull_cloud);
+        }
+
+        for (size_t i = 0; i < global_hull_cloud->points.size(); i++) {
+            geometry_msgs::msg::Point32 global_p;
+            global_p.x = global_hull_cloud->points[i].x;
+            global_p.y = global_hull_cloud->points[i].y;
+            global_p.z = global_min.z;
+            m_global_chull.polygon.points.push_back(global_p);
+        }
+    }else{
+        m_local_header = header;
+        m_id = in_id;
+
+        // Calculate min, max, and average point
+        PointT local_min, local_max, local_avg;
+        pcl::getMinMax3D(*pcloud, local_min, local_max);
+        pcl::computeCentroid(*pcloud, local_avg);
+
+        // Specify that all points are finite
+        pcloud->is_dense = true;
+
+        m_local_point = local_avg;
+        m_bbox_min = local_min;
+        m_bbox_max = local_max;
+
+        typename pcl::PointCloud<PointT>::Ptr local_hull_cloud(new typename pcl::PointCloud<PointT>);
+
+        // Skip chull calculation if less than 3 points
+        if (pcloud->points.size() >= 3){
+            // Flatten cluster point cloud to 2D
+            typename pcl::PointCloud<PointT>::Ptr cloud_2d(new typename pcl::PointCloud<PointT>);
+            pcl::copyPointCloud(*pcloud, *cloud_2d);
+            for (size_t i = 0; i < cloud_2d->points.size(); i++)
+                cloud_2d->points[i].z = local_min.z;
+
+            // Calculate convex hull polygon
+            typename pcl::ConvexHull<PointT> chull;
+            chull.setInputCloud(cloud_2d);
+            chull.reconstruct(*local_hull_cloud);
+        }
+
+        for (size_t i = 0; i < local_hull_cloud->points.size(); i++) {
+            geometry_msgs::msg::Point32 local_p;
+            local_p.x = local_hull_cloud->points[i].x;
+            local_p.y = local_hull_cloud->points[i].y;
+            local_p.z = local_min.z;
+            m_local_chull.polygon.points.push_back(local_p);
+        }
     }
 }
 

@@ -3,6 +3,12 @@
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl/common/impl/common.hpp>
+#include <pcl/common/impl/centroid.hpp>
+#include "pcl_conversions/pcl_conversions.h"
+
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
 
 #include "geometry_msgs/msg/polygon.hpp"
 #include "geometry_msgs/msg/point.hpp"
@@ -24,9 +30,14 @@ public:
              geometry_msgs::msg::TransformStamped lidar_map_tf);
 
     Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
-                    const typename pcl::PointCloud<PointT>::Ptr local_pcloud,
-                    const typename pcl::PointCloud<PointT>::Ptr global_pcloud,
-                    int in_id);
+            const typename pcl::PointCloud<PointT>::Ptr local_pcloud,
+            const typename pcl::PointCloud<PointT>::Ptr global_pcloud,
+            int in_id);
+
+    Obstacle(std_msgs::msg::Header header,
+            const typename pcl::PointCloud<PointT>::Ptr pcloud,
+            int in_id,
+            bool global);
 
     virtual ~Obstacle();
 
