@@ -150,10 +150,8 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
         local_p.y = hull_cloud->points[i].y;
         local_p.z = local_min.z;
         m_local_chull.polygon.points.push_back(local_p);
-
-        tf2::doTransform<geometry_msgs::msg::Point32>(local_p, global_p, m_lidar_map_tf);
-        m_global_chull.polygon.points.push_back(global_p);
     }
+    tf2::doTransform<geometry_msgs::msg::PolygonStamped>(m_local_chull, m_global_chull, m_lidar_map_tf);
 }
 
 template<typename PointT>
@@ -321,6 +319,85 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header header,
             m_local_chull.polygon.points.push_back(local_p);
         }
     }
+}
+
+template<typename PointT>
+void Obstacle<PointT>::transform_pcl_pt(PointT pt_in, PointT& pt_tf, geometry_msgs::msg::TransformStamped tf){
+    geometry_msgs::msg::Point pt_msg, pt_tf_msg;
+    pt_msg.x = pt_in.x;
+    pt_msg.y = pt_in.y;
+    pt_msg.z = pt_in.z;
+    tf2::doTransform<geometry_msgs::msg::Point>(pt_msg, pt_tf_msg, tf);
+    pt_tf = pt_in;
+    pt_tf.x = pt_tf_msg.x;
+    pt_tf.y = pt_tf_msg.y;
+    pt_tf.z = pt_tf_msg.z;
+}
+
+template<typename PointT>
+void Obstacle<PointT>::local_to_global(std_msgs::msg::Header global_header, geometry_msgs::msg::TransformStamped lidar_map_tf){
+    m_lidar_map_tf = lidar_map_tf;
+    m_global_header = global_header;
+    transform_pcl_pt(m_local_point, m_global_point, m_lidar_map_tf);
+    tf2::doTransform<geometry_msgs::msg::PolygonStamped>(m_local_chull, m_global_chull, m_lidar_map_tf);
+    // compute global bbox from chull (but get z components from min and max transformed z components of local bbox)
+    PointT global_min, global_max;
+    global_min.x = std::numeric_limits<float>::max();
+    global_min.y = std::numeric_limits<float>::max();
+    global_min.z = std::numeric_limits<float>::max();
+    global_max.x = std::numeric_limits<float>::lowest();
+    global_max.y = std::numeric_limits<float>::lowest();
+    global_max.z = std::numeric_limits<float>::lowest();
+    for(geometry_msgs::msg::Point32 pt : m_global_chull.polygon.points){
+        global_min.x = std::min(pt.x, global_min.x);
+        global_min.y = std::min(pt.y, global_min.y);
+        global_min.z = std::min(pt.z, global_min.z);
+        global_max.x = std::max(pt.x, global_max.x);
+        global_max.y = std::max(pt.y, global_max.y);
+        global_max.z = std::max(pt.z, global_max.z);
+    }
+    PointT bbox_min_tf, bbox_max_tf;
+    transform_pcl_pt(m_bbox_min, bbox_min_tf, m_lidar_map_tf);
+    transform_pcl_pt(m_bbox_max, bbox_max_tf, m_lidar_map_tf);
+    global_min.z = std::min(bbox_min_tf.z, global_min.z);
+    global_min.z = std::min(bbox_max_tf.z, global_min.z);
+    global_max.z = std::max(bbox_min_tf.z, global_max.z);
+    global_max.z = std::max(bbox_max_tf.z, global_max.z);
+    m_global_bbox_min = global_min;
+    m_global_bbox_max = global_max;
+}
+
+template<typename PointT>
+void Obstacle<PointT>::global_to_local(std_msgs::msg::Header local_header, geometry_msgs::msg::TransformStamped map_lidar_tf){
+    m_map_lidar_tf = map_lidar_tf;
+    m_local_header = local_header;
+    transform_pcl_pt(m_global_point, m_local_point, m_map_lidar_tf);
+    tf2::doTransform<geometry_msgs::msg::PolygonStamped>(m_global_chull, m_local_chull, m_map_lidar_tf);
+    // compute local bbox from chull (but get z components from min and max transformed z components of global bbox)
+    PointT local_min, local_max;
+    local_min.x = std::numeric_limits<float>::max();
+    local_min.y = std::numeric_limits<float>::max();
+    local_min.z = std::numeric_limits<float>::max();
+    local_max.x = std::numeric_limits<float>::lowest();
+    local_max.y = std::numeric_limits<float>::lowest();
+    local_max.z = std::numeric_limits<float>::lowest();
+    for(geometry_msgs::msg::Point32 pt : m_local_chull.polygon.points){
+        local_min.x = std::min(pt.x, local_min.x);
+        local_min.y = std::min(pt.y, local_min.y);
+        local_min.z = std::min(pt.z, local_min.z);
+        local_max.x = std::max(pt.x, local_max.x);
+        local_max.y = std::max(pt.y, local_max.y);
+        local_max.z = std::max(pt.z, local_max.z);
+    }
+    PointT bbox_min_tf, bbox_max_tf;
+    transform_pcl_pt(m_global_bbox_min, bbox_min_tf, m_map_lidar_tf);
+    transform_pcl_pt(m_global_bbox_max, bbox_max_tf, m_map_lidar_tf);
+    local_min.z = std::min(bbox_min_tf.z, local_min.z);
+    local_min.z = std::min(bbox_max_tf.z, local_min.z);
+    local_max.z = std::max(bbox_min_tf.z, local_max.z);
+    local_max.z = std::max(bbox_max_tf.z, local_max.z);
+    m_bbox_min = local_min;
+    m_bbox_max = local_max;
 }
 
 template<typename PointT>

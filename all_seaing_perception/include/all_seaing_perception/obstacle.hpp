@@ -55,6 +55,11 @@ public:
     geometry_msgs::msg::PolygonStamped get_global_chull();
     float get_polygon_area();
 
+    void transform_pcl_pt(PointT pt_in, PointT& pt_tf, geometry_msgs::msg::TransformStamped tf);
+
+    void local_to_global(std_msgs::msg::Header global_header, geometry_msgs::msg::TransformStamped lidar_map_tf);
+    void global_to_local(std_msgs::msg::Header local_header, geometry_msgs::msg::TransformStamped map_lidar_tf);
+
 private:
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header;
@@ -68,6 +73,7 @@ private:
     geometry_msgs::msg::PolygonStamped m_local_chull;
     geometry_msgs::msg::PolygonStamped m_global_chull;
     geometry_msgs::msg::TransformStamped m_lidar_map_tf;
+    geometry_msgs::msg::TransformStamped m_map_lidar_tf;
     float m_area;
 };
 
