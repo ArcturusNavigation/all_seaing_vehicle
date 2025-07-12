@@ -24,8 +24,11 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
-    slam_params = os.path.join(
+    slam_sim_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_sim.yaml"
+    )
+    slam_real_params = os.path.join(
+        bringup_prefix, "config", "slam", "slam_real.yaml"
     )
     pf_slam_params = os.path.join(
         bringup_prefix, "config", "slam", "pf_slam_sim.yaml"
@@ -101,43 +104,6 @@ def launch_setup(context, *args, **kwargs):
                 "output_range": [-1500.0, 1500.0],
                 "smoothing_factor": 0.8,
             }
-        ],
-    )
-
-    obstacle_bbox_overlay_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="obstacle_bbox_overlay",
-        remappings=[
-            (
-                "camera_info",
-                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
-            ),
-        ],
-        parameters=[{"is_sim": True}],
-    )
-
-    perception_eval_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="perception_eval.py",
-    )
-
-    obstacle_bbox_visualizer_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="obstacle_bbox_visualizer",
-        remappings=[
-            (
-                "camera_info",
-                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info",
-            ),
-            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
-        ],
-        parameters=[
-            {
-                "color_label_mappings_file": color_label_mappings,
-            },
-            {
-                "is_sim": True,
-            },
         ],
     )
 
@@ -237,6 +203,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
         ],
         parameters=[
+            {"global_frame_id": "map"},
             {"range_x": [0.0, 100000.0]},
             {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
@@ -252,6 +219,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
+            {"global_frame_id": "map"},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
@@ -288,37 +256,11 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
+            ("obstacle_map/refined_untracked", "obstacle_map/local"),
+            ("obstacle_map/refined_tracked", "obstacle_map/global"),
         ],
-        parameters=[slam_params],
-    )
-
-    object_tracking_map_pf_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="object_tracking_map_pf",
-        output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
-        remappings=[
-            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
-        ],
-        parameters=[pf_slam_params],
-    )
-
-    object_tracking_map_euclidean_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="object_tracking_map_euclidean",
-        output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
-        remappings=[
-            ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
-        ],
-        parameters=[
-            {"global_frame_id": "map"},
-            {"obstacle_seg_thresh": 10.0},
-            {"obstacle_drop_thresh": 1.0},
-            {"check_fov": False},
-            {"is_sim": True},
-        ]
+        # parameters=[slam_sim_params],
+        parameters=[slam_real_params],
     )
 
     rviz_node = launch_ros.actions.Node(
@@ -343,6 +285,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
+            {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
             {"Kpid_x": [1.0, 0.0, 0.0]},
             {"Kpid_y": [1.0, 0.0, 0.0]},
@@ -356,6 +299,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="navigation_server.py",
         parameters=[
+            {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
         ],
         output="screen",
@@ -364,14 +308,18 @@ def launch_setup(context, *args, **kwargs):
     grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
-        remappings=[("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan")],
         parameters=[
+            {"global_frame_id": "map"},
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"grid_resolution": 0.3},
             {"obstacle_radius_sigma": 3.0},
             {"search_radius_sigma": 15.0}
         ],
+        remappings=[
+            ("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan"),
+            ("odometry/filtered", "odometry/tracked"),
+        ]
     )
 
     onshore_node = launch_ros.actions.Node(
@@ -393,6 +341,9 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
+        remappings=[
+            ("obstacle_map/labeled", "obstacle_map/global")
+        ]
     )
 
     speed_challenge_pid = launch_ros.actions.Node(
@@ -410,7 +361,8 @@ def launch_setup(context, *args, **kwargs):
             (
                 "imu",
                 "/wamv/sensors/imu/imu/data"
-            )
+            ),
+            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
@@ -425,7 +377,8 @@ def launch_setup(context, *args, **kwargs):
             (
                 "camera_info",
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
-            )
+            ),
+            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
@@ -482,8 +435,6 @@ def launch_setup(context, *args, **kwargs):
         navsat_node,
         controller_node,
         controller_server,
-        obstacle_bbox_overlay_node,
-        obstacle_bbox_visualizer_node,
         obstacle_detector_node,
         color_segmentation_node,
         ycrcb_color_segmentation_node,
@@ -492,8 +443,6 @@ def launch_setup(context, *args, **kwargs):
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
-        # object_tracking_map_pf_node,
-        # object_tracking_map_euclidean_node,
         rviz_node,
         control_mux,
         navigation_server,
@@ -505,10 +454,10 @@ def launch_setup(context, *args, **kwargs):
         # follow_buoy_pid,
         # speed_challenge_pid,
         rviz_waypoint_sender,
-        map_to_odom,
+        # map_to_odom,
         keyboard_ld,
         sim_ld,
-        perception_eval_node,
+        # perception_eval_node,
     ]
 
 def generate_launch_description():

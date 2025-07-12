@@ -20,6 +20,8 @@
 #include "all_seaing_interfaces/msg/labeled_bounding_box2_d_array.hpp"
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
 
+#include "all_seaing_perception/perception_utilities.hpp"
+
 class ObstacleBboxOverlay : public rclcpp::Node {
 private:
     // Publishers and subscribers

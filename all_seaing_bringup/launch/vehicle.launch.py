@@ -109,6 +109,7 @@ def launch_setup(context, *args, **kwargs):
         executable="xdrive_controller.py",
         parameters=[
             {
+                "global_frame_id": "map",
                 "front_right_xy": [0.27, -0.27],
                 "back_left_xy": [-0.27, 0.27],
                 "front_left_xy": [0.27, 0.27],
@@ -148,6 +149,9 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"safe_margin": 0.2},
         ],
+        remappings=[
+            ("obstacle_map/labeled", "obstacle_map/global"),
+        ],
     )
 
     follow_buoy_pid = launch_ros.actions.Node(
@@ -165,6 +169,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
+            ("obstacle_map/labeled", "obstacle_map/local"),
         ],
     )
 
@@ -184,7 +189,8 @@ def launch_setup(context, *args, **kwargs):
             (
                 "imu",
                 "/mavros/imu/data"
-            )
+            ),
+            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
@@ -213,20 +219,10 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
+            {"global_frame_id": "map"},
             {"range_radius": [0.5, 60.0]},
         ],
         condition=UnlessCondition(use_bag),
-    )
-
-    obstacle_bbox_overlay_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="obstacle_bbox_overlay",
-        remappings=[
-            (
-                "camera_info",
-                "/zed/zed_node/rgb/camera_info",
-            ),
-        ],
     )
 
     obstacle_detector_node = launch_ros.actions.Node(
@@ -236,26 +232,10 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
+            {"global_frame_id": "map"},
             {"obstacle_size_min": 5},
             {"obstacle_size_max": 300},
             {"clustering_distance": 0.1},
-        ],
-    )
-
-    obstacle_bbox_visualizer_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="obstacle_bbox_visualizer",
-        remappings=[
-            (
-                "camera_info",
-                "/zed/zed_node/rgb/camera_info",
-            ),
-            ("image", "/zed/zed_node/rgb/image_rect_color"),
-        ],
-        parameters=[
-            {
-                "color_label_mappings_file": color_label_mappings,
-            }
         ],
     )
 
@@ -310,6 +290,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
         parameters=[
+            {"global_frame_id": "map"},
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"default_range": 60},
@@ -410,7 +391,7 @@ def launch_setup(context, *args, **kwargs):
             ("lidar_topic", "/point_cloud/filtered")
         ],
         parameters=[
-            # {"base_link_frame": "actual_base_link"},
+            {"camera_name": "front"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
@@ -433,13 +414,9 @@ def launch_setup(context, *args, **kwargs):
             ("camera_topic", "/back_left_oak/rgb/image_rect"),
             ("lidar_topic", "/point_cloud/filtered"),
             ("bounding_boxes", "bounding_boxes/back_left"),
-            ("/refined_object_segments_viz", "/refined_object_segments_viz/back_left"),
-            ("/object_point_clouds_viz", "/object_point_clouds_viz/back_left"),
-            ("/refined_object_point_clouds_viz", "/refined_object_point_clouds_viz/back_left"),
-            ("/refined_object_point_clouds_segments", "/refined_object_point_clouds_segments/back_left"),
         ],
         parameters=[
-            # {"base_link_frame": "actual_base_link"},
+            {"camera_name": "back_left"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
@@ -462,13 +439,9 @@ def launch_setup(context, *args, **kwargs):
             ("camera_topic", "/back_right_oak/rgb/image_rect"),
             ("lidar_topic", "/point_cloud/filtered"),
             ("bounding_boxes", "bounding_boxes/back_right"),
-            ("/refined_object_segments_viz", "/refined_object_segments_viz/back_right"),
-            ("/object_point_clouds_viz", "/object_point_clouds_viz/back_right"),
-            ("/refined_object_point_clouds_viz", "/refined_object_point_clouds_viz/back_right"),
-            ("/refined_object_point_clouds_segments", "/refined_object_point_clouds_segments/back_right"),
         ],
         parameters=[
-            # {"base_link_frame": "actual_base_link"},
+            {"camera_name": "back_right"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
@@ -507,8 +480,8 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
-            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-            # ("odometry/filtered", "odometry_correct/filtered")
+            ("obstacle_map/refined_untracked", "obstacle_map/local"),
+            ("obstacle_map/refined_tracked", "obstacle_map/global"),
         ],
         parameters=[slam_params]
     )
@@ -517,6 +490,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="navigation_server.py",
         parameters=[
+            {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
         ],
         output="screen",
@@ -633,9 +607,7 @@ def launch_setup(context, *args, **kwargs):
         # ekf_odom_node,
         # navsat_node,
         navigation_server,
-        # obstacle_bbox_overlay_node,
-        # obstacle_bbox_visualizer_node,
-        # obstacle_detector_node,
+        obstacle_detector_node,
         point_cloud_filter_node,
         rover_custom_controller,
         rover_lora_controller,
@@ -658,7 +630,7 @@ def launch_setup(context, *args, **kwargs):
         grid_map_generator,
         central_hub,
         # amcl_ld,
-        static_transforms_ld,
+        # static_transforms_ld,
         robot_state_publisher,
         # webcam_publisher,
         lidar_ld,

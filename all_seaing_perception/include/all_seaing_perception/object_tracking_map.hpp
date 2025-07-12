@@ -9,6 +9,7 @@
 #include <tuple>
 #include <chrono>
 #include <math.h>
+#include <deque>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -76,9 +77,6 @@ private:
     void publish_maps();
 
     void visualize_predictions();
-
-    // Get intrinsic camera model information needed for projection
-    void intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg);
     
     void publish_slam();
 
@@ -97,7 +95,7 @@ private:
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
     
-    std::vector<std::pair<float, float>> m_trace;
+    std::deque<std::tuple<float, float, float>> m_trace; // (x,y,time)
 
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_untracked_map_pub;
@@ -106,7 +104,6 @@ private:
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr m_slam_pub;
     rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_sub;
-    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
@@ -114,9 +111,6 @@ private:
     std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
     geometry_msgs::msg::TransformStamped m_base_link_map_tf, m_map_base_link_tf;
     rclcpp::TimerBase::SharedPtr odom_timer;
-
-    // Intrinsics callback camera model variables
-    image_geometry::PinholeCameraModel m_cam_model;
 
     //SLAM matrices & variables
     float m_range_std, m_bearing_std, m_new_obj_slam_thres;
@@ -130,11 +124,11 @@ private:
     nav_msgs::msg::Odometry m_last_odom_msg;
 
     bool m_is_sim;
-    bool m_check_fov;
     bool m_direct_tf;
     bool m_normalize_drop_thresh;
     bool m_include_odom_theta, m_include_odom_only_theta;
     std::string m_data_association_algo;
+    double m_trace_time;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();

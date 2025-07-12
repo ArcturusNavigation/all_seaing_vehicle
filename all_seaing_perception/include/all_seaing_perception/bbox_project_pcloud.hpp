@@ -49,6 +49,8 @@
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud_array.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud.hpp"
 
+#include "all_seaing_perception/perception_utilities.hpp"
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -131,6 +133,7 @@ private:
     bool m_is_sim, m_label_list, m_only_project;
     double m_bbox_margin;
     bool m_inc_segment;
+    std::string m_camera_name;
 
 public:
     BBoxProjectPCloud();

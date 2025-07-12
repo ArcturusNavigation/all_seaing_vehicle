@@ -15,7 +15,6 @@ object_tracking_map:
     update_odom_theta_uncertainty: 0.01
     new_object_slam_threshold: 2.0
     init_new_cov: 10.0
-    check_fov: True
     track_robot: True
     imu_predict: True
     gps_update: True
