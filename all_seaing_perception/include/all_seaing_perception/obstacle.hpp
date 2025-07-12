@@ -13,18 +13,19 @@
 
 namespace all_seaing_perception {
 
+template<typename PointT>
 class Obstacle {
 public:
     void to_ros_msg(all_seaing_interfaces::msg::Obstacle &out_obstacle_msg);
 
     Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
-             const pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr,
+             const typename pcl::PointCloud<PointT>::Ptr in_cloud_ptr,
              const std::vector<int> &in_cluster_indices, int in_id,
              geometry_msgs::msg::TransformStamped lidar_map_tf);
 
     Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
-                    const typename pcl::PointCloud<pcl::PointXYZI>::Ptr local_pcloud,
-                    const typename pcl::PointCloud<pcl::PointXYZI>::Ptr global_pcloud,
+                    const typename pcl::PointCloud<PointT>::Ptr local_pcloud,
+                    const typename pcl::PointCloud<PointT>::Ptr global_pcloud,
                     int in_id);
 
     virtual ~Obstacle();
@@ -32,12 +33,12 @@ public:
     int get_id();
     void set_id(int id);
 
-    pcl::PointXYZI get_local_point();
-    pcl::PointXYZI get_global_point();
-    pcl::PointXYZI get_bbox_min();
-    pcl::PointXYZI get_bbox_max();
-    pcl::PointXYZI get_global_bbox_min();
-    pcl::PointXYZI get_global_bbox_max();
+    PointT get_local_point();
+    PointT get_global_point();
+    PointT get_bbox_min();
+    PointT get_bbox_max();
+    PointT get_global_bbox_min();
+    PointT get_global_bbox_max();
 
     geometry_msgs::msg::PolygonStamped get_local_chull();
     geometry_msgs::msg::PolygonStamped get_global_chull();
@@ -47,12 +48,12 @@ private:
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header;
     int m_id;
-    pcl::PointXYZI m_local_point;
-    pcl::PointXYZI m_global_point;
-    pcl::PointXYZI m_bbox_min;
-    pcl::PointXYZI m_bbox_max;
-    pcl::PointXYZI m_global_bbox_min;
-    pcl::PointXYZI m_global_bbox_max;
+    PointT m_local_point;
+    PointT m_global_point;
+    PointT m_bbox_min;
+    PointT m_bbox_max;
+    PointT m_global_bbox_min;
+    PointT m_global_bbox_max;
     geometry_msgs::msg::PolygonStamped m_local_chull;
     geometry_msgs::msg::PolygonStamped m_global_chull;
     geometry_msgs::msg::TransformStamped m_lidar_map_tf;

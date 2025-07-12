@@ -118,7 +118,7 @@ namespace all_seaing_perception {
         std::vector<std::vector<float>> p, std::vector<std::vector<float>> probs, float new_obj_thres);
 
     void publish_map(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header, std::string ns, bool is_labeled,
-        const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map,
+        const std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> &map,
         rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub, std::vector<int> labels);
 
 } // namespace all_seaing_perception

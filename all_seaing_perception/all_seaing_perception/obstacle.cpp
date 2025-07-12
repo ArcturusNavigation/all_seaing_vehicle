@@ -13,29 +13,41 @@
 
 namespace all_seaing_perception {
 
-int Obstacle::get_id() { return m_id; }
+template<typename PointT>
+int Obstacle<PointT>::get_id() { return m_id; }
 
-void Obstacle::set_id(int id) { m_id = id; }
+template<typename PointT>
+void Obstacle<PointT>::set_id(int id) { m_id = id; }
 
-pcl::PointXYZI Obstacle::get_local_point() { return m_local_point; }
+template<typename PointT>
+PointT Obstacle<PointT>::get_local_point() { return m_local_point; }
 
-pcl::PointXYZI Obstacle::get_global_point() { return m_global_point; }
+template<typename PointT>
+PointT Obstacle<PointT>::get_global_point() { return m_global_point; }
 
-pcl::PointXYZI Obstacle::get_bbox_min() { return m_bbox_min; }
+template<typename PointT>
+PointT Obstacle<PointT>::get_bbox_min() { return m_bbox_min; }
 
-pcl::PointXYZI Obstacle::get_bbox_max() { return m_bbox_max; }
+template<typename PointT>
+PointT Obstacle<PointT>::get_bbox_max() { return m_bbox_max; }
 
-pcl::PointXYZI Obstacle::get_global_bbox_min() { return m_global_bbox_min; }
+template<typename PointT>
+PointT Obstacle<PointT>::get_global_bbox_min() { return m_global_bbox_min; }
 
-pcl::PointXYZI Obstacle::get_global_bbox_max() { return m_global_bbox_max; }
+template<typename PointT>
+PointT Obstacle<PointT>::get_global_bbox_max() { return m_global_bbox_max; }
 
-geometry_msgs::msg::PolygonStamped Obstacle::get_local_chull() { return m_local_chull; }
+template<typename PointT>
+geometry_msgs::msg::PolygonStamped Obstacle<PointT>::get_local_chull() { return m_local_chull; }
 
-geometry_msgs::msg::PolygonStamped Obstacle::get_global_chull() { return m_global_chull; }
+template<typename PointT>
+geometry_msgs::msg::PolygonStamped Obstacle<PointT>::get_global_chull() { return m_global_chull; }
 
-float Obstacle::get_polygon_area() { return m_area; }
+template<typename PointT>
+float Obstacle<PointT>::get_polygon_area() { return m_area; }
 
-void Obstacle::to_ros_msg(all_seaing_interfaces::msg::Obstacle &out_obstacle_msg) {
+template<typename PointT>
+void Obstacle<PointT>::to_ros_msg(all_seaing_interfaces::msg::Obstacle &out_obstacle_msg) {
 
     out_obstacle_msg.id = this->get_id();
 
@@ -74,8 +86,9 @@ void Obstacle::to_ros_msg(all_seaing_interfaces::msg::Obstacle &out_obstacle_msg
     out_obstacle_msg.global_bbox_max.z = this->get_global_bbox_max().z;
 }
 
-Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
-                   const pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr,
+template<typename PointT>
+Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
+                   const typename pcl::PointCloud<PointT>::Ptr in_cloud_ptr,
                    const std::vector<int> &in_cluster_indices, int in_id,
                    geometry_msgs::msg::TransformStamped lidar_map_tf) {
 
@@ -86,8 +99,8 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     m_lidar_map_tf = lidar_map_tf;
 
     // Fill cluster point by point
-    pcl::PointCloud<pcl::PointXYZI>::Ptr local_cluster_pc(new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::PointXYZI local_min, local_max, local_avg, global_min, global_max, global_avg;
+    typename pcl::PointCloud<PointT>::Ptr local_cluster_pc(new typename pcl::PointCloud<PointT>);
+    PointT local_min, local_max, local_avg, global_min, global_max, global_avg;
     local_min.x = std::numeric_limits<float>::max();
     local_min.y = std::numeric_limits<float>::max();
     local_min.z = std::numeric_limits<float>::max();
@@ -101,7 +114,7 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     global_max.y = std::numeric_limits<float>::lowest();
     global_max.z = std::numeric_limits<float>::lowest();
     for (auto pit = in_cluster_indices.begin(); pit != in_cluster_indices.end(); pit++) {
-        pcl::PointXYZI local_p, global_p;
+        PointT local_p, global_p;
         local_p = in_cloud_ptr->points[*pit];
 
         local_min.x = std::min(local_p.x, local_min.x);
@@ -162,14 +175,14 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     if (local_cluster_pc->points.size() < 3) return;
 
     // Flatten cluster point cloud to 2D
-    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZI>);
+    typename pcl::PointCloud<PointT>::Ptr cloud_2d(new typename pcl::PointCloud<PointT>);
     pcl::copyPointCloud(*local_cluster_pc, *cloud_2d);
     for (size_t i = 0; i < cloud_2d->points.size(); i++)
         cloud_2d->points[i].z = local_min.z;
 
     // Calculate convex hull polygon
-    pcl::PointCloud<pcl::PointXYZI>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::ConvexHull<pcl::PointXYZI> chull;
+    typename pcl::PointCloud<PointT>::Ptr hull_cloud(new typename pcl::PointCloud<PointT>);
+    pcl::ConvexHull<PointT> chull;
     chull.setInputCloud(cloud_2d);
     chull.reconstruct(*hull_cloud);
     m_area = pcl::calculatePolygonArea(*hull_cloud);
@@ -187,9 +200,10 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     }
 }
 
-Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
-                   const pcl::PointCloud<pcl::PointXYZI>::Ptr local_pcloud,
-                   const pcl::PointCloud<pcl::PointXYZI>::Ptr global_pcloud,
+template<typename PointT>
+Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
+                   const typename pcl::PointCloud<PointT>::Ptr local_pcloud,
+                   const typename pcl::PointCloud<PointT>::Ptr global_pcloud,
                    int in_id) {
 
     // Set id, header, and tf
@@ -198,7 +212,7 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     m_id = in_id;
 
     // Fill cluster point by point
-    pcl::PointXYZI local_min, local_max, local_avg, global_min, global_max, global_avg;
+    PointT local_min, local_max, local_avg, global_min, global_max, global_avg;
     local_min.x = std::numeric_limits<float>::max();
     local_min.y = std::numeric_limits<float>::max();
     local_min.z = std::numeric_limits<float>::max();
@@ -206,7 +220,7 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     local_max.y = std::numeric_limits<float>::lowest();
     local_max.z = std::numeric_limits<float>::lowest();
 
-    for (pcl::PointXYZI local_p: local_pcloud->points) {
+    for (PointT local_p: local_pcloud->points) {
         local_min.x = std::min(local_p.x, local_min.x);
         local_min.y = std::min(local_p.y, local_min.y);
         local_min.z = std::min(local_p.z, local_min.z);
@@ -226,7 +240,7 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     global_max.y = std::numeric_limits<float>::lowest();
     global_max.z = std::numeric_limits<float>::lowest();
 
-    for (pcl::PointXYZI global_p: global_pcloud->points) {
+    for (PointT global_p: global_pcloud->points) {
         global_min.x = std::min(global_p.x, global_min.x);
         global_min.y = std::min(global_p.y, global_min.y);
         global_min.z = std::min(global_p.z, global_min.z);
@@ -260,19 +274,19 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     m_global_bbox_min = global_min;
     m_global_bbox_max = global_max;
 
-    pcl::PointCloud<pcl::PointXYZI>::Ptr local_hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::PointCloud<pcl::PointXYZI>::Ptr global_hull_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+    typename pcl::PointCloud<PointT>::Ptr local_hull_cloud(new typename pcl::PointCloud<PointT>);
+    typename pcl::PointCloud<PointT>::Ptr global_hull_cloud(new typename pcl::PointCloud<PointT>);
 
     // Skip chull calculation if less than 3 points
     if (local_pcloud->points.size() >= 3){
         // Flatten cluster point cloud to 2D
-        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZI>);
+        typename pcl::PointCloud<PointT>::Ptr cloud_2d(new typename pcl::PointCloud<PointT>);
         pcl::copyPointCloud(*local_pcloud, *cloud_2d);
         for (size_t i = 0; i < cloud_2d->points.size(); i++)
             cloud_2d->points[i].z = local_min.z;
 
         // Calculate convex hull polygon
-        pcl::ConvexHull<pcl::PointXYZI> chull;
+        pcl::ConvexHull<PointT> chull;
         chull.setInputCloud(cloud_2d);
         chull.reconstruct(*local_hull_cloud);
         m_area = pcl::calculatePolygonArea(*local_hull_cloud);
@@ -280,13 +294,13 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
 
     if (global_pcloud->points.size() >= 3){
         // Flatten cluster point cloud to 2D
-        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZI>);
+        typename pcl::PointCloud<PointT>::Ptr cloud_2d(new typename pcl::PointCloud<PointT>);
         pcl::copyPointCloud(*global_pcloud, *cloud_2d);
         for (size_t i = 0; i < cloud_2d->points.size(); i++)
             cloud_2d->points[i].z = local_min.z;
 
         // Calculate convex hull polygon
-        pcl::ConvexHull<pcl::PointXYZI> chull;
+        pcl::ConvexHull<PointT> chull;
         chull.setInputCloud(cloud_2d);
         chull.reconstruct(*global_hull_cloud);
     }
@@ -309,6 +323,11 @@ Obstacle::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header glo
     }
 }
 
-Obstacle::~Obstacle() {}
+template<typename PointT>
+Obstacle<PointT>::~Obstacle() {}
+
+template class Obstacle<pcl::PointXYZ>;
+template class Obstacle<pcl::PointXYZI>;
+template class Obstacle<pcl::PointXYZHSV>;
 
 } // namespace all_seaing_perception

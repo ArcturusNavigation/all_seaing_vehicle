@@ -477,7 +477,7 @@ void ObjectTrackingMap::update_maps(){
 
 void ObjectTrackingMap::publish_maps(){
     // Publish map with tracked obstacles
-    std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> tracked_obs;
+    std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> tracked_obs;
     std::vector<int> tracked_labels;
     for (std::shared_ptr<all_seaing_perception::ObjectCloud> t_ob : m_tracked_obstacles) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr local_tracked_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -498,8 +498,8 @@ void ObjectTrackingMap::publish_maps(){
             global_tracked_cloud->push_back(i_pt);
         }
 
-        std::shared_ptr<all_seaing_perception::Obstacle> tracked_ob(
-            new all_seaing_perception::Obstacle(m_local_header, m_global_header, local_tracked_cloud, global_tracked_cloud,
+        std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>> tracked_ob(
+            new all_seaing_perception::Obstacle<pcl::PointXYZI>(m_local_header, m_global_header, local_tracked_cloud, global_tracked_cloud,
                                                 t_ob->id));
         tracked_labels.push_back(t_ob->label);
         tracked_obs.push_back(tracked_ob);
@@ -661,7 +661,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         detected_obstacles.push_back(obj_cloud);
     }
     // Make and publish untracked map
-    std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> untracked_obs;
+    std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> untracked_obs;
     std::vector<int> untracked_labels;
     for (std::shared_ptr<all_seaing_perception::ObjectCloud> det_obs : detected_obstacles) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -674,8 +674,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
         std::vector<int> ind(raw_cloud->size());
         std::iota(std::begin(ind), std::end(ind), 0); 
-        std::shared_ptr<all_seaing_perception::Obstacle> untracked_ob(
-            new all_seaing_perception::Obstacle(m_local_header, m_global_untracked_header, raw_cloud, ind,
+        std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>> untracked_ob(
+            new all_seaing_perception::Obstacle<pcl::PointXYZI>(m_local_header, m_global_untracked_header, raw_cloud, ind,
                                                 m_obstacle_id++, m_map_base_link_tf));
         untracked_labels.push_back(det_obs->label);
         untracked_obs.push_back(untracked_ob);
