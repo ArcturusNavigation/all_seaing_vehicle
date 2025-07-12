@@ -9,6 +9,7 @@
 
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
+#include "tf2/LinearMath/Quaternion.h"
 
 #include "geometry_msgs/msg/polygon.hpp"
 #include "geometry_msgs/msg/point.hpp"
@@ -59,6 +60,9 @@ public:
 
     void local_to_global(std_msgs::msg::Header global_header, geometry_msgs::msg::TransformStamped lidar_map_tf);
     void global_to_local(std_msgs::msg::Header local_header, geometry_msgs::msg::TransformStamped map_lidar_tf);
+
+    void local_to_global(std_msgs::msg::Header global_header, double dx, double dy, double dtheta);
+    void global_to_local(std_msgs::msg::Header local_header, double dx, double dy, double dtheta);
 
 private:
     std_msgs::msg::Header m_local_header;

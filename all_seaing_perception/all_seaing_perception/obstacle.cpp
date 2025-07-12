@@ -401,10 +401,37 @@ void Obstacle<PointT>::global_to_local(std_msgs::msg::Header local_header, geome
 }
 
 template<typename PointT>
+void Obstacle<PointT>::local_to_global(std_msgs::msg::Header global_header, double dx, double dy, double dtheta){
+    geometry_msgs::msg::TransformStamped lidar_map_tf;
+    lidar_map_tf.header = global_header;
+    lidar_map_tf.child_frame_id = m_local_header.frame_id;
+    lidar_map_tf.transform.translation.x = dx;
+    lidar_map_tf.transform.translation.y = dy;
+    tf2::Quaternion q;
+    q.setRPY(0, 0, dtheta);
+    lidar_map_tf.transform.rotation = tf2::toMsg(q);
+    local_to_global(global_header, lidar_map_tf);
+}
+
+template<typename PointT>
+void Obstacle<PointT>::global_to_local(std_msgs::msg::Header local_header, double dx, double dy, double dtheta){
+    geometry_msgs::msg::TransformStamped map_lidar_tf;
+    map_lidar_tf.header = local_header;
+    map_lidar_tf.child_frame_id = m_global_header.frame_id;
+    map_lidar_tf.transform.translation.x = dx;
+    map_lidar_tf.transform.translation.y = dy;
+    tf2::Quaternion q;
+    q.setRPY(0, 0, dtheta);
+    map_lidar_tf.transform.rotation = tf2::toMsg(q);
+    local_to_global(local_header, map_lidar_tf);
+}
+
+template<typename PointT>
 Obstacle<PointT>::~Obstacle() {}
 
 template class Obstacle<pcl::PointXYZ>;
 template class Obstacle<pcl::PointXYZI>;
 template class Obstacle<pcl::PointXYZHSV>;
+template class Obstacle<pcl::PointXYZRGB>;
 
 } // namespace all_seaing_perception
