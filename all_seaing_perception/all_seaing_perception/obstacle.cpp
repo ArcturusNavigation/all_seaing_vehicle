@@ -87,6 +87,22 @@ void Obstacle<PointT>::to_ros_msg(all_seaing_interfaces::msg::Obstacle &out_obst
 }
 
 template<typename PointT>
+Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header, all_seaing_interfaces::msg::Obstacle in_obstacle_msg){
+    m_local_chull = in_obstacle_msg.local_chull;
+    m_global_chull = in_obstacle_msg.global_chull;
+    std::tie(m_local_point.x, m_local_point.y, m_local_point.z) = std::tie(in_obstacle_msg.local_point.point.x, in_obstacle_msg.local_point.point.y, in_obstacle_msg.local_point.point.z);
+    std::tie(m_global_point.x, m_global_point.y, m_global_point.z) = std::tie(in_obstacle_msg.global_point.point.x, in_obstacle_msg.global_point.point.y, in_obstacle_msg.global_point.point.z);
+    std::tie(m_bbox_min.x, m_bbox_min.y, m_bbox_min.z) = std::tie(in_obstacle_msg.bbox_min.x, in_obstacle_msg.bbox_min.y, in_obstacle_msg.bbox_min.z);
+    std::tie(m_bbox_max.x, m_bbox_max.y, m_bbox_max.z) = std::tie(in_obstacle_msg.bbox_max.x, in_obstacle_msg.bbox_max.y, in_obstacle_msg.bbox_max.z);
+    std::tie(m_global_bbox_min.x, m_global_bbox_min.y, m_global_bbox_min.z) = std::tie(in_obstacle_msg.global_bbox_min.x, in_obstacle_msg.global_bbox_min.y, in_obstacle_msg.global_bbox_min.z);
+    std::tie(m_global_bbox_max.x, m_global_bbox_max.y, m_global_bbox_max.z) = std::tie(in_obstacle_msg.global_bbox_max.x, in_obstacle_msg.global_bbox_max.y, in_obstacle_msg.global_bbox_max.z);
+    m_local_header = local_header;
+    m_global_header = global_header;
+    m_area = in_obstacle_msg.polygon_area;
+    m_id = in_obstacle_msg.id;
+}
+
+template<typename PointT>
 Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
                    const typename pcl::PointCloud<PointT>::Ptr in_cloud_ptr,
                    const std::vector<int> &in_cluster_indices, int in_id,
@@ -401,6 +417,41 @@ void Obstacle<PointT>::global_to_local(std_msgs::msg::Header local_header, geome
 }
 
 template<typename PointT>
+void Obstacle<PointT>::global_transform(geometry_msgs::msg::TransformStamped tf){ // apply the tf to the whole obstacle
+    PointT new_global_pt;
+    transform_pcl_pt(m_global_point, new_global_pt, tf);
+    geometry_msgs::msg::PolygonStamped new_global_chull;
+    tf2::doTransform<geometry_msgs::msg::PolygonStamped>(m_global_chull, new_global_chull, tf);
+    // compute local bbox from chull (but get z components from min and max transformed z components of global bbox)
+    PointT new_min, new_max;
+    new_min.x = std::numeric_limits<float>::max();
+    new_min.y = std::numeric_limits<float>::max();
+    new_min.z = std::numeric_limits<float>::max();
+    new_max.x = std::numeric_limits<float>::lowest();
+    new_max.y = std::numeric_limits<float>::lowest();
+    new_max.z = std::numeric_limits<float>::lowest();
+    for(geometry_msgs::msg::Point32 pt : new_global_chull.polygon.points){
+        new_min.x = std::min(pt.x, new_min.x);
+        new_min.y = std::min(pt.y, new_min.y);
+        new_min.z = std::min(pt.z, new_min.z);
+        new_max.x = std::max(pt.x, new_max.x);
+        new_max.y = std::max(pt.y, new_max.y);
+        new_max.z = std::max(pt.z, new_max.z);
+    }
+    m_global_point = new_global_pt;
+    m_global_chull = new_global_chull;
+    PointT bbox_min_tf, bbox_max_tf;
+    transform_pcl_pt(m_global_bbox_min, bbox_min_tf, tf);
+    transform_pcl_pt(m_global_bbox_max, bbox_max_tf, tf);
+    new_min.z = std::min(bbox_min_tf.z, new_min.z);
+    new_min.z = std::min(bbox_max_tf.z, new_min.z);
+    new_max.z = std::max(bbox_min_tf.z, new_max.z);
+    new_max.z = std::max(bbox_max_tf.z, new_max.z);
+    m_global_bbox_min = new_min;
+    m_global_bbox_max = new_max;
+}
+
+template<typename PointT>
 void Obstacle<PointT>::local_to_global(std_msgs::msg::Header global_header, double dx, double dy, double dtheta){
     geometry_msgs::msg::TransformStamped lidar_map_tf;
     lidar_map_tf.header = global_header;
@@ -424,6 +475,17 @@ void Obstacle<PointT>::global_to_local(std_msgs::msg::Header local_header, doubl
     q.setRPY(0, 0, dtheta);
     map_lidar_tf.transform.rotation = tf2::toMsg(q);
     local_to_global(local_header, map_lidar_tf);
+}
+
+template<typename PointT>
+void Obstacle<PointT>::global_transform(double dx, double dy, double dtheta){
+    geometry_msgs::msg::TransformStamped tf;
+    tf.transform.translation.x = dx;
+    tf.transform.translation.y = dy;
+    tf2::Quaternion q;
+    q.setRPY(0, 0, dtheta);
+    tf.transform.rotation = tf2::toMsg(q);
+    global_transform(tf);
 }
 
 template<typename PointT>

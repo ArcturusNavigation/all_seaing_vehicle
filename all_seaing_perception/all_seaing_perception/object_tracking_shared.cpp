@@ -2,41 +2,24 @@
 
 namespace all_seaing_perception{
 
-    ObjectCloud::ObjectCloud(rclcpp::Time t, int l, pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc,
-                         pcl::PointCloud<pcl::PointXYZHSV>::Ptr glob) {
-        id = -1;
+    template<typename PointT>
+    ObjectCloud<PointT>::ObjectCloud(rclcpp::Time t, int l, typename all_seaing_perception::Obstacle<PointT> obs) : obstacle(obs) {
         label = l;
         time_seen = t;
         last_dead = rclcpp::Time(0);
         time_dead = rclcpp::Duration(0, 0);
         is_dead = false;
-        global_pcloud_ptr = glob;
-        for (pcl::PointXYZHSV &global_pt : global_pcloud_ptr->points) {
-            global_centroid.x += global_pt.x / ((double)global_pcloud_ptr->points.size());
-            global_centroid.y += global_pt.y / ((double)global_pcloud_ptr->points.size());
-            global_centroid.z += global_pt.z / ((double)global_pcloud_ptr->points.size());
-        }
-        this->update_loc_pcloud(loc);
     }
 
-    void ObjectCloud::update_loc_pcloud(pcl::PointCloud<pcl::PointXYZHSV>::Ptr loc) {
-        local_pcloud_ptr = loc;
-        for (pcl::PointXYZHSV &local_pt : local_pcloud_ptr->points) {
-            local_centroid.x += local_pt.x / ((double)local_pcloud_ptr->points.size());
-            local_centroid.y += local_pt.y / ((double)local_pcloud_ptr->points.size());
-            local_centroid.z += local_pt.z / ((double)local_pcloud_ptr->points.size());
-        }
-    }
-
-    std::shared_ptr<ObjectCloud> clone(std::shared_ptr<ObjectCloud> orig){
-        std::shared_ptr<ObjectCloud> new_ocl = std::make_shared<ObjectCloud>(*orig);
-        new_ocl->local_pcloud_ptr = (*orig->local_pcloud_ptr).makeShared();
-        new_ocl->global_pcloud_ptr = (*orig->global_pcloud_ptr).makeShared();
+    template<typename PointT>
+    std::shared_ptr<ObjectCloud<PointT>> clone(typename std::shared_ptr<ObjectCloud<PointT>> orig){
+        std::shared_ptr<ObjectCloud<PointT>> new_ocl = std::make_shared<ObjectCloud<PointT>>(*orig);
         return new_ocl;
     }
 
-    std::vector<std::shared_ptr<ObjectCloud>> clone(std::vector<std::shared_ptr<ObjectCloud>> orig){
-        std::vector<std::shared_ptr<ObjectCloud>> new_vec;
+    template<typename PointT>
+    std::vector<std::shared_ptr<ObjectCloud<PointT>>> clone(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> orig){
+        std::vector<std::shared_ptr<ObjectCloud<PointT>>> new_vec;
         for(auto ocl : orig){
             new_vec.push_back(clone(ocl));
         }
@@ -77,7 +60,8 @@ namespace all_seaing_perception{
     }
 
     //(range, bearing, signature)
-    std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZ point, int label) {
+    template<typename PointT>
+    std::tuple<float, float, int> local_to_range_bearing_signature(PointT point, int label) {
         double range = std::hypot(point.x, point.y);
         double bearing = mod_2pi(std::atan2(point.y, point.x));
         return std::make_tuple(range, bearing, label);
@@ -94,8 +78,9 @@ namespace all_seaing_perception{
         return tf;
     }
 
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
-        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+    template<typename PointT>
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
         std::vector<std::vector<float>> p, float new_obj_thres){
         // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
         std::vector<int> match(detected_obstacles.size(), -1);
@@ -126,8 +111,9 @@ namespace all_seaing_perception{
         return std::make_tuple(match, chosen_detected, chosen_tracked);
     }
 
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
-        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+    template<typename PointT>
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
         std::vector<std::vector<float>> p, float new_obj_thres){
         // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
         std::vector<int> match(detected_obstacles.size(), -1);
@@ -153,8 +139,9 @@ namespace all_seaing_perception{
         return std::make_tuple(match, chosen_detected, chosen_tracked);
     }
 
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
-        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+    template<typename PointT>
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
+        typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
         std::vector<std::vector<float>> p, float new_obj_thres, bool sqrt){
         // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
         // sqrt is whether we are using the Mahalanobis distances (sqrt of p values) and not their squares (p values)
@@ -204,8 +191,9 @@ namespace all_seaing_perception{
         return std::make_tuple(match, chosen_detected, chosen_tracked);
     }
     
-    std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud>> tracked_obstacles,
-        std::vector<std::shared_ptr<ObjectCloud>> detected_obstacles,
+    template<typename PointT>
+    std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
+        typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
         std::vector<std::vector<float>> p, std::vector<std::vector<float>> probs, float new_obj_thres){
         // Compute weight of particle based on the probability of the correspondence of matched obstacles (detections<->map)
         // which is the product of the probabilities of each detection given the measurement prediction and covariance
@@ -226,26 +214,77 @@ namespace all_seaing_perception{
         return std::make_tuple(weight, match, chosen_detected, chosen_tracked); 
     }
 
-    void publish_map(
-        std_msgs::msg::Header local_header, std_msgs::msg::Header global_header, std::string ns, bool is_labeled,
-        const std::vector<std::shared_ptr<Obstacle<pcl::PointXYZI>>> &map,
-        rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr pub,
-        std::vector<int> labels) {
-    
-        all_seaing_interfaces::msg::ObstacleMap map_msg;
-        map_msg.ns = ns;
-        map_msg.local_header = local_header;
-        map_msg.header = global_header;
-        map_msg.is_labeled = is_labeled;
-        for (size_t i = 0; i < map.size(); i++) {
-            all_seaing_interfaces::msg::Obstacle det_obstacle;
-            map[i]->to_ros_msg(det_obstacle);
-            if (is_labeled) {
-                det_obstacle.label = labels[i];
-            }
-            map_msg.obstacles.push_back(det_obstacle);
-        }
-        pub->publish(map_msg);
-    }
+    template class ObjectCloud<pcl::PointXYZ>;
+    template class ObjectCloud<pcl::PointXYZI>;
+    template class ObjectCloud<pcl::PointXYZHSV>;
+    template class ObjectCloud<pcl::PointXYZRGB>;
 
+    template std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZ point, int label);
+    template std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZI point, int label);
+    template std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZHSV point, int label);
+    template std::tuple<float, float, int> local_to_range_bearing_signature(pcl::PointXYZRGB point, int label);
+
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZ>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZ>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
+    
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZI>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZI>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
+    
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZHSV>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZHSV>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
+
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZRGB>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZRGB>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
+
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZ>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZ>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
+    
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZI>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZI>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
+    
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZHSV>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZHSV>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
+
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZRGB>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZRGB>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
+    
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZ>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZ>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres, bool sqrt);
+    
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZI>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZI>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres, bool sqrt);
+    
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZHSV>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZHSV>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres, bool sqrt);
+
+    template std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZRGB>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZRGB>>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres, bool sqrt);
+    
+    template std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZ>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZ>>> detected_obstacles,
+        std::vector<std::vector<float>> p, std::vector<std::vector<float>> probs, float new_obj_thres);
+    
+    template std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZI>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZI>>> detected_obstacles,
+        std::vector<std::vector<float>> p, std::vector<std::vector<float>> probs, float new_obj_thres);
+    
+    template std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZHSV>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZHSV>>> detected_obstacles,
+        std::vector<std::vector<float>> p, std::vector<std::vector<float>> probs, float new_obj_thres);
+
+    template std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZRGB>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<pcl::PointXYZRGB>>> detected_obstacles,
+        std::vector<std::vector<float>> p, std::vector<std::vector<float>> probs, float new_obj_thres);
 }

@@ -30,6 +30,7 @@ ament_auto_add_executable(
     bbox_project_pcloud
     ${PROJECT_NAME}/bbox_project_pcloud.cpp
     ${PROJECT_NAME}/perception_utilities.cpp
+    ${PROJECT_NAME}/obstacle.cpp
 )
 ament_auto_add_executable(
     object_tracking_map

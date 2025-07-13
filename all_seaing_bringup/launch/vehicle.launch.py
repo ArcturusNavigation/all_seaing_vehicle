@@ -479,7 +479,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
+            ("detections", "detections/merged"),
             ("obstacle_map/refined_untracked", "obstacle_map/local"),
             ("obstacle_map/refined_tracked", "obstacle_map/global"),
         ],

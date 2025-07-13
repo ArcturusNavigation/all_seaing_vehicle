@@ -64,7 +64,7 @@
 
 class ObjectTrackingMap : public rclcpp::Node{
 private:
-    void object_track_map_publish(const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &msg);
+    void object_track_map_publish(const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr &msg);
     void odom_callback();
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
     template <typename T>
@@ -81,7 +81,7 @@ private:
     void publish_slam();
 
     // Member variables
-    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud>> m_tracked_obstacles;
+    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>> m_tracked_obstacles;
     std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header, m_global_untracked_header;
@@ -98,12 +98,11 @@ private:
     std::deque<std::tuple<float, float, float>> m_trace; // (x,y,time)
 
     // Publishers and subscribers
-    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_untracked_map_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_map_cov_viz_pub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr m_slam_pub;
-    rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_sub;
+    rclcpp::Subscription<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_object_sub;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};

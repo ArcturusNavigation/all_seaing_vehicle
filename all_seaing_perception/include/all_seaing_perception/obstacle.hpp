@@ -25,6 +25,8 @@ class Obstacle {
 public:
     void to_ros_msg(all_seaing_interfaces::msg::Obstacle &out_obstacle_msg);
 
+    Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header, all_seaing_interfaces::msg::Obstacle in_obstacle_msg);
+
     Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::Header global_header,
              const typename pcl::PointCloud<PointT>::Ptr in_cloud_ptr,
              const std::vector<int> &in_cluster_indices, int in_id,
@@ -63,6 +65,9 @@ public:
 
     void local_to_global(std_msgs::msg::Header global_header, double dx, double dy, double dtheta);
     void global_to_local(std_msgs::msg::Header local_header, double dx, double dy, double dtheta);
+
+    void global_transform(geometry_msgs::msg::TransformStamped tf);
+    void global_transform(double dx, double dy, double dtheta);
 
 private:
     std_msgs::msg::Header m_local_header;
