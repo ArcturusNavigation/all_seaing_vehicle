@@ -256,8 +256,6 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("obstacle_map/refined_untracked", "obstacle_map/local"),
-            ("obstacle_map/refined_tracked", "obstacle_map/global"),
         ],
         # parameters=[slam_sim_params],
         parameters=[slam_real_params],

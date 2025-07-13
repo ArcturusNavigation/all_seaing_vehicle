@@ -480,8 +480,6 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("detections", "detections/merged"),
-            ("obstacle_map/refined_untracked", "obstacle_map/local"),
-            ("obstacle_map/refined_tracked", "obstacle_map/global"),
         ],
         parameters=[slam_params]
     )
