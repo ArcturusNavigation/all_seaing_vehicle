@@ -86,7 +86,22 @@ def launch_setup(context, *args, **kwargs):
         executable="navsat_transform_node",
         parameters=[
             robot_localization_params,
-            {"datum": [lat, lon, 0.0]},
+            # {"datum": [lat, lon, 0.0]},
+        ],remappings=[
+            ("/imu/data", "/mavros/imu/data")
+        ]
+    )
+
+    odometry_publisher_node = launch_ros.actions.Node(
+        package = "all_seaing_perception",
+        executable = "odometry_publisher.py",
+        output = "screen",
+        remappings=[
+            ("gps_topic", "/mavros/global_position/global"),
+            ("odom_topic", "/odometry/filtered")
+        ],
+        parameters=[
+
         ]
     )
 
@@ -331,6 +346,7 @@ def launch_setup(context, *args, **kwargs):
         ekf_node,
         # ekf_odom_node,
         # navsat_node,
+        odometry_publisher_node,
         oak_ld,
         buoy_yolo_node,
         buoy_yolo_node_back_left,
