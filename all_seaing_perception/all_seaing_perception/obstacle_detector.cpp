@@ -48,7 +48,7 @@ public:
     }
 
 private:
-    std::vector<std::shared_ptr<all_seaing_perception::Obstacle>>
+    std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>>
     cluster_cloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &in_cloud_ptr) {
 
         // Flatten input point cloud to 2D
@@ -62,17 +62,17 @@ private:
         all_seaing_perception::euclideanClustering(cloud_2d, obstacles_indices, m_clustering_distance, m_obstacle_size_min, m_obstacle_size_max);
 
         // Cluster points into obstacles
-        std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> obstacles;
+        std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> obstacles;
         for (auto it = obstacles_indices.begin(); it != obstacles_indices.end(); it++) {
-            std::shared_ptr<all_seaing_perception::Obstacle> obstacle(
-                new all_seaing_perception::Obstacle(m_local_header, m_global_header, in_cloud_ptr,
+            std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>> obstacle(
+                new all_seaing_perception::Obstacle<pcl::PointXYZI>(m_local_header, m_global_header, in_cloud_ptr,
                                                     it->indices, m_obstacle_id++, m_lidar_map_tf));
             obstacles.push_back(obstacle);
         }
         return obstacles;
     }
 
-    void publish_map(const std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> &map) {
+    void publish_map(const std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> &map) {
         all_seaing_interfaces::msg::ObstacleMap map_msg;
         map_msg.ns = "raw";
         map_msg.local_header = m_local_header;
@@ -99,7 +99,7 @@ private:
         pcl::fromROSMsg(*in_cloud, *cloud_ptr);
 
         // Cluster the pointcloud by the distance of the points
-        std::vector<std::shared_ptr<all_seaing_perception::Obstacle>> raw_obstacles =
+        std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> raw_obstacles =
             cluster_cloud(cloud_ptr);
 
         // Publish raw map

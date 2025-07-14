@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from all_seaing_interfaces.msg import LabeledObjectPointCloudArray, LabeledObjectPointCloud
+from all_seaing_interfaces.msg import ObstacleMap
 from rclpy.qos import qos_profile_sensor_data
 from message_filters import Subscriber, TimeSynchronizer, ApproximateTimeSynchronizer
 
@@ -26,13 +26,13 @@ class MulticamDetectionMerge(Node):
         if not self.individual:
             self.detection_subs = []
             if self.enable_front:
-                self.detection_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/front")
+                self.detection_sub = Subscriber(self, ObstacleMap, "detections/front")
                 self.detection_subs.append(self.detection_sub)
             if self.enable_back_left:
-                self.detection_back_left_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_left")
+                self.detection_back_left_sub = Subscriber(self, ObstacleMap, "detections/back_left")
                 self.detection_subs.append(self.detection_back_left_sub)
             if self.enable_back_right:
-                self.detection_back_right_sub = Subscriber(self, LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_right")
+                self.detection_back_right_sub = Subscriber(self, ObstacleMap, "detections/back_right")
                 self.detection_subs.append(self.detection_back_right_sub)
             if not self.approximate:
                 self.sync = TimeSynchronizer(self.detection_subs, 10)
@@ -41,20 +41,25 @@ class MulticamDetectionMerge(Node):
             self.sync.registerCallback(self.detection_sync_callback)
         else:
             if self.enable_front:
-                self.detection_sub = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/front", self.detection_sync_callback, 10)
+                self.detection_sub = self.create_subscription(ObstacleMap, "detections/front", self.detection_sync_callback, 10)
             if self.enable_back_left:
-                self.detection_sub_back_left = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_left", self.detection_sync_callback, 10)
+                self.detection_sub_back_left = self.create_subscription(ObstacleMap, "detections/back_left", self.detection_sync_callback, 10)
             if self.enable_back_right:
-                self.detection_sub_back_right = self.create_subscription(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/back_right", self.detection_sync_callback, 10)
+                self.detection_sub_back_right = self.create_subscription(ObstacleMap, "detections/back_right", self.detection_sync_callback, 10)
         
-        self.merged_detection_pub = self.create_publisher(LabeledObjectPointCloudArray, "refined_object_point_clouds_segments/merged", 10)
+        self.merged_detection_pub = self.create_publisher(ObstacleMap, "detections/merged", 10)
     
     def detection_sync_callback(self, *args):
         # we assume all the detections are on the same frame (base_link or something equivalent)
-        merged_detections = LabeledObjectPointCloudArray()
+        merged_detections = ObstacleMap()
+        detections: ObstacleMap
         for detections in args:
             merged_detections.header = detections.header
-            merged_detections.objects.extend(detections.objects)
+            merged_detections.local_header = detections.local_header
+            merged_detections.ns = detections.ns
+            merged_detections.is_labeled = detections.is_labeled
+            
+            merged_detections.obstacles.extend(detections.obstacles)
         self.merged_detection_pub.publish(merged_detections)
         
 def main():

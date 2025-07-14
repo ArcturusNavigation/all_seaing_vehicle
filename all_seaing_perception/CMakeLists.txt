@@ -30,6 +30,7 @@ ament_auto_add_executable(
     bbox_project_pcloud
     ${PROJECT_NAME}/bbox_project_pcloud.cpp
     ${PROJECT_NAME}/perception_utilities.cpp
+    ${PROJECT_NAME}/obstacle.cpp
 )
 ament_auto_add_executable(
     object_tracking_map
@@ -58,6 +59,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/yolov8_node.py
     ${PROJECT_NAME}/perception_eval.py
     ${PROJECT_NAME}/multicam_detection_merge.py
+    ${PROJECT_NAME}/odometry_publisher.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

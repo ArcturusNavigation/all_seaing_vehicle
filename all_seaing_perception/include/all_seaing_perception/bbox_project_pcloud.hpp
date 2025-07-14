@@ -48,8 +48,11 @@
 #include "all_seaing_interfaces/msg/labeled_bounding_box2_d.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud_array.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud.hpp"
+#include "all_seaing_interfaces/msg/obstacle.hpp"
+#include "all_seaing_interfaces/msg/obstacle_map.hpp"
 
 #include "all_seaing_perception/perception_utilities.hpp"
+#include "all_seaing_perception/obstacle.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
@@ -59,10 +62,8 @@ private:
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_pcl_pub;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_object_pcl_viz_pub;
-    rclcpp::Publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_refined_object_pcl_segment_pub;
+    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_detection_pub;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_refined_object_pcl_viz_pub;
-    // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_refined_object_segment_viz_pub;
-    // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_pcl_img_pub;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> m_cloud_sub;
@@ -132,8 +133,9 @@ private:
 
     bool m_is_sim, m_label_list, m_only_project;
     double m_bbox_margin;
-    bool m_inc_segment;
     std::string m_camera_name;
+
+    std_msgs::msg::Header m_local_header;
 
 public:
     BBoxProjectPCloud();

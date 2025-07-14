@@ -42,9 +42,6 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     matching_weights_file = this->get_parameter("matching_weights_file").as_string();
     contour_matching_color_ranges_file = this->get_parameter("contour_matching_color_ranges_file").as_string();
 
-    this->declare_parameter("include_image_segment", false);
-    m_inc_segment = this->get_parameter("include_image_segment").as_bool();
-
     this->declare_parameter<std::string>("camera_name", "");
     m_camera_name = this->get_parameter("camera_name").as_string();
 
@@ -64,7 +61,7 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     // Publishers
     m_object_pcl_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>(m_camera_name!=""?std::string("labeled_object_point_clouds/")+m_camera_name:"labeled_object_point_clouds", 5);
     m_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(m_camera_name!=""?std::string("object_point_clouds_viz/")+m_camera_name:"object_point_clouds_viz", 5);
-    m_refined_object_pcl_segment_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>(m_camera_name!=""?std::string("refined_object_point_clouds_segments/")+m_camera_name:"refined_object_point_clouds_segments", 5);
+    m_detection_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(m_camera_name!=""?std::string("detections/")+m_camera_name:"detections", 5);
     m_refined_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(m_camera_name!=""?std::string("refined_object_point_clouds_viz/")+m_camera_name:"refined_object_point_clouds_viz", 5);
 
     // get color label mappings from yaml
@@ -216,11 +213,17 @@ void BBoxProjectPCloud::bb_pcl_project(
     if(m_only_project) return;
 
     // REFINE OBJECT POINT CLOUDS
-    auto refined_objects_pub = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
-    refined_objects_pub.header.stamp = in_cloud_msg->header.stamp;
-    refined_objects_pub.header.frame_id = m_base_link_frame;
-    std::vector<std::pair<pcl::PointCloud<pcl::PointXYZHSV>, std::vector<cv::Point>>> refined_cloud_contour_vec;
+    auto refined_objects_msg = all_seaing_interfaces::msg::ObstacleMap();
+    m_local_header.stamp = in_cloud_msg->header.stamp;
+    m_local_header.frame_id = m_base_link_frame;
+    refined_objects_msg.local_header = m_local_header;
+    refined_objects_msg.ns = "labeled";
+    refined_objects_msg.is_labeled = true;
 
+    pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
+    all_obj_refined_pcls_ptr->header = in_cloud_tf_ptr->header;
+
+    int id = 0;
     for(auto bbox_pcloud_pair : bbox_pcloud_objects){
         all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = bbox_pcloud_pair.first;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
@@ -388,43 +391,29 @@ void BBoxProjectPCloud::bb_pcl_project(
             }
         }
 
-        auto refined_pcl_segments = all_seaing_interfaces::msg::LabeledObjectPointCloud();
-        refined_pcl_segments.time = in_cloud_msg->header.stamp;
-        refined_pcl_segments.label = bbox.label;
-        refined_pcl_segments.camera_name = m_camera_name;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         refined_cloud_ptr->header = pcloud_ptr->header;
-        if(m_inc_segment){
-            cv::Mat refined_obj_contour_mat = cv::Mat::zeros(img_sz, CV_8UC3);
-            for (cv::Point image_pt : in_contours[opt_contour_id]){
-                refined_obj_contour_mat.at<cv::Vec3b>(image_pt) = cv::Vec3b(255,255,255);
-            }
-            cv_bridge::CvImagePtr refined_obj_contour_ptr(new cv_bridge::CvImage(in_img_msg->header, sensor_msgs::image_encodings::TYPE_8UC3, refined_obj_contour_mat));
-            refined_pcl_segments.segment = *refined_obj_contour_ptr->toImageMsg();
-        }
         for (pcl::index_t ind : clusters_indices[opt_cluster_id].indices){
             pcl::PointXYZHSV pt = pcloud_ptr->points[ind];
             refined_cloud_ptr->push_back(pt);
         }
-        auto pcls_camera_msg = sensor_msgs::msg::PointCloud2();
+        sensor_msgs::msg::PointCloud2 pcls_camera_msg, pcl_base_link_msg;
         pcl::toROSMsg(*refined_cloud_ptr, pcls_camera_msg);
-        tf2::doTransform<sensor_msgs::msg::PointCloud2>(pcls_camera_msg, refined_pcl_segments.cloud, m_cam_base_link_tf);
-        refined_pcl_segments.cloud.header.stamp = in_cloud_msg->header.stamp;
-        refined_objects_pub.objects.push_back(refined_pcl_segments);
-        refined_cloud_contour_vec.push_back(std::make_pair(*refined_cloud_ptr,in_contours[opt_contour_id]));
+        tf2::doTransform<sensor_msgs::msg::PointCloud2>(pcls_camera_msg, pcl_base_link_msg, m_cam_base_link_tf);
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_base_link_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
+        pcl::fromROSMsg(pcl_base_link_msg, *refined_cloud_base_link_ptr);
+
+        all_seaing_perception::Obstacle<pcl::PointXYZHSV> obstacle(m_local_header, refined_cloud_base_link_ptr, id++, false);
+        all_seaing_interfaces::msg::Obstacle obstacle_msg;
+        obstacle.to_ros_msg(obstacle_msg);
+        obstacle_msg.label = bbox.label;
+
+        refined_objects_msg.obstacles.push_back(obstacle_msg);
+        
+        *all_obj_refined_pcls_ptr += *refined_cloud_ptr;
     }
-    m_refined_object_pcl_segment_pub->publish(refined_objects_pub);
-    pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_refined_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
-    all_obj_refined_pcls_ptr->header = in_cloud_tf_ptr->header;
-    try{
-        for(int i = 0; i<refined_cloud_contour_vec.size(); i++){
-            for(int j = 0; j<refined_cloud_contour_vec[i].first.size(); j++){
-                all_obj_refined_pcls_ptr->push_back(refined_cloud_contour_vec[i].first[j]);
-            }
-        }
-    }catch(std::exception &ex){
-        RCLCPP_ERROR(this->get_logger(), "REFINED POINT CLOUD PUBLISHING ERROR: %s", ex.what());
-    }
+    m_detection_pub->publish(refined_objects_msg);
+    
     auto obj_refined_pcls_msg = sensor_msgs::msg::PointCloud2();
     pcl::toROSMsg(*all_obj_refined_pcls_ptr, obj_refined_pcls_msg);
     obj_refined_pcls_msg.header.stamp = in_cloud_msg->header.stamp;

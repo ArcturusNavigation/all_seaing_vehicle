@@ -50,7 +50,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
+            ("detections", "detections/merged"),
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             # ("odometry/filtered", "odometry_correct/filtered")
         ],

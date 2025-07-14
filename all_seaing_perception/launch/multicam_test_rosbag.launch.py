@@ -214,7 +214,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("refined_object_point_clouds_segments", "refined_object_point_clouds_segments/merged"),
+            ("detections", "detections/merged"),
         ],
         parameters=[slam_params]
     )
@@ -228,7 +228,7 @@ def launch_setup(context, *args, **kwargs):
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
             {"child_frames_to_remove": ["slam_map"]},
-            # {"parent_frames_to_remove": ["velodyne"]},
+            {"parent_frames_to_remove": ["map"]},
         ]
     )
 

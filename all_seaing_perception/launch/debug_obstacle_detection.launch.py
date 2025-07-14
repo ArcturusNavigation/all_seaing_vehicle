@@ -268,79 +268,11 @@ def launch_setup(context, *args, **kwargs):
         parameters=[slam_params]
     )
 
-    object_tracking_map_pf_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="object_tracking_map_pf",
-        output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
-        remappings=[
-            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-            ("odometry/filtered", "odometry_correct/filtered")
-        ],
-        parameters=[pf_slam_params],
-    )
-
-    object_tracking_map_euclidean_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="object_tracking_map_euclidean",
-        output="screen",
-        remappings=[
-            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-        ],
-        parameters=[
-            {"global_frame_id": "map"},
-            {"obstacle_seg_thresh": 10.0},
-            {"obstacle_drop_thresh": 1.0},
-            {"check_fov": True},
-            {"is_sim": False},
-        ]
-    )
-
-    obstacle_bbox_overlay_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="obstacle_bbox_overlay",
-        remappings=[
-            ("camera_info", "/zed/zed_node/rgb/camera_info"),
-            # ("obstacle_map/raw", "obstacle_map/refined_untracked")
-        ],
-        parameters=[
-        ]
-    )
-
-    follow_buoy_path = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="follow_buoy_path.py",
-        remappings=[
-            ("obstacle_map/labeled", "obstacle_map/refined_tracked"),
-        ],
-        parameters=[
-            {"is_sim": False},
-            {"color_label_mappings_file": color_label_mappings},
-            {"safe_margin": 0.2},
-        ],
-    )
-
     return [
-        # set_use_sim_time,
-        # ekf_node,
-        # navsat_node,
-        # keyboard_ld,
         static_transforms_ld,
         tf_filtering,
-        # odom_transformer,
-        # run_tasks,
-        # task_init_server, 
-        # follow_buoy_path,
-        # buoy_yolo_node,
-        # shape_yolo_node,
-        # static_shape_yolo_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
-        # object_tracking_map_pf_node,
-        # object_tracking_map_euclidean_node,
-        # obstacle_detector_node,
-        # color_segmentation_node,
-        # obstacle_bbox_overlay_node
     ]
 
 def generate_launch_description():
