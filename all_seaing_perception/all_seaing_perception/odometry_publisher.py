@@ -34,7 +34,7 @@ class OdometryPublisher(Node):
             Odometry,
             "odom_topic",
             self.odom_callback,
-            10,
+            rclpy.qos.qos_profile_sensor_data,
         )
 
         self.got_gps = False
@@ -60,7 +60,7 @@ class OdometryPublisher(Node):
         frame_id = self.gps_msg.header.frame_id
         lat, lon = self.gps_msg.latitude, self.gps_msg.longitude
         _,_,imu_heading = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
-        actual_heading = imu_heading
+        actual_heading = imu_heading - np.pi/2.0
         imu_twist = self.odom_msg.twist.twist
 
         # convert gps lat/lon to reference frame coordinates
@@ -75,8 +75,8 @@ class OdometryPublisher(Node):
         gps_odom_msg.header.stamp = stamp
         gps_odom_msg.header.frame_id = "odom"
         gps_odom_msg.child_frame_id = "base_link" # same as imu_link here
-        gps_odom_msg.twist.twist.linear.x = imu_twist.linear.x
-        gps_odom_msg.twist.twist.linear.y = imu_twist.linear.y
+        gps_odom_msg.twist.twist.linear.x = imu_twist.linear.y
+        gps_odom_msg.twist.twist.linear.y = -imu_twist.linear.x
         gps_odom_msg.pose.pose.position.x = dx
         gps_odom_msg.pose.pose.position.y = dy
         gps_odom_msg.pose.pose.orientation.x, gps_odom_msg.pose.pose.orientation.y, gps_odom_msg.pose.pose.orientation.z, gps_odom_msg.pose.pose.orientation.w = quaternion_from_euler(0,0,actual_heading)

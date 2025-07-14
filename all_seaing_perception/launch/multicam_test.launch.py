@@ -26,9 +26,6 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
-    robot_localization_odom_params = os.path.join(
-        bringup_prefix, "config", "localization", "localize_odom_real.yaml"
-    )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -69,11 +66,6 @@ def launch_setup(context, *args, **kwargs):
         parameters=[robot_localization_params]
     )
 
-    ekf_odom_node = launch_ros.actions.Node(
-        package="robot_localization",
-        executable="ekf_node",
-        parameters=[robot_localization_odom_params]
-    )
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
 
@@ -97,8 +89,8 @@ def launch_setup(context, *args, **kwargs):
         executable = "odometry_publisher.py",
         output = "screen",
         remappings=[
-            ("gps_topic", "/mavros/global_position/global"),
-            ("odom_topic", "/odometry/filtered")
+            ("gps_topic", "/mavros/global_position/raw/fix"),
+            ("odom_topic", "/mavros/local_position/odom")
         ],
         parameters=[
 
@@ -343,8 +335,7 @@ def launch_setup(context, *args, **kwargs):
 
     return [
         mavros_ld,
-        ekf_node,
-        # ekf_odom_node,
+        # ekf_node,
         # navsat_node,
         odometry_publisher_node,
         oak_ld,
