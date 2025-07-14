@@ -122,11 +122,8 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
     pcl::computeCentroid(*local_cloud_ptr, local_avg);
 
     // Transform local to global point cloud
-    sensor_msgs::msg::PointCloud2 local_pcl_msg, global_pcl_msg;
     typename pcl::PointCloud<PointT>::Ptr global_cloud_ptr(new typename pcl::PointCloud<PointT>);
-    pcl::toROSMsg(*local_cloud_ptr, local_pcl_msg);
-    tf2::doTransform<sensor_msgs::msg::PointCloud2>(local_pcl_msg, global_pcl_msg, m_lidar_map_tf);
-    pcl::fromROSMsg(global_pcl_msg, *global_cloud_ptr);
+    all_seaing_perception::transformPCLCloud(*local_cloud_ptr, *global_cloud_ptr, m_lidar_map_tf);;
 
     // Calculate global min, max, and average point
     pcl::getMinMax3D(*global_cloud_ptr, global_min, global_max);

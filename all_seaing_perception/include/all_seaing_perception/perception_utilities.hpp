@@ -11,6 +11,9 @@
 #include "pcl_conversions/pcl_conversions.h"
 #include <pcl/filters/extract_indices.h>
 
+#include "geometry_msgs/msg/transform_stamped.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
@@ -83,6 +86,11 @@ namespace all_seaing_perception{
 
     // project bbox to point cloud and assign HSV colors
     void PCLInBBoxHSV(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim = false);
+
+    // transform pcl::PointCloud using TF2
+    template<typename PointT>
+    void transformPCLCloud(typename pcl::PointCloud<PointT> pcl_in, typename pcl::PointCloud<PointT> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+
 } // namespace all_seaing_perception
 
 #endif // ALL_SEAING_PERCEPTION__PERCEPTION_UTILITIES_HPP

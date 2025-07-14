@@ -29,9 +29,7 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
-    robot_localization_odom_params = os.path.join(
-        bringup_prefix, "config", "localization", "localize_odom_real.yaml"
-    )
+
     inc_color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
     )
@@ -77,17 +75,6 @@ def launch_setup(context, *args, **kwargs):
         ),
     )
 
-    ekf_odom_node = launch_ros.actions.Node(
-        package="robot_localization",
-        executable="ekf_node",
-        parameters=[robot_localization_odom_params],
-        condition=IfCondition(
-            PythonExpression([
-                "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'"
-            ]),
-        ),
-    )
-
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     navsat_node = launch_ros.actions.Node(
@@ -102,6 +89,19 @@ def launch_setup(context, *args, **kwargs):
                 "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'",
             ]),
         ),
+    )
+
+    odometry_publisher_node = launch_ros.actions.Node(
+        package = "all_seaing_driver",
+        executable = "odometry_publisher.py",
+        output = "screen",
+        remappings=[
+            ("gps_topic", "/mavros/global_position/raw/fix"),
+            ("odom_topic", "/mavros/local_position/odom")
+        ],
+        parameters=[
+
+        ]
     )
 
     controller_node = launch_ros.actions.Node(
@@ -601,9 +601,9 @@ def launch_setup(context, *args, **kwargs):
         control_mux,
         controller_node,
         controller_server,
-        ekf_node,
-        # ekf_odom_node,
+        # ekf_node,
         # navsat_node,
+        odometry_publisher_node,
         navigation_server,
         obstacle_detector_node,
         point_cloud_filter_node,

@@ -1,0 +1,29 @@
+object_tracking_map:
+  ros__parameters:
+    global_frame_id: "odom"
+    slam_frame_id: "map"
+    obstacle_drop_thresh: 30.0
+    normalize_drop_thresh: False
+    range_uncertainty: 10.0
+    bearing_uncertainty: 2.0
+    motion_gps_xy_noise: 1.0
+    motion_gps_theta_noise: 0.01
+    motion_imu_xy_noise: 1.0
+    motion_imu_theta_noise: 10.0
+    odom_refresh_rate: 10.0
+    update_gps_xy_uncertainty: 20.0
+    include_odom_theta: True
+    include_odom_only_theta: True
+    rotate_odom: False
+    update_odom_theta_uncertainty: 0.01
+    new_object_slam_threshold: 0.2
+    init_xy_noise: 0.7
+    init_theta_noise: 0.1
+    init_new_cov: 50.0
+    track_robot: True
+    imu_predict: True
+    gps_update: True
+    direct_tf: True
+    is_sim: False
+    data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
+    trace_time: 10.0

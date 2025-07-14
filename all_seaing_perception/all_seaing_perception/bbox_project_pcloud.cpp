@@ -397,11 +397,8 @@ void BBoxProjectPCloud::bb_pcl_project(
             pcl::PointXYZHSV pt = pcloud_ptr->points[ind];
             refined_cloud_ptr->push_back(pt);
         }
-        sensor_msgs::msg::PointCloud2 pcls_camera_msg, pcl_base_link_msg;
-        pcl::toROSMsg(*refined_cloud_ptr, pcls_camera_msg);
-        tf2::doTransform<sensor_msgs::msg::PointCloud2>(pcls_camera_msg, pcl_base_link_msg, m_cam_base_link_tf);
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_base_link_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
-        pcl::fromROSMsg(pcl_base_link_msg, *refined_cloud_base_link_ptr);
+        all_seaing_perception::transformPCLCloud(*refined_cloud_ptr, *refined_cloud_base_link_ptr, m_cam_base_link_tf);
 
         all_seaing_perception::Obstacle<pcl::PointXYZHSV> obstacle(m_local_header, refined_cloud_base_link_ptr, id++, false);
         all_seaing_interfaces::msg::Obstacle obstacle_msg;
