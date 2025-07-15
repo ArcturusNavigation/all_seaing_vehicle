@@ -10,6 +10,7 @@
 #include <tuple>
 #include <chrono>
 #include <string>
+#include <algorithm>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -107,6 +108,14 @@ namespace all_seaing_perception {
     std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
         typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
         std::vector<std::vector<float>> p, float new_obj_thres);
+    template<typename PointT>
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_indiv_var_data_association(std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
+        std::vector<std::vector<float>> p, std::vector<float> v_indiv, float new_obj_thres);
+    template<typename PointT>
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_meas_var_data_association(std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
+        std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
+        std::vector<std::vector<float>> p, std::vector<std::vector<float>> v_meas, float new_obj_thres);
     template<typename PointT>
     std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
         typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,

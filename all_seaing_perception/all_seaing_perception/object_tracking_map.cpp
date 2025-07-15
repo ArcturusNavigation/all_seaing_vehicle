@@ -643,12 +643,22 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         {0, m_bearing_std*m_bearing_std},
     };
     std::vector<std::vector<float>> p;
+    std::vector<float> v_indiv;
+    std::vector<std::vector<float>> v_meas;
+    for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
+        if(m_track_robot){
+            v_indiv.push_back(m_cov(3 + 2 * tracked_id, 3 + 2 * tracked_id)+m_cov(3 + 2 * tracked_id+1, 3 + 2 * tracked_id+1));
+        }else{
+            v_indiv.push_back(m_tracked_obstacles[tracked_id]->cov(0,0)+m_tracked_obstacles[tracked_id]->cov(1,1));
+        }
+    }
     for (std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>> det_obs : detected_obstacles) {
         float range, bearing;
         int signature;
         std::tie(range, bearing, signature) =
             all_seaing_perception::local_to_range_bearing_signature(det_obs->obstacle.get_local_point(), det_obs->label);
         p.push_back(std::vector<float>());
+        v_meas.push_back(std::vector<float>());
         Eigen::Vector2f z_pred;
         Eigen::MatrixXf Psi;
         for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
@@ -692,6 +702,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
             p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
                                (z_actual - z_pred));
+            v_meas.back().push_back(Psi.trace());
         }
     }
 
@@ -701,6 +712,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
     }else if (m_data_association_algo == "greedy_individual"){
         std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::indiv_greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+    }else if (m_data_association_algo == "greedy_exclusive_indiv_var"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_indiv_var_data_association(m_tracked_obstacles, detected_obstacles, p, v_indiv, m_new_obj_slam_thres);
+    }else if (m_data_association_algo == "greedy_exclusive_measurement_var"){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_meas_var_data_association(m_tracked_obstacles, detected_obstacles, p, v_meas, m_new_obj_slam_thres);
     }else if (m_data_association_algo == "linear_sum_assignment"){
         std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
     }else if (m_data_association_algo == "linear_sum_assignment_sqrt"){
