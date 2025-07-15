@@ -18,6 +18,8 @@
 
 #include "all_seaing_interfaces/msg/obstacle.hpp"
 
+#include "all_seaing_perception/perception_utilities.hpp"
+
 namespace all_seaing_perception {
 
 template<typename PointT>

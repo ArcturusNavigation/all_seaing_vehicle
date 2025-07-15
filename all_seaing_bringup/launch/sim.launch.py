@@ -219,6 +219,7 @@ def launch_setup(context, *args, **kwargs):
             ("point_cloud", "point_cloud/filtered"),
         ],
         parameters=[
+            {"base_link_frame": "wamv/wamv/base_link"},
             {"global_frame_id": "map"},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 60},

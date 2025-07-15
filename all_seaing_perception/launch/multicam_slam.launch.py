@@ -85,7 +85,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     odometry_publisher_node = launch_ros.actions.Node(
-        package = "all_seaing_perception",
+        package = "all_seaing_driver",
         executable = "odometry_publisher.py",
         output = "screen",
         remappings=[

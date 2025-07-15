@@ -13,6 +13,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/central_hub_ros.py
     ${PROJECT_NAME}/gps_converter.py
     ${PROJECT_NAME}/odom_reframe.py
+    ${PROJECT_NAME}/odometry_publisher.py
     ${PROJECT_NAME}/onshore_lora_controller.py
     ${PROJECT_NAME}/onshore_node.py
     ${PROJECT_NAME}/rover_custom_controller.py

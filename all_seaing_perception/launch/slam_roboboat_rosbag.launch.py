@@ -54,8 +54,8 @@ def launch_setup(context, *args, **kwargs):
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
-    pf_slam_params = os.path.join(
-        bringup_prefix, "config", "slam", "pf_slam_real.yaml"
+    slam_rosbag_params = os.path.join(
+        bringup_prefix, "config", "slam", "slam_rosbag.yaml"
     )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
@@ -115,8 +115,8 @@ def launch_setup(context, *args, **kwargs):
             {"new_tf_topic": "/tf"},
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
-            {"child_frames_to_remove": ["slam_map"]},
-            # {"parent_frames_to_remove": ["base_link"]},
+            # {"child_frames_to_remove": ["zed_camera_link"]},
+            {"parent_frames_to_remove": ["base_link", "map"]},
         ]
     )
 
@@ -232,6 +232,53 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    obstacle_detector_raw_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("point_cloud", "point_cloud/filtered"),
+        ],
+        parameters=[
+            {"base_link_frame": "actual_base_link"},
+            {"global_frame_id": "map"},
+            {"clustering_distance": 0.75},
+            {"obstacle_size_min": 5},
+            # {"obstacle_size_max": 300},
+            # {"obstacle_filter_size_max": 300},
+            {"range_max": 50.0},
+        ],
+    )
+
+    obstacle_detector_unlabeled_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("point_cloud", "point_cloud/filtered"),
+            ("obstacle_map/raw", "obstacle_map/unlabeled")
+        ],
+        parameters=[
+            {"base_link_frame": "actual_base_link"},
+            {"global_frame_id": "map"},
+            {"clustering_distance": 0.75},
+            {"obstacle_size_min": 5},
+            # {"obstacle_size_max": 300},
+            {"obstacle_filter_size_max": 50},
+            {"range_max": 50.0},
+        ],
+    )
+
+    grid_map_generator = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="grid_map_generator.py",
+        parameters=[
+            {"global_frame_id": "map"},
+            {"timer_period": 1.0},
+            {"grid_dim": [800, 800]},
+            {"default_range": 60},
+            {"grid_resolution": 0.1},
+        ],
+    )
+
     bbox_project_pcloud_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="bbox_project_pcloud",
@@ -265,12 +312,16 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             ("odometry/filtered", "odometry_correct/filtered")
         ],
-        parameters=[slam_params]
+        parameters=[slam_rosbag_params]
     )
 
     return [
         static_transforms_ld,
         tf_filtering,
+        odom_transformer,
+        obstacle_detector_raw_node,
+        obstacle_detector_unlabeled_node,
+        grid_map_generator,
         bbox_project_pcloud_node,
         object_tracking_map_node,
     ]
