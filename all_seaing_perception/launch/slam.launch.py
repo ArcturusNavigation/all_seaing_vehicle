@@ -51,8 +51,7 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("detections", "detections/merged"),
-            ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-            # ("odometry/filtered", "odometry_correct/filtered")
+            ("odometry/filtered", "odometry/gps"),
         ],
         parameters=[slam_params]
     )

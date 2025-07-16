@@ -11,6 +11,7 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 import launch_ros
 import os
 import yaml
+import numpy as np
 
 def launch_setup(context, *args, **kwargs):
 
@@ -104,7 +105,11 @@ def launch_setup(context, *args, **kwargs):
             ("odom_topic", "/odometry/filtered")
         ],
         parameters=[
-            {"datum": [27.374, -82.451, 3.14159265359]}
+            {"base_link_frame": "actual_base_link"},
+            {"datum": [27.374, -82.451, np.pi/2.0]},
+            # {"magnetic_declination": 0.14},
+            {"odom_yaw_offset": -np.pi/2.0},
+            {"use_odom_pos": False},
         ]
     )
     
@@ -131,118 +136,6 @@ def launch_setup(context, *args, **kwargs):
             # {"child_frames_to_remove": ["zed_camera_link"]},
             {"parent_frames_to_remove": ["base_link", "map", "odom"]},
         ]
-    )
-
-    odom_transformer = launch_ros.actions.Node(
-        package="odom_transformer",
-        executable="transformer_node.py",
-        name="odom_transformer",
-        # output={"both": {"screen", "log", "own_log"}},
-        parameters=[odom_transformer_params],
-    )
-
-    run_tasks = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="run_tasks.py",
-    )
-
-    task_init_server = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="task_init.py",
-        parameters=[{"is_sim": True}],
-    )
-
-    keyboard_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
-    )
-
-    point_cloud_filter_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="point_cloud_filter",
-        remappings=[
-            ("point_cloud", "/velodyne_points"),
-        ],
-        parameters=[
-            {"range_radius": [0.5, 60.0]},
-        ],
-        # condition=UnlessCondition(use_bag),
-    )
-    
-    color_segmentation_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="color_segmentation.py",
-        remappings=[
-            ("image", "/zed/zed_node/rgb/image_rect_color"),
-        ],
-        parameters=[
-            {
-                "color_label_mappings_file": color_label_mappings,
-                "color_ranges_file": color_ranges,
-            }
-        ],
-    )
-
-    obstacle_detector_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="obstacle_detector",
-        remappings=[
-            ("point_cloud", "point_cloud/filtered"),
-        ],
-        parameters=[
-            {"obstacle_size_min": 10},
-            {"obstacle_size_max": 800},
-            {"clustering_distance": 0.1},
-        ],
-    )
-
-    buoy_yolo_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {"model": "roboboat_2025"},
-            {"label_config": "buoy_label_mappings"},
-            {"conf": 0.6},
-            {"use_color_names": False},
-        ],
-        remappings=[
-            ("image", "/zed/zed_node/rgb/image_rect_color"),
-            ("annotated_image", "annotated_image/buoy"),
-        ],
-        output="screen",
-    )
-
-    shape_yolo_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {"model": "roboboat_shape_2025"},
-            {"label_config": "shape_label_mappings"},
-            {"conf": 0.4},
-            {"use_color_names": False},
-        ],
-        remappings=[
-            ("image", "turret_image"),
-            ("annotated_image", "annotated_image/shape"),
-            ("bounding_boxes", "shape_boxes"),
-        ],
-        output="screen",
-    )
-
-    static_shape_yolo_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {"model": "roboboat_shape_2025"},
-            {"label_config": "shape_label_mappings"},
-            {"conf": 0.4},
-            {"use_color_names": False},
-        ],
-        remappings=[
-            ("image", "/zed/zed_node/rgb/image_rect_color"),
-            ("annotated_image", "annotated_image/static_shape"),
-            ("bounding_boxes", "static_shape_boxes"),
-        ],
-        output="screen",
     )
 
     obstacle_detector_raw_node = launch_ros.actions.Node(
@@ -323,7 +216,8 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
-            ("odometry/filtered", "odometry_correct/filtered")
+            # ("odometry/filtered", "odometry_correct/filtered")
+            ("odometry/filtered", "odometry/gps"),
         ],
         parameters=[slam_rosbag_params]
     )
@@ -332,7 +226,6 @@ def launch_setup(context, *args, **kwargs):
         odometry_publisher_node,
         static_transforms_ld,
         tf_filtering,
-        odom_transformer,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         grid_map_generator,

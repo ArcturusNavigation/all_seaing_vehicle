@@ -19,13 +19,19 @@ class OdometryPublisher(Node):
         self.declare_parameter("base_link_frame", "base_link")
         self.declare_parameter("datum", [42.3567949, -71.1070491, 0.0])
         self.declare_parameter("magnetic_declination", 0.0)
+        self.declare_parameter("yaw_offset", -np.pi/2.0)
+        self.declare_parameter("odom_yaw_offset", np.pi/2.0)
         self.declare_parameter("odom_hz", 30.0)
+        self.declare_parameter("use_odom_pos", False)
 
         self.global_frame_id = self.get_parameter("global_frame_id").get_parameter_value().string_value
         self.base_link_frame = self.get_parameter("base_link_frame").get_parameter_value().string_value
         self.datum = self.get_parameter("datum").get_parameter_value().double_array_value
         self.odom_hz = self.get_parameter("odom_hz").get_parameter_value().double_value
         self.magnetic_declination = self.get_parameter("magnetic_declination").get_parameter_value().double_value
+        self.yaw_offset = self.get_parameter("yaw_offset").get_parameter_value().double_value
+        self.odom_yaw_offset = self.get_parameter("odom_yaw_offset").get_parameter_value().double_value
+        self.use_odom_pos = self.get_parameter("use_odom_pos").get_parameter_value().bool_value
         self.datum_lat = self.datum[0]
         self.datum_lon = self.datum[1]
         self.datum_heading = self.datum[2] # actual heading of imu's 0 (- imu's value when facing east)
@@ -59,30 +65,35 @@ class OdometryPublisher(Node):
         self.got_odom = True
         self.odom_msg = odom_msg
     def filter_cb(self):
-        if (not self.got_odom) or (not self.got_gps):
+        if (not self.got_odom) or (not self.use_odom_pos and not self.got_gps):
             return
         # get filtered values -> in imu_link -> rotated 90 degrees left wrt base_link
-        stamp = self.gps_msg.header.stamp
-        frame_id = self.gps_msg.header.frame_id
-        lat, lon = self.gps_msg.latitude, self.gps_msg.longitude
+        stamp = self.odom_msg.header.stamp
+        frame_id = self.odom_msg.header.frame_id
+        if not self.use_odom_pos:
+            lat, lon = self.gps_msg.latitude, self.gps_msg.longitude
         _,_,imu_heading = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
-        actual_heading = imu_heading - np.pi/2.0
+        actual_heading = imu_heading + self.yaw_offset
         imu_twist = self.odom_msg.twist.twist
 
-        # convert gps lat/lon to reference frame coordinates
-        # adapted from tag_transformer.py
-        delta = geopy.distance.geodesic((self.datum_lat, self.datum_lon), (lat, lon)).meters
-        heading = np.arctan2(lon-self.datum_lon, lat-self.datum_lat)
-        dx = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
-        dy = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
+        if(not self.use_odom_pos):
+            # convert gps lat/lon to reference frame coordinates
+            delta = geopy.distance.geodesic((self.datum_lat, self.datum_lon), (lat, lon)).meters
+            heading = np.arctan2(lon-self.datum_lon, lat-self.datum_lat)
+            dx = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
+            dy = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
+        else:
+            dx = self.odom_msg.pose.pose.position.x
+            dy = self.odom_msg.pose.pose.position.y
         
         # publish odometry (altitude is 0, we don't care about it)
         gps_odom_msg = Odometry()
         gps_odom_msg.header.stamp = stamp
         gps_odom_msg.header.frame_id = self.global_frame_id
         gps_odom_msg.child_frame_id = self.base_link_frame
-        gps_odom_msg.twist.twist.linear.x = imu_twist.linear.y
-        gps_odom_msg.twist.twist.linear.y = -imu_twist.linear.x
+        gps_odom_msg.twist.twist.linear.x = imu_twist.linear.x*np.cos(self.odom_yaw_offset) + imu_twist.linear.y*np.sin(self.odom_yaw_offset)
+        gps_odom_msg.twist.twist.linear.y = -imu_twist.linear.x*np.sin(self.odom_yaw_offset) + imu_twist.linear.y*np.cos(self.odom_yaw_offset)
+        gps_odom_msg.twist.twist.angular = imu_twist.angular
         gps_odom_msg.pose.pose.position.x = dx
         gps_odom_msg.pose.pose.position.y = dy
         gps_odom_msg.pose.pose.orientation.x, gps_odom_msg.pose.pose.orientation.y, gps_odom_msg.pose.pose.orientation.z, gps_odom_msg.pose.pose.orientation.w = quaternion_from_euler(0,0,actual_heading)
