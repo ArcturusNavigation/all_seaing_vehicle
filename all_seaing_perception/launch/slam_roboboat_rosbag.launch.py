@@ -94,6 +94,19 @@ def launch_setup(context, *args, **kwargs):
             ]),
         ),
     )
+
+    odometry_publisher_node = launch_ros.actions.Node(
+        package = "all_seaing_driver",
+        executable = "odometry_publisher.py",
+        output = "screen",
+        remappings=[
+            ("gps_topic", "/mavros/global_position/global"),
+            ("odom_topic", "/odometry/filtered")
+        ],
+        parameters=[
+            {"datum": [27.374, -82.451, 3.14159265359]}
+        ]
+    )
     
     static_transforms_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -116,7 +129,7 @@ def launch_setup(context, *args, **kwargs):
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
             # {"child_frames_to_remove": ["zed_camera_link"]},
-            {"parent_frames_to_remove": ["base_link", "map"]},
+            {"parent_frames_to_remove": ["base_link", "map", "odom"]},
         ]
     )
 
@@ -316,6 +329,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
+        odometry_publisher_node,
         static_transforms_ld,
         tf_filtering,
         odom_transformer,

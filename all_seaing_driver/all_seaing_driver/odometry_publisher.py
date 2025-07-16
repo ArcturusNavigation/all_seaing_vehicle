@@ -15,11 +15,17 @@ class OdometryPublisher(Node):
     def __init__(self):
         super().__init__("odometry_publisher")
 
+        self.declare_parameter("global_frame_id", "odom")
+        self.declare_parameter("base_link_frame", "base_link")
         self.declare_parameter("datum", [42.3567949, -71.1070491, 0.0])
+        self.declare_parameter("magnetic_declination", 0.0)
         self.declare_parameter("odom_hz", 30.0)
 
+        self.global_frame_id = self.get_parameter("global_frame_id").get_parameter_value().string_value
+        self.base_link_frame = self.get_parameter("base_link_frame").get_parameter_value().string_value
         self.datum = self.get_parameter("datum").get_parameter_value().double_array_value
         self.odom_hz = self.get_parameter("odom_hz").get_parameter_value().double_value
+        self.magnetic_declination = self.get_parameter("magnetic_declination").get_parameter_value().double_value
         self.datum_lat = self.datum[0]
         self.datum_lon = self.datum[1]
         self.datum_heading = self.datum[2] # actual heading of imu's 0 (- imu's value when facing east)
@@ -67,14 +73,14 @@ class OdometryPublisher(Node):
         # adapted from tag_transformer.py
         delta = geopy.distance.geodesic((self.datum_lat, self.datum_lon), (lat, lon)).meters
         heading = np.arctan2(lon-self.datum_lon, lat-self.datum_lat)
-        dx = delta * np.cos(heading-self.datum_heading)
-        dy = delta * np.sin(heading-self.datum_heading)
+        dx = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
+        dy = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
         
         # publish odometry (altitude is 0, we don't care about it)
         gps_odom_msg = Odometry()
         gps_odom_msg.header.stamp = stamp
-        gps_odom_msg.header.frame_id = "odom"
-        gps_odom_msg.child_frame_id = "base_link" # same as imu_link here
+        gps_odom_msg.header.frame_id = self.global_frame_id
+        gps_odom_msg.child_frame_id = self.base_link_frame
         gps_odom_msg.twist.twist.linear.x = imu_twist.linear.y
         gps_odom_msg.twist.twist.linear.y = -imu_twist.linear.x
         gps_odom_msg.pose.pose.position.x = dx
@@ -85,8 +91,8 @@ class OdometryPublisher(Node):
         # publish tf
         tf_msg = TransformStamped()
         tf_msg.header.stamp = stamp
-        tf_msg.header.frame_id = "odom"
-        tf_msg.child_frame_id = "base_link"
+        tf_msg.header.frame_id = self.global_frame_id
+        tf_msg.child_frame_id = self.base_link_frame
         tf_msg.transform.translation.x = dx
         tf_msg.transform.translation.y = dy
         tf_msg.transform.rotation.x, tf_msg.transform.rotation.y, tf_msg.transform.rotation.z, tf_msg.transform.rotation.w = quaternion_from_euler(0,0,actual_heading)
