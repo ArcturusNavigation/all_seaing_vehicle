@@ -5,15 +5,15 @@ object_tracking_map:
     obstacle_drop_thresh: 60.0
     normalize_drop_thresh: False
     range_uncertainty: 10.0
-    bearing_uncertainty: 2.0
+    bearing_uncertainty: 1.0
     motion_gps_xy_noise: 1.0 # useless
     motion_gps_theta_noise: 0.1 # useless
     motion_imu_xy_noise: 1.0
     motion_imu_theta_noise: 0.0 # because we can't update, but it's accurate anyways, IRL use a small value
     odom_refresh_rate: 10.0
-    update_gps_xy_uncertainty: 20.0
-    include_odom_theta: True
-    include_odom_only_theta: True
+    update_gps_xy_uncertainty: 70.0
+    include_odom_theta: False
+    include_odom_only_theta: False
     rotate_odom: False
     update_odom_theta_uncertainty: 0.01
     new_object_slam_threshold: 0.2
@@ -22,7 +22,7 @@ object_tracking_map:
     init_new_cov: 50.0
     track_robot: True
     imu_predict: True
-    gps_update: False
+    gps_update: True
     direct_tf: True
     is_sim: False
     data_association: "greedy_exclusive_meas_var" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
