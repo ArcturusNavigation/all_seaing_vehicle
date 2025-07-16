@@ -42,6 +42,12 @@ class OdometryPublisher(Node):
             self.nav_sat_callback,
             rclpy.qos.qos_profile_sensor_data,
         )
+        self.pos_odom_sub = self.create_subscription(
+            Odometry,
+            "pos_odom_topic",
+            self.pos_odom_callback,
+            rclpy.qos.qos_profile_sensor_data,
+        )
         self.odom_sub = self.create_subscription(
             Odometry,
             "odom_topic",
@@ -50,6 +56,7 @@ class OdometryPublisher(Node):
         )
 
         self.got_gps = False
+        self.got_pos_odom = False
         self.got_odom = False
 
         self.odom_timer = self.create_timer(1.0/self.odom_hz, self.filter_cb)
@@ -61,11 +68,15 @@ class OdometryPublisher(Node):
         self.got_gps = True
         self.gps_msg = gps_msg
     
+    def pos_odom_callback(self, pos_odom_msg):
+        self.got_pos_odom = True
+        self.pos_odom_msg = pos_odom_msg
+    
     def odom_callback(self, odom_msg):
         self.got_odom = True
         self.odom_msg = odom_msg
     def filter_cb(self):
-        if (not self.got_odom) or (not self.use_odom_pos and not self.got_gps):
+        if (not self.got_odom) or (not self.use_odom_pos and not self.got_gps) or (self.use_odom_pos and not self.got_pos_odom):
             return
         # get filtered values -> in imu_link -> rotated 90 degrees left wrt base_link
         stamp = self.odom_msg.header.stamp
@@ -83,8 +94,8 @@ class OdometryPublisher(Node):
             dx = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
             dy = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
         else:
-            dx = self.odom_msg.pose.pose.position.x
-            dy = self.odom_msg.pose.pose.position.y
+            dx = self.pos_odom_msg.pose.pose.position.x
+            dy = self.pos_odom_msg.pose.pose.position.y
         
         # publish odometry (altitude is 0, we don't care about it)
         gps_odom_msg = Odometry()

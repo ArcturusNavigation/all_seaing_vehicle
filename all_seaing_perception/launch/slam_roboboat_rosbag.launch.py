@@ -102,14 +102,15 @@ def launch_setup(context, *args, **kwargs):
         output = "screen",
         remappings=[
             ("gps_topic", "/mavros/global_position/global"),
-            ("odom_topic", "/odometry/filtered")
+            ("odom_topic", "/odometry/filtered"),
+            ("pos_odom_topic", "/odometry/gps_fake"),
         ],
         parameters=[
             {"base_link_frame": "actual_base_link"},
             {"datum": [27.374, -82.451, np.pi/2.0]},
             # {"magnetic_declination": 0.14},
             {"odom_yaw_offset": -np.pi/2.0},
-            {"use_odom_pos": False},
+            {"use_odom_pos": True},
         ]
     )
     
