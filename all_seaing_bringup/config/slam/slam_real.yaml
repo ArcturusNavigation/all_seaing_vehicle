@@ -4,14 +4,14 @@ object_tracking_map:
     slam_frame_id: "map"
     obstacle_drop_thresh: 30.0
     normalize_drop_thresh: False
-    range_uncertainty: 10.0
+    range_uncertainty: 15.0
     bearing_uncertainty: 1.0
     motion_gps_xy_noise: 1.0 # useless
     motion_gps_theta_noise: 0.1 # useless
-    motion_imu_xy_noise: 1.0
+    motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 0.01 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 10.0
-    update_gps_xy_uncertainty: 70.0
+    update_gps_xy_uncertainty: 60.0
     include_odom_theta: True
     include_odom_only_theta: False
     rotate_odom: False
