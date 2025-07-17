@@ -723,6 +723,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     std::vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
+    std::vector<bool> tracked_labeled_det(m_num_obj, false);
     double assoc_threshold = msg->is_labeled?m_new_obj_slam_thres:m_unlabeled_assoc_threshold;
     if (m_data_association_algo == "greedy_exclusive"){
         std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
@@ -776,6 +777,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                                             std::sin(bearing + m_nav_heading));
                 m_tracked_obstacles.back()->cov = init_new_cov;
             }
+        }else{
+            tracked_labeled_det[match[i]] = (detected_obstacles[i]->label != -1)?true:false;
         }
         int tracked_id = match[i] >= 0 ? match[i] : m_num_obj - 1;
         if (m_track_robot) {
@@ -838,7 +841,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     std::vector<int> to_keep_flat = {0, 1, 2};
     for (int tracked_id = 0; tracked_id < static_cast<int>(m_tracked_obstacles.size());
          tracked_id++) {
-        if (chosen_tracked.count(tracked_id)) {
+        if (chosen_tracked.count(tracked_id) && tracked_labeled_det[tracked_id]) {
             to_keep.push_back(tracked_id);
             if (m_track_robot) {
                 to_keep_flat.insert(to_keep_flat.end(),
