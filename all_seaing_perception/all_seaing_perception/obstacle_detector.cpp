@@ -137,10 +137,10 @@ private:
         m_global_header.frame_id = m_global_frame_id;
         m_global_header.stamp = m_local_header.stamp;
         if (!m_got_lidar_base_link_tf){
-            m_lidar_base_link_tf = get_tf(m_base_link_frame, m_local_header.frame_id);
+            m_lidar_base_link_tf = get_tf(m_base_link_frame, m_local_header.frame_id, "lidar_base_link");
         }
         m_local_header.frame_id = m_base_link_frame;
-        m_base_link_map_tf = get_tf(m_global_frame_id, m_base_link_frame);
+        m_base_link_map_tf = get_tf(m_global_frame_id, m_base_link_frame, "base_link_map");
 
         // Convert ROS2 PointCloud2 to pcl PointCloud
         pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
@@ -155,11 +155,14 @@ private:
     }
 
     geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
-                                                const std::string &in_src_frame) {
+                                                const std::string &in_src_frame, std::string info) {
         geometry_msgs::msg::TransformStamped tf;
         try {
             tf = m_tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
-            m_got_lidar_base_link_tf = true;
+            // RCLCPP_INFO(this->get_logger(), "Transform %s to %s", in_src_frame.c_str(), in_target_frame.c_str());
+            if (info == "lidar_base_link"){
+                m_got_lidar_base_link_tf = true;
+            }
         } catch (tf2::TransformException &ex) {
             RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
         }
