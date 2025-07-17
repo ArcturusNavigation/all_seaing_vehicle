@@ -148,10 +148,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "actual_base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 0.75},
+            {"clustering_distance": 1.0},
             {"obstacle_size_min": 5},
-            # {"obstacle_size_max": 300},
-            # {"obstacle_filter_size_max": 300},
             {"range_max": 50.0},
         ],
     )
@@ -166,11 +164,13 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "actual_base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 0.75},
+            {"clustering_distance": 1.0},
             {"obstacle_size_min": 5},
             # {"obstacle_size_max": 300},
-            {"obstacle_filter_size_max": 50},
-            {"range_max": 50.0},
+            # {"obstacle_filter_pts_max": 100},
+            # {"obstacle_filter_area_max": 0.2},
+            {"obstacle_filter_length_max": 0.5},
+            # {"range_max": 50.0},
         ],
     )
 

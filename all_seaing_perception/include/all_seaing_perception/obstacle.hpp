@@ -50,15 +50,58 @@ public:
     void set_id(int id);
 
     PointT get_local_point();
+    void set_local_point(PointT local_point){
+        m_local_point = local_point;
+    }
     PointT get_global_point();
+    void set_global_point(PointT global_point){
+        m_global_point = global_point;
+    }
     PointT get_bbox_min();
+    void set_bbox_min(PointT bbox_min){
+        m_bbox_min = bbox_min;
+    }
     PointT get_bbox_max();
+    void set_bbox_max(PointT bbox_max){
+        m_bbox_max = bbox_max;
+    }
     PointT get_global_bbox_min();
+    void set_global_bbox_min(PointT global_bbox_min){
+        m_global_bbox_min = global_bbox_min;
+    }
     PointT get_global_bbox_max();
+    void set_global_bbox_max(PointT global_bbox_max){
+        m_global_bbox_max = global_bbox_max;
+    }
 
     geometry_msgs::msg::PolygonStamped get_local_chull();
+    void set_local_chull(geometry_msgs::msg::PolygonStamped local_chull){
+        m_local_chull = local_chull;
+    }
     geometry_msgs::msg::PolygonStamped get_global_chull();
+    void set_global_chull(geometry_msgs::msg::PolygonStamped global_chull){
+        m_global_chull = global_chull;
+    }
     float get_polygon_area();
+    void set_polygon_area(float polygon_area){
+        m_area = polygon_area;
+    }
+
+    std_msgs::msg::Header get_local_header(){
+        return m_local_header;
+    }
+
+    std_msgs::msg::Header get_global_header(){
+        return m_global_header;
+    }
+    
+    void set_local_header(std_msgs::msg::Header local_header){
+        m_local_header = local_header;
+    }
+
+    void set_global_header(std_msgs::msg::Header global_header){
+        m_global_header = global_header;
+    }
 
     void transform_pcl_pt(PointT pt_in, PointT& pt_tf, geometry_msgs::msg::TransformStamped tf);
 

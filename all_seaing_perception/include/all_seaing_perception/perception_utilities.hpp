@@ -10,6 +10,9 @@
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
 #include "pcl_conversions/pcl_conversions.h"
 #include <pcl/filters/extract_indices.h>
+#include <pcl/common/impl/common.hpp>
+#include <pcl/common/centroid.h>
+#include <pcl/common/transforms.h>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -20,6 +23,7 @@
 #include "cv_bridge/cv_bridge.h"
 
 #include "all_seaing_interfaces/msg/labeled_bounding_box2_d.hpp"
+#include "all_seaing_perception/obstacle.hpp"
 
 namespace all_seaing_perception{
     // To project OpenCV 3d points to the camera frame
@@ -79,17 +83,40 @@ namespace all_seaing_perception{
     std::vector<cv::Point> inContour(std::vector<cv::Point>& contour);
 
     // Euclidean clustering
-    void euclideanClustering(pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance = 0.0f, int obstacle_sz_min = 1, int obstacle_sz_max = std::numeric_limits<int>::max (), bool conditional = false, std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func = std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)>());
+    void euclideanClustering(const pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance = 0.0f, int obstacle_sz_min = 1, int obstacle_sz_max = std::numeric_limits<int>::max (), bool conditional = false, std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func = std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)>());
 
     // @overload
-    void euclideanClustering(pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance = 0.0f, int obstacle_sz_min = 1, int obstacle_sz_max = std::numeric_limits<int>::max (), bool conditional = false, std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)> cond_func = std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)>());
+    void euclideanClustering(const pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance = 0.0f, int obstacle_sz_min = 1, int obstacle_sz_max = std::numeric_limits<int>::max (), bool conditional = false, std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)> cond_func = std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)>());
 
     // project bbox to point cloud and assign HSV colors
-    void PCLInBBoxHSV(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim = false);
+    void PCLInBBoxHSV(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, const pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim = false);
 
     // transform pcl::PointCloud using TF2
     template<typename PointT>
-    void transformPCLCloud(typename pcl::PointCloud<PointT> pcl_in, typename pcl::PointCloud<PointT> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+    void transformPCLCloud(const typename pcl::PointCloud<PointT> pcl_in, typename pcl::PointCloud<PointT> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+
+    // compute the minimum oriented bounding box for a point cloud -> (centroid, eigenvectors, axes lengths)
+    template<typename PointT>
+    std::tuple<Eigen::Vector4d, Eigen::Matrix3d, Eigen::Vector3d> minimumOrientedBBox(const typename pcl::PointCloud<PointT> pcl_in){
+        Eigen::Matrix3d cov_mat;
+        Eigen::Vector4d centr;
+        pcl::computeMeanAndCovarianceMatrix(pcl_in, cov_mat, centr);
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(cov_mat, Eigen::ComputeEigenvectors);
+        Eigen::Matrix3d eigenvecs = eigen_solver.eigenvectors();
+        Eigen::Vector3d eigenvals = eigen_solver.eigenvalues();
+        // from https://codextechnicanum.blogspot.com/2015/04/find-minimum-oriented-bounding-box-of.html
+        // Transform the original cloud to the origin where the principal components correspond to the axes.
+        Eigen::Matrix4d projectionTransform(Eigen::Matrix4d::Identity());
+        projectionTransform.block<3,3>(0,0) = eigenvecs.transpose();
+        projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * centr.head<3>());
+        pcl::PointCloud<pcl::PointXYZI>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::transformPointCloud(pcl_in, *cloudPointsProjected, projectionTransform);
+        // Get the minimum and maximum points of the transformed cloud.
+        pcl::PointXYZI minPoint, maxPoint;
+        pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
+        Eigen::Vector3d axes_length = Eigen::Vector3d(maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z);
+        return std::make_tuple(centr, eigenvecs, axes_length);
+    }
 
 } // namespace all_seaing_perception
 

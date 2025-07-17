@@ -86,11 +86,20 @@ private:
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header, m_global_untracked_header;
     int m_obstacle_id;
+    
     double m_obstacle_drop_thresh;
     double m_init_new_cov, m_init_xy_noise, m_init_theta_noise;
     bool m_track_robot, m_imu_predict, m_gps_update;
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;
+    bool m_is_sim;
+    bool m_direct_tf;
+    bool m_normalize_drop_thresh;
+    bool m_include_odom_theta, m_include_odom_only_theta;
+    std::string m_data_association_algo;
+    double m_trace_time;
+    bool m_include_unlabeled;
+    double m_unlabeled_assoc_threshold;
 
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
@@ -103,6 +112,7 @@ private:
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr m_slam_pub;
     rclcpp::Subscription<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_object_sub;
+    rclcpp::Subscription<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_unlabeled_sub;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
@@ -121,13 +131,6 @@ private:
     Eigen::MatrixXf m_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
     nav_msgs::msg::Odometry m_last_odom_msg;
-
-    bool m_is_sim;
-    bool m_direct_tf;
-    bool m_normalize_drop_thresh;
-    bool m_include_odom_theta, m_include_odom_only_theta;
-    std::string m_data_association_algo;
-    double m_trace_time;
 public:
     ObjectTrackingMap();
     virtual ~ObjectTrackingMap();
