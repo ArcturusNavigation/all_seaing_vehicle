@@ -2,7 +2,7 @@ object_tracking_map:
   ros__parameters:
     global_frame_id: "odom"
     slam_frame_id: "map"
-    obstacle_drop_thresh: 30.0
+    obstacle_drop_thresh: 60.0
     normalize_drop_thresh: False
     range_uncertainty: 15.0
     bearing_uncertainty: 1.0
@@ -27,3 +27,5 @@ object_tracking_map:
     is_sim: False
     data_association: "greedy_exclusive_meas_var" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0
+    include_unlabeled: True
+    unlabeled_association_threshold: 0.2

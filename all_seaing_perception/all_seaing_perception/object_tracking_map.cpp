@@ -70,6 +70,12 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<double>("trace_time", 5.0);
     m_trace_time = this->get_parameter("trace_time").as_double();
 
+    this->declare_parameter<bool>("include_unlabeled", false);
+    m_include_unlabeled = this->get_parameter("include_unlabeled").as_bool();
+
+    this->declare_parameter<double>("unlabeled_association_threshold", 0.2);
+    m_unlabeled_assoc_threshold = this->get_parameter("unlabeled_association_threshold").as_double();
+
     // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
     m_nav_y = 0;
@@ -89,6 +95,12 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
         this->create_subscription<all_seaing_interfaces::msg::ObstacleMap>(
             "detections", 10,
             std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
+    if (m_include_unlabeled){
+        m_unlabeled_sub =
+            this->create_subscription<all_seaing_interfaces::msg::ObstacleMap>(
+                "obstacle_map/unlabeled", 10,
+                std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
+    }
 
     // Initialize tf_listener pointer
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -708,20 +720,21 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     std::vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
+    double assoc_threshold = msg->is_labeled?m_new_obj_slam_thres:m_unlabeled_assoc_threshold;
     if (m_data_association_algo == "greedy_exclusive"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
     }else if (m_data_association_algo == "greedy_individual"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::indiv_greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::indiv_greedy_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
     }else if (m_data_association_algo == "greedy_exclusive_indiv_var"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_indiv_var_data_association(m_tracked_obstacles, detected_obstacles, p, v_indiv, m_new_obj_slam_thres);
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_indiv_var_data_association(m_tracked_obstacles, detected_obstacles, p, v_indiv, assoc_threshold);
     }else if (m_data_association_algo == "greedy_exclusive_measurement_var"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_meas_var_data_association(m_tracked_obstacles, detected_obstacles, p, v_meas, m_new_obj_slam_thres);
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_meas_var_data_association(m_tracked_obstacles, detected_obstacles, p, v_meas, assoc_threshold);
     }else if (m_data_association_algo == "linear_sum_assignment"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
     }else if (m_data_association_algo == "linear_sum_assignment_sqrt"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres, true);
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold, true);
     }else{
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, m_new_obj_slam_thres);
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
     }
 
     // Update vectors, now with known correspondence
@@ -732,6 +745,10 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             detected_obstacles[i]->obstacle.get_local_point(), detected_obstacles[i]->label);
         Eigen::Vector2f z_actual(range, bearing);
         if (match[i] == -1) {
+            if (detected_obstacles[i]->label == -1){
+                // don't create new obstacles when they have no label
+                continue;
+            }
             // increase object count and expand & initialize matrices
             m_num_obj++;
             // add object to tracked obstacles vector
@@ -800,6 +817,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
         // update data for matched obstacles (we'll update position after we update SLAM with all points)
         detected_obstacles[i]->obstacle.set_id(m_tracked_obstacles[tracked_id]->obstacle.get_id());
+        detected_obstacles[i]->label = m_tracked_obstacles[tracked_id]->label;
         m_tracked_obstacles[tracked_id] = detected_obstacles[i];
     }
     

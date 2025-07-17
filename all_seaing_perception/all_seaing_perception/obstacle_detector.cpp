@@ -30,7 +30,9 @@ public:
         this->declare_parameter<double>("clustering_distance", 0.75);
         this->declare_parameter<int>("obstacle_size_min", 20);
         this->declare_parameter<int>("obstacle_size_max", 100000);
-        this->declare_parameter<int>("obstacle_filter_size_max", 100000);
+        this->declare_parameter<int>("obstacle_filter_pts_max", 100000);
+        this->declare_parameter<double>("obstacle_filter_area_max", 100000.0);
+        this->declare_parameter<double>("obstacle_filter_length_max", 100000.0);
         this->declare_parameter<double>("range_max", 200.0);
 
         // Initialize member variables from parameters
@@ -39,7 +41,9 @@ public:
         m_clustering_distance = this->get_parameter("clustering_distance").as_double();
         m_obstacle_size_min = this->get_parameter("obstacle_size_min").as_int();
         m_obstacle_size_max = this->get_parameter("obstacle_size_max").as_int();
-        m_obstacle_filter_size_max = this->get_parameter("obstacle_filter_size_max").as_int();
+        m_obstacle_filter_size_max = this->get_parameter("obstacle_filter_pts_max").as_int();
+        m_obstacle_filter_area_max = this->get_parameter("obstacle_filter_area_max").as_double();
+        m_obstacle_filter_length_max = this->get_parameter("obstacle_filter_length_max").as_double();
         m_range_max = this->get_parameter("range_max").as_double();
 
         // Initialize tf_listener pointer
@@ -81,7 +85,18 @@ private:
             pcl::copyPointCloud(*in_cloud_ptr, it->indices, *cloud_lidar_ptr);
             // Transform point cloud to base link
             pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_base_link_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+            // TODO: Fix detections being rotated 90 degrees to the left, as if they are aligned with base_link instead of actual_base_link
             all_seaing_perception::transformPCLCloud(*cloud_lidar_ptr, *cloud_base_link_ptr, m_lidar_base_link_tf);
+            
+            // perform PCA and filter based on largest dimension, to only get point-like detections and not edges or anything
+            Eigen::Vector4d centr;
+            Eigen::Matrix3d eigenvecs;
+            Eigen::Vector3d axes_length;            
+            std::tie(centr, eigenvecs, axes_length) = all_seaing_perception::minimumOrientedBBox(*cloud_base_link_ptr);
+
+            if (axes_length[2] > m_obstacle_filter_length_max){
+                continue;
+            }
 
             // Publish global raw map (for obstacle avoidance)
             std::vector<int> ind(it->indices.size(), 0);
@@ -90,28 +105,14 @@ private:
                 new all_seaing_perception::Obstacle<pcl::PointXYZI>(m_local_header, m_global_header, cloud_base_link_ptr,
                                                     ind, m_obstacle_id++, m_base_link_map_tf));
             // Filter out obstacles far apart (probably random stuff/shore)
-            pcl::PointXYZI obs_ctr = obstacle->get_global_point();
+            pcl::PointXYZI obs_ctr = obstacle->get_local_point();
             pcl::PointXYZI orig(0, 0, 0);
-            if (pcl::euclideanDistance(orig, obs_ctr) > m_range_max){
+            if (pcl::euclideanDistance(orig, obs_ctr) > m_range_max || obstacle->get_polygon_area()>m_obstacle_filter_area_max){
                 continue;
             }
             obstacles.push_back(obstacle);
         }
         return obstacles;
-    }
-
-    void publish_local_map(const std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> &map) {
-        all_seaing_interfaces::msg::ObstacleMap map_msg;
-        map_msg.ns = "raw";
-        map_msg.local_header = m_local_header;
-        map_msg.header = m_global_header;
-        map_msg.is_labeled = false;
-        for (unsigned int i = 0; i < map.size(); i++) {
-            all_seaing_interfaces::msg::Obstacle raw_obstacle;
-            map[i]->to_ros_msg(raw_obstacle);
-            map_msg.obstacles.push_back(raw_obstacle);
-        }
-        m_raw_map_pub->publish(map_msg);
     }
     
     void publish_map(const std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> &map) {
@@ -123,6 +124,7 @@ private:
         for (unsigned int i = 0; i < map.size(); i++) {
             all_seaing_interfaces::msg::Obstacle raw_obstacle;
             map[i]->to_ros_msg(raw_obstacle);
+            raw_obstacle.label = -1;
             map_msg.obstacles.push_back(raw_obstacle);
         }
         m_raw_map_pub->publish(map_msg);
@@ -135,10 +137,10 @@ private:
         m_global_header.frame_id = m_global_frame_id;
         m_global_header.stamp = m_local_header.stamp;
         if (!m_got_lidar_base_link_tf){
-            m_lidar_base_link_tf = get_tf(m_base_link_frame, m_local_header.frame_id);
+            m_lidar_base_link_tf = get_tf(m_base_link_frame, m_local_header.frame_id, "lidar_base_link");
         }
         m_local_header.frame_id = m_base_link_frame;
-        m_base_link_map_tf = get_tf(m_global_frame_id, m_base_link_frame);
+        m_base_link_map_tf = get_tf(m_global_frame_id, m_base_link_frame, "base_link_map");
 
         // Convert ROS2 PointCloud2 to pcl PointCloud
         pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
@@ -153,11 +155,14 @@ private:
     }
 
     geometry_msgs::msg::TransformStamped get_tf(const std::string &in_target_frame,
-                                                const std::string &in_src_frame) {
+                                                const std::string &in_src_frame, std::string info) {
         geometry_msgs::msg::TransformStamped tf;
         try {
             tf = m_tf_buffer->lookupTransform(in_target_frame, in_src_frame, tf2::TimePointZero);
-            m_got_lidar_base_link_tf = true;
+            // RCLCPP_INFO(this->get_logger(), "Transform %s to %s", in_src_frame.c_str(), in_target_frame.c_str());
+            if (info == "lidar_base_link"){
+                m_got_lidar_base_link_tf = true;
+            }
         } catch (tf2::TransformException &ex) {
             RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
         }
@@ -173,6 +178,8 @@ private:
     int m_obstacle_size_min;
     int m_obstacle_size_max;
     int m_obstacle_filter_size_max;
+    double m_obstacle_filter_area_max;
+    double m_obstacle_filter_length_max;
     double m_range_max;
 
     // Transform variables

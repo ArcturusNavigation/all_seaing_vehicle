@@ -94,7 +94,7 @@ namespace all_seaing_perception{
                     continue;
                 for (int tracked_id = 0; tracked_id < tracked_obstacles.size(); tracked_id++) {
                     if (chosen_tracked.count(tracked_id) ||
-                        tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
+                        (detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label))
                         continue;
                     if (p[i][tracked_id] < min_p) {
                         best_match = std::make_pair(i, tracked_id);
@@ -125,7 +125,8 @@ namespace all_seaing_perception{
             float min_p = new_obj_thres;
             int best_match = -1;
             for (int i = 0; i < detected_obstacles.size(); i++) {
-                if (chosen_detected.count(i) || tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
+                if (chosen_detected.count(i) || 
+                    (detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label))
                     continue;
                 if (p[i][tracked_id] < min_p) {
                     best_match = i;
@@ -161,7 +162,7 @@ namespace all_seaing_perception{
             if (chosen_detected.count(i))
                 continue;
             if (chosen_tracked.count(tracked_id) ||
-                tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
+                (detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label))
                 continue;
             if (p[i][tracked_id] < new_obj_thres) {
                 match[i] = tracked_id;
@@ -184,7 +185,7 @@ namespace all_seaing_perception{
             min_p = new_obj_thres;
             int best_match = -1;
             for (int tracked_id = 0; tracked_id < tracked_obstacles.size(); tracked_id++) {
-                if (tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
+                if (detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label)
                     continue;
                 if (p[i][tracked_id] < min_p) {
                     best_match = tracked_id;
@@ -215,7 +216,7 @@ namespace all_seaing_perception{
         float max_val = 0;
         for (int i = 0; i < num_det; i++) {
             for (int tracked_id = 0; tracked_id < num_obj; tracked_id++) {
-                if (tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label || p[i][tracked_id] >= new_obj_thres){
+                if ((detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label) || p[i][tracked_id] >= new_obj_thres){
                     cost_matrix(i,tracked_id) = INF;
                 }else{
                     cost_matrix(i,tracked_id) = sqrt ? std::sqrt(p[i][tracked_id]) : p[i][tracked_id];

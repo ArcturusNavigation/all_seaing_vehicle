@@ -212,7 +212,7 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    obstacle_detector_node = launch_ros.actions.Node(
+    obstacle_detector_raw_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_detector",
         remappings=[
@@ -221,9 +221,29 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "wamv/wamv/base_link"},
             {"global_frame_id": "map"},
-            {"obstacle_size_min": 2},
-            {"obstacle_size_max": 60},
             {"clustering_distance": 1.0},
+            {"obstacle_size_min": 5},
+            {"range_max": 50.0},
+        ],
+    )
+
+    obstacle_detector_unlabeled_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("point_cloud", "point_cloud/filtered"),
+            ("obstacle_map/raw", "obstacle_map/unlabeled")
+        ],
+        parameters=[
+            {"base_link_frame": "wamv/wamv/base_link"},
+            {"global_frame_id": "map"},
+            {"clustering_distance": 1.0},
+            {"obstacle_size_min": 5},
+            # {"obstacle_size_max": 300},
+            # {"obstacle_filter_pts_max": 100},
+            # {"obstacle_filter_area_max": 0.2},
+            {"obstacle_filter_length_max": 0.5},
+            # {"range_max": 50.0},
         ],
     )
 
@@ -434,7 +454,8 @@ def launch_setup(context, *args, **kwargs):
         navsat_node,
         controller_node,
         controller_server,
-        obstacle_detector_node,
+        obstacle_detector_raw_node,
+        obstacle_detector_unlabeled_node,
         color_segmentation_node,
         ycrcb_color_segmentation_node,
         # yolov8_node,

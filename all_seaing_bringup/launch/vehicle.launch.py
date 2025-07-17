@@ -473,6 +473,41 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    obstacle_detector_raw_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("point_cloud", "point_cloud/filtered"),
+        ],
+        parameters=[
+            {"base_link_frame": "base_link"},
+            {"global_frame_id": "map"},
+            {"clustering_distance": 1.0},
+            {"obstacle_size_min": 5},
+            {"range_max": 50.0},
+        ],
+    )
+
+    obstacle_detector_unlabeled_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("point_cloud", "point_cloud/filtered"),
+            ("obstacle_map/raw", "obstacle_map/unlabeled")
+        ],
+        parameters=[
+            {"base_link_frame": "base_link"},
+            {"global_frame_id": "map"},
+            {"clustering_distance": 1.0},
+            {"obstacle_size_min": 5},
+            # {"obstacle_size_max": 300},
+            # {"obstacle_filter_pts_max": 100},
+            # {"obstacle_filter_area_max": 0.2},
+            {"obstacle_filter_length_max": 0.5},
+            # {"range_max": 50.0},
+        ],
+    )
+
     object_tracking_map_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="object_tracking_map",
@@ -621,6 +656,8 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,
         multicam_detection_merge_node,
+        obstacle_detector_raw_node,
+        obstacle_detector_unlabeled_node,
         object_tracking_map_node,
         run_tasks,
         task_init_server, 

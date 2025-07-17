@@ -66,7 +66,7 @@ namespace all_seaing_perception{
         return in_contour;
     }
 
-    void euclideanClustering(pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance, int obstacle_sz_min, int obstacle_sz_max, bool conditional, std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func){
+    void euclideanClustering(const pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance, int obstacle_sz_min, int obstacle_sz_max, bool conditional, std::function<bool(const pcl::PointXYZHSV&, const pcl::PointXYZHSV&, float)> cond_func){
         // extract clusters
         pcl::search::KdTree<pcl::PointXYZHSV>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZHSV>);
         if (!pcloud_ptr->points.empty())
@@ -93,7 +93,7 @@ namespace all_seaing_perception{
         }
     }
 
-    void euclideanClustering(pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance, int obstacle_sz_min, int obstacle_sz_max, bool conditional, std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)> cond_func){
+    void euclideanClustering(const pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance, int obstacle_sz_min, int obstacle_sz_max, bool conditional, std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)> cond_func){
         // extract clusters
         pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>);
         if (!pcloud_ptr->points.empty())
@@ -120,7 +120,7 @@ namespace all_seaing_perception{
         }
     }
 
-    void PCLInBBoxHSV(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim){
+    void PCLInBBoxHSV(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim){
         for (pcl::PointXYZI &point_tf : cloud->points) {
             cv::Point2d xy_rect = all_seaing_perception::projectPCLPtToPixel(cmodel, point_tf, is_sim);
             // Check if within bounds & in front of the boat
@@ -135,15 +135,15 @@ namespace all_seaing_perception{
     }
 
     template<typename PointT>
-    void transformPCLCloud(typename pcl::PointCloud<PointT> pcl_in, typename pcl::PointCloud<PointT> &pcl_out, geometry_msgs::msg::TransformStamped tf){
+    void transformPCLCloud(const typename pcl::PointCloud<PointT> pcl_in, typename pcl::PointCloud<PointT> &pcl_out, geometry_msgs::msg::TransformStamped tf){
         sensor_msgs::msg::PointCloud2 pcl_in_msg, pcl_out_msg;
         pcl::toROSMsg(pcl_in, pcl_in_msg);
         tf2::doTransform<sensor_msgs::msg::PointCloud2>(pcl_in_msg, pcl_out_msg, tf);
         pcl::fromROSMsg(pcl_out_msg, pcl_out);
     }
 
-    template void transformPCLCloud(typename pcl::PointCloud<pcl::PointXYZ> pcl_in, typename pcl::PointCloud<pcl::PointXYZ> &pcl_out, geometry_msgs::msg::TransformStamped tf);
-    template void transformPCLCloud(typename pcl::PointCloud<pcl::PointXYZI> pcl_in, typename pcl::PointCloud<pcl::PointXYZI> &pcl_out, geometry_msgs::msg::TransformStamped tf);
-    template void transformPCLCloud(typename pcl::PointCloud<pcl::PointXYZHSV> pcl_in, typename pcl::PointCloud<pcl::PointXYZHSV> &pcl_out, geometry_msgs::msg::TransformStamped tf);
-    template void transformPCLCloud(typename pcl::PointCloud<pcl::PointXYZRGB> pcl_in, typename pcl::PointCloud<pcl::PointXYZRGB> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+    template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZ> pcl_in, typename pcl::PointCloud<pcl::PointXYZ> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+    template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZI> pcl_in, typename pcl::PointCloud<pcl::PointXYZI> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+    template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZHSV> pcl_in, typename pcl::PointCloud<pcl::PointXYZHSV> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+    template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZRGB> pcl_in, typename pcl::PointCloud<pcl::PointXYZRGB> &pcl_out, geometry_msgs::msg::TransformStamped tf);
 }
