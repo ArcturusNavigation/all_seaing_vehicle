@@ -58,6 +58,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("normalize_drop_thresh", false);
     m_normalize_drop_thresh = this->get_parameter("normalize_drop_thresh").as_bool();
 
+    this->declare_parameter<double>("range_drop_thresh", 10.0);
+    m_range_drop_thresh = this->get_parameter("range_drop_thresh").as_double();
+
     this->declare_parameter<bool>("include_odom_theta", true);
     m_include_odom_theta = this->get_parameter("include_odom_theta").as_bool();
 
@@ -851,10 +854,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                 rclcpp::Time(m_local_header.stamp) -
                 m_tracked_obstacles[tracked_id]->last_dead +
                 m_tracked_obstacles[tracked_id]->time_dead;
-            if (m_tracked_obstacles[tracked_id]->time_dead.seconds() >
+            if ((m_tracked_obstacles[tracked_id]->time_dead.seconds() >
                 (m_normalize_drop_thresh ? (m_obstacle_drop_thresh * (pcl::euclideanDistance(p0,
                                             m_tracked_obstacles[tracked_id]->obstacle.get_local_point()) / avg_dist) *
-                                            m_normalize_drop_dist) : m_obstacle_drop_thresh)) {
+                                            m_normalize_drop_dist) : m_obstacle_drop_thresh)) && (pcl::euclideanDistance(p0,
+                                            m_tracked_obstacles[tracked_id]->obstacle.get_local_point()) < m_range_drop_thresh)) {
                 to_remove.push_back(tracked_id);
                 continue;
             }
