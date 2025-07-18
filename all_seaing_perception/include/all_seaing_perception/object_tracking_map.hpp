@@ -98,7 +98,7 @@ private:
     bool m_include_odom_theta, m_include_odom_only_theta;
     std::string m_data_association_algo;
     double m_trace_time;
-    bool m_include_unlabeled;
+    bool m_include_unlabeled, m_drop_ignore_unlabeled;
     double m_unlabeled_assoc_threshold;
 
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
