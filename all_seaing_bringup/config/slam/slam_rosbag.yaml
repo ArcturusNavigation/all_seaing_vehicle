@@ -2,7 +2,8 @@ object_tracking_map:
   ros__parameters:
     global_frame_id: "odom"
     slam_frame_id: "map"
-    obstacle_drop_thresh: 5.0
+    duplicate_thresh: 1.0
+    obstacle_drop_thresh: 30.0
     range_drop_thresh: 30.0
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False

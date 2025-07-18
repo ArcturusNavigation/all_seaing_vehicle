@@ -55,6 +55,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("rotate_odom", false);
     m_rotate_odom = this->get_parameter("rotate_odom").as_bool();
 
+    this->declare_parameter<double>("duplicate_thresh", 10.0);
+    m_duplicate_thresh = this->get_parameter("duplicate_thresh").as_double();
+
     this->declare_parameter<bool>("drop_ignore_unlabeled", false);
     m_drop_ignore_unlabeled = this->get_parameter("drop_ignore_unlabeled").as_bool();
 
@@ -840,47 +843,75 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     }
 
     // Filter old obstacles
-    std::vector<int> to_remove;
-    std::vector<int> to_keep;
-    std::vector<int> to_keep_flat = {0, 1, 2};
+    std::unordered_set<int> to_keep_set;
     for (int tracked_id = 0; tracked_id < static_cast<int>(m_tracked_obstacles.size()); tracked_id++) {
-        // RCLCPP_INFO(this->get_logger(), "IS LABELED: %s", msg->is_labeled?"true":"false");
         if (chosen_tracked.count(tracked_id) && ((!m_drop_ignore_unlabeled) || msg->is_labeled)) {
-            to_keep.push_back(tracked_id);
-            if (m_track_robot) {
-                to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * tracked_id, 3 + 2 * tracked_id + 1});
-            }
+            to_keep_set.insert(tracked_id);
             m_tracked_obstacles[tracked_id]->is_dead = false;
             m_tracked_obstacles[tracked_id]->time_dead = rclcpp::Duration(0,0);
+            if(msg->is_labeled){
+                m_tracked_obstacles[tracked_id]->time_seen = m_local_header.stamp;
+            }
             continue;
         }
         // Dead
-        // RCLCPP_INFO(this->get_logger(), "IS DEAD BEFORE: %s", m_tracked_obstacles[tracked_id]->is_dead?"true":"false");
         if (m_tracked_obstacles[tracked_id]->is_dead) {
             // Was also dead before, add time dead
             m_tracked_obstacles[tracked_id]->time_dead =
                 rclcpp::Time(m_local_header.stamp) -
                 m_tracked_obstacles[tracked_id]->last_dead +
                 m_tracked_obstacles[tracked_id]->time_dead;
-            // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d DEAD FOR %lf SECONDS, IN RANGE: %lf", tracked_id, m_tracked_obstacles[tracked_id]->time_dead.seconds(), pcl::euclideanDistance(p0, m_tracked_obstacles[tracked_id]->obstacle.get_local_point()));
             if ((m_tracked_obstacles[tracked_id]->time_dead.seconds() >
                 (m_normalize_drop_thresh ? (m_obstacle_drop_thresh * (pcl::euclideanDistance(p0,
                                             m_tracked_obstacles[tracked_id]->obstacle.get_local_point()) / avg_dist) *
                                             m_normalize_drop_dist) : m_obstacle_drop_thresh)) && (pcl::euclideanDistance(p0,
                                             m_tracked_obstacles[tracked_id]->obstacle.get_local_point()) < m_range_drop_thresh)) {
-                to_remove.push_back(tracked_id);
                 continue;
             }
-        }else{
-            // RCLCPP_INFO(this->get_logger(), "OBSTACLE %d WAS NOT DEAD, WILL BE SOON THO", tracked_id);
         }
         m_tracked_obstacles[tracked_id]->is_dead = true;
         m_tracked_obstacles[tracked_id]->last_dead = m_local_header.stamp;
-        to_keep.push_back(tracked_id);
-        if (m_track_robot) {
-            to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * tracked_id, 3 + 2 * tracked_id + 1});
+        to_keep_set.insert(tracked_id);
+    }
+
+    // Clear out duplicates
+    // TODO: optimize to N^2 (now is N^3) by making a priority queue of pairs of indices based on minimum distance and popping if index already removed and removing if distance < threshold
+    int ind_to_remove = 0;
+    while(ind_to_remove != -1){
+        ind_to_remove = -1;
+        // find minimum distance obstacles and remove one seen earliest if under the duplicate threshold
+        float min_dist = m_duplicate_thresh;
+        for (int i : to_keep_set){
+            for (int j : to_keep_set){
+                if (i == j){
+                    continue;
+                }
+                if (pcl::euclideanDistance(m_tracked_obstacles[i]->obstacle.get_global_point(),
+                                            m_tracked_obstacles[j]->obstacle.get_global_point()) < min_dist){
+                    min_dist = pcl::euclideanDistance(m_tracked_obstacles[i]->obstacle.get_global_point(),
+                                                        m_tracked_obstacles[j]->obstacle.get_global_point());
+                    // remove
+                    ind_to_remove = (m_tracked_obstacles[i]->time_seen < m_tracked_obstacles[j]->time_seen)?i:j;
+                }
+            }
         }
-        // RCLCPP_INFO(this->get_logger(), "IS DEAD AFTER: %s", m_tracked_obstacles[tracked_id]->is_dead?"true":"false");
+        if (ind_to_remove != -1){
+            to_keep_set.erase(ind_to_remove);
+        }
+    }
+
+    std::vector<int> to_remove;
+    std::vector<int> to_keep;
+    std::vector<int> to_keep_flat = {0, 1, 2};
+    for (int i = 0; i < m_tracked_obstacles.size(); i++){
+        if(to_keep_set.count(i)){
+            to_keep.push_back(i);
+            if (m_track_robot) {
+                to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * i, 3 + 2 * i + 1});
+            }
+        }else{
+            to_remove.push_back(i);
+        }
     }
 
     // update vectors & matrices
