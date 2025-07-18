@@ -107,7 +107,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"base_link_frame": "actual_base_link"},
-            {"datum": [27.374, -82.451, np.pi/2.0]},
+            {"datum": [27.3729, -82.4537, np.pi/2.0]},
             # {"magnetic_declination": 0.14},
             {"odom_yaw_offset": -np.pi/2.0},
             {"use_odom_pos": True},
@@ -136,6 +136,18 @@ def launch_setup(context, *args, **kwargs):
             {"new_static_tf_topic": "/tf_static"},
             # {"child_frames_to_remove": ["zed_camera_link"]},
             {"parent_frames_to_remove": ["base_link", "map", "odom"]},
+        ]
+    )
+
+    point_cloud_filter_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/point_cloud/filtered_fake"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"range_radius": [0.5, 60.0]},
         ]
     )
 
@@ -177,12 +189,17 @@ def launch_setup(context, *args, **kwargs):
     grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
+        remappings=[
+            ("odometry/filtered", "odometry/tracked"),
+        ],
         parameters=[
             {"global_frame_id": "map"},
             {"timer_period": 1.0},
-            {"grid_dim": [800, 800]},
-            {"default_range": 60},
+            {"grid_dim": [1000, 1000]},
             {"grid_resolution": 0.1},
+            {"obstacle_radius_sigma": 3.0},
+            {"search_radius_sigma": 10.0},
+            {"dynamic_origin": True},
         ],
     )
 
@@ -227,9 +244,10 @@ def launch_setup(context, *args, **kwargs):
         odometry_publisher_node,
         static_transforms_ld,
         tf_filtering,
+        point_cloud_filter_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
-        grid_map_generator,
+        # grid_map_generator,
         bbox_project_pcloud_node,
         object_tracking_map_node,
     ]

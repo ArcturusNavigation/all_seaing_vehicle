@@ -58,6 +58,12 @@ class GridMapGenerator(Node):
             .double_value
         )
 
+        self.dynamic_origin = (
+            self.declare_parameter("dynamic_origin", False)
+            .get_parameter_value()
+            .bool_value
+        )
+
         # --------------- SUBSCRIBERS, PUBLISHERS, AND TIMERS ---------------#
 
         self.obstacle_map_sub = self.create_subscription(
@@ -87,6 +93,7 @@ class GridMapGenerator(Node):
         self.obstacle_map = ObstacleMap()
         self.ship_pos = (0, 0)
         self.lidar_range = default_lidar_range
+        self.got_odom = False
 
     def initialize_grid(self):
         self.grid = OccupancyGrid()
@@ -201,6 +208,11 @@ class GridMapGenerator(Node):
         self.ship_pos = self.world_to_grid(
             msg.pose.pose.position.x, msg.pose.pose.position.y
         )
+        if self.dynamic_origin:
+            if not self.got_odom:
+                self.grid.info.origin.position.x = msg.pose.pose.position.x - self.grid_dim[0]*self.grid_resolution/2
+                self.grid.info.origin.position.y = msg.pose.pose.position.y - self.grid_dim[0]*self.grid_resolution/2
+        self.got_odom = True
 
     def scan_callback(self, msg):
         self.lidar_range = msg.range_max
