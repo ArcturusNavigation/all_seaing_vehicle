@@ -523,9 +523,15 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
+        remappings=[
+            ("odometry/filtered", "odometry/tracked"),
+        ],
         parameters=[
             {"global_frame_id": "map"},
-            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"timer_period": 1.0},
+            {"grid_dim": [1000, 1000]},
+            {"default_range": 60},
+            {"grid_resolution": 0.1},
         ],
         output="screen",
     )

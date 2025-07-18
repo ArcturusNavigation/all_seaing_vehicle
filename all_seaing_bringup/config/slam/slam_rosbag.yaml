@@ -2,12 +2,13 @@ object_tracking_map:
   ros__parameters:
     global_frame_id: "odom"
     slam_frame_id: "map"
-    obstacle_drop_thresh: 60.0
+    duplicate_thresh: 1.0
+    obstacle_drop_thresh: 30.0
+    range_drop_thresh: 30.0
+    drop_ignore_unlabeled: False
     normalize_drop_thresh: False
     range_uncertainty: 15.0
-    bearing_uncertainty: 1.0
-    motion_gps_xy_noise: 1.0 # useless
-    motion_gps_theta_noise: 0.1 # useless
+    bearing_uncertainty: 1.5
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 0.0 # because we can't update, but it's accurate anyways, IRL use a small value
     odom_refresh_rate: 10.0
@@ -16,16 +17,16 @@ object_tracking_map:
     include_odom_only_theta: False
     rotate_odom: False
     update_odom_theta_uncertainty: 0.01
-    new_object_slam_threshold: 0.2
+    new_object_slam_threshold: 0.03
     init_xy_noise: 0.7
-    init_theta_noise: 0.1
+    init_theta_noise: 0.25
     init_new_cov: 50.0
     track_robot: True
     imu_predict: True
     gps_update: True
     direct_tf: True
     is_sim: False
-    data_association: "greedy_exclusive_meas_var" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
+    data_association: "greedy_exclusive_measurement_var" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 100.0
     include_unlabeled: True
-    unlabeled_association_threshold: 0.2
+    unlabeled_association_threshold: 0.01

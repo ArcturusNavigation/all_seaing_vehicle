@@ -87,7 +87,8 @@ private:
     std_msgs::msg::Header m_global_header, m_global_untracked_header;
     int m_obstacle_id;
     
-    double m_obstacle_drop_thresh;
+    double m_duplicate_thresh;
+    double m_obstacle_drop_thresh, m_range_drop_thresh;
     double m_init_new_cov, m_init_xy_noise, m_init_theta_noise;
     bool m_track_robot, m_imu_predict, m_gps_update;
     double m_normalize_drop_dist;
@@ -98,7 +99,7 @@ private:
     bool m_include_odom_theta, m_include_odom_only_theta;
     std::string m_data_association_algo;
     double m_trace_time;
-    bool m_include_unlabeled;
+    bool m_include_unlabeled, m_drop_ignore_unlabeled;
     double m_unlabeled_assoc_threshold;
 
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;

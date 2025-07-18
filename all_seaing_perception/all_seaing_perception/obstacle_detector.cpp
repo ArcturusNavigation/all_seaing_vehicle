@@ -85,7 +85,6 @@ private:
             pcl::copyPointCloud(*in_cloud_ptr, it->indices, *cloud_lidar_ptr);
             // Transform point cloud to base link
             pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_base_link_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-            // TODO: Fix detections being rotated 90 degrees to the left, as if they are aligned with base_link instead of actual_base_link
             all_seaing_perception::transformPCLCloud(*cloud_lidar_ptr, *cloud_base_link_ptr, m_lidar_base_link_tf);
             
             // perform PCA and filter based on largest dimension, to only get point-like detections and not edges or anything
