@@ -324,6 +324,16 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    navigation_server_nomap = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server_nomap.py",
+        parameters=[
+            {"global_frame_id": "map"},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ],
+        output="screen",
+    )
+
     grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
@@ -361,7 +371,8 @@ def launch_setup(context, *args, **kwargs):
             {"safe_margin": 0.2},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global")
+            ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
         ]
     )
 
@@ -465,12 +476,13 @@ def launch_setup(context, *args, **kwargs):
         object_tracking_map_node,
         rviz_node,
         control_mux,
-        navigation_server,
+        # navigation_server,
+        navigation_server_nomap,
         grid_map_generator,
         onshore_node,
         run_tasks,
         task_init_server,
-        # follow_buoy_path,
+        follow_buoy_path,
         # follow_buoy_pid,
         # speed_challenge_pid,
         rviz_waypoint_sender,
