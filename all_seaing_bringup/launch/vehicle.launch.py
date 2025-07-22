@@ -146,11 +146,12 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
-            {"color_label_mappings_file": color_label_mappings},
+            {"color_label_mappings_file": buoy_label_mappings},
             {"safe_margin": 0.2},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
         ],
     )
 
@@ -672,8 +673,8 @@ def launch_setup(context, *args, **kwargs):
         object_tracking_map_node,
         run_tasks,
         task_init_server, 
-        # follow_buoy_path,
-        follow_buoy_pid,
+        follow_buoy_path,
+        # follow_buoy_pid,
         # grid_map_generator,
         central_hub,
         # amcl_ld,
