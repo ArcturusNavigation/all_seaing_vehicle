@@ -464,7 +464,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings = [
-
+            ("detections/merged", "obstacle_map/local"),
         ],
         parameters = [
             {"enable_front": True},
@@ -517,7 +517,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("detections", "detections/merged"),
+            ("detections", "obstacle_map/local"),
             ("odometry/filtered", "odometry/gps"),
         ],
         parameters=[slam_params]

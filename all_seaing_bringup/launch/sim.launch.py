@@ -254,7 +254,8 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
             ("camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
-            ("lidar_topic", "point_cloud/filtered")
+            ("lidar_topic", "point_cloud/filtered"),
+            ("detections", "obstacle_map/local"),
         ],
         parameters=[
             {"base_link_frame": "wamv/wamv/base_link"},
@@ -277,6 +278,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
+            ("detections", "obstacle_map/local"),
         ],
         # parameters=[slam_sim_params],
         parameters=[slam_real_params],
