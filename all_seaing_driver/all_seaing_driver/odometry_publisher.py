@@ -19,7 +19,7 @@ class OdometryPublisher(Node):
         self.declare_parameter("base_link_frame", "base_link")
         self.declare_parameter("datum", [42.3567949, -71.1070491, 0.0])
         self.declare_parameter("magnetic_declination", 0.0)
-        self.declare_parameter("yaw_offset", -np.pi/2.0)
+        self.declare_parameter("yaw_offset", np.pi/2.0)
         self.declare_parameter("odom_yaw_offset", np.pi/2.0)
         self.declare_parameter("odom_hz", 30.0)
         self.declare_parameter("use_odom_pos", False)

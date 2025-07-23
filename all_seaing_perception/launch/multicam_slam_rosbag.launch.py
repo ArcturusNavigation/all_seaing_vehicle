@@ -251,7 +251,6 @@ def launch_setup(context, *args, **kwargs):
             ("odom_topic", "/mavros/local_position/odom")
         ],
         parameters=[
-            {"yaw_offset": np.pi/2.0},
             {"swap_dx_dy": True},
         ]
     )
