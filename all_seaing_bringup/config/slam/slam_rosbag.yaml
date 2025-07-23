@@ -8,7 +8,7 @@ object_tracking_map:
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False
     range_uncertainty: 15.0
-    bearing_uncertainty: 1.5
+    bearing_uncertainty: 5.0
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 0.0 # because we can't update, but it's accurate anyways, IRL use a small value
     odom_refresh_rate: 10.0
@@ -26,7 +26,7 @@ object_tracking_map:
     gps_update: True
     direct_tf: True
     is_sim: False
-    data_association: "greedy_exclusive_measurement_var" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
+    data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 100.0
     include_unlabeled: True
     unlabeled_association_threshold: 0.01
