@@ -23,6 +23,7 @@ class OdometryPublisher(Node):
         self.declare_parameter("odom_yaw_offset", np.pi/2.0)
         self.declare_parameter("odom_hz", 30.0)
         self.declare_parameter("use_odom_pos", False)
+        self.declare_parameter("swap_dx_dy", False)
 
         self.global_frame_id = self.get_parameter("global_frame_id").get_parameter_value().string_value
         self.base_link_frame = self.get_parameter("base_link_frame").get_parameter_value().string_value
@@ -32,6 +33,7 @@ class OdometryPublisher(Node):
         self.yaw_offset = self.get_parameter("yaw_offset").get_parameter_value().double_value
         self.odom_yaw_offset = self.get_parameter("odom_yaw_offset").get_parameter_value().double_value
         self.use_odom_pos = self.get_parameter("use_odom_pos").get_parameter_value().bool_value
+        self.swap_dx_dy = self.get_parameter("swap_dx_dy").get_parameter_value().bool_value
         self.datum_lat = self.datum[0]
         self.datum_lon = self.datum[1]
         self.datum_heading = self.datum[2] # actual heading of imu's 0 (- imu's value when facing east)
@@ -91,9 +93,11 @@ class OdometryPublisher(Node):
             # convert gps lat/lon to reference frame coordinates
             delta = geopy.distance.geodesic((self.datum_lat, self.datum_lon), (lat, lon)).meters
             heading = np.arctan2(lon-self.datum_lon, lat-self.datum_lat)
+            dx = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
+            dy = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
             # TODO: hotfix or real? should be swapped
-            dy = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
-            dx = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
+            if self.swap_dx_dy:
+                dx, dy = dy, dx
         else:
             dx = self.pos_odom_msg.pose.pose.position.x
             dy = self.pos_odom_msg.pose.pose.position.y

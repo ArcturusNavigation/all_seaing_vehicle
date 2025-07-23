@@ -228,7 +228,7 @@ def launch_setup(context, *args, **kwargs):
             {"new_tf_topic": "/tf"},
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
-            {"child_frames_to_remove": ["slam_map"]},
+            # {"child_frames_to_remove": ["slam_map"]},
             {"parent_frames_to_remove": ["map"]},
         ]
     )

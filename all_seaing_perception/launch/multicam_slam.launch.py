@@ -95,6 +95,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"yaw_offset": np.pi/2.0},
+            {"swap_dx_dy": True},
         ]
     )
 
