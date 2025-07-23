@@ -109,6 +109,7 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "actual_base_link"},
             {"datum": [27.3729, -82.4537, np.pi/2.0]},
             # {"magnetic_declination": 0.14},
+            {"yaw_offset": -np.pi/2.0},
             {"odom_yaw_offset": -np.pi/2.0},
             {"use_odom_pos": True},
         ]

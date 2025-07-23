@@ -14,6 +14,7 @@ from launch_ros.actions import SetRemap
 import os
 import yaml
 import xacro
+import numpy as np
 
 
 def launch_setup(context, *args, **kwargs):
@@ -100,7 +101,7 @@ def launch_setup(context, *args, **kwargs):
             ("odom_topic", "/mavros/local_position/odom")
         ],
         parameters=[
-
+            {"swap_dx_dy": True},
         ]
     )
 
@@ -146,11 +147,12 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
-            {"color_label_mappings_file": color_label_mappings},
+            {"color_label_mappings_file": buoy_label_mappings},
             {"safe_margin": 0.2},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
         ],
     )
 
@@ -461,7 +463,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings = [
-
+            ("detections/merged", "obstacle_map/local"),
         ],
         parameters = [
             {"enable_front": True},
@@ -514,7 +516,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("detections", "detections/merged"),
+            ("detections", "obstacle_map/local"),
             ("odometry/filtered", "odometry/gps"),
         ],
         parameters=[slam_params]
@@ -523,15 +525,19 @@ def launch_setup(context, *args, **kwargs):
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
-        remappings=[
-            ("odometry/filtered", "odometry/tracked"),
-        ],
         parameters=[
             {"global_frame_id": "map"},
-            {"timer_period": 1.0},
-            {"grid_dim": [1000, 1000]},
-            {"default_range": 60},
-            {"grid_resolution": 0.1},
+            {"robot_frame_id": "base_link"},
+        ],
+        output="screen",
+    )
+
+    navigation_server_nomap = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server_nomap.py",
+        parameters=[
+            {"global_frame_id": "map"},
+            {"robot_frame_id": "base_link"},
         ],
         output="screen",
     )
@@ -646,7 +652,8 @@ def launch_setup(context, *args, **kwargs):
         # ekf_node,
         # navsat_node,
         odometry_publisher_node,
-        navigation_server,
+        # navigation_server,
+        navigation_server_nomap,
         obstacle_detector_node,
         point_cloud_filter_node,
         rover_custom_controller,
@@ -667,9 +674,9 @@ def launch_setup(context, *args, **kwargs):
         object_tracking_map_node,
         run_tasks,
         task_init_server, 
-        # follow_buoy_path,
-        follow_buoy_pid,
-        grid_map_generator,
+        follow_buoy_path,
+        # follow_buoy_pid,
+        # grid_map_generator,
         central_hub,
         # amcl_ld,
         # static_transforms_ld,

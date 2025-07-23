@@ -14,6 +14,7 @@ from launch_ros.actions import SetRemap
 import os
 import yaml
 import xacro
+import numpy as np
 
 def launch_setup(context, *args, **kwargs):
     driver_prefix = get_package_share_directory("all_seaing_driver")
@@ -228,7 +229,7 @@ def launch_setup(context, *args, **kwargs):
             {"new_tf_topic": "/tf"},
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
-            {"child_frames_to_remove": ["slam_map"]},
+            # {"child_frames_to_remove": ["slam_map"]},
             {"parent_frames_to_remove": ["map"]},
         ]
     )
@@ -239,6 +240,19 @@ def launch_setup(context, *args, **kwargs):
         executable='robot_state_publisher',
         output='screen',
         parameters=[{'robot_description': robot_urdf}]
+    )
+
+    odometry_publisher_node = launch_ros.actions.Node(
+        package = "all_seaing_driver",
+        executable = "odometry_publisher.py",
+        output = "screen",
+        remappings=[
+            ("gps_topic", "/mavros/global_position/raw/fix"),
+            ("odom_topic", "/mavros/local_position/odom")
+        ],
+        parameters=[
+            {"swap_dx_dy": True},
+        ]
     )
 
     return [
@@ -252,6 +266,7 @@ def launch_setup(context, *args, **kwargs):
         # multicam_detection_merge_node,
         object_tracking_map_node,
         tf_filtering,
+        # odometry_publisher_node,
         # robot_state_publisher,
     ]
 

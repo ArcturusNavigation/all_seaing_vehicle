@@ -97,8 +97,12 @@ class FollowBuoyPath(ActionServerBase):
         with open(color_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
         # hardcoded from reading YAML
-        self.green_labels.add(label_mappings["green"])
-        self.red_labels.add(label_mappings["red"])
+        if self.is_sim:
+            self.green_labels.add(label_mappings["green"])
+            self.red_labels.add(label_mappings["red"])
+        else:
+            self.green_labels.add(label_mappings["green_buoy"])
+            self.red_labels.add(label_mappings["red_buoy"])
         
         self.sent_waypoints = set()
 

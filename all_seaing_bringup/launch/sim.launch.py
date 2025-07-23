@@ -254,7 +254,8 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
             ("camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
-            ("lidar_topic", "point_cloud/filtered")
+            ("lidar_topic", "point_cloud/filtered"),
+            ("detections", "obstacle_map/local"),
         ],
         parameters=[
             {"base_link_frame": "wamv/wamv/base_link"},
@@ -277,6 +278,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
+            ("detections", "obstacle_map/local"),
         ],
         # parameters=[slam_sim_params],
         parameters=[slam_real_params],
@@ -324,6 +326,16 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    navigation_server_nomap = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server_nomap.py",
+        parameters=[
+            {"global_frame_id": "map"},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ],
+        output="screen",
+    )
+
     grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
@@ -361,7 +373,8 @@ def launch_setup(context, *args, **kwargs):
             {"safe_margin": 0.2},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global")
+            ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
         ]
     )
 
@@ -466,11 +479,12 @@ def launch_setup(context, *args, **kwargs):
         rviz_node,
         control_mux,
         navigation_server,
+        # navigation_server_nomap,
         grid_map_generator,
         onshore_node,
         run_tasks,
         task_init_server,
-        # follow_buoy_path,
+        follow_buoy_path,
         # follow_buoy_pid,
         # speed_challenge_pid,
         rviz_waypoint_sender,
