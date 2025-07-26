@@ -577,7 +577,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM0"
         }.items(),
         condition=UnlessCondition(use_bag),
     )
