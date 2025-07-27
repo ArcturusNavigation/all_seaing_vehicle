@@ -5,7 +5,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
-from all_seaing_interfaces.action import FollowPath, Task
+from all_seaing_interfaces.action import FollowPath, Task, Waypoint
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from nav_msgs.msg import Odometry
@@ -55,6 +55,8 @@ class FollowBuoyPath(ActionServerBase):
             MarkerArray, "waypoint_markers", 10
         )
 
+        self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
+
         self.declare_parameter("xy_threshold", 2.0)
         self.declare_parameter("theta_threshold", 180.0)
         self.declare_parameter("goal_tol", 0.5)
@@ -62,6 +64,9 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("choose_every", 5)
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
+        self.declare_parameter("bypass_planner", False)
+
+        self.bypass_planner = self.get_parameter("bypass_planner").get_parameter_value().bool_value
 
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
@@ -185,8 +190,8 @@ class FollowBuoyPath(ActionServerBase):
                     type=Marker.ARROW,
                     pose=point,
                     header=Header(frame_id="odom"),
-                    scale=Vector3(x=1.0, y=0.05, z=0.05),
-                    color=ColorRGBA(a=1.0),
+                    scale=Vector3(x=2.0, y=0.15, z=0.15),
+                    color=ColorRGBA(a=1.0, b=1.0),
                     id=(4 * i),
                 )
             )
@@ -217,23 +222,23 @@ class FollowBuoyPath(ActionServerBase):
                     id=(4 * i) + 2,
                 )
             )
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.CYLINDER,
-                    pose=Pose(
-                        position=Point(
-                            x=point.position.x,
-                            y=point.position.y,
-                        )
-                    ),
-                    header=Header(frame_id="odom"),
-                    scale=Vector3(
-                        x=radius, y=radius, z=1.0
-                    ),
-                    color=ColorRGBA(g=1.0, a=0.5),
-                    id=(4 * i) + 3,
-                )
-            )
+            # marker_array.markers.append(
+            #     Marker(
+            #         type=Marker.CYLINDER,
+            #         pose=Pose(
+            #             position=Point(
+            #                 x=point.position.x,
+            #                 y=point.position.y,
+            #             )
+            #         ),
+            #         header=Header(frame_id="odom"),
+            #         scale=Vector3(
+            #             x=radius, y=radius, z=1.0
+            #         ),
+            #         color=ColorRGBA(g=1.0, a=0.5),
+            #         id=(4 * i) + 3,
+            #     )
+            # )
             i += 1
         return marker_array
 
@@ -598,21 +603,34 @@ class FollowBuoyPath(ActionServerBase):
                 self.first_buoy_pair = False
     
     def send_waypoint_to_server(self, waypoint):
-        self.follow_path_client.wait_for_server()
-        goal_msg = FollowPath.Goal()
-        goal_msg.planner = self.get_parameter("planner").value
-        goal_msg.x = waypoint[0]
-        goal_msg.y = waypoint[1]
-        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-        goal_msg.goal_tol = self.get_parameter("goal_tol").value
-        goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
-        goal_msg.choose_every = self.get_parameter("choose_every").value
-        goal_msg.is_stationary = True
-        self.follow_path_client.wait_for_server()
-        self.send_goal_future = self.follow_path_client.send_goal_async(
-            goal_msg
-        )
+        # sending waypoints to navigation server
+        if not self.bypass_planner:
+            self.follow_path_client.wait_for_server()
+            goal_msg = FollowPath.Goal()
+            goal_msg.planner = self.get_parameter("planner").value
+            goal_msg.x = waypoint[0]
+            goal_msg.y = waypoint[1]
+            goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+            goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
+            goal_msg.goal_tol = self.get_parameter("goal_tol").value
+            goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
+            goal_msg.choose_every = self.get_parameter("choose_every").value
+            goal_msg.is_stationary = True
+            self.follow_path_client.wait_for_server()
+            self.send_goal_future = self.follow_path_client.send_goal_async(
+                goal_msg
+            )
+        else:
+            goal_msg = Waypoint.Goal()
+            goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+            goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
+            goal_msg.x = waypoint[0]
+            goal_msg.y = waypoint[1]
+            goal_msg.ignore_theta = True
+            goal_msg.is_stationary = True
+            self.result = False
+            self.waypoint_client.wait_for_server()
+            self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
 
     def map_cb(self, msg):
         """
