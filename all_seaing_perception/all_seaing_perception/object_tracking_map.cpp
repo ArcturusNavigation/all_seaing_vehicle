@@ -224,7 +224,29 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     float dt = (curr_odom_time - m_last_odom_time).seconds();
     m_last_odom_time = curr_odom_time;
 
-    if (!m_got_nav || !m_track_robot || !m_imu_predict || m_first_state) return;
+    if (!m_got_nav || !m_track_robot || !m_imu_predict) return;
+
+    if (m_first_state) {
+        // initialize mean and cov robot pose
+        tf2::Quaternion quat;
+        tf2::fromMsg(msg.pose.pose.orientation, quat);
+        tf2::Matrix3x3 m(quat);
+        double r, p, y;
+        m.getRPY(r, p, y);
+        if(r > M_PI/2 || p > M_PI/2){ // to discard weird RPY solutions
+            m.getRPY(r, p, y, 2);
+        }
+        m_state = Eigen::Vector3f(msg.pose.pose.position.x, msg.pose.pose.position.y, y);
+        Eigen::Matrix3f init_pose_noise{
+            {m_init_xy_noise*m_init_xy_noise, 0, 0},
+            {0, m_init_xy_noise*m_init_xy_noise, 0},
+            {0, 0, m_init_theta_noise*m_init_xy_noise},
+        };
+        m_cov = init_pose_noise;
+        m_first_state = false;
+        // m_last_odom_time = rclcpp::Time(msg.header.stamp);
+        return;
+    }
 
     Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, 3 + 2 * m_num_obj);
     F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
@@ -305,21 +327,7 @@ void ObjectTrackingMap::odom_callback() {
     m_nav_x = m_map_base_link_tf.transform.translation.x;
     m_nav_y = m_map_base_link_tf.transform.translation.y;
 
-    if(!m_track_robot) return;
-
-    if (m_first_state) {
-        // initialize mean and cov robot pose
-        m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
-        Eigen::Matrix3f init_pose_noise{
-            {m_init_xy_noise*m_init_xy_noise, 0, 0},
-            {0, m_init_xy_noise*m_init_xy_noise, 0},
-            {0, 0, m_init_theta_noise*m_init_xy_noise},
-        };
-        m_cov = init_pose_noise;
-        m_first_state = false;
-        // m_last_odom_time = rclcpp::Time(msg.header.stamp);
-        return;
-    }
+    if(!m_track_robot || m_first_state) return;
 
     if (!m_imu_predict) {
 

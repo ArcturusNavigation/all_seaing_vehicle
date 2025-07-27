@@ -85,7 +85,9 @@ class OdometryPublisher(Node):
         frame_id = self.odom_msg.header.frame_id
         if not self.use_odom_pos:
             lat, lon = self.gps_msg.latitude, self.gps_msg.longitude
-        _,_,imu_heading = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
+        roll,pitch,yaw = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
+        # self.get_logger().info(f'RPY: {roll, pitch, yaw}')
+        imu_heading = yaw
         actual_heading = imu_heading + self.yaw_offset
         imu_twist = self.odom_msg.twist.twist
 
