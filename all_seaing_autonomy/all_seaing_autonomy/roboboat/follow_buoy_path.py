@@ -189,7 +189,7 @@ class FollowBuoyPath(ActionServerBase):
                 Marker(
                     type=Marker.ARROW,
                     pose=point,
-                    header=Header(frame_id="odom"),
+                    header=Header(frame_id=self.global_frame_id),
                     scale=Vector3(x=2.0, y=0.15, z=0.15),
                     color=ColorRGBA(a=1.0, b=1.0),
                     id=(4 * i),
@@ -206,7 +206,7 @@ class FollowBuoyPath(ActionServerBase):
                 Marker(
                     type=Marker.SPHERE,
                     pose=self.pair_to_pose(self.ob_coords(p_left)),
-                    header=Header(frame_id="odom"),
+                    header=Header(frame_id=self.global_frame_id),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=left_color,
                     id=(4 * i) + 1,
@@ -216,7 +216,7 @@ class FollowBuoyPath(ActionServerBase):
                 Marker(
                     type=Marker.SPHERE,
                     pose=self.pair_to_pose(self.ob_coords(p_right)),
-                    header=Header(frame_id="odom"),
+                    header=Header(frame_id=self.global_frame_id),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=right_color,
                     id=(4 * i) + 2,
@@ -231,7 +231,7 @@ class FollowBuoyPath(ActionServerBase):
             #                 y=point.position.y,
             #             )
             #         ),
-            #         header=Header(frame_id="odom"),
+            #         header=Header(frame_id=self.global_frame_id),
             #         scale=Vector3(
             #             x=radius, y=radius, z=1.0
             #         ),
@@ -409,7 +409,7 @@ class FollowBuoyPath(ActionServerBase):
         return q
     
     def pair_angle_to_pose(self, pair, angle):
-        quat = self.quaternion_from_euler(0, angle, 0)
+        quat = self.quaternion_from_euler(0, 0, angle)
         return Pose(
             position=Point(x=pair[0], y=pair[1]),
             orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
@@ -420,6 +420,7 @@ class FollowBuoyPath(ActionServerBase):
         p2_left, p2_right = (self.ob_coords(p2.left, local=loc), self.ob_coords(p2.right, local=loc))
         p1_diff = (p1_right[0]-p1_left[0], p1_right[1]-p1_left[1])
         p2_diff = (p2_right[0]-p2_left[0], p2_right[1]-p2_left[1])
+        # TODO: change angle to be away from the boat, use dot product
         angle = math.acos((p1_diff[0]*p2_diff[0]+p1_diff[1]*p2_diff[1])/(self.norm(p1_diff)*self.norm(p2_diff)))
         return angle
     

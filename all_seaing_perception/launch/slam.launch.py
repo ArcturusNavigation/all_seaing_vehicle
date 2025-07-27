@@ -56,9 +56,19 @@ def launch_setup(context, *args, **kwargs):
         parameters=[slam_params]
     )
 
+    static_transforms_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                description_prefix,
+                "/launch/static_transforms.launch.py",
+            ]
+        ),
+    )
+
     return [
         # multicam_detection_merge_node,
         object_tracking_map_node,
+        # static_transforms_ld,
     ]
 
 def generate_launch_description():

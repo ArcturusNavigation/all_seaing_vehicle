@@ -75,6 +75,7 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
+            {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
             {"safe_margin": 0.2},
         ],
@@ -205,7 +206,7 @@ def launch_setup(context, *args, **kwargs):
     return [
         controller_server,
         grid_map_generator,
-        navigation_server,
+        # navigation_server,
         navigation_server_nomap,
         run_tasks,
         task_init_server, 

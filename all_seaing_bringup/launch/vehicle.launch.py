@@ -150,6 +150,7 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
+            {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
             {"safe_margin": 0.2},
         ],
@@ -164,6 +165,7 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_pid.py",
         parameters=[
             {"is_sim": False},
+            {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
             {"Kpid_x": [0.3, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
@@ -183,6 +185,7 @@ def launch_setup(context, *args, **kwargs):
         executable="speed_challenge_pid.py",
         parameters=[
             {"is_sim": False},
+            {"global_frame_id": "map"},
             {"color_label_mappings_file": color_label_mappings},
             {"forward_speed": 1.2}
         ],

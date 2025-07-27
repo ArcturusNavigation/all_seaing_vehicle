@@ -75,6 +75,7 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
+            {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
             {"safe_margin": 0.2},
         ],

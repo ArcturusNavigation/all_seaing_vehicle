@@ -258,6 +258,15 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    static_transforms_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                description_prefix,
+                "/launch/static_transforms.launch.py",
+            ]
+        ),
+    )
+
     return [
         # ekf_node,
         # buoy_yolo_node,
@@ -272,6 +281,7 @@ def launch_setup(context, *args, **kwargs):
         tf_filtering,
         # odometry_publisher_node,
         # robot_state_publisher,
+        # static_transforms_ld,
     ]
 
 def generate_launch_description():
