@@ -103,6 +103,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"swap_dx_dy": True},
             {"datum": [42.358541, -71.087389, 0.0]},
+            {"yaw_offset": -np.pi/2.0},
+            {"odom_yaw_offset": -np.pi/2.0},
         ]
     )
 
