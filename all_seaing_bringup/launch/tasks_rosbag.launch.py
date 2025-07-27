@@ -178,12 +178,28 @@ def launch_setup(context, *args, **kwargs):
     task_init_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="task_init.py",
-        parameters=[{"is_sim": False}],
+        # parameters=[{"is_sim": False}], # for IRL
+        parameters=[{"is_sim": True}], # only for rosbag
     )
 
     delivery_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="delivery_server.py",
+    )
+
+    keyboard_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
+    )
+
+    onshore_node = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="onshore_node.py",
+        parameters=[
+            {"joy_x_scale": 3.0},
+            {"joy_y_scale": -2.0},
+            {"joy_ang_scale": -1.5},
+        ],
+        output="screen",
     )
     
     return [
@@ -195,7 +211,9 @@ def launch_setup(context, *args, **kwargs):
         task_init_server, 
         follow_buoy_path,
         # follow_buoy_pid,
-        # delivery_server
+        # delivery_server,
+        keyboard_ld, # only for rosbag
+        onshore_node, # only for rosbag
     ]
 
 
