@@ -106,7 +106,8 @@ class OdometryPublisher(Node):
         
         # publish odometry (altitude is 0, we don't care about it)
         gps_odom_msg = Odometry()
-        gps_odom_msg.header.stamp = stamp
+        # TODO: Maybe make the stamp be the current time instead of taking it from the message, so that SLAM updates based on velocities faster (will handle nonlinearities in motion model better and will not have large jumps but rather correct over time)
+        gps_odom_msg.header.stamp = self.get_clock().now().to_msg()
         gps_odom_msg.header.frame_id = self.global_frame_id
         gps_odom_msg.child_frame_id = self.base_link_frame
         gps_odom_msg.twist.twist.linear.x = imu_twist.linear.x*np.cos(self.odom_yaw_offset) + imu_twist.linear.y*np.sin(self.odom_yaw_offset)

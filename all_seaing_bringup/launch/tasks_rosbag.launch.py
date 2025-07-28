@@ -57,13 +57,7 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
 
-    with open(locations_file, "r") as f:
-        locations = yaml.safe_load(f)
-
-    location = context.perform_substitution(LaunchConfiguration("location"))
-    comms = LaunchConfiguration("comms")
-    use_bag = LaunchConfiguration("use_bag")
-    is_indoors = str(locations[location]["indoors"]).lower()
+    set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
@@ -204,6 +198,7 @@ def launch_setup(context, *args, **kwargs):
     )
     
     return [
+        set_use_sim_time,
         controller_server,
         grid_map_generator,
         # navigation_server,
@@ -221,13 +216,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="boathouse"),
-            DeclareLaunchArgument(
-                "comms", default_value="wifi", choices=["wifi", "lora", "custom"]
-            ),
-            DeclareLaunchArgument(
-                "use_bag", default_value="false", choices=["true", "false"]
-            ),
+            DeclareLaunchArgument('use_sim_time', default_value='true'),
             OpaqueFunction(function=launch_setup),
         ]
     )

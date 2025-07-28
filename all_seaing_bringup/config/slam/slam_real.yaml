@@ -12,7 +12,7 @@ object_tracking_map:
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 0.01 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 10.0
-    update_gps_xy_uncertainty: 10.0 # for only labeled
+    update_gps_xy_uncertainty: 25.0 # for only labeled
     include_odom_theta: True
     include_odom_only_theta: False
     rotate_odom: False

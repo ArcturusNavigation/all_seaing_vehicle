@@ -268,6 +268,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
+        set_use_sim_time,
         # ekf_node,
         # buoy_yolo_node,
         # buoy_yolo_node_back_left,
