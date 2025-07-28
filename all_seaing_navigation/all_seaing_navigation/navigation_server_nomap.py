@@ -68,25 +68,32 @@ class NavigationServerNoMap(ActionServerBase):
     def generate_path(self, goal_handle, nav_x, nav_y):
         self.start_plan()  # Protect the long-running generate path function with semaphores
 
+        path = PoseArray(header=Header(frame_id=self.global_frame_id, stamp=self.get_clock().now().to_msg()))
+
+        # find actual robot's position
+        while (nav_x == 0) and (nav_y == 0):
+            if self.should_abort_plan():
+                self.stopped_plan()  # Release the semaphore
+                return path
+            nav_x, nav_y, _ = self.get_robot_pose()
+
         start = Point(x=nav_x, y=nav_y)
         goal = Point(x=goal_handle.request.x, y=goal_handle.request.y)
         obstacle_tol = goal_handle.request.obstacle_tol
         goal_tol = goal_handle.request.goal_tol
 
-        path = PoseArray(header=Header(frame_id=self.global_frame_id, stamp=self.get_clock().now().to_msg()))
         diff_x, diff_y = goal.x-start.x, goal.y-start.y
         dx, dy = diff_x/math.sqrt(diff_x**2+diff_y**2), diff_y/math.sqrt(diff_x**2+diff_y**2)
         curr_x, curr_y = start.x, start.y
         res = min(self.res, goal_tol - 0.1)
-        while math.sqrt((curr_x-goal.x)**2+(curr_y-goal.y)**2) > goal_tol and (not self.should_abort_plan()):
-            path.poses.append(Pose(position=Point(x=curr_x, y=curr_y)))
-            curr_x += res*dx
-            curr_y += res*dy
         if not self.should_abort_plan():
+            path.poses.append(Pose(position=Point(x=curr_x, y=curr_y)))
+            while math.sqrt((curr_x-goal.x)**2+(curr_y-goal.y)**2) > goal_tol:
+                curr_x += res*dx
+                curr_y += res*dy
+                path.poses.append(Pose(position=Point(x=curr_x, y=curr_y)))
             path.poses.append(Pose(position=Point(x=goal.x, y=goal.y)))
             path.poses = path.poses[:: goal_handle.request.choose_every]
-        else:
-            path = PoseArray(header=Header(frame_id=self.global_frame_id, stamp=self.get_clock().now().to_msg()))
 
         self.stopped_plan()  # Release the semaphore
         return path
@@ -131,7 +138,7 @@ class NavigationServerNoMap(ActionServerBase):
         self.get_logger().info("Path following started!")
 
         # Get robot pose
-        nav_x, nav_y, _ = self.get_robot_pose()
+        nav_x, nav_y, _ = self.get_robot_pose()            
 
         # Generate path using requested planner
         path = self.generate_path(goal_handle, nav_x, nav_y)

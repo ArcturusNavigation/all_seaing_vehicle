@@ -123,6 +123,8 @@ class FollowBuoyPath(ActionServerBase):
 
         self.thresh_dist = 5.0
 
+        self.sent_forward = False
+
     def norm_squared(self, vec, ref=(0, 0)):
         return vec[0] ** 2 + vec[1] ** 2
 
@@ -516,19 +518,27 @@ class FollowBuoyPath(ActionServerBase):
                 self.waypoints = self.waypoints[1:]
                 self.time_last_seen_buoys = time.time()
                 self.pair_to = self.buoy_pairs[0]
+                self.sent_forward = False
             elif len(self.buoy_pairs) == 1:
                 if time.time() - self.time_last_seen_buoys > 1:
-                    self.get_logger().debug("No next buoy pair to go to")
+                    if self.sent_forward:
+                        return
                     buoy_pair = self.buoy_pairs[0]
                     left_coords = self.ob_coords(buoy_pair.left)
                     right_coords = self.ob_coords(buoy_pair.right)
                     # get the perp forward direction
                     forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
+                    forward_dir_norm = math.sqrt(forward_dir[0]**2 + forward_dir[1]**2)
+                    forward_dir = (-forward_dir[0]/forward_dir_norm, -forward_dir[1]/forward_dir_norm)
                     midpt = self.midpoint_pair(buoy_pair)
                     scale = self.thresh_dist
                     wpt = (midpt[0] + scale * forward_dir[0], midpt[1] + scale * forward_dir[1])
 
                     self.send_waypoint_to_server(wpt)
+
+                    self.sent_forward = True
+
+                    return
                     
             # buoy_pair = buoy_pairs[0]
             # left_coords = self.ob_coords(buoy_pair.left)
@@ -545,8 +555,7 @@ class FollowBuoyPath(ActionServerBase):
                 #     self.waypoints = [self.midpoint_pair(self.pair_to)]
                 #     self.time_last_seen_buoys = time.time()
                 # else:
-                self.get_logger().debug("No next buoy pair to go to.")
-                if time.time() - self.time_last_seen_buoys > 1:
+                if time.time() - self.time_last_seen_buoys > 5:
                     self.result = True
                 return
 
@@ -604,6 +613,7 @@ class FollowBuoyPath(ActionServerBase):
                 self.first_buoy_pair = False
     
     def send_waypoint_to_server(self, waypoint):
+        # self.get_logger().info('SENDING WAYPOINT TO SERVER')
         # sending waypoints to navigation server
         if not self.bypass_planner:
             self.follow_path_client.wait_for_server()
