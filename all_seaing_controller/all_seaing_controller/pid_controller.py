@@ -6,6 +6,11 @@ class PIDController:
         self.Ki = Ki
         self.Kd = Kd
 
+        self.setpoint = 0.0
+        self.prev_error = 0.0
+        self.integral = 0.0
+        self.effort = 0.0
+
         self.integral_min = -float("inf")
         self.integral_max = float("inf")
         self.effort_min = -float("inf")
@@ -37,6 +42,8 @@ class PIDController:
         return abs(self.setpoint - feedback) <= threshold
     
     def update(self, feedback, dt):
+        if dt == 0:
+            return
         error = self.setpoint - feedback
         derivative = (error - self.prev_error) / dt
         self.integral += error * dt
@@ -45,16 +52,18 @@ class PIDController:
         self.prev_error = error
 
     def reset(self):
-        self.setpoint = 0
-        self.prev_error = 0
-        self.integral = 0
-        self.effort = 0
+        self.setpoint = 0.0
+        self.prev_error = 0.0
+        self.integral = 0.0
+        self.effort = 0.0
 
 class CircularPID(PIDController):
     def is_done(self, feedback, threshold):
         return abs(self.setpoint - feedback) % math.pi <= threshold
 
     def update(self, feedback, dt):
+        if dt == 0:
+            return
         error = (self.setpoint - feedback) % (2 * math.pi)
         if error > math.pi:
             error -= 2 * math.pi

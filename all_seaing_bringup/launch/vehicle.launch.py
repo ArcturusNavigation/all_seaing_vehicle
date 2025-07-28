@@ -102,6 +102,9 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"swap_dx_dy": True},
+            {"datum": [42.358541, -71.087389, 0.0]},
+            {"yaw_offset": -np.pi/2.0},
+            {"odom_yaw_offset": -np.pi/2.0},
         ]
     )
 
@@ -130,8 +133,8 @@ def launch_setup(context, *args, **kwargs):
             {
                 "front_right_port": 2,
                 "front_left_port": 3,
-                "back_left_port": 4,
-                "back_right_port": 5,
+                "back_left_port": 5,
+                "back_right_port":4,
             }
         ],
         condition=UnlessCondition(use_bag),
@@ -147,6 +150,7 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
+            {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
             {"safe_margin": 0.2},
         ],
@@ -161,6 +165,7 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_pid.py",
         parameters=[
             {"is_sim": False},
+            {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
             {"Kpid_x": [0.3, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
@@ -180,6 +185,7 @@ def launch_setup(context, *args, **kwargs):
         executable="speed_challenge_pid.py",
         parameters=[
             {"is_sim": False},
+            {"global_frame_id": "map"},
             {"color_label_mappings_file": color_label_mappings},
             {"forward_speed": 1.2}
         ],
@@ -205,11 +211,12 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_controller",
         executable="controller_server.py",
         parameters=[
-            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"global_frame_id": "map"},
+            {"robot_frame_id": "base_link"},
             {"Kpid_x": [0.3, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
-            {"max_vel": [1.5, 1.0, 0.3]},
+            {"max_vel": [1.5, 1.0, 0.1]},
         ],
         output="screen",
     )
@@ -268,7 +275,7 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_custom_controller.py",
         parameters=[
             {"joy_x_scale": -1.8},
-            {"joy_ang_scale": 0.2},
+            {"joy_ang_scale": 0.4},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -556,7 +563,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM2"}],
+        parameters=[{"port": "/dev/ttyACM1"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -577,7 +584,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM2"
         }.items(),
         condition=UnlessCondition(use_bag),
     )
@@ -648,12 +655,12 @@ def launch_setup(context, *args, **kwargs):
     return [
         control_mux,
         controller_node,
-        controller_server,
+        # controller_server,
         # ekf_node,
         # navsat_node,
         odometry_publisher_node,
         # navigation_server,
-        navigation_server_nomap,
+        # navigation_server_nomap,
         obstacle_detector_node,
         point_cloud_filter_node,
         rover_custom_controller,
@@ -671,10 +678,10 @@ def launch_setup(context, *args, **kwargs):
         multicam_detection_merge_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
-        object_tracking_map_node,
-        run_tasks,
-        task_init_server, 
-        follow_buoy_path,
+        # object_tracking_map_node,
+        # run_tasks,
+        # task_init_server, 
+        # follow_buoy_path,
         # follow_buoy_pid,
         # grid_map_generator,
         central_hub,

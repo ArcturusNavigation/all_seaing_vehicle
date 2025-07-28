@@ -50,15 +50,25 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("detections", "detections/merged"),
+            ("detections", "obstacle_map/local"),
             ("odometry/filtered", "odometry/gps"),
         ],
         parameters=[slam_params]
     )
 
+    static_transforms_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                description_prefix,
+                "/launch/static_transforms.launch.py",
+            ]
+        ),
+    )
+
     return [
-        multicam_detection_merge_node,
+        # multicam_detection_merge_node,
         object_tracking_map_node,
+        # static_transforms_ld,
     ]
 
 def generate_launch_description():

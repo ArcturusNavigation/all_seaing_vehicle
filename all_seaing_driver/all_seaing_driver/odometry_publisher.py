@@ -85,7 +85,9 @@ class OdometryPublisher(Node):
         frame_id = self.odom_msg.header.frame_id
         if not self.use_odom_pos:
             lat, lon = self.gps_msg.latitude, self.gps_msg.longitude
-        _,_,imu_heading = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
+        roll,pitch,yaw = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
+        # self.get_logger().info(f'RPY: {roll, pitch, yaw}')
+        imu_heading = yaw
         actual_heading = imu_heading + self.yaw_offset
         imu_twist = self.odom_msg.twist.twist
 
@@ -104,7 +106,8 @@ class OdometryPublisher(Node):
         
         # publish odometry (altitude is 0, we don't care about it)
         gps_odom_msg = Odometry()
-        gps_odom_msg.header.stamp = stamp
+        # TODO: Maybe make the stamp be the current time instead of taking it from the message, so that SLAM updates based on velocities faster (will handle nonlinearities in motion model better and will not have large jumps but rather correct over time)
+        gps_odom_msg.header.stamp = self.get_clock().now().to_msg()
         gps_odom_msg.header.frame_id = self.global_frame_id
         gps_odom_msg.child_frame_id = self.base_link_frame
         gps_odom_msg.twist.twist.linear.x = imu_twist.linear.x*np.cos(self.odom_yaw_offset) + imu_twist.linear.y*np.sin(self.odom_yaw_offset)

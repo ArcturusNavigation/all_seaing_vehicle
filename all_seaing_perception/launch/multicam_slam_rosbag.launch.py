@@ -215,7 +215,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            ("detections", "detections/merged"),
+            ("detections", "obstacle_map/local"),
             ("odometry/filtered", "odometry/gps"),
         ],
         parameters=[slam_params]
@@ -230,7 +230,7 @@ def launch_setup(context, *args, **kwargs):
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
             # {"child_frames_to_remove": ["slam_map"]},
-            {"parent_frames_to_remove": ["map"]},
+            {"parent_frames_to_remove": ["map", "odom"]},
         ]
     )
 
@@ -252,10 +252,23 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"swap_dx_dy": True},
+            {"datum": [42.358541, -71.087389, 0.0]},
+            {"yaw_offset": -np.pi/2.0},
+            {"odom_yaw_offset": -np.pi/2.0},
         ]
     )
 
+    static_transforms_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                description_prefix,
+                "/launch/static_transforms.launch.py",
+            ]
+        ),
+    )
+
     return [
+        set_use_sim_time,
         # ekf_node,
         # buoy_yolo_node,
         # buoy_yolo_node_back_left,
@@ -264,10 +277,12 @@ def launch_setup(context, *args, **kwargs):
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
         # multicam_detection_merge_node,
+        odometry_publisher_node,
         object_tracking_map_node,
         tf_filtering,
         # odometry_publisher_node,
         # robot_state_publisher,
+        # static_transforms_ld,
     ]
 
 def generate_launch_description():
