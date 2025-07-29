@@ -10,6 +10,7 @@ from tf2_ros import TransformBroadcaster
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 import numpy as np
 import geopy.distance
+from pyproj import CRS, Transformer
 
 class OdometryPublisher(Node):
     def __init__(self):
@@ -19,11 +20,11 @@ class OdometryPublisher(Node):
         self.declare_parameter("base_link_frame", "base_link")
         self.declare_parameter("datum", [42.3567949, -71.1070491, 0.0])
         self.declare_parameter("magnetic_declination", 0.0)
-        self.declare_parameter("yaw_offset", np.pi/2.0)
+        self.declare_parameter("yaw_offset", np.pi/2.0) # angle wrt to east-aligned
         self.declare_parameter("odom_yaw_offset", np.pi/2.0)
         self.declare_parameter("odom_hz", 30.0)
         self.declare_parameter("use_odom_pos", False)
-        self.declare_parameter("swap_dx_dy", False)
+        self.declare_parameter("utm_zone", 19)
 
         self.global_frame_id = self.get_parameter("global_frame_id").get_parameter_value().string_value
         self.base_link_frame = self.get_parameter("base_link_frame").get_parameter_value().string_value
@@ -33,10 +34,10 @@ class OdometryPublisher(Node):
         self.yaw_offset = self.get_parameter("yaw_offset").get_parameter_value().double_value
         self.odom_yaw_offset = self.get_parameter("odom_yaw_offset").get_parameter_value().double_value
         self.use_odom_pos = self.get_parameter("use_odom_pos").get_parameter_value().bool_value
-        self.swap_dx_dy = self.get_parameter("swap_dx_dy").get_parameter_value().bool_value
+        self.utm_zone = self.get_parameter("utm_zone").get_parameter_value().integer_value
         self.datum_lat = self.datum[0]
         self.datum_lon = self.datum[1]
-        self.datum_heading = self.datum[2] # actual heading of imu's 0 (- imu's value when facing east)
+        self.datum_heading = self.datum[2] # angle of datum x axis wrt east
 
         self.nav_sat_sub = self.create_subscription(
             NavSatFix,
@@ -88,18 +89,23 @@ class OdometryPublisher(Node):
         roll,pitch,yaw = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
         # self.get_logger().info(f'RPY: {roll, pitch, yaw}')
         imu_heading = yaw
-        actual_heading = imu_heading + self.yaw_offset
+        actual_heading = imu_heading + self.yaw_offset - self.datum_heading
         imu_twist = self.odom_msg.twist.twist
 
         if(not self.use_odom_pos):
             # convert gps lat/lon to reference frame coordinates
-            delta = geopy.distance.geodesic((self.datum_lat, self.datum_lon), (lat, lon)).meters
-            heading = np.arctan2(lon-self.datum_lon, lat-self.datum_lat)
-            dx = delta * np.cos(heading-self.magnetic_declination-self.datum_heading)
-            dy = delta * np.sin(heading-self.magnetic_declination-self.datum_heading)
-            # TODO: hotfix or real? should be swapped
-            if self.swap_dx_dy:
-                dx, dy = dy, dx
+            crs_latlon = CRS("EPSG:4326")
+            crs_xy = CRS(f"EPSG:326{self.utm_zone}")
+            transformer = Transformer.from_crs(crs_latlon, crs_xy, always_xy=True)
+            x_boat, y_boat = transformer.transform(lon, lat)
+            x_datum, y_datum = transformer.transform(self.datum_lon, self.datum_lat)
+            dx = x_boat - x_datum
+            dy = y_boat - y_datum
+            # convert to rotated frame
+            rotated_dx = np.cos(self.datum_heading)*dx + np.sin(self.datum_heading)*dy
+            rotated_dy = -np.sin(self.datum_heading)*dx + np.cos(self.datum_heading)*dy
+            dx = rotated_dx
+            dy = rotated_dy
         else:
             dx = self.pos_odom_msg.pose.pose.position.x
             dy = self.pos_odom_msg.pose.pose.position.y
