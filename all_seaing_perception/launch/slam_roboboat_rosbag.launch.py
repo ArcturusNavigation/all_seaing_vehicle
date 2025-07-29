@@ -62,6 +62,8 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "localization", "locations.yaml"
     )
 
+    set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
+
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
 
@@ -103,15 +105,16 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("gps_topic", "/mavros/global_position/global"),
             ("odom_topic", "/odometry/filtered"),
-            ("pos_odom_topic", "/odometry/gps_fake"),
+            # ("pos_odom_topic", "/odometry/gps_fake"),
         ],
         parameters=[
             {"base_link_frame": "actual_base_link"},
-            {"datum": [27.3729, -82.4537, np.pi/2.0]},
+            {"datum": [27.3729, -82.4537, 0.0]},
             # {"magnetic_declination": 0.14},
             {"yaw_offset": -np.pi/2.0},
             {"odom_yaw_offset": -np.pi/2.0},
-            {"use_odom_pos": True},
+            # {"use_odom_pos": True},
+            {"utm_zone": 17}, # 19 for Boston, 17 for Florida
         ]
     )
     
@@ -242,6 +245,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
+        set_use_sim_time,
         odometry_publisher_node,
         static_transforms_ld,
         tf_filtering,
