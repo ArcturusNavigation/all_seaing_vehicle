@@ -248,13 +248,15 @@ def launch_setup(context, *args, **kwargs):
         output = "screen",
         remappings=[
             ("gps_topic", "/mavros/global_position/raw/fix"),
-            ("odom_topic", "/mavros/local_position/odom")
+            ("odom_topic", "/mavros/local_position/odom"),
+            # ("pos_odom_topic", "/mavros/local_position/odom"),
         ],
         parameters=[
             {"datum": [42.358541, -71.087389, 0.0]},
             {"yaw_offset": -np.pi/2.0},
             {"odom_yaw_offset": -np.pi/2.0},
             {"utm_zone": 19}, # 19 for Boston, 17 for Florida
+            # {"use_odom_pos": True},
         ]
     )
 
