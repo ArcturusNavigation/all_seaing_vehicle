@@ -254,13 +254,25 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     mot_grad: rows -> components of final state (actually difference with old state), columns -> components of old state wrt to which the gradient is taken
     */
 
-    Eigen::Vector3f mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
-    // gradient - identity
-    Eigen::Matrix3f mot_grad{
-        {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
-        {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
-        {0, 0, 0},
-    };
+    Eigen::Vector3f mot_const;
+    Eigen::Matrix3f mot_grad;
+    if (m_nav_omega < 0.001){
+        mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
+        // gradient - identity
+        mot_grad = Eigen::Matrix3f({
+            {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
+            {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
+            {0, 0, 0},
+        });
+    }else{
+        mot_const = Eigen::Vector3f(((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy, ((-cos(m_state(2)+m_nav_omega*dt)+cos(m_state(2)))/m_nav_omega)*m_nav_vx+((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vy, m_nav_omega*dt);
+        // gradient - identity
+        mot_grad = Eigen::Matrix3f({
+            {0, 0, ((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vx+((-sin(m_state(2)+m_nav_omega*dt)+sin(m_state(2)))/m_nav_omega)*m_nav_vy},
+            {0, 0, ((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy},
+            {0, 0, 0},
+        });
+    }
 
     m_state += F.transpose() * mot_const;
 
@@ -314,15 +326,15 @@ void ObjectTrackingMap::odom_callback() {
     if(r > M_PI/2 || p > M_PI/2){ // to discard weird RPY solutions
         m.getRPY(r, p, y, 2);
     }
-    m_nav_heading = y;
 
     m_got_nav = true;
 
     // to ignore gps TFs that are the same thing 5000 times a second and cause SLAM to lock into the GPS
-    if((!m_first_state) && (m_nav_x == m_map_base_link_tf.transform.translation.x) && (m_nav_y == m_map_base_link_tf.transform.translation.y)) return;
+    if((!m_first_state) && (((m_nav_x == m_map_base_link_tf.transform.translation.x) && (m_nav_y == m_map_base_link_tf.transform.translation.y)) ||  (m_nav_heading == y))) return;
 
     m_nav_x = m_map_base_link_tf.transform.translation.x;
     m_nav_y = m_map_base_link_tf.transform.translation.y;
+    m_nav_heading = y;
 
     if(!m_track_robot || m_first_state) return;
 
