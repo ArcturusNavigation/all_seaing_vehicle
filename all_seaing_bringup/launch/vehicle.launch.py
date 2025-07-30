@@ -101,10 +101,10 @@ def launch_setup(context, *args, **kwargs):
             ("odom_topic", "/mavros/local_position/odom")
         ],
         parameters=[
-            {"datum": [42.358541, -71.087389, 0.0]},
+            {"datum": [lat, lon, 0.0]},
             {"yaw_offset": -np.pi/2.0},
             {"odom_yaw_offset": -np.pi/2.0},
-            {"utm_zone": 19}, # 19 for Boston, 17 for Florida
+            {"utm_zone": 17 if location == "nbpark" else 19}, # 19 for Boston, 17 for Florida
         ]
     )
 
@@ -699,7 +699,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="boathouse"),
+            DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument(
                 "comms", default_value="wifi", choices=["wifi", "lora", "custom"]
             ),
