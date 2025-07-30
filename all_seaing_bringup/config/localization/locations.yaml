@@ -3,6 +3,11 @@ seagrant:
   lat: 42.3599
   lon: -71.1044
 
+pavillion:
+  indoors: false
+  lat: 42.358541
+  lon: -71.087389
+
 boathouse:
   indoors: false
   lat: 42.355

@@ -25,7 +25,6 @@ object_tracking_map:
     imu_predict: True
     gps_update: True
     direct_tf: False
-    is_sim: False
     data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0
     include_unlabeled: True

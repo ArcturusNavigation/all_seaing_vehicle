@@ -46,9 +46,6 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
     m_odom_refresh_rate = this->get_parameter("odom_refresh_rate").as_double();
 
-    this->declare_parameter<bool>("is_sim", false);
-    m_is_sim = this->get_parameter("is_sim").as_bool();
-
     this->declare_parameter<bool>("direct_tf", true);
     m_direct_tf = this->get_parameter("direct_tf").as_bool();
 

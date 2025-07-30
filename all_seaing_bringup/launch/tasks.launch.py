@@ -65,6 +65,18 @@ def launch_setup(context, *args, **kwargs):
     use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
 
+    object_tracking_map_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="object_tracking_map",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("detections", "obstacle_map/local"),
+            ("odometry/filtered", "odometry/gps"),
+        ],
+        parameters=[slam_params]
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
@@ -188,6 +200,7 @@ def launch_setup(context, *args, **kwargs):
     )
     
     return [
+        object_tracking_map_node,
         controller_server,
         grid_map_generator,
         navigation_server,
