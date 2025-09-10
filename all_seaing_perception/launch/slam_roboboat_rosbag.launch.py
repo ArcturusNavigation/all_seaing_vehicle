@@ -207,6 +207,22 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    buoy_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov8_node.py",
+        parameters=[
+            {"model": "roboboat_2025"},
+            {"label_config": "buoy_label_mappings"},
+            {"conf": 0.6},
+            {"use_color_names": False},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
     bbox_project_pcloud_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="bbox_project_pcloud",
@@ -214,7 +230,8 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
-            ("lidar_topic", "/point_cloud/filtered")
+            ("lidar_topic", "/point_cloud/filtered"),
+            ("detections", "obstacle_map/local")
         ],
         parameters=[
             {"base_link_frame": "actual_base_link"},
@@ -240,6 +257,7 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             # ("odometry/filtered", "odometry_correct/filtered")
             ("odometry/filtered", "odometry/gps"),
+            ("detections", "obstacle_map/local")
         ],
         parameters=[slam_rosbag_params]
     )
@@ -253,6 +271,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         # grid_map_generator,
+        # buoy_yolo_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
     ]
