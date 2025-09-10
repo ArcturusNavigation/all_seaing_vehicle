@@ -129,6 +129,8 @@ private:
     std::vector<double> m_cluster_contour_color_weights;
     std::vector<double> m_contour_detection_color_weights;
     double m_cluster_contour_size_weight;
+    double m_cluster_distance_weight;
+    double m_cluster_area_ratio_weight;
     std::map<std::string, std::vector<int>> contour_matching_color_range_map;
 
     bool m_is_sim, m_label_list, m_only_project;

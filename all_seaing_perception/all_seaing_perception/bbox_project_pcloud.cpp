@@ -96,6 +96,8 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
         m_cluster_contour_color_weights = matching_weights_config_yaml["cluster_contour_color_weights"].as<std::vector<double>>();
         m_contour_detection_color_weights = matching_weights_config_yaml["contour_detection_color_weights"].as<std::vector<double>>();
         m_cluster_contour_size_weight = matching_weights_config_yaml["cluster_contour_size_weight"].as<double>();
+        m_cluster_distance_weight = matching_weights_config_yaml["cluster_distance_weight"].as<double>();
+        m_cluster_area_ratio_weight = matching_weights_config_yaml["cluster_area_ratio_weight"].as<double>();
     } 
     else {
         RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", matching_weights_file.c_str());
@@ -127,7 +129,7 @@ bool hsv_diff_condition(std::vector<double> weights, double thres, const pcl::Po
 
 double line_range_penalty(int a, int b, int x){
     // Average of squared distances from each point in the range
-    return (a<=x && x<=b)?0:(pow(b-x,3)-pow(x-a,3))/(b-a);
+    return (a<=x && x<=b)?0:(pow(b-x,3)-pow(a-x,3))/(b-a);
 }
 
 // The penalty function that compares an HSV color value to an HSV color range
@@ -309,10 +311,13 @@ void BBoxProjectPCloud::bb_pcl_project(
         }
         std::vector<std::vector<std::pair<cv::Point2d, std::vector<long long>>>> clusters_pts;
         std::vector<std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>>> clusters_qts;
+        std::vector<double> cluster_dists;
+        std::vector<double> cluster_area_ratios;
         for (pcl::PointIndices cluster : clusters_indices){// vector<index_t> is cluster.indices
             std::vector<std::pair<cv::Point2d, std::vector<long long>>> cluster_pts;
             std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> cluster_qts;
             cluster_qts.first.second = cluster_qts.second.second = {0,0,0};
+            double min_x = bbox.max_x, min_y = bbox.max_y, max_x = 0, max_y = 0;
             for(pcl::index_t ind : cluster.indices){
                 // transform to OpenCV HSV (180, 255, 255)
                 std::vector<long long> cloud_pt_hsv = all_seaing_perception::HSVPCLToOpenCV<long long>(pcloud_ptr->points[ind]);
@@ -321,6 +326,10 @@ void BBoxProjectPCloud::bb_pcl_project(
                 }
                 cv::Point2d cloud_pt_xy = all_seaing_perception::projectPCLPtToPixel(m_cam_model, pcloud_ptr->points[ind], m_is_sim);
                 cluster_pts.push_back(std::make_pair(cloud_pt_xy, cloud_pt_hsv));
+                min_x = std::min(min_x, cloud_pt_xy.x);
+                max_x = std::max(max_x, cloud_pt_xy.x);
+                min_y = std::min(min_y, cloud_pt_xy.y);
+                max_y = std::max(max_y, cloud_pt_xy.y);
                 // store sums
                 cluster_qts.first.first.x+=cloud_pt_xy.x;
                 cluster_qts.first.first.y+=cloud_pt_xy.y;
@@ -336,6 +345,12 @@ void BBoxProjectPCloud::bb_pcl_project(
             }
             clusters_pts.push_back(cluster_pts);
             clusters_qts.push_back(cluster_qts);
+            // compute cluster centroid
+            pcl::PointXYZHSV centr;
+            pcl::computeCentroid(*pcloud_ptr, cluster.indices, centr);
+            cluster_dists.push_back(centr.x*centr.x+centr.y*centr.y+centr.z*centr.z);
+            // RCLCPP_INFO(this->get_logger(), "(%lf, %lf)->(%lf, %lf) from (%lf, %lf)->(%lf, %lf)", min_x, min_y, max_x, max_y, (double)bbox.min_x, (double)bbox.min_y, (double)bbox.max_x, (double)bbox.max_y);
+            cluster_area_ratios.push_back(((max_x-min_x)*(max_y-min_y))/((bbox.max_x-bbox.min_x)*(bbox.max_y-bbox.min_y)));
         }
 
         // GO THROUGH ALL THE CLUSTER/CONTOUR PAIRS AND FIND THE BEST ONE BASED ON THE OPTIMALITY METRIC WITH THE WEIGHTS
@@ -356,6 +371,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                     contour_cost += (long long)color_range_penalty(m_contour_detection_color_weights, adjusted_color_range, contour_pt.second)/contour_size;
                 }
             }
+            // RCLCPP_INFO(this->get_logger(), "contour cost: %ld", contour_cost);
             for (int cluster = 0; cluster < clusters_pts.size(); cluster++){
                 long long cluster_size = clusters_pts[cluster].size();
                 std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> cluster_qts = clusters_qts[cluster];
@@ -372,17 +388,26 @@ void BBoxProjectPCloud::bb_pcl_project(
                 long long fast_cluster_sq_dh_sum = cluster_qts.second.second[0]-2*cluster_qts.first.second[0]*avg_contour_col[0]+cluster_size*avg_contour_col[0]*avg_contour_col[0];//sum((h_i-m_h)^2=h_i^2-2*h_i*m_h+cluster_size*m_h^2)
                 long long fast_cluster_sq_ds_sum = cluster_qts.second.second[1]-2*cluster_qts.first.second[1]*avg_contour_col[1]+cluster_size*avg_contour_col[1]*avg_contour_col[1];//same for s
                 long long fast_cluster_sq_dv_sum = cluster_qts.second.second[2]-2*cluster_qts.first.second[2]*avg_contour_col[2]+cluster_size*avg_contour_col[2]*avg_contour_col[2];//same for v
-
+                
                 long long cluster_dh_ms = fast_cluster_sq_dh_sum/cluster_size;
                 long long cluster_ds_ms = fast_cluster_sq_ds_sum/cluster_size;
                 long long cluster_dv_ms = fast_cluster_sq_dv_sum/cluster_size;
+
+                double cluster_dist = cluster_dists[cluster];
+                double cluster_area_ratio = cluster_area_ratios[cluster];
+
+                // RCLCPP_INFO(this->get_logger(), "sqdist: %ld, dhsv: %ld, %ld, %ld, cluster size: %d, contour size: %d, dist: %ld, cluster area ratio: %lf, weights: %ld, %ld, %ld, %ld, %ld, %ld, %ld", contour_cluster_dist_ms, cluster_dh_ms, cluster_ds_ms, cluster_dv_ms, cluster_size, contour_size, (long long)cluster_dist, cluster_area_ratio, (long long)m_cluster_contour_distance_weight, (long long)m_cluster_contour_color_weights[0], (long long)m_cluster_contour_color_weights[1], (long long)m_cluster_contour_color_weights[2], (long long)m_cluster_contour_size_weight, (long long)m_cluster_distance_weight, (long long)m_cluster_area_ratio_weight);
                 
                 long long pair_cost = m_cluster_contour_distance_weight*contour_cluster_dist_ms\
                                     + m_cluster_contour_color_weights[0]*cluster_dh_ms\
                                     + m_cluster_contour_color_weights[1]*cluster_ds_ms\
                                     + m_cluster_contour_color_weights[2]*cluster_dv_ms\
                                     - m_cluster_contour_size_weight*cluster_size*contour_size\
+                                    + m_cluster_distance_weight*cluster_dist\
+                                    - m_cluster_area_ratio_weight*cluster_area_ratio\
                                     + contour_cost;
+
+                // RCLCPP_INFO(this->get_logger(), "pair cost: %ld", pair_cost);
                 if (min_pair_cost == -1 || pair_cost < min_pair_cost){
                     min_pair_cost = pair_cost;
                     opt_contour_id = contour;
@@ -390,7 +415,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 }
             }
         }
-
+        // RCLCPP_INFO(this->get_logger(), "min pair cost: %ld", min_pair_cost);
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         refined_cloud_ptr->header = pcloud_ptr->header;
         for (pcl::index_t ind : clusters_indices[opt_cluster_id].indices){
@@ -401,6 +426,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         all_seaing_perception::transformPCLCloud(*refined_cloud_ptr, *refined_cloud_base_link_ptr, m_cam_base_link_tf);
 
         all_seaing_perception::Obstacle<pcl::PointXYZHSV> obstacle(m_local_header, refined_cloud_base_link_ptr, id++, false);
+        obstacle.local_to_global(m_local_header, geometry_msgs::msg::TransformStamped());
         all_seaing_interfaces::msg::Obstacle obstacle_msg;
         obstacle.to_ros_msg(obstacle_msg);
         obstacle_msg.label = bbox.label;
