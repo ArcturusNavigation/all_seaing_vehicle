@@ -363,7 +363,6 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
-            {"safe_margin": 0.2},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),

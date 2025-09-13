@@ -95,6 +95,12 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("adapt_dist", 0.3)
         self.adapt_dist = self.get_parameter("adapt_dist").get_parameter_value().double_value
 
+        self.declare_parameter("thresh_dist", 0.5)
+        self.thresh_dist = self.get_parameter("thresh_dist").get_parameter_value().double_value
+
+        self.declare_parameter("forward_dist", 5.0)
+        self.forward_dist = self.get_parameter("forward_dist").get_parameter_value().double_value
+
         self.declare_parameter("better_angle_thres", 0.2)
         self.better_angle_thres = self.get_parameter("better_angle_thres").get_parameter_value().double_value
 
@@ -133,11 +139,11 @@ class FollowBuoyPath(ActionServerBase):
         self.buoy_pairs = []
         self.obstacles = []
 
-        self.thresh_dist = 5.0
-
         self.sent_forward = False
 
         self.sent_waypoint = None
+
+        self.first_passed_previous = True
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -613,10 +619,7 @@ class FollowBuoyPath(ActionServerBase):
             # Check if new target waypoint is further than adapt_dist away from the old one that's been sent (store it in a global variable and only change it when sending to server)
             if (self.sent_waypoint is not None) and (self.norm(self.midpoint_pair(self.buoy_pairs[0]), self.sent_waypoint) > self.adapt_dist):
                 adapt_waypoint = True
-                self.get_logger().info('ADAPTING WAYPOINT') # TODO: Why does that trigger when passing a waypoint?
             changed_pair_to = self.find_better_pair_to(self.buoy_pairs[0], red_buoys if self.red_left else green_buoys, green_buoys if self.red_left else red_buoys)
-            if changed_pair_to:
-                self.get_logger().info('BETTER PAIR TO')
             self.pair_to = self.buoy_pairs[0]
         ind = 0
         while ind < len(self.buoy_pairs):
@@ -628,9 +631,7 @@ class FollowBuoyPath(ActionServerBase):
             next_pair = self.next_pair(self.buoy_pairs[ind], red_buoys, green_buoys)
             if next_pair is not None and ((ind == (len(self.buoy_pairs)-1) and self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair) > self.buoy_pair_dist_thres) or (ind < (len(self.buoy_pairs)-1) and self.better_buoy_pair_transition(self.buoy_pairs[ind+1],next_pair,self.buoy_pairs[ind]))):
                 self.buoy_pairs = self.buoy_pairs[:ind+1]
-                self.waypoints = self.waypoints[:ind+1]
                 self.buoy_pairs.append(next_pair)
-                self.waypoints.append(self.midpoint_pair(next_pair))
             ind += 1
 
         passed_previous = False
@@ -645,33 +646,21 @@ class FollowBuoyPath(ActionServerBase):
             self.robot_pos,
         ) or (x - rx) ** 2 + (y - ry) ** 2 <= self.thresh_dist:
             passed_previous = True
-            # new_pair = self.next_pair(self.pair_to, red_buoys, green_buoys)
-            # if new_pair is not None:
-            #     self.pair_to = new_pair
-            #     self.time_last_seen_buoys = time.time()
-            # else:
-            #     # if self.backup_pair is not None:
-            #     #     self.get_logger().info("Using previously seen backup pair")
-            #     #     self.pair_to = self.backup_pair
-            #     #     self.backup_pair = None
-            #     # else:
-            #     self.get_logger().debug("No next buoy pair to go to.")
-            #     if time.time() - self.time_last_seen_buoys > 1:
-            #         self.result = True
-            #     return
 
         if self.first_buoy_pair:
             self.buoy_pairs = [self.pair_to]
-            self.waypoints = [self.midpoint_pair(self.pair_to)]
+            self.time_last_seen_buoys = time.time()
         elif passed_previous:
             if len(self.buoy_pairs)>=2:
                 self.buoy_pairs = self.buoy_pairs[1:]
-                self.waypoints = self.waypoints[1:]
                 self.time_last_seen_buoys = time.time()
                 self.pair_to = self.buoy_pairs[0]
                 self.sent_forward = False
             elif len(self.buoy_pairs) == 1:
-                if time.time() - self.time_last_seen_buoys > 1:
+                if time.time() - self.time_last_seen_buoys > 5:
+                    self.result = True
+                    return
+                else:
                     if self.sent_forward:
                         return
                     buoy_pair = self.buoy_pairs[0]
@@ -682,53 +671,26 @@ class FollowBuoyPath(ActionServerBase):
                     forward_dir_norm = math.sqrt(forward_dir[0]**2 + forward_dir[1]**2)
                     forward_dir = (-forward_dir[0]/forward_dir_norm, -forward_dir[1]/forward_dir_norm)
                     midpt = self.midpoint_pair(buoy_pair)
-                    scale = self.thresh_dist
+                    scale = self.forward_dist
                     wpt = (midpt[0] + scale * forward_dir[0], midpt[1] + scale * forward_dir[1])
 
                     self.send_waypoint_to_server(wpt)
 
+                    self.get_logger().info("FORWARD WAYPOINT")
+
                     self.sent_forward = True
 
                     return
-                    
-            # buoy_pair = buoy_pairs[0]
-            # left_coords = self.ob_coords(buoy_pair.left)
-            # right_coords = self.ob_coords(buoy_pair.right)
-            # # get the perp forward direction
-            # forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
-
             else:
-                # below is equivalent to the previous case as we update the sequence before we go to the next buoy pair
-                # if self.next_pair(self.pair_to, red_buoys, green_buoys) != None:
-                #     self.get_logger().info("FOUND NEW NEXT BUOY PAIR")
-                #     self.pair_to = self.next_pair(self.pair_to, red_buoys, green_buoys)
-                #     self.buoy_pairs = [self.pair_to]
-                #     self.waypoints = [self.midpoint_pair(self.pair_to)]
-                #     self.time_last_seen_buoys = time.time()
-                # else:
                 if time.time() - self.time_last_seen_buoys > 5:
                     self.result = True
                 return
-
-        # self.get_logger().debug(f"pair to: {len(self.buoy_pairs)}")
-
-        # """
-        # Form a sequence of buoy pairs (and the respective waypoints) that form a path that the robot can follow
-        # will terminate if we run out of either green or red buoys
-        # """
-
-        # next_buoy_pair = self.next_pair(self.buoy_pairs[-1], red_buoys, green_buoys)
-        # while next_buoy_pair is not None:
-        #     self.buoy_pairs.append(next_buoy_pair)
-        #     self.waypoints.append(self.midpoint_pair(next_buoy_pair))
-        #     next_buoy_pair = self.next_pair(self.buoy_pairs[-1], red_buoys, green_buoys)
-
-        # if(len(self.buoy_pairs)>=2):
-        #     # choose the next pair with the least angle compared to the current one as a backup, to hopefully mitigate diagonal ones caused by duplicates, also take distance into account
-        #     if self.backup_pair is None or self.better_buoy_pair_transition(self.backup_pair, self.buoy_pairs[1], self.pair_to):
-        #         self.backup_pair = self.buoy_pairs[1]
-        #         self.get_logger().info(f"Updated backup buoy pair with angle: {self.buoy_pairs_angle(self.pair_to, self.backup_pair)} and distance: {self.buoy_pairs_distance(self.pair_to, self.backup_pair)}")
-
+        else:
+            self.sent_forward = False
+            self.time_last_seen_buoys = time.time()
+        
+        self.waypoints = [self.midpoint_pair(pair) for pair in self.buoy_pairs]
+        
         self.get_logger().debug(f"Waypoints: {self.waypoints}")
 
         self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
@@ -747,18 +709,17 @@ class FollowBuoyPath(ActionServerBase):
             )
             self.get_logger().debug(f"len(waypoints): {len(self.waypoints)}")
 
-            # check if waypoint is close enough (check_dist) to some previous waypoint
-            # passed_waypoint = False
-            # check_dist = 5.0  # TODO: FIX magic number T_T
-            # for sent_waypoint in self.sent_waypoints:
-            #     if math.dist(waypoint, sent_waypoint) < check_dist:
-            #         passed_waypoint = True
-
             # if not passed_waypoint:
-            if passed_previous or self.first_buoy_pair or changed_pair_to or adapt_waypoint:
+            if (passed_previous and self.first_passed_previous) or self.first_buoy_pair or changed_pair_to or (adapt_waypoint and (not passed_previous)):
+                self.get_logger().info('SENDING WAYPOINT')
+                # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
                 self.send_waypoint_to_server(waypoint)
                 self.sent_waypoints.add(waypoint)
                 self.first_buoy_pair = False
+            if passed_previous:
+                self.first_passed_previous = False
+        if not passed_previous:
+            self.first_passed_previous = True
     
     def send_waypoint_to_server(self, waypoint):
         # self.get_logger().info('SENDING WAYPOINT TO SERVER')
