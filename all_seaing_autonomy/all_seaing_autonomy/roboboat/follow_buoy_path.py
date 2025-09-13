@@ -74,6 +74,9 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("buoy_pair_dist_thres", 1.0)
         self.buoy_pair_dist_thres = self.get_parameter("buoy_pair_dist_thres").get_parameter_value().double_value
 
+        self.declare_parameter("inter_buoy_pair_dist", 1.0)
+        self.inter_buoy_pair_dist = self.get_parameter("inter_buoy_pair_dist").get_parameter_value().double_value
+
         self.robot_pos = (0, 0)
 
         self.declare_parameter("safe_margin", 0.2)
@@ -287,28 +290,38 @@ class FollowBuoyPath(ActionServerBase):
         # From the red buoys that are in front of the robot, take the one that is closest to it.
         # And do the same for the green buoys.
         # This pair is the front pair of the starting box of the robot.
-        closest_red = self.get_closest_to((0, 0), red_buoys, local=True)
-        closest_green = self.get_closest_to((0, 0), green_buoys, local=True)
-        if self.ccw(
-            (0, 0),
-            self.ob_coords(closest_green, local=True),
-            self.ob_coords(closest_red, local=True),
-        ):
+        # closest_red = self.get_closest_to((0, 0), red_buoys, local=True)
+        # closest_green = self.get_closest_to((0, 0), green_buoys, local=True)
+        # if self.ccw((0, 0), self.ob_coords(closest_green, local=True), self.ob_coords(closest_red, local=True)):
+        #     self.red_left = True
+        #     self.pair_to = InternalBuoyPair(closest_red, closest_green)
+        #     self.get_logger().info("RED BUOYS LEFT, GREEN BUOYS RIGHT")
+        # else:
+        #     self.red_left = False
+        #     self.pair_to = InternalBuoyPair(closest_green, closest_red)
+        #     self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
+        # self.backup_pair = None
+        # want to pick the pair that's far apart but has the closest midpoint
+        # TODO: Add more conditions on judging what the best pair is, other than just distance (e.g. should not be really angled wrt the boat etc.)
+        green_to = None
+        red_to = None
+        for red_b in red_buoys:
+            for green_b in green_buoys:
+                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
+                    continue
+                elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
+                    green_to = green_b
+                    red_to = red_b
+        if green_to is None:
+            return False
+        if self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True)):
             self.red_left = True
-            self.starting_buoys = InternalBuoyPair(
-                self.get_closest_to((0, 0), red_buoys, local=True),
-                self.get_closest_to((0, 0), green_buoys, local=True),
-            )
+            self.pair_to = InternalBuoyPair(red_b, green_b)
             self.get_logger().info("RED BUOYS LEFT, GREEN BUOYS RIGHT")
         else:
             self.red_left = False
-            self.starting_buoys = InternalBuoyPair(
-                self.get_closest_to((0, 0), green_buoys, local=True),
-                self.get_closest_to((0, 0), red_buoys, local=True),
-            )
+            self.pair_to = InternalBuoyPair(green_b, red_b)
             self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
-        self.pair_to = self.starting_buoys
-        # self.backup_pair = None
         return True
 
     def ccw(self, a, b, c):
@@ -384,6 +397,8 @@ class FollowBuoyPath(ActionServerBase):
             if left_duplicate and right_duplicate:
                 return None
             elif (left_duplicate and (not self.check_better_one_side(prev_pair.left, right_next, prev_pair.right))) or (right_duplicate and (not self.check_better_one_side(prev_pair.right, left_next, prev_pair.left))):
+                return None
+            elif self.norm(self.ob_coords(left_next), self.ob_coords(right_next)) < self.inter_buoy_pair_dist:
                 return None
             else:
                 return InternalBuoyPair(left_next, right_next)
@@ -545,17 +560,21 @@ class FollowBuoyPath(ActionServerBase):
         for buoy in right_buoys:
             if self.ob_coords(buoy) == self.ob_coords(curr_pair.right):
                 continue
+            if self.norm(self.ob_coords(curr_pair.left), self.ob_coords(buoy)) < self.inter_buoy_pair_dist:
+                continue
             if self.check_better_one_side(curr_pair.left, curr_pair.right, buoy):
                 new_right = buoy
                 changed = True
+        curr_pair.right = new_right
         new_left = curr_pair.left
         for buoy in left_buoys:
             if self.ob_coords(buoy) == self.ob_coords(curr_pair.left):
                 continue
+            if self.norm(self.ob_coords(curr_pair.right), self.ob_coords(buoy)) < self.inter_buoy_pair_dist:
+                continue
             if self.check_better_one_side(curr_pair.right, curr_pair.left, buoy):
                 new_left = buoy
                 changed = True
-        curr_pair.right = new_right
         curr_pair.left = new_left
         return changed
 
@@ -594,7 +613,10 @@ class FollowBuoyPath(ActionServerBase):
             # Check if new target waypoint is further than adapt_dist away from the old one that's been sent (store it in a global variable and only change it when sending to server)
             if (self.sent_waypoint is not None) and (self.norm(self.midpoint_pair(self.buoy_pairs[0]), self.sent_waypoint) > self.adapt_dist):
                 adapt_waypoint = True
+                self.get_logger().info('ADAPTING WAYPOINT') # TODO: Why does that trigger when passing a waypoint?
             changed_pair_to = self.find_better_pair_to(self.buoy_pairs[0], red_buoys if self.red_left else green_buoys, green_buoys if self.red_left else red_buoys)
+            if changed_pair_to:
+                self.get_logger().info('BETTER PAIR TO')
             self.pair_to = self.buoy_pairs[0]
         ind = 0
         while ind < len(self.buoy_pairs):
