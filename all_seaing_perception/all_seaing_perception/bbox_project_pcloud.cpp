@@ -163,6 +163,14 @@ void BBoxProjectPCloud::bb_pcl_project(
             return;
     }
 
+    // // measuring time
+    // using std::chrono::high_resolution_clock;
+    // using std::chrono::duration_cast;
+    // using std::chrono::duration;
+    // using std::chrono::milliseconds;
+
+    // auto t1 = high_resolution_clock::now();
+
     // Transform in_cloud_msg to the camera frame and convert PointCloud2 to PCL PointCloud
     sensor_msgs::msg::PointCloud2 in_cloud_tf;
     tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, m_pc_cam_tf);
@@ -435,6 +443,15 @@ void BBoxProjectPCloud::bb_pcl_project(
         
         *all_obj_refined_pcls_ptr += *refined_cloud_ptr;
     }
+
+    // auto t2 = high_resolution_clock::now();
+
+    // /* Getting number of milliseconds as a double. */
+    // duration<double, std::milli> ms_double = t2 - t1;
+
+    // // TODO: Count points processed after projecting the bboxes, to compare & have a better idea of what's actually being processed
+    // RCLCPP_INFO(this->get_logger(), "# TOTAL POINTS: %d, # PROJECTED POINTS: %d, PROCESSING TIME: %lfms", in_cloud_tf_ptr->points.size(), all_obj_pcls_ptr->points.size(), ms_double.count());
+
     m_detection_pub->publish(refined_objects_msg);
     
     auto obj_refined_pcls_msg = sensor_msgs::msg::PointCloud2();
