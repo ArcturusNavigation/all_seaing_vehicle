@@ -19,6 +19,7 @@
 
 #include <string>
 #include <vector>
+#include <chrono>
 
 class ObstacleDetector : public rclcpp::Node {
 public:
@@ -130,6 +131,11 @@ private:
     }
 
     void pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud) {
+        // // measuring time
+        // using std::chrono::high_resolution_clock;
+        // using std::chrono::duration_cast;
+        // using std::chrono::duration;
+        // using std::chrono::milliseconds;
 
         // Set up headers and transforms
         m_local_header = in_cloud->header;
@@ -145,9 +151,16 @@ private:
         pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
         pcl::fromROSMsg(*in_cloud, *cloud_ptr);
 
+        // auto t1 = high_resolution_clock::now();
         // Cluster the pointcloud by the distance of the points
         std::vector<std::shared_ptr<all_seaing_perception::Obstacle<pcl::PointXYZI>>> raw_obstacles =
             cluster_cloud(cloud_ptr);
+        // auto t2 = high_resolution_clock::now();
+
+        // /* Getting number of milliseconds as a double. */
+        // duration<double, std::milli> ms_double = t2 - t1;
+
+        // RCLCPP_INFO(this->get_logger(), "# POINTS: %d, CLUSTERING TIME: %lfms", cloud_ptr->points.size(), ms_double.count());
 
         // Publish raw map
         publish_map(raw_obstacles);

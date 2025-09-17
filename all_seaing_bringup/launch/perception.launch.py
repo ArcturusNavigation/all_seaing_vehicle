@@ -213,17 +213,17 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
-    obstacle_detector_node = launch_ros.actions.Node(
+    point_cloud_filter_downsampled_node = launch_ros.actions.Node(
         package="all_seaing_perception",
-        executable="obstacle_detector",
+        executable="point_cloud_filter",
         remappings=[
-            ("point_cloud", "point_cloud/filtered"),
+            ("point_cloud", "/velodyne_points"),
+            ("point_cloud/filtered", "point_cloud/filtered_downsampled"),
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"obstacle_size_min": 5},
-            {"obstacle_size_max": 300},
-            {"clustering_distance": 0.1},
+            {"range_radius": [0.5, 60.0]},
+            {"leaf_size": 0.25},
         ],
     )
 
@@ -231,7 +231,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="obstacle_detector",
         remappings=[
-            ("point_cloud", "point_cloud/filtered"),
+            ("point_cloud", "point_cloud/filtered_downsampled"),
         ],
         parameters=[
             {"base_link_frame": "base_link"},
@@ -246,7 +246,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="obstacle_detector",
         remappings=[
-            ("point_cloud", "point_cloud/filtered"),
+            ("point_cloud", "point_cloud/filtered_downsampled"),
             ("obstacle_map/raw", "obstacle_map/unlabeled")
         ],
         parameters=[
@@ -327,7 +327,7 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,
         multicam_detection_merge_node,
-        obstacle_detector_node,
+        point_cloud_filter_downsampled_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         grid_map_generator,

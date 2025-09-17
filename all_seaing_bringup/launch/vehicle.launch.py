@@ -142,85 +142,9 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(use_bag),
     )
 
-    run_tasks = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="run_tasks.py",
-    )
-
-    follow_buoy_path = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="follow_buoy_path.py",
-        parameters=[
-            {"is_sim": False},
-            {"global_frame_id": "map"},
-            {"color_label_mappings_file": buoy_label_mappings},
-            {"safe_margin": 0.2},
-        ],
-        remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
-            ("odometry/filtered", "odometry/tracked"),
-        ],
-    )
-
-    follow_buoy_pid = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="follow_buoy_pid.py",
-        parameters=[
-            {"is_sim": False},
-            {"global_frame_id": "map"},
-            {"color_label_mappings_file": buoy_label_mappings},
-            {"Kpid_x": [0.3, 0.0, 0.0]},
-            {"Kpid_y": [0.3, 0.0, 0.0]},
-            {"Kpid_theta": [0.2, 0.0, 0.0]},
-            {"max_vel": [0.5, 0.5, 0.2]}
-            # {"forward_speed": 0.5},
-            # {"max_yaw": 0.001},
-        ],
-        remappings=[
-            ("camera_info", "/zed/zed_node/rgb/camera_info"),
-            ("obstacle_map/labeled", "obstacle_map/local"),
-        ],
-    )
-
-    speed_challenge_pid = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="speed_challenge_pid.py",
-        parameters=[
-            {"is_sim": False},
-            {"global_frame_id": "map"},
-            {"color_label_mappings_file": color_label_mappings},
-            {"forward_speed": 1.2}
-        ],
-        remappings=[
-            (
-                "camera_info",
-                "/zed/zed_node/rgb/camera_info"
-            ),
-            (
-                "imu",
-                "/mavros/imu/data"
-            ),
-            ("obstacle_map/labeled", "obstacle_map/local")
-        ],
-    )
-
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="control_mux.py",
-    )
-
-    controller_server = launch_ros.actions.Node(
-        package="all_seaing_controller",
-        executable="controller_server.py",
-        parameters=[
-            {"global_frame_id": "map"},
-            {"robot_frame_id": "base_link"},
-            {"Kpid_x": [0.3, 0.0, 0.0]},
-            {"Kpid_y": [0.3, 0.0, 0.0]},
-            {"Kpid_theta": [0.3, 0.0, 0.0]},
-            {"max_vel": [1.5, 1.0, 0.1]},
-        ],
-        output="screen",
     )
 
     point_cloud_filter_node = launch_ros.actions.Node(
@@ -232,22 +156,9 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [0.5, 60.0]},
+            {"leaf_size": 0.0},
         ],
         condition=UnlessCondition(use_bag),
-    )
-
-    obstacle_detector_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="obstacle_detector",
-        remappings=[
-            ("point_cloud", "point_cloud/filtered"),
-        ],
-        parameters=[
-            {"global_frame_id": "map"},
-            {"obstacle_size_min": 5},
-            {"obstacle_size_max": 300},
-            {"clustering_distance": 0.1},
-        ],
     )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
@@ -419,7 +330,6 @@ def launch_setup(context, *args, **kwargs):
     return [
         control_mux,
         controller_node,
-        # controller_server,
         # ekf_node,
         # navsat_node,
         odometry_publisher_node,
