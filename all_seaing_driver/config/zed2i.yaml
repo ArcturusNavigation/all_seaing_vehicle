@@ -1,5 +1,7 @@
-# general:
-#     grab_resolution: 'HD720' # TODO: check out how to get full/higher resolution?
+general:
+    # grab_resolution: 'HD720' # TODO: check out how to get full/higher resolution?
+    grab_frame_rate: 30
+    pub_frame_rate: 30.0
 pos_tracking:
     pos_tracking_enabled: false
     publish_tf: false

@@ -42,7 +42,7 @@ def generate_launch_description():
     driver_params["repeat_delay"] = 0.0
     driver_params["frame_id"] = "velodyne"
     driver_params["model"] = "32E"
-    driver_params["rpm"] = 600.0
+    driver_params["rpm"] = 1200.0 # change to change Hz (600 is 5Hz, 1200 is 10Hz and the maximum)
     driver_params["port"] = 2368
     driver_container = ComposableNodeContainer(
         name="velodyne_driver_container",

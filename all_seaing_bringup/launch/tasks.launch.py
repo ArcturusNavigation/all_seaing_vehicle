@@ -61,21 +61,8 @@ def launch_setup(context, *args, **kwargs):
         locations = yaml.safe_load(f)
 
     location = context.perform_substitution(LaunchConfiguration("location"))
-    comms = LaunchConfiguration("comms")
     use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
-
-    object_tracking_map_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="object_tracking_map",
-        output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
-        remappings=[
-            ("detections", "obstacle_map/local"),
-            ("odometry/filtered", "odometry/gps"),
-        ],
-        parameters=[slam_params]
-    )
 
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
@@ -155,18 +142,6 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    grid_map_generator = launch_ros.actions.Node(
-        package="all_seaing_navigation",
-        executable="grid_map_generator.py",
-        parameters=[
-            {"global_frame_id": "map"},
-            {"timer_period": 1.0},
-            {"grid_dim": [800, 800]},
-            {"default_range": 60},
-            {"grid_resolution": 0.1},
-        ],
-    )
-
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
@@ -199,9 +174,7 @@ def launch_setup(context, *args, **kwargs):
     )
     
     return [
-        object_tracking_map_node,
         controller_server,
-        grid_map_generator,
         navigation_server,
         navigation_server_nomap,
         run_tasks,
@@ -216,9 +189,6 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("location", default_value="boathouse"),
-            DeclareLaunchArgument(
-                "comms", default_value="wifi", choices=["wifi", "lora", "custom"]
-            ),
             DeclareLaunchArgument(
                 "use_bag", default_value="false", choices=["true", "false"]
             ),

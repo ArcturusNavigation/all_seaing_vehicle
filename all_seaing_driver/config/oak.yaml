@@ -10,6 +10,7 @@
       # i_sensor_img_orientation: "NORMAL"
       i_resolution: '1080P' # may need to use 13MP to not lose FoV
       i_set_isp_scale: false
+      i_fps: 30.0
 
 /back_right_oak:
   ros__parameters:
@@ -23,3 +24,4 @@
       # i_sensor_img_orientation: "NORMAL"
       i_resolution: '1080P' # may need to use 13MP to not lose FoV
       i_set_isp_scale: false
+      i_fps: 30.0
