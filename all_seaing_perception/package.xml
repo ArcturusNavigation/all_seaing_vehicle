@@ -18,7 +18,7 @@
     <depend>tf2_ros</depend>
     <depend>tf2_geometry_msgs</depend>
     <depend>tf2_sensor_msgs</depend>
-
+    <depend>nav2_common</depend>
     <depend>all_seaing_interfaces</depend>
     <depend>all_seaing_common</depend>
 
