@@ -98,7 +98,7 @@ class CentralHubROS(Node):
         response.drive_y = -self.estop.drive_y2()
         # TODO: Implement side strafe using drive x2 and y2 (add those to the .srv as well)
         response.is_connected = bool(self.estop.connected())
-        response.is_estopped = bool(self.main_pow.estop() or (not self.estop.connected()) or self.estop.remote_estop())
+        response.is_estopped = bool(self.main_pow.estop())
         return response
     
     def cmd_fan_cb(self, request, response):

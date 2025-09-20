@@ -44,7 +44,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "roboboat_2025"},
             {"label_config": "buoy_label_mappings"},
-            {"conf": 0.6},
+            {"conf": 0.4},
             {"use_color_names": False},
         ],
         remappings=[
@@ -60,7 +60,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "roboboat_2025"},
             {"label_config": "buoy_label_mappings"},
-            {"conf": 0.6},
+            {"conf": 0.4},
             {"use_color_names": False},
         ],
         remappings=[
@@ -77,7 +77,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "roboboat_2025"},
             {"label_config": "buoy_label_mappings"},
-            {"conf": 0.6},
+            {"conf": 0.4},
             {"use_color_names": False},
         ],
         remappings=[
@@ -236,8 +236,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 1.0},
-            {"obstacle_size_min": 5},
+            {"clustering_distance": 0.2},
+            {"obstacle_size_min": 4},
             {"range_max": 50.0},
         ],
     )
@@ -265,12 +265,16 @@ def launch_setup(context, *args, **kwargs):
     grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
+        remappings=[
+            ("odometry/filtered", "odometry/gps"),
+        ],
         parameters=[
             {"global_frame_id": "map"},
-            {"timer_period": 1.0},
+            {"timer_period": 0.5},
             {"grid_dim": [800, 800]},
             {"default_range": 60},
             {"grid_resolution": 0.1},
+            {"dynamic_origin": True},
         ],
     )
 
@@ -340,7 +344,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument('use_sim_time', default_value='true'),
-            DeclareLaunchArgument("location", default_value="boathouse"),
+            DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
             OpaqueFunction(function=launch_setup),
         ]
