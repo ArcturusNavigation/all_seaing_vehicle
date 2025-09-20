@@ -42,6 +42,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_track_robot = this->get_parameter("track_robot").as_bool();
     m_imu_predict = this->get_parameter("imu_predict").as_bool();
     m_gps_update = this->get_parameter("gps_update").as_bool();
+
+    RCLCPP_INFO(this->get_logger(), m_track_robot? "SLAM: ON" : "SLAM: OFF");
     
     m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
     m_odom_refresh_rate = this->get_parameter("odom_refresh_rate").as_double();

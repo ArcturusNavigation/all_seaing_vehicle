@@ -27,7 +27,7 @@ class GridMapGenerator(Node):
             .get_parameter_value()
             .double_value
         )
-        
+
         default_lidar_range = (
             self.declare_parameter("default_lidar_range", 130.0)
             .get_parameter_value()
@@ -122,7 +122,7 @@ class GridMapGenerator(Node):
         x = gx * resolution + origin.x
         y = gy * resolution + origin.y
         return x, y
-    
+
     def set_active(self, make_active):
         """
         Set the active_cells for bounding boxes to be true (or false when resetting)
@@ -178,7 +178,6 @@ class GridMapGenerator(Node):
 
             for edge in active_edge_table:
                 edge["x"] += edge["inverse_slope"]
-    
 
     def find_active_cells(self):
         """

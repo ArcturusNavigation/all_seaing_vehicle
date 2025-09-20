@@ -7,7 +7,7 @@ from std_msgs.msg import Float64
 import rclpy
 from all_seaing_interfaces.msg import Heartbeat
 
-TIMER_PERIOD = 1 / 8
+TIMER_PERIOD = 1 / 30.0
 
 class ThrustCommander(Node):
 

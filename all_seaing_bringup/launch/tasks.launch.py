@@ -61,21 +61,8 @@ def launch_setup(context, *args, **kwargs):
         locations = yaml.safe_load(f)
 
     location = context.perform_substitution(LaunchConfiguration("location"))
-    comms = LaunchConfiguration("comms")
     use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
-
-    object_tracking_map_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="object_tracking_map",
-        output="screen",
-        # arguments=['--ros-args', '--log-level', 'debug'],
-        remappings=[
-            ("detections", "obstacle_map/local"),
-            ("odometry/filtered", "odometry/gps"),
-        ],
-        parameters=[slam_params]
-    )
 
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
@@ -89,6 +76,9 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
+            {"duplicate_dist": 0.5},
+            {"forward_dist": 1.5},
+            {"inter_buoy_pair_dist": 1.5},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -150,21 +140,9 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_x": [0.3, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
-            {"max_vel": [1.5, 1.0, 0.1]},
+            {"max_vel": [2.5, 1.0, 0.1]},
         ],
         output="screen",
-    )
-
-    grid_map_generator = launch_ros.actions.Node(
-        package="all_seaing_navigation",
-        executable="grid_map_generator.py",
-        parameters=[
-            {"global_frame_id": "map"},
-            {"timer_period": 1.0},
-            {"grid_dim": [800, 800]},
-            {"default_range": 60},
-            {"grid_resolution": 0.1},
-        ],
     )
 
     navigation_server = launch_ros.actions.Node(
@@ -199,11 +177,9 @@ def launch_setup(context, *args, **kwargs):
     )
     
     return [
-        object_tracking_map_node,
         controller_server,
-        grid_map_generator,
         navigation_server,
-        navigation_server_nomap,
+        # navigation_server_nomap,
         run_tasks,
         task_init_server, 
         follow_buoy_path,
@@ -216,9 +192,6 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("location", default_value="boathouse"),
-            DeclareLaunchArgument(
-                "comms", default_value="wifi", choices=["wifi", "lora", "custom"]
-            ),
             DeclareLaunchArgument(
                 "use_bag", default_value="false", choices=["true", "false"]
             ),

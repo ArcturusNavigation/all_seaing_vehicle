@@ -77,18 +77,18 @@ private:
         for (const auto &point : in_cloud_ptr->points) {
             double radius = sqrt(point.x * point.x + point.y * point.y);
 
-            // Convert point to map
-            geometry_msgs::msg::Point point_msg;
-            geometry_msgs::msg::Point point_tf;
-            point_msg.x = point.x;
-            point_msg.y = point.y;
-            point_msg.z = point.z;
-            tf2::doTransform<geometry_msgs::msg::Point>(point_msg, point_tf, m_lidar_map_tf);
+            // // Convert point to map
+            // geometry_msgs::msg::Point point_msg;
+            // geometry_msgs::msg::Point point_tf;
+            // point_msg.x = point.x;
+            // point_msg.y = point.y;
+            // point_msg.z = point.z;
+            // tf2::doTransform<geometry_msgs::msg::Point>(point_msg, point_tf, m_lidar_map_tf);
 
-            if (m_range_x[0] <= point_tf.x && point_tf.x <= m_range_x[1] &&
-                m_range_y[0] <= point_tf.y && point_tf.y <= m_range_y[1] &&
-                m_range_z[0] <= point_tf.z && point_tf.z <= m_range_z[1] &&
-                m_range_radius[0] <= radius && radius <= m_range_radius[1] &&
+            // if (m_range_x[0] <= point_tf.x && point_tf.x <= m_range_x[1] &&
+            //     m_range_y[0] <= point_tf.y && point_tf.y <= m_range_y[1] &&
+            //     m_range_z[0] <= point_tf.z && point_tf.z <= m_range_z[1] &&
+            if (m_range_radius[0] <= radius && radius <= m_range_radius[1] &&
                 m_range_intensity[0] <= point.intensity &&
                 point.intensity <= m_range_intensity[1] && 
                 pcl::isFinite(point)) {
@@ -98,7 +98,7 @@ private:
     }
 
     void pc_callback(const sensor_msgs::msg::PointCloud2 &in_cloud_msg) {
-        m_lidar_map_tf = get_tf(m_global_frame_id, in_cloud_msg.header.frame_id);
+        // m_lidar_map_tf = get_tf(m_global_frame_id, in_cloud_msg.header.frame_id);
 
         // Convert to PCL PointCloud
         pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
@@ -129,7 +129,7 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_cloud_pub;
 
     // Transform variables
-    geometry_msgs::msg::TransformStamped m_lidar_map_tf;
+    // geometry_msgs::msg::TransformStamped m_lidar_map_tf;
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
 
