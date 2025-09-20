@@ -194,7 +194,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
         remappings=[
-            ("odometry/filtered", "odometry/tracked"),
+            ("odometry/filtered", "odometry/gps"),
         ],
         parameters=[
             {"global_frame_id": "map"},
@@ -263,14 +263,14 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        set_use_sim_time,
+        # set_use_sim_time,
         odometry_publisher_node,
         static_transforms_ld,
         tf_filtering,
         point_cloud_filter_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
-        # grid_map_generator,
+        grid_map_generator,
         # buoy_yolo_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
