@@ -23,7 +23,7 @@ class GridMapGenerator(Node):
         )
 
         self.timer_period = (
-            self.declare_parameter("timer_period", 1.0)
+            self.declare_parameter("timer_period", 0.4)
             .get_parameter_value()
             .double_value
         )
@@ -126,39 +126,59 @@ class GridMapGenerator(Node):
     def set_active(self, make_active):
         """
         Set the active_cells for bounding boxes to be true (or false when resetting)
+
+        Uses the scanline rendering algorithm (also used for rasterization!):
+        https://en.wikipedia.org/wiki/Scanline_rendering
         """
+
+        edge_table = {} # ymin: (ymax, x, dx/dy)
+        ymin, ymax = self.grid.info.height, 0
         for obstacle in self.obstacle_map.obstacles:
-            # Get obstacle center in grid coordinates
-            center_x, center_y = self.world_to_grid(
-                obstacle.global_point.point.x, obstacle.global_point.point.y
-            )
+            polygon = obstacle.global_chull.polygon
+            for i, low_point in enumerate(polygon.points):
+                j = (i + 1) % len(polygon.points)
+                high_point = polygon.points[j]
+                high_point = self.world_to_grid(high_point.x, high_point.y)
+                low_point = self.world_to_grid(low_point.x, low_point.y)
 
-            # Use default radius if not set or is zero
-            bbox_width = obstacle.global_bbox_max.x-obstacle.global_bbox_min.x
-            bbox_length = obstacle.global_bbox_max.y-obstacle.global_bbox_min.y
-            radius = math.sqrt((bbox_width/2)**2+(bbox_length/2)**2)
+                if high_point[1] == low_point[1]: # get rid of horizontal lines
+                    continue
 
-            # Convert radius to grid cells (3 sigma)
-            sigma = radius / (self.obstacle_radius_sigma * self.grid_resolution)
-            search_radius = int(self.search_radius_sigma * sigma)
+                if low_point[1] > high_point[1]:
+                    low_point, high_point = high_point, low_point
 
-            # Calculate bounding box
-            minx = max(0, center_x - search_radius)
-            miny = max(0, center_y - search_radius)
-            maxx = min(self.grid.info.width, center_x + search_radius + 1)
-            maxy = min(self.grid.info.height, center_y + search_radius + 1)
+                invslope = (high_point[0] - low_point[0]) / (high_point[1] - low_point[1]) 
+                edge_table.setdefault(low_point[1], []).append(
+                    {
+                        "ymax": high_point[1],
+                        "x": low_point[0],
+                        "inverse_slope": invslope
+                    }
+                )
+                ymin = min(ymin, low_point[1])
+                ymax = max(ymax, high_point[1])
 
-            # Create Gaussian distribution
-            for x in range(minx, maxx):
-                for y in range(miny, maxy):
-                    # Calculate squared distance from center
-                    dx = x - center_x
-                    dy = y - center_y
-                    dist_sq = dx * dx + dy * dy
+        active_edge_table = []
+        for y in range(ymin, ymax):
+            if y in edge_table:
+                active_edge_table.extend(edge_table[y])
+            active_edge_table = [edge for edge in active_edge_table if edge["ymax"] > y]
+            active_edge_table.sort(key=lambda edge: edge["x"])
 
-                    if dist_sq <= search_radius * search_radius:
-                        idx = x + y * self.grid.info.width
-                        self.active_cells[idx] = make_active
+            # even odd rule: fill between pairs
+            for i in range(0, len(active_edge_table), 2):
+                if i + 1 >= len(active_edge_table):
+                    break
+                x_start = math.ceil(active_edge_table[i]["x"])
+                x_end = math.ceil(active_edge_table[i+1]["x"])
+                for x in range(x_start, x_end + 1):
+                    if 0 <= x < self.grid.info.width and 0 <= y < self.grid.info.height:
+                        self.active_cells[x + y * self.grid.info.width] = make_active
+                        self.grid.data[x + y * self.grid.info.width] = 100
+
+            for edge in active_edge_table:
+                edge["x"] += edge["inverse_slope"]
+    
 
     def find_active_cells(self):
         """
@@ -192,7 +212,7 @@ class GridMapGenerator(Node):
                     curVal *= 5
                     curVal = min(100, curVal)
                 else:
-                    curVal /= 1.2 # decrease probability by some small amount
+                    curVal /= 1.8 # decrease probability by some small amount
                     curVal = math.floor(curVal)
                 self.grid.data[x + y * self.grid.info.width] = curVal
 
