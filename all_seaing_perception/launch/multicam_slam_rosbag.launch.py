@@ -230,7 +230,7 @@ def launch_setup(context, *args, **kwargs):
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
             # {"child_frames_to_remove": ["slam_map"]},
-            {"parent_frames_to_remove": ["map", "odom"]},
+            {"parent_frames_to_remove": ["map"]},
         ]
     )
 
@@ -279,7 +279,7 @@ def launch_setup(context, *args, **kwargs):
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
         # multicam_detection_merge_node,
-        odometry_publisher_node,
+        # odometry_publisher_node,
         object_tracking_map_node,
         tf_filtering,
         # odometry_publisher_node,

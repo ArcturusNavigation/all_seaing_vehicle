@@ -279,7 +279,8 @@ def launch_setup(context, *args, **kwargs):
     )
 
     param_substitutions = {
-        'track_robot': LaunchConfiguration('use_slam'),
+        'track_robot': str(context.perform_substitution(LaunchConfiguration('use_slam')).lower() == "true"),
+        'include_odom_only_theta': str(context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false"),
     }
 
     configured_params = RewrittenYaml(
@@ -346,6 +347,7 @@ def generate_launch_description():
             DeclareLaunchArgument('use_sim_time', default_value='true'),
             DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
+            DeclareLaunchArgument("use_gps", default_value='true'),
             OpaqueFunction(function=launch_setup),
         ]
     )

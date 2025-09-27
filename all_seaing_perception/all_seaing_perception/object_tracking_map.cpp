@@ -72,6 +72,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("include_odom_only_theta", true);
     m_include_odom_only_theta = this->get_parameter("include_odom_only_theta").as_bool();
 
+    RCLCPP_INFO(this->get_logger(), m_include_odom_only_theta? "GPS: OFF" : "GPS: ON");
+
     this->declare_parameter<std::string>("data_association", "greedy_exclusive");
     m_data_association_algo = this->get_parameter("data_association").as_string();
 

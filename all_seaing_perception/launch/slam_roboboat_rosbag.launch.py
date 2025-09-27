@@ -259,7 +259,7 @@ def launch_setup(context, *args, **kwargs):
             ("odometry/filtered", "odometry/gps"),
             ("detections", "obstacle_map/local")
         ],
-        parameters=[slam_rosbag_params]
+        parameters=[slam_params]
     )
 
     return [
