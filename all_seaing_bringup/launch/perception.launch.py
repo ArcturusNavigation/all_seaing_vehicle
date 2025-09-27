@@ -270,7 +270,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"timer_period": 0.5},
+            {"timer_period": 0.4},
             {"grid_dim": [800, 800]},
             {"default_range": 60},
             {"grid_resolution": 0.1},

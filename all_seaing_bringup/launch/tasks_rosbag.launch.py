@@ -140,12 +140,16 @@ def launch_setup(context, *args, **kwargs):
     grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
+        remappings=[
+            ("odometry/filtered", "odometry/gps"),
+        ],
         parameters=[
             {"global_frame_id": "map"},
-            {"timer_period": 1.0},
+            {"timer_period": 0.4},
             {"grid_dim": [800, 800]},
             {"default_range": 60},
             {"grid_resolution": 0.1},
+            {"dynamic_origin": True},
         ],
     )
 
@@ -195,13 +199,23 @@ def launch_setup(context, *args, **kwargs):
         ],
         output="screen",
     )
+
+    rviz_waypoint_sender = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="rviz_waypoint_sender.py",
+        parameters=[
+            {"xy_threshold": 3.0},
+            {"theta_threshold": 180.0},
+            {"use_waypoint_client": False},
+        ],
+    )
     
     return [
         set_use_sim_time,
         controller_server,
         grid_map_generator,
-        # navigation_server,
-        navigation_server_nomap,
+        navigation_server,
+        # navigation_server_nomap,
         run_tasks,
         task_init_server, 
         follow_buoy_path,
@@ -209,6 +223,7 @@ def launch_setup(context, *args, **kwargs):
         # delivery_server,
         keyboard_ld, # only for rosbag
         onshore_node, # only for rosbag
+        rviz_waypoint_sender,
     ]
 
 
