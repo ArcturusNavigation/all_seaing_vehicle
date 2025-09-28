@@ -136,10 +136,11 @@ namespace all_seaing_perception{
 
     template<typename PointT>
     void transformPCLCloud(const typename pcl::PointCloud<PointT> pcl_in, typename pcl::PointCloud<PointT> &pcl_out, geometry_msgs::msg::TransformStamped tf){
-        sensor_msgs::msg::PointCloud2 pcl_in_msg, pcl_out_msg;
-        pcl::toROSMsg(pcl_in, pcl_in_msg);
-        tf2::doTransform<sensor_msgs::msg::PointCloud2>(pcl_in_msg, pcl_out_msg, tf);
-        pcl::fromROSMsg(pcl_out_msg, pcl_out);
+        tf2::Transform tf_tf;
+        tf2::fromMsg(tf.transform, tf_tf);
+        pcl_ros::transformPointCloud(pcl_in, pcl_out, tf_tf);
+        pcl_out.header = pcl_in.header;
+        pcl_out.header.frame_id = tf.header.frame_id;
     }
 
     template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZ> pcl_in, typename pcl::PointCloud<pcl::PointXYZ> &pcl_out, geometry_msgs::msg::TransformStamped tf);

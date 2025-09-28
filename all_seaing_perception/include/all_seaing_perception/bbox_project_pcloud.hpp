@@ -38,8 +38,12 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/visualization/cloud_viewer.h>
+#include <pcl/common/transforms.h>
 
 #include "cv_bridge/cv_bridge.h"
+
+#include "tf2_eigen/tf2_eigen.hpp"
+#include <Eigen/Geometry>
 
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
@@ -136,6 +140,9 @@ private:
     bool m_is_sim, m_label_list, m_only_project;
     double m_bbox_margin;
     std::string m_camera_name;
+
+    double m_contour_bbox_area_thres;
+    double m_cluster_bbox_area_thres;
 
     std_msgs::msg::Header m_local_header;
 

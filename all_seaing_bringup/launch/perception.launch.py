@@ -185,7 +185,7 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
-            {"obstacle_size_min": 2},
+            {"obstacle_size_min": 5},
             {"obstacle_size_max": 1000},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},

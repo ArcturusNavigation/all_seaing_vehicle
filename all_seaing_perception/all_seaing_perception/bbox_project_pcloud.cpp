@@ -9,6 +9,12 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     this->declare_parameter<double>("bbox_object_margin", 0.0);
     m_bbox_margin = this->get_parameter("bbox_object_margin").as_double();
 
+    this->declare_parameter<double>("contour_bbox_area_thres", 0.5);
+    m_contour_bbox_area_thres = this->get_parameter("contour_bbox_area_thres").as_double();
+
+    this->declare_parameter<double>("cluster_bbox_area_thres", 0.35);
+    m_cluster_bbox_area_thres = this->get_parameter("cluster_bbox_area_thres").as_double();
+
     // for cluster extraction
     this->declare_parameter<int>("obstacle_size_min", 20);
     this->declare_parameter<int>("obstacle_size_max", 100000);
@@ -172,16 +178,30 @@ void BBoxProjectPCloud::bb_pcl_project(
     // auto t1 = high_resolution_clock::now();
 
     // Transform in_cloud_msg to the camera frame and convert PointCloud2 to PCL PointCloud
-    sensor_msgs::msg::PointCloud2 in_cloud_tf;
-    tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, m_pc_cam_tf);
-    pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
+    // sensor_msgs::msg::PointCloud2 in_cloud_tf;
+    // tf2::doTransform<sensor_msgs::msg::PointCloud2>(*in_cloud_msg, in_cloud_tf, m_pc_cam_tf);
+    // pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+    // pcl::fromROSMsg(in_cloud_tf, *in_cloud_tf_ptr);
+    
+    pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>), in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::fromROSMsg(*in_cloud_msg, *in_cloud_ptr);
+    
+    // auto t1_tf = high_resolution_clock::now();
+
+    all_seaing_perception::transformPCLCloud(*in_cloud_ptr, *in_cloud_tf_ptr, m_pc_cam_tf);
+    
+    // auto t2_tf = high_resolution_clock::now();
+
+    // duration<double, std::milli> ms_double_tf = t2_tf - t1_tf;
+    
+    // RCLCPP_INFO(this->get_logger(), "TRANSFORM TIME: %lfms", ms_double_tf.count());
 
     auto object_pcls = all_seaing_interfaces::msg::LabeledObjectPointCloudArray();
     std::vector<pcl::PointCloud<pcl::PointXYZHSV>> obj_cloud_vec;
     // Just use the same pcloud to image projection, but check if it's within some binding box and assign it to that detection
     int obj = 0;
     // Convert msg to CvImage to work with CV2. Copy img since we will be modifying.
+    // auto t1_col = high_resolution_clock::now();
     cv_bridge::CvImagePtr cv_ptr;
     try {
         cv_ptr = cv_bridge::toCvCopy(in_img_msg, sensor_msgs::image_encodings::BGR8);
@@ -189,8 +209,19 @@ void BBoxProjectPCloud::bb_pcl_project(
         RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
         return;
     }
+
     cv::Mat cv_hsv;
+    
     cv::cvtColor(cv_ptr->image, cv_hsv, cv::COLOR_BGR2HSV);
+
+    // auto t2_col = high_resolution_clock::now();
+
+    // duration<double, std::milli> ms_double_col = t2_col - t1_col;
+    
+    // RCLCPP_INFO(this->get_logger(), "IMAGE READING & COLOR CONVERSION TIME: %lfms", ms_double_col.count());
+
+    // auto t1_project = high_resolution_clock::now();
+
     std::vector<std::pair<all_seaing_interfaces::msg::LabeledBoundingBox2D, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>> bbox_pcloud_objects;
     pcl::PointCloud<pcl::PointXYZHSV>::Ptr all_obj_pcls_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
     all_obj_pcls_ptr->header = in_cloud_tf_ptr->header;
@@ -220,6 +251,12 @@ void BBoxProjectPCloud::bb_pcl_project(
     obj_pcls_msg.header.stamp = in_cloud_msg->header.stamp;
     m_object_pcl_viz_pub->publish(obj_pcls_msg);
 
+    // auto t2_project = high_resolution_clock::now();
+
+    // duration<double, std::milli> ms_double_proj = t2_project - t1_project;
+    
+    // RCLCPP_INFO(this->get_logger(), "# BBOXES: %d, PROJECTION/FILTERING TIME: %lfms", in_bbox_msg->boxes.size(), ms_double_proj.count());
+
     if(m_only_project) return;
 
     // REFINE OBJECT POINT CLOUDS
@@ -246,6 +283,8 @@ void BBoxProjectPCloud::bb_pcl_project(
         cv::Point bbox_offset;
         hsv_img.locateROI(img_sz, bbox_offset);
 
+        // auto t1_cluster = high_resolution_clock::now();
+
         if (label_color_map[bbox.label]=="red"){
             // invert colors of cloud if the label is red, to have red (now cyan) points close to each other in HSV range
             // PCL color range: (360,1,1)
@@ -270,58 +309,159 @@ void BBoxProjectPCloud::bb_pcl_project(
             }
         }
 
+        // auto t2_cluster = high_resolution_clock::now();
+
+        // duration<double, std::milli> ms_double_cluster = t2_cluster - t1_cluster;
+        
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) CLUSTERING TIME: %lfms", ms_double_cluster.count());
+
+        // auto t1_colorseg = high_resolution_clock::now();
+
         // color segmentation
         cv::Mat mask;
         std::vector<std::vector<cv::Point>> contours;
         std::tie(mask, contours) = all_seaing_perception::colorSegmentationHSV(hsv_img, contour_matching_color_range_map[label_color_map[bbox.label]], 5, 7, label_color_map[bbox.label]=="red", contour_matching_color_range_map.count("red2")?contour_matching_color_range_map["red2"]:std::vector<int>());
-        std::vector<std::vector<cv::Point>> in_contours;
+        // std::vector<std::vector<cv::Point>> in_contours;
         // Get image points inside contour, put them into a vector, will then process those (not the contours themselves, they are just a boundary)
-        for(std::vector<cv::Point> contour : contours){
-            in_contours.push_back(all_seaing_perception::inContour(contour));
-        }
+        // for(std::vector<cv::Point> contour : contours){
+        //     in_contours.push_back(all_seaing_perception::inContour(contour));
+        // }
         // Convert the contour points to fit the original image (using image_sz and bbox_offset -> just bbox_offset+pt_coords) to be able to use it with the LiDAR (projected) points
-        for(int ctr = 0; ctr < in_contours.size(); ctr++){
-            for(int pt=0; pt < in_contours[ctr].size(); pt++){
-                in_contours[ctr][pt]+=bbox_offset;
+        // for(int ctr = 0; ctr < in_contours.size(); ctr++){
+        //     for(int pt=0; pt < in_contours[ctr].size(); pt++){
+        //         in_contours[ctr][pt]+=bbox_offset;
+        //     }
+        // }
+        for(int ctr = 0; ctr < contours.size(); ctr++){
+            for(int pt=0; pt < contours[ctr].size(); pt++){
+                contours[ctr][pt]+=bbox_offset;
             }
         }
-        if(in_contours.empty() || clusters_indices.empty()) continue;
+
+        // auto t2_colorseg = high_resolution_clock::now();
+
+        // duration<double, std::milli> ms_double_colorseg = t2_colorseg - t1_colorseg;
+        
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) COLOR SEGMENTATION TIME: %lfms", ms_double_colorseg.count());
+
+        // if(in_contours.empty() || clusters_indices.empty()) continue;
+        if(contours.empty() || clusters_indices.empty()) continue;
+
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) # SEGMENTS BEFORE: %d, # CLUSTERS BEFORE: %d", in_contours.size(), clusters_indices.size());
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) # SEGMENTS BEFORE: %d, # CLUSTERS BEFORE: %d", contours.size(), clusters_indices.size());
+
+        // auto t1_prep = high_resolution_clock::now();
+        // pre-filter clusters & segments
+        std::vector<std::vector<cv::Point>> contours_filtered;
+        for (std::vector<cv::Point> contour : contours){
+            if (cv::contourArea(contour)/((bbox.max_x-bbox.min_x)*(bbox.max_y-bbox.min_y)) > m_contour_bbox_area_thres){
+                contours_filtered.push_back(contour);
+            }
+            // RCLCPP_INFO(this->get_logger(), "contour: %lf/%d", cv::contourArea(contour), ((bbox.max_x-bbox.min_x)*(bbox.max_y-bbox.min_y)));
+        }
+        // std::vector<std::vector<cv::Point>> in_contours_filtered;
+        // for (std::vector<cv::Point> in_contour : in_contours){
+        //     if (double(in_contour.size())/((bbox.max_x-bbox.min_x)*(bbox.max_y-bbox.min_y)) > m_contour_bbox_area_thres){
+        //         in_contours_filtered.push_back(in_contour);
+        //     }
+        //     RCLCPP_INFO(this->get_logger(), "contour: %d/%d", in_contour.size(), ((bbox.max_x-bbox.min_x)*(bbox.max_y-bbox.min_y)));
+        // }
+        std::vector<pcl::PointIndices> clusters_indices_filtered;
+        for (pcl::PointIndices cluster : clusters_indices){
+            double min_x = bbox.max_x, min_y = bbox.max_y, max_x = 0, max_y = 0;
+            for(pcl::index_t ind : cluster.indices){
+                cv::Point2d cloud_pt_xy = all_seaing_perception::projectPCLPtToPixel(m_cam_model, pcloud_ptr->points[ind], m_is_sim);
+                min_x = std::min(min_x, cloud_pt_xy.x);
+                max_x = std::max(max_x, cloud_pt_xy.x);
+                min_y = std::min(min_y, cloud_pt_xy.y);
+                max_y = std::max(max_y, cloud_pt_xy.y);
+            }
+            if (((max_x-min_x)*(max_y-min_y))/((bbox.max_x-bbox.min_x)*(bbox.max_y-bbox.min_y)) > m_cluster_bbox_area_thres)   {
+                clusters_indices_filtered.push_back(cluster);
+            }
+        }
+
+        // auto t2_prep = high_resolution_clock::now();
+
+        // duration<double, std::milli> ms_double_prep = t2_prep - t1_prep;
+        
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) PRE-PROCESSING/FILTERING TIME: %lfms", ms_double_prep.count());
+        
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) # SEGMENTS AFTER: %d, # CLUSTERS AFTER: %d", in_contours_filtered.size(), clusters_indices_filtered.size());
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) # SEGMENTS AFTER: %d, # CLUSTERS AFTER: %d", contours_filtered.size(), clusters_indices_filtered.size());
+        
+        // if(in_contours_filtered.empty() || clusters_indices_filtered.empty()) continue;
+        if(contours_filtered.empty() || clusters_indices_filtered.empty()) continue;
+        
+        // auto t1_comp = high_resolution_clock::now();
+
         // Convert both the pcloud and the contours to a vector of pair<Point2d, Vec3b> and compute sum and sum of squares (can be used to compute all the needed metrics)
-        std::vector<std::vector<std::pair<cv::Point2d, std::vector<long long>>>> contours_pts;
+        // std::vector<std::vector<std::pair<cv::Point2d, std::vector<long long>>>> contours_pts;
         std::vector<std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>>> contours_qts;
-        for (std::vector<cv::Point> in_contour : in_contours){// point.x, point.y the coords
-            std::vector<std::pair<cv::Point2d, std::vector<long long>>> contour_pts;
+        std::vector<int> contour_szs;
+        for (std::vector<cv::Point> contour : contours_filtered){
+            cv::Moments mu = cv::moments(contour);
+            // RCLCPP_INFO(this->get_logger(), "COMPUTED MOMENTS: %lf, %lf, %lf, %lf, %lf", mu.m00, mu.m10, mu.m01, mu.m20, mu.m02);
+            contour_szs.push_back(mu.m00);
             std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> contour_qts;
             contour_qts.first.second = contour_qts.second.second = {0,0,0};
-            for(cv::Point image_pt : in_contour){
-                cv::Vec3b image_pt_hsv_vec3b = cv_hsv.at<cv::Vec3b>(image_pt);
-                std::vector<long long> image_pt_hsv = {(long long)image_pt_hsv_vec3b[0], (long long)image_pt_hsv_vec3b[1], (long long)image_pt_hsv_vec3b[2]};
-                if (label_color_map[bbox.label]=="red"){
-                    all_seaing_perception::invertHSVOpenCV(image_pt_hsv); // shift the scale so that red values are close to one another -> invert colors, red is cyan now
-                }
-                cv::Point2d image_pt_xy = cv::Point2d(image_pt.x, image_pt.y);
-                contour_pts.push_back(std::make_pair(image_pt_xy, image_pt_hsv));
-                //store sums
-                contour_qts.first.first.x+=image_pt_xy.x;
-                contour_qts.first.first.y+=image_pt_xy.y;
-                contour_qts.first.second[0]+=image_pt_hsv[0];
-                contour_qts.first.second[1]+=image_pt_hsv[1];
-                contour_qts.first.second[2]+=image_pt_hsv[2];
-                //store sum of squares
-                contour_qts.second.first.x+=image_pt_xy.x*image_pt_xy.x;
-                contour_qts.second.first.y+=image_pt_xy.y*image_pt_xy.y;
-                contour_qts.second.second[0]+=image_pt_hsv[0]*image_pt_hsv[0];
-                contour_qts.second.second[1]+=image_pt_hsv[1]*image_pt_hsv[1];
-                contour_qts.second.second[2]+=image_pt_hsv[2]*image_pt_hsv[2];
+            contour_qts.first.first.x = mu.m10;
+            contour_qts.first.first.y = mu.m01;
+            contour_qts.second.first.x = mu.m20;
+            contour_qts.second.first.y = mu.m02;
+            // find correct average hsv
+            std::vector<int> adjusted_color_range;
+            if (label_color_map[bbox.label]!="red"){
+                adjusted_color_range = contour_matching_color_range_map[label_color_map[bbox.label]];
+            }else{
+                adjusted_color_range = contour_matching_color_range_map["red"]; //(Hmin,Hmax, ...)
+                adjusted_color_range[1] += 90; // Hmax from red is low, add 90
+                adjusted_color_range[1] = contour_matching_color_range_map["red2"][0]-90; // Hmin from red2 is high, add 90 and subtract 180 -> -90
             }
-            contours_pts.push_back(contour_pts);
+            //approximate to make things faster
+            contour_qts.first.second[0] = mu.m00*(long long)(float(adjusted_color_range[0]+adjusted_color_range[1])/2);
+            contour_qts.first.second[1] = mu.m00*(long long)(float(adjusted_color_range[2]+adjusted_color_range[3])/2);
+            contour_qts.first.second[2] = mu.m00*(long long)(float(adjusted_color_range[4]+adjusted_color_range[5])/2);
+            contour_qts.second.second[0] = mu.m00*(long long)(float(adjusted_color_range[0]+adjusted_color_range[1])/2)*(long long)(float(adjusted_color_range[0]+adjusted_color_range[1])/2);
+            contour_qts.second.second[1] = mu.m00*(long long)(float(adjusted_color_range[2]+adjusted_color_range[3])/2)*(long long)(float(adjusted_color_range[2]+adjusted_color_range[3])/2);
+            contour_qts.second.second[2] = mu.m00*(long long)(float(adjusted_color_range[4]+adjusted_color_range[5])/2)*(long long)(float(adjusted_color_range[4]+adjusted_color_range[5])/2);
+            // RCLCPP_INFO(this->get_logger(), "COMPUTED QUANTITIES");
             contours_qts.push_back(contour_qts);
         }
+        // for (std::vector<cv::Point> in_contour : in_contours_filtered){// point.x, point.y the coords
+        //     contour_szs.push_back(in_contour.size());
+        //     std::vector<std::pair<cv::Point2d, std::vector<long long>>> contour_pts;
+        //     std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> contour_qts;
+        //     contour_qts.first.second = contour_qts.second.second = {0,0,0};
+        //     for(cv::Point image_pt : in_contour){
+        //         cv::Vec3b image_pt_hsv_vec3b = cv_hsv.at<cv::Vec3b>(image_pt);
+        //         std::vector<long long> image_pt_hsv = {(long long)image_pt_hsv_vec3b[0], (long long)image_pt_hsv_vec3b[1], (long long)image_pt_hsv_vec3b[2]};
+        //         if (label_color_map[bbox.label]=="red"){
+        //             all_seaing_perception::invertHSVOpenCV(image_pt_hsv); // shift the scale so that red values are close to one another -> invert colors, red is cyan now
+        //         }
+        //         cv::Point2d image_pt_xy = cv::Point2d(image_pt.x, image_pt.y);
+        //         // contour_pts.push_back(std::make_pair(image_pt_xy, image_pt_hsv));
+        //         //store sums
+        //         contour_qts.first.first.x+=image_pt_xy.x;
+        //         contour_qts.first.first.y+=image_pt_xy.y;
+        //         contour_qts.first.second[0]+=image_pt_hsv[0];
+        //         contour_qts.first.second[1]+=image_pt_hsv[1];
+        //         contour_qts.first.second[2]+=image_pt_hsv[2];
+        //         //store sum of squares
+        //         contour_qts.second.first.x+=image_pt_xy.x*image_pt_xy.x;
+        //         contour_qts.second.first.y+=image_pt_xy.y*image_pt_xy.y;
+        //         contour_qts.second.second[0]+=image_pt_hsv[0]*image_pt_hsv[0];
+        //         contour_qts.second.second[1]+=image_pt_hsv[1]*image_pt_hsv[1];
+        //         contour_qts.second.second[2]+=image_pt_hsv[2]*image_pt_hsv[2];
+        //     }
+        //     // contours_pts.push_back(contour_pts);
+        //     contours_qts.push_back(contour_qts);
+        // }
         std::vector<std::vector<std::pair<cv::Point2d, std::vector<long long>>>> clusters_pts;
         std::vector<std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>>> clusters_qts;
         std::vector<double> cluster_dists;
         std::vector<double> cluster_area_ratios;
-        for (pcl::PointIndices cluster : clusters_indices){// vector<index_t> is cluster.indices
+        for (pcl::PointIndices cluster : clusters_indices_filtered){// vector<index_t> is cluster.indices
             std::vector<std::pair<cv::Point2d, std::vector<long long>>> cluster_pts;
             std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> cluster_qts;
             cluster_qts.first.second = cluster_qts.second.second = {0,0,0};
@@ -361,29 +501,47 @@ void BBoxProjectPCloud::bb_pcl_project(
             cluster_area_ratios.push_back(((max_x-min_x)*(max_y-min_y))/((bbox.max_x-bbox.min_x)*(bbox.max_y-bbox.min_y)));
         }
 
+        // auto t2_comp = high_resolution_clock::now();
+
+        // duration<double, std::milli> ms_double_comp = t2_comp - t1_comp;
+        
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) MATCHING COMPUTATION TIME: %lfms", ms_double_comp.count());
+
+        // auto t1_matching = high_resolution_clock::now();
+        
         // GO THROUGH ALL THE CLUSTER/CONTOUR PAIRS AND FIND THE BEST ONE BASED ON THE OPTIMALITY METRIC WITH THE WEIGHTS
         long long min_pair_cost = -1;
         int opt_contour_id = -1, opt_cluster_id = -1;
-        for (int contour = 0; contour < contours_pts.size(); contour++){
-            long long contour_size = contours_pts[contour].size();
+        for (int contour = 0; contour < contours_qts.size(); contour++){
+            long long contour_size = contour_szs[contour];
             std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> contour_qts = contours_qts[contour];
             
+            // auto t1_contour = high_resolution_clock::now();
+
             long long contour_cost = 0;
-            for (std::pair<cv::Point2d, std::vector<long long>> contour_pt : contours_pts[contour]){
-                if (label_color_map[bbox.label]!="red"){
-                    contour_cost += (long long)color_range_penalty(m_contour_detection_color_weights, contour_matching_color_range_map[label_color_map[bbox.label]], contour_pt.second)/contour_size;
-                }else{
-                    std::vector<int> adjusted_color_range = contour_matching_color_range_map["red"]; //(Hmin,Hmax, ...)
-                    adjusted_color_range[1] += 90; // Hmax from red is low, add 90
-                    adjusted_color_range[1] = contour_matching_color_range_map["red2"][0]-90; // Hmin from red2 is high, add 90 and subtract 180 -> -90
-                    contour_cost += (long long)color_range_penalty(m_contour_detection_color_weights, adjusted_color_range, contour_pt.second)/contour_size;
-                }
-            }
+            // for (std::pair<cv::Point2d, std::vector<long long>> contour_pt : contours_pts[contour]){
+            //     if (label_color_map[bbox.label]!="red"){
+            //         contour_cost += (long long)color_range_penalty(m_contour_detection_color_weights, contour_matching_color_range_map[label_color_map[bbox.label]], contour_pt.second)/contour_size;
+            //     }else{
+            //         std::vector<int> adjusted_color_range = contour_matching_color_range_map["red"]; //(Hmin,Hmax, ...)
+            //         adjusted_color_range[1] += 90; // Hmax from red is low, add 90
+            //         adjusted_color_range[1] = contour_matching_color_range_map["red2"][0]-90; // Hmin from red2 is high, add 90 and subtract 180 -> -90
+            //         contour_cost += (long long)color_range_penalty(m_contour_detection_color_weights, adjusted_color_range, contour_pt.second)/contour_size;
+            //     }
+            // }
+
+            // auto t2_contour = high_resolution_clock::now();
+
+            // duration<double, std::milli> ms_double_cont = t2_contour - t1_contour;
+            
+            // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX, SEGMENT) SEGMENT COLOR COST COMP TIME: %lfms", ms_double_cont.count());
+
             // RCLCPP_INFO(this->get_logger(), "contour cost: %ld", contour_cost);
             for (int cluster = 0; cluster < clusters_pts.size(); cluster++){
                 long long cluster_size = clusters_pts[cluster].size();
                 std::pair<std::pair<cv::Point2d, std::vector<long long>>, std::pair<cv::Point2d, std::vector<long long>>> cluster_qts = clusters_qts[cluster];
                 
+                // TODO: Change this, it penalizes large clusters (think of it same as moment of inertia, it's RMS within cluster, which is bigger with size, ^2 + distance between cluster & segment ^2) -> replace with distance between midpoints?
                 // sum(cluster_size*x_i^2+contour_size*x_j^2) -2*sum(x_i*x_j) +sum(cluster_size*y_i^2+contour_size*y_j^2) -2*sum(y_i*y_j))
                 long long fast_contour_cluster_sq_dist_sum = cluster_size*contour_qts.second.first.x+contour_size*cluster_qts.second.first.x\
                                         - 2*contour_qts.first.first.x*cluster_qts.first.first.x\
@@ -404,7 +562,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 double cluster_dist = cluster_dists[cluster];
                 double cluster_area_ratio = cluster_area_ratios[cluster];
 
-                // RCLCPP_INFO(this->get_logger(), "sqdist: %ld, dhsv: %ld, %ld, %ld, cluster size: %d, contour size: %d, dist: %ld, cluster area ratio: %lf, weights: %ld, %ld, %ld, %ld, %ld, %ld, %ld", contour_cluster_dist_ms, cluster_dh_ms, cluster_ds_ms, cluster_dv_ms, cluster_size, contour_size, (long long)cluster_dist, cluster_area_ratio, (long long)m_cluster_contour_distance_weight, (long long)m_cluster_contour_color_weights[0], (long long)m_cluster_contour_color_weights[1], (long long)m_cluster_contour_color_weights[2], (long long)m_cluster_contour_size_weight, (long long)m_cluster_distance_weight, (long long)m_cluster_area_ratio_weight);
+                // RCLCPP_INFO(this->get_logger(), "sqdist: %ld, dhsv: %ld, %ld, %ld, cluster size: %d, contour size: %d, dist: %lf, cluster area ratio: %lf, weights: %ld, %ld, %ld, %ld, %ld, %ld, %ld", contour_cluster_dist_ms, cluster_dh_ms, cluster_ds_ms, cluster_dv_ms, cluster_size, contour_size, (double)cluster_dist, cluster_area_ratio, (long long)m_cluster_contour_distance_weight, (long long)m_cluster_contour_color_weights[0], (long long)m_cluster_contour_color_weights[1], (long long)m_cluster_contour_color_weights[2], (long long)m_cluster_contour_size_weight, (long long)m_cluster_distance_weight, (long long)m_cluster_area_ratio_weight);
                 
                 long long pair_cost = m_cluster_contour_distance_weight*contour_cluster_dist_ms\
                                     + m_cluster_contour_color_weights[0]*cluster_dh_ms\
@@ -418,21 +576,29 @@ void BBoxProjectPCloud::bb_pcl_project(
                 // RCLCPP_INFO(this->get_logger(), "pair cost: %ld", pair_cost);
                 if (min_pair_cost == -1 || pair_cost < min_pair_cost){
                     min_pair_cost = pair_cost;
-                    opt_contour_id = contour;
+                    // opt_contour_id = contour;
                     opt_cluster_id = cluster;
                 }
             }
         }
+
+        // auto t2_matching = high_resolution_clock::now();
+
+        // duration<double, std::milli> ms_double_matching = t2_matching - t1_matching;
+        
+        // RCLCPP_INFO(this->get_logger(), "(SINGLE BBOX) MATCHING TIME: %lfms", ms_double_matching.count());
+
         // RCLCPP_INFO(this->get_logger(), "min pair cost: %ld", min_pair_cost);
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         refined_cloud_ptr->header = pcloud_ptr->header;
-        for (pcl::index_t ind : clusters_indices[opt_cluster_id].indices){
+        for (pcl::index_t ind : clusters_indices_filtered[opt_cluster_id].indices){
             pcl::PointXYZHSV pt = pcloud_ptr->points[ind];
             refined_cloud_ptr->push_back(pt);
         }
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr refined_cloud_base_link_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
-        all_seaing_perception::transformPCLCloud(*refined_cloud_ptr, *refined_cloud_base_link_ptr, m_cam_base_link_tf);
 
+        all_seaing_perception::transformPCLCloud(*refined_cloud_ptr, *refined_cloud_base_link_ptr, m_cam_base_link_tf);
+                
         all_seaing_perception::Obstacle<pcl::PointXYZHSV> obstacle(m_local_header, refined_cloud_base_link_ptr, id++, false);
         obstacle.local_to_global(m_local_header, geometry_msgs::msg::TransformStamped());
         all_seaing_interfaces::msg::Obstacle obstacle_msg;
@@ -449,7 +615,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     // /* Getting number of milliseconds as a double. */
     // duration<double, std::milli> ms_double = t2 - t1;
 
-    // // TODO: Count points processed after projecting the bboxes, to compare & have a better idea of what's actually being processed
+    // // Count points processed after projecting the bboxes, to compare & have a better idea of what's actually being processed
     // RCLCPP_INFO(this->get_logger(), "# TOTAL POINTS: %d, # PROJECTED POINTS: %d, PROCESSING TIME: %lfms", in_cloud_tf_ptr->points.size(), all_obj_pcls_ptr->points.size(), ms_double.count());
 
     m_detection_pub->publish(refined_objects_msg);
