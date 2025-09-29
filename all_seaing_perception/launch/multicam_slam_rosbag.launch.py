@@ -275,6 +275,18 @@ def launch_setup(context, *args, **kwargs):
         ),
     )
 
+    point_cloud_filter_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/point_cloud/filtered_fake"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"range_radius": [0.5, 60.0]},
+        ]
+    )
+
     point_cloud_filter_downsampled_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -357,6 +369,7 @@ def launch_setup(context, *args, **kwargs):
         # odometry_publisher_node,
         # robot_state_publisher,
         # static_transforms_ld,
+        point_cloud_filter_node,
         point_cloud_filter_downsampled_node,
         # obstacle_detector_raw_node,
         # grid_map_generator,
