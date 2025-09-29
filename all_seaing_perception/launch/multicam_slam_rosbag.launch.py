@@ -269,6 +269,72 @@ def launch_setup(context, *args, **kwargs):
         ),
     )
 
+    point_cloud_filter_downsampled_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/velodyne_points"),
+            ("point_cloud/filtered", "point_cloud/filtered_downsampled"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"range_radius": [0.5, 60.0]},
+            {"leaf_size": 0.2},
+            {"local_range_z": [-100000.0, 0.0]},
+        ],
+    )
+
+    obstacle_detector_raw_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("point_cloud", "point_cloud/filtered_downsampled"),
+        ],
+        parameters=[
+            {"base_link_frame": "base_link"},
+            {"global_frame_id": "map"},
+            {"clustering_distance": 0.2},
+            {"obstacle_size_min": 2},
+            {"range_max": 50.0},
+        ],
+    )
+
+    obstacle_detector_unlabeled_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="obstacle_detector",
+        remappings=[
+            ("point_cloud", "point_cloud/filtered_downsampled"),
+            ("obstacle_map/raw", "obstacle_map/unlabeled")
+        ],
+        parameters=[
+            {"base_link_frame": "base_link"},
+            {"global_frame_id": "map"},
+            {"clustering_distance": 1.0},
+            {"obstacle_size_min": 2},
+            # {"obstacle_size_max": 300},
+            # {"obstacle_filter_pts_max": 100},
+            # {"obstacle_filter_area_max": 0.2},
+            {"obstacle_filter_length_max": 0.5},
+            # {"range_max": 50.0},
+        ],
+    )
+
+    grid_map_generator = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="grid_map_generator.py",
+        remappings=[
+            ("odometry/filtered", "odometry/gps"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"timer_period": 0.4},
+            {"grid_dim": [800, 800]},
+            {"default_range": 60},
+            {"grid_resolution": 0.1},
+            {"dynamic_origin": True},
+        ],
+    )
+
     return [
         set_use_sim_time,
         # ekf_node,
@@ -285,6 +351,9 @@ def launch_setup(context, *args, **kwargs):
         # odometry_publisher_node,
         # robot_state_publisher,
         # static_transforms_ld,
+        point_cloud_filter_downsampled_node,
+        # obstacle_detector_raw_node,
+        # grid_map_generator,
     ]
 
 def generate_launch_description():
