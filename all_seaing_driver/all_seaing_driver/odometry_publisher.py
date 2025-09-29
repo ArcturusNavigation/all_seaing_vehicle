@@ -25,6 +25,7 @@ class OdometryPublisher(Node):
         self.declare_parameter("odom_hz", 30.0)
         self.declare_parameter("use_odom_pos", False)
         self.declare_parameter("utm_zone", 19)
+        self.declare_parameter("publish_tf", True)
 
         self.global_frame_id = self.get_parameter("global_frame_id").get_parameter_value().string_value
         self.base_link_frame = self.get_parameter("base_link_frame").get_parameter_value().string_value
@@ -35,6 +36,7 @@ class OdometryPublisher(Node):
         self.odom_yaw_offset = self.get_parameter("odom_yaw_offset").get_parameter_value().double_value
         self.use_odom_pos = self.get_parameter("use_odom_pos").get_parameter_value().bool_value
         self.utm_zone = self.get_parameter("utm_zone").get_parameter_value().integer_value
+        self.publish_tf = self.get_parameter("publish_tf").get_parameter_value().bool_value
         self.datum_lat = self.datum[0]
         self.datum_lon = self.datum[1]
         self.datum_heading = self.datum[2] # angle of datum x axis wrt east
@@ -123,15 +125,16 @@ class OdometryPublisher(Node):
         gps_odom_msg.pose.pose.orientation.x, gps_odom_msg.pose.pose.orientation.y, gps_odom_msg.pose.pose.orientation.z, gps_odom_msg.pose.pose.orientation.w = quaternion_from_euler(0,0,actual_heading)
         self.odom_pub.publish(gps_odom_msg)
 
-        # publish tf
-        tf_msg = TransformStamped()
-        tf_msg.header.stamp = stamp
-        tf_msg.header.frame_id = self.global_frame_id
-        tf_msg.child_frame_id = self.base_link_frame
-        tf_msg.transform.translation.x = dx
-        tf_msg.transform.translation.y = dy
-        tf_msg.transform.rotation.x, tf_msg.transform.rotation.y, tf_msg.transform.rotation.z, tf_msg.transform.rotation.w = quaternion_from_euler(0,0,actual_heading)
-        self.tf_broadcaster.sendTransform(tf_msg)
+        if self.publish_tf:
+            # publish tf
+            tf_msg = TransformStamped()
+            tf_msg.header.stamp = stamp
+            tf_msg.header.frame_id = self.global_frame_id
+            tf_msg.child_frame_id = self.base_link_frame
+            tf_msg.transform.translation.x = dx
+            tf_msg.transform.translation.y = dy
+            tf_msg.transform.rotation.x, tf_msg.transform.rotation.y, tf_msg.transform.rotation.z, tf_msg.transform.rotation.w = quaternion_from_euler(0,0,actual_heading)
+            self.tf_broadcaster.sendTransform(tf_msg)
 
 def main(args=None):
     rclpy.init(args=args)

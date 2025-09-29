@@ -81,6 +81,7 @@ def launch_setup(context, *args, **kwargs):
 
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
+    utm = locations[location]["utm"]
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
@@ -107,7 +108,7 @@ def launch_setup(context, *args, **kwargs):
             {"datum": [lat, lon, 0.0]},
             {"yaw_offset": np.pi/2.0},
             {"odom_yaw_offset": np.pi/2.0},
-            {"utm_zone": 17 if location == "nbpark" else 19}, # 19 for Boston, 17 for Florida
+            {"utm_zone": utm}, # 19 for Boston, 17 for Florida
         ]
     )
 

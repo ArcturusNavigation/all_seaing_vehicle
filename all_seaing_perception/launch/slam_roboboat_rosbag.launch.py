@@ -115,6 +115,7 @@ def launch_setup(context, *args, **kwargs):
             {"odom_yaw_offset": -np.pi/2.0},
             # {"use_odom_pos": True},
             {"utm_zone": 17}, # 19 for Boston, 17 for Florida
+            # {"publish_tf": False},
         ]
     )
     
@@ -236,10 +237,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "actual_base_link"},
             # {"base_link_frame": "base_link"},
-            {"bbox_object_margin": 10.0},
+            {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
@@ -259,7 +262,19 @@ def launch_setup(context, *args, **kwargs):
             ("odometry/filtered", "odometry/gps"),
             ("detections", "obstacle_map/local")
         ],
-        parameters=[slam_params]
+        parameters=[slam_rosbag_params]
+    )
+
+    imu_reframe_node = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="imu_reframe.py",
+        parameters=[
+            {"target_frame_id": "imu_link_accel"}
+        ],
+        remappings=[
+            ("imu_topic", "/mavros/imu/data"),
+            ("new_imu_topic", "/mavros/imu/data/reframed")
+        ]
     )
 
     return [
@@ -273,7 +288,8 @@ def launch_setup(context, *args, **kwargs):
         grid_map_generator,
         # buoy_yolo_node,
         bbox_project_pcloud_node,
-        object_tracking_map_node,
+        # object_tracking_map_node,
+        imu_reframe_node,
     ]
 
 def generate_launch_description():
