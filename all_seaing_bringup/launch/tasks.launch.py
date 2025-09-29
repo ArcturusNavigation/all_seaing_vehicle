@@ -63,6 +63,7 @@ def launch_setup(context, *args, **kwargs):
     location = context.perform_substitution(LaunchConfiguration("location"))
     use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
+    use_waypoint_client = LaunchConfiguration("use_waypoint_client")
 
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
@@ -176,10 +177,21 @@ def launch_setup(context, *args, **kwargs):
         executable="delivery_server.py",
     )
     
+    rviz_waypoint_sender = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="rviz_waypoint_sender.py",
+        parameters=[
+            {"xy_threshold": 3.0},
+            {"theta_threshold": 180.0},
+            {"use_waypoint_client": use_waypoint_client},
+        ],
+    )
+
     return [
         controller_server,
         navigation_server,
         # navigation_server_nomap,
+        rviz_waypoint_sender,
         run_tasks,
         task_init_server, 
         follow_buoy_path,
@@ -194,6 +206,9 @@ def generate_launch_description():
             DeclareLaunchArgument("location", default_value="boathouse"),
             DeclareLaunchArgument(
                 "use_bag", default_value="false", choices=["true", "false"]
+            ),
+            DeclareLaunchArgument(
+                "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),
             OpaqueFunction(function=launch_setup),
         ]

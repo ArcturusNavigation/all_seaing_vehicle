@@ -185,7 +185,7 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
-            {"obstacle_size_min": 2},
+            {"obstacle_size_min": 5},
             {"obstacle_size_max": 1000},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
@@ -223,7 +223,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [0.5, 60.0]},
-            {"leaf_size": 0.25},
+            {"leaf_size": 0.2},
+            {"local_range_z": [-100000.0, 0.0]},
         ],
     )
 
@@ -237,7 +238,7 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
             {"clustering_distance": 0.2},
-            {"obstacle_size_min": 4},
+            {"obstacle_size_min": 2},
             {"range_max": 50.0},
         ],
     )
@@ -253,7 +254,7 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
             {"clustering_distance": 1.0},
-            {"obstacle_size_min": 5},
+            {"obstacle_size_min": 2},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},
@@ -270,7 +271,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"timer_period": 0.5},
+            {"timer_period": 0.4},
             {"grid_dim": [800, 800]},
             {"default_range": 60},
             {"grid_resolution": 0.1},
@@ -279,7 +280,8 @@ def launch_setup(context, *args, **kwargs):
     )
 
     param_substitutions = {
-        'track_robot': LaunchConfiguration('use_slam'),
+        'track_robot': str(context.perform_substitution(LaunchConfiguration('use_slam')).lower() == "true"),
+        'include_odom_only_theta': str(context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false"),
     }
 
     configured_params = RewrittenYaml(
@@ -346,6 +348,7 @@ def generate_launch_description():
             DeclareLaunchArgument('use_sim_time', default_value='true'),
             DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
+            DeclareLaunchArgument("use_gps", default_value='true'),
             OpaqueFunction(function=launch_setup),
         ]
     )

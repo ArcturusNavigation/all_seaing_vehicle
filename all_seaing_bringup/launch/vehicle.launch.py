@@ -63,6 +63,7 @@ def launch_setup(context, *args, **kwargs):
 
     location = context.perform_substitution(LaunchConfiguration("location"))
     use_slam = context.perform_substitution(LaunchConfiguration("use_slam"))
+    use_gps = context.perform_substitution(LaunchConfiguration("use_gps"))
     comms = LaunchConfiguration("comms")
     use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
@@ -310,6 +311,7 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "location": location,
             "use_slam": use_slam,
+            "use_gps": use_gps,
             "use_bag": context.perform_substitution(use_bag),
         }.items(),
     )
@@ -363,6 +365,7 @@ def generate_launch_description():
                 "use_bag", default_value="false", choices=["true", "false"]
             ),
             DeclareLaunchArgument("use_slam", default_value="true", choices=["true", "false"]),
+            DeclareLaunchArgument("use_gps", default_value="true", choices=["true", "false"]),
             OpaqueFunction(function=launch_setup),
         ]
     )

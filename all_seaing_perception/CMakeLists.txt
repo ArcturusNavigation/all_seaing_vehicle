@@ -41,7 +41,7 @@ ament_auto_add_executable(
     ${PROJECT_NAME}/Hungarian.cpp
 )
 
-target_link_libraries(bbox_project_pcloud yaml-cpp ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+target_link_libraries(bbox_project_pcloud yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 target_link_libraries(object_tracking_map yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 
 install(TARGETS

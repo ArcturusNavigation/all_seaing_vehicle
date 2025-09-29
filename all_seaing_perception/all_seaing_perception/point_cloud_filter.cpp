@@ -26,6 +26,9 @@ public:
         this->declare_parameter<std::vector<double>>("range_x", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("range_y", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("range_z", {-100000.0, 100000.0});
+        this->declare_parameter<std::vector<double>>("local_range_x", {-100000.0, 100000.0});
+        this->declare_parameter<std::vector<double>>("local_range_y", {-100000.0, 100000.0});
+        this->declare_parameter<std::vector<double>>("local_range_z", {-100000.0, 100000.0});
         this->declare_parameter<double>("leaf_size", 0.0);
 
         // Initialize tf_listener pointer
@@ -48,6 +51,9 @@ public:
         m_range_x = this->get_parameter("range_x").as_double_array();
         m_range_y = this->get_parameter("range_y").as_double_array();
         m_range_z = this->get_parameter("range_z").as_double_array();
+        m_local_range_x = this->get_parameter("local_range_x").as_double_array();
+        m_local_range_y = this->get_parameter("local_range_y").as_double_array();
+        m_local_range_z = this->get_parameter("local_range_z").as_double_array();
         m_leaf_size = this->get_parameter("leaf_size").as_double();
     }
 
@@ -89,6 +95,9 @@ private:
             //     m_range_y[0] <= point_tf.y && point_tf.y <= m_range_y[1] &&
             //     m_range_z[0] <= point_tf.z && point_tf.z <= m_range_z[1] &&
             if (m_range_radius[0] <= radius && radius <= m_range_radius[1] &&
+                m_local_range_x[0] <= point.x && point.x <= m_local_range_x[1] &&
+                m_local_range_y[0] <= point.y && point.y <= m_local_range_y[1] &&
+                m_local_range_z[0] <= point.z && point.z <= m_local_range_z[1] &&
                 m_range_intensity[0] <= point.intensity &&
                 point.intensity <= m_range_intensity[1] && 
                 pcl::isFinite(point)) {
@@ -140,6 +149,9 @@ private:
     std::vector<double> m_range_x;
     std::vector<double> m_range_y;
     std::vector<double> m_range_z;
+    std::vector<double> m_local_range_x;
+    std::vector<double> m_local_range_y;
+    std::vector<double> m_local_range_z;
     double m_leaf_size;
 };
 
