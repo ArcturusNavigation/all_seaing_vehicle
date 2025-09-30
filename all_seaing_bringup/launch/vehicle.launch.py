@@ -31,7 +31,9 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
-
+    robot_localization_rf2o_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_rf2o.yaml"
+    )
     inc_color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
     )
@@ -301,6 +303,51 @@ def launch_setup(context, *args, **kwargs):
             ]),
         ),
     )
+    
+    pcl_to_scan_node = launch_ros.actions.Node(
+        package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
+        remappings=[('cloud_in', '/point_cloud/filtered'),
+                    ('scan', '/pcl_scan')],
+        parameters=[{
+            'target_frame': 'base_link',
+            'transform_tolerance': 0.01,
+            'min_height': -1.0,
+            'max_height': 1.0,
+            'angle_min': -np.pi,
+            'angle_max': np.pi,
+            'angle_increment': np.pi/360.0,
+            'scan_time': 1/30.0,
+            'range_min': 3.0,
+            'range_max': 60.0,
+            'use_inf': True,
+            'inf_epsilon': 1.0
+        }],
+        name='pointcloud_to_laserscan'
+    )
+
+    rf2o_node = launch_ros.actions.Node(
+        package='rf2o_laser_odometry',
+        executable='rf2o_laser_odometry_node',
+        name='rf2o_laser_odometry',
+        output='screen',
+        parameters=[{
+            'laser_scan_topic' : '/pcl_scan',
+            'odom_topic' : '/odom_rf2o',
+            'publish_tf' : True,
+            'base_frame_id' : 'base_link',
+            'odom_frame_id' : 'odom_rf2o',
+            'init_pose_from_topic' : '',
+            'freq' : 20.0}],
+    )
+    
+    ekf_node_rf2o = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_rf2o_params],
+        remappings=[
+            ("odometry/filtered", "odometry/gps"),
+        ]
+    )
 
     perception_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -350,6 +397,9 @@ def launch_setup(context, *args, **kwargs):
         mavros_ld,
         zed_ld,
         oak_ld,
+        pcl_to_scan_node,
+        rf2o_node,
+        ekf_node_rf2o,
         # perception_ld,
         # tasks_ld,
     ]
