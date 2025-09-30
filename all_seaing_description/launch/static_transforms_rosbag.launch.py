@@ -75,18 +75,18 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    rotate_imu = Node(
+    rotate_imu_accel = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         arguments=[
             "--qx",
-            "0.0",
+            "0.7071068",
             "--qy",
-            "0.0",
+            "0.7071068",
             "--qz",
-            "0.7071068",
+            "0.0",
             "--qw",
-            "0.7071068",
+            "0.0",
             "--frame-id",
             "actual_base_link",
             "--child-frame-id",
@@ -99,7 +99,7 @@ def launch_setup(context, *args, **kwargs):
         # lidar_to_camera,
         zed_to_base,
         rotate_base_link,
-        rotate_imu,
+        rotate_imu_accel,
     ]
 
 

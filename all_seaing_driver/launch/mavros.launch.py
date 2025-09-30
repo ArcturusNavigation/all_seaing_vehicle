@@ -53,5 +53,18 @@ def generate_launch_description():
                     ("new_odom_topic", "/mavros/local_position/odom/reframed")
                 ]
             ),
+            launch_ros.actions.Node(
+                package="all_seaing_driver",
+                executable="imu_reframe.py",
+                parameters=[
+                    {"target_frame_id": "imu_link_accel"},
+                    {"zero_g": True},
+                    {"flip_gyro": True},
+                ],
+                remappings=[
+                    ("imu_topic", "/mavros/imu/data"),
+                    ("new_imu_topic", "/mavros/imu/data/reframed")
+                ]
+            ),
         ]
     )

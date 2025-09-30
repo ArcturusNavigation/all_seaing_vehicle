@@ -11,11 +11,21 @@ class ImuReframe(Node):
         self.declare_parameter("target_frame_id", "base_link")
         self.target_frame_id = self.get_parameter("target_frame_id").get_parameter_value().string_value
 
+        self.declare_parameter("zero_g", True)
+        self.zero_g = self.get_parameter("zero_g").get_parameter_value().bool_value
+
+        self.declare_parameter("flip_gyro", True)
+        self.flip_gyro = self.get_parameter("flip_gyro").get_parameter_value().bool_value
+
         self.imu_sub = self.create_subscription(Imu, "imu_topic", self.imu_cb, qos_profile_sensor_data)
         self.imu_pub = self.create_publisher(Imu, "new_imu_topic", qos_profile_sensor_data)
 
     def imu_cb(self, imu_msg):
         imu_msg.header.frame_id = self.target_frame_id
+        imu_msg.linear_acceleration.z = 0.0
+        imu_msg.angular_velocity.x = imu_msg.angular_velocity.y = 0.0
+        if self.flip_gyro:
+            imu_msg.angular_velocity.z = -imu_msg.angular_velocity.z # gyroscope might be upside down compared to the accelerometer
         self.imu_pub.publish(imu_msg)
 
 def main(args=None):

@@ -235,7 +235,7 @@ def launch_setup(context, *args, **kwargs):
             {"new_tf_topic": "/tf"},
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
-            # {"child_frames_to_remove": ["slam_map"]},
+            {"child_frames_to_remove": ["imu_link_accel"]},
             {"parent_frames_to_remove": ["map"]},
         ]
     )
@@ -353,6 +353,37 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    rotate_imu_accel = launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--qx",
+            "1.0",
+            "--qy",
+            "0.0",
+            "--qz",
+            "0.0",
+            "--qw",
+            "0.0",
+            "--frame-id",
+            "imu_link_odom",
+            "--child-frame-id",
+            "imu_link_accel",
+        ],
+    )
+    
+    imu_reframe_node = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="imu_reframe.py",
+        parameters=[
+            {"target_frame_id": "imu_link_accel"}
+        ],
+        remappings=[
+            ("imu_topic", "/mavros/imu/data"),
+            ("new_imu_topic", "/mavros/imu/data/reframed")
+        ]
+    )
+
     return [
         set_use_sim_time,
         # ekf_node,
@@ -373,6 +404,8 @@ def launch_setup(context, *args, **kwargs):
         point_cloud_filter_downsampled_node,
         # obstacle_detector_raw_node,
         # grid_map_generator,
+        rotate_imu_accel,
+        imu_reframe_node,
     ]
 
 def generate_launch_description():
