@@ -57,6 +57,15 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
+
+    robot_localization_rf2o_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_rf2o.yaml"
+    )
+
+    imu_filter_params = os.path.join(
+        driver_prefix, "config", "imu_filter.yaml"
+    )
+
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
@@ -133,6 +142,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
@@ -158,6 +169,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
@@ -183,6 +196,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
@@ -229,8 +244,9 @@ def launch_setup(context, *args, **kwargs):
             {"new_tf_topic": "/tf"},
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
-            # {"child_frames_to_remove": ["slam_map"]},
+            # {"child_frames_to_remove": ["imu_link_accel"]},
             {"parent_frames_to_remove": ["map"]},
+            # {"parent_frames_to_remove": ["map", "odom"]},
         ]
     )
 
@@ -267,6 +283,18 @@ def launch_setup(context, *args, **kwargs):
                 "/launch/static_transforms.launch.py",
             ]
         ),
+    )
+
+    point_cloud_filter_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/point_cloud/filtered_fake"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"range_radius": [0.5, 60.0]},
+        ]
     )
 
     point_cloud_filter_downsampled_node = launch_ros.actions.Node(
@@ -335,6 +363,97 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    rotate_imu_accel = launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--qx",
+            "1.0",
+            "--qy",
+            "0.0",
+            "--qz",
+            "0.0",
+            "--qw",
+            "0.0",
+            "--frame-id",
+            "imu_link_odom",
+            "--child-frame-id",
+            "imu_link_accel",
+        ],
+    )
+
+    imu_filter_node = launch_ros.actions.Node(
+        package='imu_filter_madgwick',
+        executable='imu_filter_madgwick_node',
+        name='imu_filter',
+        output='screen',
+        parameters=[imu_filter_params],
+        remappings=[
+            ("imu/data_raw", "/mavros/imu/data"),
+            ("imu/mag", "/mavros/imu/mag"),
+            ("imu/data", "/mavros/imu/data/filtered"),
+        ]
+    )
+
+    imu_reframe_node = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="imu_reframe.py",
+        parameters=[
+            {"target_frame_id": "imu_link_accel"},
+            {"zero_g": True},
+            {"flip_gyro": True},
+        ],
+        remappings=[
+            ("imu_topic", "/mavros/imu/data/filtered"),
+            ("new_imu_topic", "/mavros/imu/data/reframed")
+        ]
+    )
+
+    pcl_to_scan_node = launch_ros.actions.Node(
+        package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
+        remappings=[('cloud_in', '/point_cloud/filtered'),
+                    ('scan', '/pcl_scan')],
+        parameters=[{
+            'target_frame': 'base_link',
+            'transform_tolerance': 0.01,
+            'min_height': -1.0,
+            'max_height': 1.0,
+            'angle_min': -np.pi,
+            'angle_max': np.pi,
+            'angle_increment': np.pi/360.0,
+            'scan_time': 1/30.0,
+            'range_min': 3.0,
+            'range_max': 60.0,
+            'use_inf': True,
+            'inf_epsilon': 1.0
+        }],
+        name='pointcloud_to_laserscan'
+    )
+
+    rf2o_node = launch_ros.actions.Node(
+        package='rf2o_laser_odometry',
+        executable='rf2o_laser_odometry_node',
+        name='rf2o_laser_odometry',
+        output='screen',
+        parameters=[{
+            'laser_scan_topic' : '/pcl_scan',
+            'odom_topic' : '/odom_rf2o',
+            'publish_tf' : True,
+            'base_frame_id' : 'base_link',
+            'odom_frame_id' : 'odom_rf2o',
+            'init_pose_from_topic' : '',
+            'freq' : 30.0}],
+    )
+    
+    ekf_node_rf2o = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_rf2o_params],
+        remappings=[
+            ("odometry/filtered", "odometry/gps"),
+        ]
+    )
+
     return [
         set_use_sim_time,
         # ekf_node,
@@ -351,9 +470,16 @@ def launch_setup(context, *args, **kwargs):
         # odometry_publisher_node,
         # robot_state_publisher,
         # static_transforms_ld,
+        point_cloud_filter_node,
         point_cloud_filter_downsampled_node,
         # obstacle_detector_raw_node,
         # grid_map_generator,
+        # rotate_imu_accel,
+        # imu_reframe_node,
+        # imu_filter_node,
+        # pcl_to_scan_node,
+        # rf2o_node,
+        # ekf_node_rf2o,
     ]
 
 def generate_launch_description():

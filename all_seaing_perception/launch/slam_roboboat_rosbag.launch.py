@@ -52,6 +52,9 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
+    robot_localization_rf2o_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_rf2o.yaml"
+    )
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
@@ -60,6 +63,9 @@ def launch_setup(context, *args, **kwargs):
     )
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
+    )
+    imu_filter_params = os.path.join(
+        driver_prefix, "config", "imu_filter.yaml"
     )
 
     set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
@@ -115,6 +121,7 @@ def launch_setup(context, *args, **kwargs):
             {"odom_yaw_offset": -np.pi/2.0},
             # {"use_odom_pos": True},
             {"utm_zone": 17}, # 19 for Boston, 17 for Florida
+            # {"publish_tf": False},
         ]
     )
     
@@ -236,10 +243,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "actual_base_link"},
             # {"base_link_frame": "base_link"},
-            {"bbox_object_margin": 10.0},
+            {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
@@ -259,7 +268,79 @@ def launch_setup(context, *args, **kwargs):
             ("odometry/filtered", "odometry/gps"),
             ("detections", "obstacle_map/local")
         ],
-        parameters=[slam_params]
+        parameters=[slam_rosbag_params]
+    )
+
+    imu_filter_node = launch_ros.actions.Node(
+        package='imu_filter_madgwick',
+        executable='imu_filter_madgwick_node',
+        name='imu_filter',
+        output='screen',
+        parameters=[imu_filter_params],
+        remappings=[
+            ("imu/data_raw", "/mavros/imu/data"),
+            ("imu/mag", "/mavros/imu/mag"),
+            ("imu/data", "/mavros/imu/data/filtered"),
+        ]
+    )
+
+    imu_reframe_node = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="imu_reframe.py",
+        parameters=[
+            {"target_frame_id": "imu_link_accel"},
+            {"zero_g": True},
+            {"flip_gyro": True},
+        ],
+        remappings=[
+            ("imu_topic", "/mavros/imu/data/filtered"),
+            ("new_imu_topic", "/mavros/imu/data/reframed")
+        ]
+    )
+
+    pcl_to_scan_node = launch_ros.actions.Node(
+        package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
+        remappings=[('cloud_in', '/point_cloud/filtered'),
+                    ('scan', '/pcl_scan')],
+        parameters=[{
+            'target_frame': 'actual_base_link',
+            'transform_tolerance': 0.01,
+            'min_height': -1.0,
+            'max_height': 1.0,
+            'angle_min': -np.pi,
+            'angle_max': np.pi,
+            'angle_increment': np.pi/360.0,
+            'scan_time': 1/30.0,
+            'range_min': 3.0,
+            'range_max': 60.0,
+            'use_inf': True,
+            'inf_epsilon': 1.0
+        }],
+        name='pointcloud_to_laserscan'
+    )
+
+    rf2o_node = launch_ros.actions.Node(
+        package='rf2o_laser_odometry',
+        executable='rf2o_laser_odometry_node',
+        name='rf2o_laser_odometry',
+        output='screen',
+        parameters=[{
+            'laser_scan_topic' : '/pcl_scan',
+            'odom_topic' : '/odom_rf2o',
+            'publish_tf' : True,
+            'base_frame_id' : 'actual_base_link',
+            'odom_frame_id' : 'odom_rf2o',
+            'init_pose_from_topic' : '',
+            'freq' : 20.0}],
+    )
+    
+    ekf_node_rf2o = launch_ros.actions.Node(
+        package="robot_localization",
+        executable="ekf_node",
+        parameters=[robot_localization_rf2o_params],
+        remappings=[
+            ("odometry/filtered", "odometry/gps"),
+        ]
     )
 
     return [
@@ -270,10 +351,14 @@ def launch_setup(context, *args, **kwargs):
         point_cloud_filter_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
-        grid_map_generator,
+        # grid_map_generator,
         # buoy_yolo_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
+        # imu_reframe_node,
+        # pcl_to_scan_node,
+        # rf2o_node,
+        # ekf_node_rf2o,
     ]
 
 def generate_launch_description():

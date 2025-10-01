@@ -61,7 +61,6 @@ def launch_setup(context, *args, **kwargs):
         locations = yaml.safe_load(f)
 
     location = context.perform_substitution(LaunchConfiguration("location"))
-    use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
     use_waypoint_client = LaunchConfiguration("use_waypoint_client")
 
@@ -204,9 +203,6 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("location", default_value="boathouse"),
-            DeclareLaunchArgument(
-                "use_bag", default_value="false", choices=["true", "false"]
-            ),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),

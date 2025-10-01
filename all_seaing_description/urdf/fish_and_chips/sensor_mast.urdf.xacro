@@ -21,16 +21,16 @@
         <child link="gps_link"/>
     </joint>
 
-    <joint name="base_to_imu_accel" type="fixed">
-        <origin xyz="0.0 0.0 0.0" rpy="0 0 ${pi/2}"/>
-        <parent link="base_link"/>
-        <child link="imu_link_accel"/>
-    </joint>
-
     <joint name="base_to_imu_odom" type="fixed">
         <origin xyz="0.0 0.0 0.0" rpy="0 0 -${pi/2}"/>
         <parent link="base_link"/>
         <child link="imu_link_odom"/>
+    </joint>
+
+    <joint name="imu_odom_to_imu_accel" type="fixed">
+        <origin xyz="0.0 0.0 0.0" rpy="${pi} 0 0"/>
+        <parent link="imu_link_odom"/>
+        <child link="imu_link_accel"/>
     </joint>
 
     <joint name="velodyne_to_zed" type="fixed">

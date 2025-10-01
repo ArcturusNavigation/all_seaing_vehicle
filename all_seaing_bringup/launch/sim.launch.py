@@ -258,6 +258,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_ranges_file": color_ranges},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 2000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},

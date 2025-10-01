@@ -2,39 +2,46 @@ seagrant:
   indoors: false
   lat: 42.3599
   lon: -71.1044
+  utm: 19
 
 pavillion:
   indoors: false
   lat: 42.358541
   lon: -71.087389
+  utm: 19
 
 boathouse:
   indoors: false
   lat: 42.355
   lon: -71.0975
+  utm: 19
 
 conference:
   indoors: true
   lat: 0.0
   lon: 0.0
+  utm: 19
 
 nbpark:
   indoors: false
   lat: 27.3729
   lon: -82.4537
+  utm: 17
 
 sydney:
   indoors: false
   lat: -33.7228
   lon: 150.67365
+  utm: 56
 
 z_center:
   indoors: true
   lat: 0.0
   lon: 0.0
+  utm: 19
 
 tank:
   indoors: true
   lat: 0.0
   lon: 0.0
-
+  utm: 19

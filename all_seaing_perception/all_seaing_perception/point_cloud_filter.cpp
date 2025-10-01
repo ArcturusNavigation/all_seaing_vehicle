@@ -41,8 +41,10 @@ public:
             std::bind(&PointCloudFilter::pc_callback, this, std::placeholders::_1));
 
         // Advertise the filtered point cloud topic
+        // m_cloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        //     "point_cloud/filtered", rclcpp::SensorDataQoS());
         m_cloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-            "point_cloud/filtered", rclcpp::SensorDataQoS());
+            "point_cloud/filtered", rclcpp::SensorDataQoS().reliable());
 
         // Get values from parameter server
         m_global_frame_id = this->get_parameter("global_frame_id").as_string();

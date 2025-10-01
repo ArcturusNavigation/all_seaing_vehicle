@@ -137,6 +137,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
@@ -162,6 +164,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
@@ -187,6 +191,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"obstacle_size_min": 5},
             {"obstacle_size_max": 1000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
             {"clustering_distance": 0.1},
             {"matching_weights_file": matching_weights},
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
@@ -281,7 +287,8 @@ def launch_setup(context, *args, **kwargs):
 
     param_substitutions = {
         'track_robot': str(context.perform_substitution(LaunchConfiguration('use_slam')).lower() == "true"),
-        'include_odom_only_theta': str(context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false"),
+        'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false") or 
+                                       (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")),
     }
 
     configured_params = RewrittenYaml(
@@ -349,6 +356,7 @@ def generate_launch_description():
             DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
             DeclareLaunchArgument("use_gps", default_value='true'),
+            DeclareLaunchArgument("use_lio", default_value='false'),
             OpaqueFunction(function=launch_setup),
         ]
     )
