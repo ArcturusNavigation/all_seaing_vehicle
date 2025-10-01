@@ -5,6 +5,7 @@ from message_filters import Subscriber, TimeSynchronizer
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import Imu
 from tf2_ros import TransformException
 from tf2_ros import TransformBroadcaster
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
@@ -24,6 +25,7 @@ class OdometryPublisher(Node):
         self.declare_parameter("odom_yaw_offset", np.pi/2.0)
         self.declare_parameter("odom_hz", 30.0)
         self.declare_parameter("use_odom_pos", False)
+        self.declare_parameter("use_odom_yaw", False)
         self.declare_parameter("utm_zone", 19)
         self.declare_parameter("publish_tf", True)
 
@@ -35,6 +37,7 @@ class OdometryPublisher(Node):
         self.yaw_offset = self.get_parameter("yaw_offset").get_parameter_value().double_value
         self.odom_yaw_offset = self.get_parameter("odom_yaw_offset").get_parameter_value().double_value
         self.use_odom_pos = self.get_parameter("use_odom_pos").get_parameter_value().bool_value
+        self.use_odom_yaw = self.get_parameter("use_odom_yaw").get_parameter_value().bool_value
         self.utm_zone = self.get_parameter("utm_zone").get_parameter_value().integer_value
         self.publish_tf = self.get_parameter("publish_tf").get_parameter_value().bool_value
         self.datum_lat = self.datum[0]
@@ -53,6 +56,12 @@ class OdometryPublisher(Node):
             self.pos_odom_callback,
             rclpy.qos.qos_profile_sensor_data,
         )
+        self.yaw_odom_sub = self.create_subscription(
+            Odometry,
+            "yaw_odom_topic",
+            self.yaw_odom_callback,
+            rclpy.qos.qos_profile_sensor_data,
+        )
         self.odom_sub = self.create_subscription(
             Odometry,
             "odom_topic",
@@ -63,6 +72,7 @@ class OdometryPublisher(Node):
         self.got_gps = False
         self.got_pos_odom = False
         self.got_odom = False
+        self.got_yaw_odom = False
 
         self.odom_timer = self.create_timer(1.0/self.odom_hz, self.filter_cb)
         
@@ -76,19 +86,26 @@ class OdometryPublisher(Node):
     def pos_odom_callback(self, pos_odom_msg):
         self.got_pos_odom = True
         self.pos_odom_msg = pos_odom_msg
+
+    def yaw_odom_callback(self, yaw_odom_msg):
+        self.got_yaw_odom = True
+        self.yaw_odom_msg = yaw_odom_msg
     
     def odom_callback(self, odom_msg):
         self.got_odom = True
         self.odom_msg = odom_msg
     def filter_cb(self):
-        if (not self.got_odom) or (not self.use_odom_pos and not self.got_gps) or (self.use_odom_pos and not self.got_pos_odom):
+        if (not self.got_odom) or (not self.use_odom_pos and not self.got_gps) or (self.use_odom_pos and not self.got_pos_odom) or (self.use_odom_yaw and not self.got_pos_odom):
             return
         # get filtered values -> in imu_link -> rotated 90 degrees left wrt base_link
         stamp = self.odom_msg.header.stamp
         frame_id = self.odom_msg.header.frame_id
         if not self.use_odom_pos:
             lat, lon = self.gps_msg.latitude, self.gps_msg.longitude
-        roll,pitch,yaw = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
+        if not self.use_odom_yaw:
+            roll,pitch,yaw = euler_from_quaternion([self.odom_msg.pose.pose.orientation.x, self.odom_msg.pose.pose.orientation.y, self.odom_msg.pose.pose.orientation.z, self.odom_msg.pose.pose.orientation.w])
+        else:
+            roll,pitch,yaw = euler_from_quaternion([self.yaw_odom_msg.pose.pose.orientation.x, self.yaw_odom_msg.pose.pose.orientation.y, self.yaw_odom_msg.pose.pose.orientation.z, self.yaw_odom_msg.pose.pose.orientation.w])
         # self.get_logger().info(f'RPY: {roll, pitch, yaw}')
         imu_heading = yaw
         actual_heading = imu_heading + self.yaw_offset - self.datum_heading

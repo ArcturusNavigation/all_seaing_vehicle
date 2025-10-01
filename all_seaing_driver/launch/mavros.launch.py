@@ -11,6 +11,9 @@ def generate_launch_description():
     mavros_params = os.path.join(
         driver_prefix, "config", "mavros.yaml"
     )
+    imu_filter_params = os.path.join(
+        driver_prefix, "config", "imu_filter.yaml"
+    )
 
     return LaunchDescription(
         [
@@ -54,6 +57,18 @@ def generate_launch_description():
                 ]
             ),
             launch_ros.actions.Node(
+                package='imu_filter_madgwick',
+                executable='imu_filter_madgwick_node',
+                name='imu_filter',
+                output='screen',
+                parameters=[imu_filter_params],
+                remappings=[
+                    ("imu/data_raw", "/mavros/imu/data"),
+                    ("imu/mag", "/mavros/imu/mag"),
+                    ("imu/data", "/mavros/imu/data/filtered"),
+                ]
+            ),
+            launch_ros.actions.Node(
                 package="all_seaing_driver",
                 executable="imu_reframe.py",
                 parameters=[
@@ -62,7 +77,7 @@ def generate_launch_description():
                     {"flip_gyro": True},
                 ],
                 remappings=[
-                    ("imu_topic", "/mavros/imu/data"),
+                    ("imu_topic", "/mavros/imu/data/filtered"),
                     ("new_imu_topic", "/mavros/imu/data/reframed")
                 ]
             ),

@@ -66,37 +66,37 @@ def launch_setup(context, *args, **kwargs):
     location = context.perform_substitution(LaunchConfiguration("location"))
     use_slam = context.perform_substitution(LaunchConfiguration("use_slam"))
     use_gps = context.perform_substitution(LaunchConfiguration("use_gps"))
+    use_lio = LaunchConfiguration("use_lio")
     comms = LaunchConfiguration("comms")
-    use_bag = LaunchConfiguration("use_bag")
     is_indoors = str(locations[location]["indoors"]).lower()
 
-    ekf_node = launch_ros.actions.Node(
-        package="robot_localization",
-        executable="ekf_node",
-        parameters=[robot_localization_params],
-        condition=IfCondition(
-            PythonExpression([
-                "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'"
-            ]),
-        ),
-    )
+    # ekf_node = launch_ros.actions.Node(
+    #     package="robot_localization",
+    #     executable="ekf_node",
+    #     parameters=[robot_localization_params],
+    #     condition=IfCondition(
+    #         PythonExpression([
+    #             "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'"
+    #         ]),
+    #     ),
+    # )
 
     lat = locations[location]["lat"]
     lon = locations[location]["lon"]
     utm = locations[location]["utm"]
-    navsat_node = launch_ros.actions.Node(
-        package="robot_localization",
-        executable="navsat_transform_node",
-        parameters=[
-            robot_localization_params,
-            {"datum": [lat, lon, 0.0]},
-        ],
-        condition=IfCondition(
-            PythonExpression([
-                "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'",
-            ]),
-        ),
-    )
+    # navsat_node = launch_ros.actions.Node(
+    #     package="robot_localization",
+    #     executable="navsat_transform_node",
+    #     parameters=[
+    #         robot_localization_params,
+    #         {"datum": [lat, lon, 0.0]},
+    #     ],
+    #     condition=IfCondition(
+    #         PythonExpression([
+    #             "'", is_indoors, "' == 'false' and '", use_bag, "' == 'false'",
+    #         ]),
+    #     ),
+    # )
 
     odometry_publisher_node = launch_ros.actions.Node(
         package = "all_seaing_driver",
@@ -111,7 +111,11 @@ def launch_setup(context, *args, **kwargs):
             {"yaw_offset": np.pi/2.0},
             {"odom_yaw_offset": np.pi/2.0},
             {"utm_zone": utm}, # 19 for Boston, 17 for Florida
-        ]
+        ],condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'false' and '", use_lio, "' == 'false'"
+            ]),
+        ),
     )
 
     controller_node = launch_ros.actions.Node(
@@ -143,7 +147,6 @@ def launch_setup(context, *args, **kwargs):
                 "back_right_port":4,
             }
         ],
-        condition=UnlessCondition(use_bag),
     )
 
     control_mux = launch_ros.actions.Node(
@@ -162,7 +165,6 @@ def launch_setup(context, *args, **kwargs):
             {"range_radius": [0.5, 60.0]},
             {"leaf_size": 0.0},
         ],
-        condition=UnlessCondition(use_bag),
     )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
@@ -172,7 +174,6 @@ def launch_setup(context, *args, **kwargs):
             {"xy_threshold": 2.0},
             {"theta_threshold": 180.0},
         ],
-        condition=UnlessCondition(use_bag),
         output="screen",
     )
 
@@ -181,7 +182,7 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_lora_controller.py",
         condition=IfCondition(
             PythonExpression([
-                "'", comms, "' == 'lora' and '", use_bag, "' == 'false'",
+                "'", comms, "' == 'lora'"
             ]),
         ),
         output="screen",
@@ -196,7 +197,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         condition=IfCondition(
             PythonExpression([
-                "'", comms, "' == 'custom' and '", use_bag, "' == 'false'",
+                "'", comms, "' == 'custom'"
             ]),
         ),
     )
@@ -225,7 +226,6 @@ def launch_setup(context, *args, **kwargs):
                 "/launch/32e_points.launch.py",
             ]
         ),
-        condition=UnlessCondition(use_bag),
     )
 
     mavros_ld = IncludeLaunchDescription(
@@ -238,7 +238,6 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "port": "/dev/ttyACM1"
         }.items(),
-        condition=UnlessCondition(use_bag),
     )
 
     zed_ld = IncludeLaunchDescription(
@@ -248,7 +247,6 @@ def launch_setup(context, *args, **kwargs):
                 "/launch/zed2i.launch.py",
             ]
         ),
-        condition=UnlessCondition(use_bag),
     )
 
     oak_ld = GroupAction(
@@ -266,18 +264,17 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
-    static_transforms_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                description_prefix,
-                "/launch/static_transforms.launch.py",
-            ]
-        ),
-        launch_arguments={
-            "indoors": is_indoors,
-        }.items(),
-        condition=UnlessCondition(use_bag),
-    )
+    # static_transforms_ld = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource(
+    #         [
+    #             description_prefix,
+    #             "/launch/static_transforms.launch.py",
+    #         ]
+    #     ),
+    #     launch_arguments={
+    #         "indoors": is_indoors,
+    #     }.items(),
+    # )
 
     robot_urdf = xacro.process_file(robot_urdf_file).toxml()
     robot_state_publisher = launch_ros.actions.Node(
@@ -287,22 +284,22 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{'robot_description': robot_urdf}]
     )
 
-    amcl_ld = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [
-                bringup_prefix,
-                "/launch/amcl.launch.py"
-            ]
-        ),
-        launch_arguments={
-            "location": location,
-        }.items(),
-        condition=IfCondition(
-            PythonExpression([
-                "'", is_indoors, "' == 'true' and '", use_bag, "' == 'false'",
-            ]),
-        ),
-    )
+    # amcl_ld = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource(
+    #         [
+    #             bringup_prefix,
+    #             "/launch/amcl.launch.py"
+    #         ]
+    #     ),
+    #     launch_arguments={
+    #         "location": location,
+    #     }.items(),
+    #     condition=IfCondition(
+    #         PythonExpression([
+    #             "'", is_indoors, "' == 'true'"
+    #         ]),
+    #     ),
+    # )
     
     pcl_to_scan_node = launch_ros.actions.Node(
         package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
@@ -322,7 +319,11 @@ def launch_setup(context, *args, **kwargs):
             'use_inf': True,
             'inf_epsilon': 1.0
         }],
-        name='pointcloud_to_laserscan'
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'true' or '", use_lio, "' == 'true'"
+            ]),
+        ),
     )
 
     rf2o_node = launch_ros.actions.Node(
@@ -338,6 +339,11 @@ def launch_setup(context, *args, **kwargs):
             'odom_frame_id' : 'odom_rf2o',
             'init_pose_from_topic' : '',
             'freq' : 20.0}],
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'true' or '", use_lio, "' == 'true'"
+            ]),
+        ),
     )
     
     ekf_node_rf2o = launch_ros.actions.Node(
@@ -346,7 +352,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[robot_localization_rf2o_params],
         remappings=[
             ("odometry/filtered", "odometry/gps"),
-        ]
+        ],
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'true' or '", use_lio, "' == 'true'"
+            ]),
+        ),
     )
 
     perception_ld = IncludeLaunchDescription(
@@ -360,7 +371,7 @@ def launch_setup(context, *args, **kwargs):
             "location": location,
             "use_slam": use_slam,
             "use_gps": use_gps,
-            "use_bag": context.perform_substitution(use_bag),
+            "use_lio": context.perform_substitution(use_lio),
         }.items(),
     )
     
@@ -373,7 +384,6 @@ def launch_setup(context, *args, **kwargs):
         ),
         launch_arguments={
             "location": location,
-            "use_bag": context.perform_substitution(use_bag),
         }.items(),
     )
 
@@ -412,11 +422,9 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "comms", default_value="custom", choices=["wifi", "lora", "custom"]
             ),
-            DeclareLaunchArgument(
-                "use_bag", default_value="false", choices=["true", "false"]
-            ),
             DeclareLaunchArgument("use_slam", default_value="true", choices=["true", "false"]),
             DeclareLaunchArgument("use_gps", default_value="true", choices=["true", "false"]),
+            DeclareLaunchArgument("use_lio", default_value="false", choices=["true", "false"]),
             OpaqueFunction(function=launch_setup),
         ]
     )

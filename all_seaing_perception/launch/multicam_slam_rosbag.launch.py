@@ -62,6 +62,10 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "localization", "localize_rf2o.yaml"
     )
 
+    imu_filter_params = os.path.join(
+        driver_prefix, "config", "imu_filter.yaml"
+    )
+
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
@@ -240,9 +244,9 @@ def launch_setup(context, *args, **kwargs):
             {"new_tf_topic": "/tf"},
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
-            {"child_frames_to_remove": ["imu_link_accel"]},
-            # {"parent_frames_to_remove": ["map"]},
-            {"parent_frames_to_remove": ["map", "odom"]},
+            # {"child_frames_to_remove": ["imu_link_accel"]},
+            {"parent_frames_to_remove": ["map"]},
+            # {"parent_frames_to_remove": ["map", "odom"]},
         ]
     )
 
@@ -377,7 +381,20 @@ def launch_setup(context, *args, **kwargs):
             "imu_link_accel",
         ],
     )
-    
+
+    imu_filter_node = launch_ros.actions.Node(
+        package='imu_filter_madgwick',
+        executable='imu_filter_madgwick_node',
+        name='imu_filter',
+        output='screen',
+        parameters=[imu_filter_params],
+        remappings=[
+            ("imu/data_raw", "/mavros/imu/data"),
+            ("imu/mag", "/mavros/imu/mag"),
+            ("imu/data", "/mavros/imu/data/filtered"),
+        ]
+    )
+
     imu_reframe_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="imu_reframe.py",
@@ -387,7 +404,7 @@ def launch_setup(context, *args, **kwargs):
             {"flip_gyro": True},
         ],
         remappings=[
-            ("imu_topic", "/mavros/imu/data"),
+            ("imu_topic", "/mavros/imu/data/filtered"),
             ("new_imu_topic", "/mavros/imu/data/reframed")
         ]
     )
@@ -457,11 +474,12 @@ def launch_setup(context, *args, **kwargs):
         point_cloud_filter_downsampled_node,
         # obstacle_detector_raw_node,
         # grid_map_generator,
-        rotate_imu_accel,
-        imu_reframe_node,
-        pcl_to_scan_node,
-        rf2o_node,
-        ekf_node_rf2o,
+        # rotate_imu_accel,
+        # imu_reframe_node,
+        # imu_filter_node,
+        # pcl_to_scan_node,
+        # rf2o_node,
+        # ekf_node_rf2o,
     ]
 
 def generate_launch_description():

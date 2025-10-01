@@ -64,6 +64,9 @@ def launch_setup(context, *args, **kwargs):
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
     )
+    imu_filter_params = os.path.join(
+        driver_prefix, "config", "imu_filter.yaml"
+    )
 
     set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
@@ -268,6 +271,19 @@ def launch_setup(context, *args, **kwargs):
         parameters=[slam_rosbag_params]
     )
 
+    imu_filter_node = launch_ros.actions.Node(
+        package='imu_filter_madgwick',
+        executable='imu_filter_madgwick_node',
+        name='imu_filter',
+        output='screen',
+        parameters=[imu_filter_params],
+        remappings=[
+            ("imu/data_raw", "/mavros/imu/data"),
+            ("imu/mag", "/mavros/imu/mag"),
+            ("imu/data", "/mavros/imu/data/filtered"),
+        ]
+    )
+
     imu_reframe_node = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="imu_reframe.py",
@@ -277,7 +293,7 @@ def launch_setup(context, *args, **kwargs):
             {"flip_gyro": True},
         ],
         remappings=[
-            ("imu_topic", "/mavros/imu/data"),
+            ("imu_topic", "/mavros/imu/data/filtered"),
             ("new_imu_topic", "/mavros/imu/data/reframed")
         ]
     )
@@ -339,10 +355,10 @@ def launch_setup(context, *args, **kwargs):
         # buoy_yolo_node,
         bbox_project_pcloud_node,
         # object_tracking_map_node,
-        imu_reframe_node,
-        pcl_to_scan_node,
-        rf2o_node,
-        ekf_node_rf2o,
+        # imu_reframe_node,
+        # pcl_to_scan_node,
+        # rf2o_node,
+        # ekf_node_rf2o,
     ]
 
 def generate_launch_description():
