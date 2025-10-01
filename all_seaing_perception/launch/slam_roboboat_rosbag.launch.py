@@ -345,7 +345,7 @@ def launch_setup(context, *args, **kwargs):
 
     return [
         # set_use_sim_time,
-        # odometry_publisher_node,
+        odometry_publisher_node,
         static_transforms_ld,
         tf_filtering,
         point_cloud_filter_node,
@@ -354,7 +354,7 @@ def launch_setup(context, *args, **kwargs):
         # grid_map_generator,
         # buoy_yolo_node,
         bbox_project_pcloud_node,
-        # object_tracking_map_node,
+        object_tracking_map_node,
         # imu_reframe_node,
         # pcl_to_scan_node,
         # rf2o_node,
