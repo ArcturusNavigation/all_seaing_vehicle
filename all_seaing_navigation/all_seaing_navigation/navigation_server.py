@@ -135,8 +135,7 @@ class NavigationServer(ActionServerBase):
 
         # Generate path using requested planner
         path = self.generate_path(goal_handle, nav_x, nav_y)
-        if True:
-        # if not path.poses:
+        if not path.poses:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
             return FollowPath.Result()
