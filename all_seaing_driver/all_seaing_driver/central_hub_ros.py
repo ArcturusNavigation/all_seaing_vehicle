@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-
-
-
-"""
-in estpostatus srv, include something about low battery
-check this in rover custom controller line 67
-"""
-
 import rclpy
 from rclpy.node import Node
 from all_seaing_driver.ArcturusEE import BMS, main_power, ESTOP, mech_power
@@ -62,7 +54,7 @@ class CentralHubROS(Node):
             self.ack_low_battery_cb
         )
 
-        self.create_timer(5.0, self.low_battery_check)
+        self.create_timer(5.0, self.battery_check)
         self.battery_ack = False # true if user acknowledges that the battery is low
 
     def ack_low_battery_cb(self, request, response):
