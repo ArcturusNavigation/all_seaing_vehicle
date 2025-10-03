@@ -12,6 +12,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
+from action_msgs.msg import GoalStatus
 
 import math
 import os
@@ -144,6 +145,9 @@ class FollowBuoyPath(ActionServerBase):
         self.sent_waypoint = None
 
         self.first_passed_previous = True
+
+        self.lastSelectedGoal = None
+        self.waypoint_sent_future = None
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -716,14 +720,30 @@ class FollowBuoyPath(ActionServerBase):
                 self.send_waypoint_to_server(waypoint)
                 self.sent_waypoints.add(waypoint)
                 self.first_buoy_pair = False
+            elif self.send_goal_future != None and self.lastSelectedGoal != None:
+                goal_result = self.send_goal_future.result()
+                if (not goal_result.accepted) or (self.waypoint_sent_future != None and 
+                                                  self.waypoint_sent_future.result().status == GoalStatus.STATUS_ABORTED):
+                    self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
+                    self.send_waypoint_to_server(self.lastSelectedGoal)
+                    # Waypoint has already been sent before, should be fine to avoid adding it to set?
             if passed_previous:
                 self.first_passed_previous = False
         if not passed_previous:
             self.first_passed_previous = True
-    
+
+    def _waypoint_sent_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info("Strange - sent waypoint rejected immediately.")
+            return
+        self.waypoint_sent_future = goal_handle.get_result_async()
+
     def send_waypoint_to_server(self, waypoint):
         # self.get_logger().info('SENDING WAYPOINT TO SERVER')
         # sending waypoints to navigation server
+        self.waypoint_sent_future = None # Reset this... Make sure chance of going backwards is 0
+
         self.sent_waypoint = waypoint
         if not self.bypass_planner:
             self.follow_path_client.wait_for_server()
@@ -752,6 +772,8 @@ class FollowBuoyPath(ActionServerBase):
             self.result = False
             self.waypoint_client.wait_for_server()
             self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
+        self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
+        self.lastSelectedGoal = waypoint
 
     def map_cb(self, msg):
         """
