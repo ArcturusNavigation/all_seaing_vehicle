@@ -148,6 +148,7 @@ class FollowBuoyPath(ActionServerBase):
 
         self.lastSelectedGoal = None
         self.waypoint_sent_future = None
+        self.send_goal_future = None
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -572,6 +573,8 @@ class FollowBuoyPath(ActionServerBase):
                 continue
             if self.norm(self.ob_coords(curr_pair.left), self.ob_coords(buoy)) < self.inter_buoy_pair_dist:
                 continue
+            if not self.ccw((0, 0), self.ob_coords(buoy, local=True), self.ob_coords(curr_pair.left, local=True)):
+                continue
             if self.check_better_one_side(curr_pair.left, curr_pair.right, buoy):
                 new_right = buoy
                 changed = True
@@ -581,6 +584,8 @@ class FollowBuoyPath(ActionServerBase):
             if self.ob_coords(buoy) == self.ob_coords(curr_pair.left):
                 continue
             if self.norm(self.ob_coords(curr_pair.right), self.ob_coords(buoy)) < self.inter_buoy_pair_dist:
+                continue
+            if not self.ccw((0, 0), self.ob_coords(curr_pair.right, local=True), self.ob_coords(buoy, local=True)):
                 continue
             if self.check_better_one_side(curr_pair.right, curr_pair.left, buoy):
                 new_left = buoy
@@ -620,10 +625,11 @@ class FollowBuoyPath(ActionServerBase):
         if len(self.buoy_pairs) != 0:
             self.buoy_pairs[0].left = self.replace_closest(self.buoy_pairs[0].left, red_buoys if self.red_left else green_buoys)
             self.buoy_pairs[0].right = self.replace_closest(self.buoy_pairs[0].right, green_buoys if self.red_left else red_buoys)
+            # TODO Check if there is not a buoy of the intended color in close distance and there is one from the other color, then remove the waypoint
             # Check if new target waypoint is further than adapt_dist away from the old one that's been sent (store it in a global variable and only change it when sending to server)
             if (self.sent_waypoint is not None) and (self.norm(self.midpoint_pair(self.buoy_pairs[0]), self.sent_waypoint) > self.adapt_dist):
                 adapt_waypoint = True
-            changed_pair_to = self.find_better_pair_to(self.buoy_pairs[0], red_buoys if self.red_left else green_buoys, green_buoys if self.red_left else red_buoys)
+            # changed_pair_to = self.find_better_pair_to(self.buoy_pairs[0], red_buoys if self.red_left else green_buoys, green_buoys if self.red_left else red_buoys)
             self.pair_to = self.buoy_pairs[0]
         ind = 0
         while ind < len(self.buoy_pairs):
@@ -631,6 +637,7 @@ class FollowBuoyPath(ActionServerBase):
             if ind != 0:
                 self.buoy_pairs[ind].left = self.replace_closest(self.buoy_pairs[ind].left, red_buoys if self.red_left else green_buoys)
                 self.buoy_pairs[ind].right = self.replace_closest(self.buoy_pairs[ind].right, green_buoys if self.red_left else red_buoys)
+                # TODO Check if there is not a buoy of the intended color in close distance and there is one from the other color, then remove the waypoint
             # Find potential better next pair
             next_pair = self.next_pair(self.buoy_pairs[ind], red_buoys, green_buoys)
             if next_pair is not None and ((ind == (len(self.buoy_pairs)-1) and self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair) > self.buoy_pair_dist_thres) or (ind < (len(self.buoy_pairs)-1) and self.better_buoy_pair_transition(self.buoy_pairs[ind+1],next_pair,self.buoy_pairs[ind]))):
@@ -722,7 +729,8 @@ class FollowBuoyPath(ActionServerBase):
                 self.first_buoy_pair = False
             elif self.send_goal_future != None and self.lastSelectedGoal != None:
                 goal_result = self.send_goal_future.result()
-                if (not goal_result.accepted) or (self.waypoint_sent_future != None and 
+                if (not goal_result.accepted) or (self.waypoint_sent_future != None and
+                                                  self.waypoint_sent_future.result() != None and 
                                                   self.waypoint_sent_future.result().status == GoalStatus.STATUS_ABORTED):
                     self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
                     self.send_waypoint_to_server(self.lastSelectedGoal)
