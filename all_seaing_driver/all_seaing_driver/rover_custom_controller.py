@@ -70,9 +70,9 @@ class RoverCustomController(Node):
     def send_controls(self, result):
         control_option = ControlOption()
         control_option.priority = 0  # TeleOp has the highest priority value
-        control_option.twist.linear.x = result.drive_y * self.joy_x_scale
-        control_option.twist.linear.y = 0.0
-        control_option.twist.angular.z = result.drive_x * self.joy_ang_scale
+        control_option.twist.linear.x = result.drive_y2 * self.joy_x_scale
+        control_option.twist.linear.y = result.drive_x1 * self.joy_x_scale
+        control_option.twist.angular.z = result.drive_x2 * self.joy_ang_scale
         self.control_option_pub.publish(control_option)
 
 
