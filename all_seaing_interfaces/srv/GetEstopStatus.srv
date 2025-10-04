@@ -1,7 +1,9 @@
 ---
 bool success
 uint8 mode
-float32 drive_x
-float32 drive_y
+float32 drive_x2
+float32 drive_y2
+float32 drive_x1
+float32 drive_y1
 bool is_connected
 bool is_estopped

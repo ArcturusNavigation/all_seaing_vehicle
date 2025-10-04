@@ -58,11 +58,11 @@ class FollowBuoyPath(ActionServerBase):
 
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
 
-        self.declare_parameter("xy_threshold", 2.0)
+        self.declare_parameter("xy_threshold", 0.5)
         self.declare_parameter("theta_threshold", 180.0)
         self.declare_parameter("goal_tol", 0.5)
         self.declare_parameter("obstacle_tol", 50)
-        self.declare_parameter("choose_every", 5)
+        self.declare_parameter("choose_every", 1)
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
         self.declare_parameter("bypass_planner", False)
@@ -126,7 +126,12 @@ class FollowBuoyPath(ActionServerBase):
             self.red_labels.add(label_mappings["red"])
         else:
             self.green_labels.add(label_mappings["green_buoy"])
+            self.green_labels.add(label_mappings["green_circle"])
+            self.green_labels.add(label_mappings["green_pole_buoy"])
             self.red_labels.add(label_mappings["red_buoy"])
+            self.red_labels.add(label_mappings["red_circle"])
+            self.red_labels.add(label_mappings["red_pole_buoy"])
+            self.red_labels.add(label_mappings["red_racquet_ball"])
         
         self.sent_waypoints = set()
 
@@ -288,12 +293,12 @@ class FollowBuoyPath(ActionServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if (self.is_sim and ob.local_point.point.x > 0) or (not self.is_sim and ob.local_point.point.y > 0)
+            if ob.local_point.point.x > 0
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
-        self.get_logger().debug(
-            f"initial red buoys: {red_buoys}, green buoys: {green_buoys}"
+        self.get_logger().info(
+            f"initial red buoys: {[self.ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[self.ob_coords(buoy) for buoy in green_buoys]}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
             self.get_logger().debug("No starting buoy pairs!")
@@ -321,8 +326,10 @@ class FollowBuoyPath(ActionServerBase):
             for red_b in red_buoys:
                 for green_b in green_buoys:
                     if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
+                        self.get_logger().info(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))} < {self.inter_buoy_pair_dist}')
                         continue
                     elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
+                        self.get_logger().info(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} BETTER, DIST FROM ROBOT: {self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True)))}')
                         green_to = green_b
                         red_to = red_b
             if green_to is None:
@@ -770,7 +777,7 @@ class FollowBuoyPath(ActionServerBase):
                 self.first_buoy_pair = False
             elif self.send_goal_future != None and self.lastSelectedGoal != None:
                 goal_result = self.send_goal_future.result()
-                if (not goal_result.accepted) or (self.waypoint_sent_future != None and
+                if ((goal_result is not None) and (not goal_result.accepted)) or (self.waypoint_sent_future != None and
                                                   self.waypoint_sent_future.result() != None and 
                                                   self.waypoint_sent_future.result().status == GoalStatus.STATUS_ABORTED):
                     self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")

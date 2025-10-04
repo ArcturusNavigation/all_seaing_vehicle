@@ -162,7 +162,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"range_radius": [0.5, 60.0]},
+            {"range_radius": [1.0, 60.0]},
             {"leaf_size": 0.0},
         ],
     )
@@ -192,7 +192,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
         parameters=[
-            {"joy_x_scale": -1.8},
+            {"joy_x_scale": -1.0},
             {"joy_ang_scale": 0.4},
         ],
         condition=IfCondition(
@@ -216,7 +216,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM2"}],
+        parameters=[{"port": "/dev/ttyACM0"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -236,7 +236,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0"
+            "port": "/dev/ttyACM1"
         }.items(),
     )
 
