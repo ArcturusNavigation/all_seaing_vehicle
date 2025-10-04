@@ -76,7 +76,7 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
-            {"duplicate_dist": 0.5},
+            {"duplicate_dist": 0.7},
             {"forward_dist": 1.5},
             {"inter_buoy_pair_dist": 1.5},
         ],
