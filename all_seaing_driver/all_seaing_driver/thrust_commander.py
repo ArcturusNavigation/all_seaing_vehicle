@@ -68,7 +68,7 @@ class ThrustCommander(Node):
         self.back_left_command = 1500
         
     def send_pwm(self, channel: int, value: float):
-        self.get_logger().info(f"Sending PWM value {value} to channel {channel}")
+        self.get_logger().debug(f"Sending PWM value {value} to channel {channel}")
         return self.proxy.call_async(
             CommandLong.Request(command=183, param1=float(channel), param2=float(value))
         )
