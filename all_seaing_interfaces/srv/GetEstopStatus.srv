@@ -5,3 +5,4 @@ float32 drive_x
 float32 drive_y
 bool is_connected
 bool is_estopped
+bool battery_ok
