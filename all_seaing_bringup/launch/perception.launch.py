@@ -42,7 +42,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.4},
             {"use_color_names": False},
@@ -58,7 +58,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.4},
             {"use_color_names": False},
@@ -75,7 +75,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.4},
             {"use_color_names": False},
