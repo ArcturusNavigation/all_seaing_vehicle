@@ -192,7 +192,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
         parameters=[
-            {"joy_x_scale": -1.8},
+            {"joy_x_scale": -1.0},
             {"joy_ang_scale": 0.4},
         ],
         condition=IfCondition(
