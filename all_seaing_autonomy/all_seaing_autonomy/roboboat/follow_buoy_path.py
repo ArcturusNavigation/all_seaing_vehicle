@@ -105,6 +105,9 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("better_angle_thres", 0.2)
         self.better_angle_thres = self.get_parameter("better_angle_thres").get_parameter_value().double_value
 
+        self.declare_parameter("timer_period", 1/30.0)
+        self.timer_period = self.get_parameter("timer_period").get_parameter_value().double_value
+
         self.green_labels = set()
         self.red_labels = set()
 
@@ -125,6 +128,8 @@ class FollowBuoyPath(ActionServerBase):
             self.green_labels.add(label_mappings["green"])
             self.red_labels.add(label_mappings["red"])
         else:
+            # self.green_labels.add(11) # just to use old rosbags
+            # self.red_labels.add(17) # just to use old rosbags
             self.green_labels.add(label_mappings["green_buoy"])
             self.green_labels.add(label_mappings["green_circle"])
             self.green_labels.add(label_mappings["green_pole_buoy"])
@@ -138,7 +143,6 @@ class FollowBuoyPath(ActionServerBase):
         self.red_left = True
         self.first_setup = True
         self.result = False
-        self.timer_period = 1/60
         self.time_last_seen_buoys = time.time()
 
         self.obstacles = None
@@ -297,7 +301,7 @@ class FollowBuoyPath(ActionServerBase):
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
-        self.get_logger().info(
+        self.get_logger().debug(
             f"initial red buoys: {[self.ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[self.ob_coords(buoy) for buoy in green_buoys]}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
@@ -326,10 +330,10 @@ class FollowBuoyPath(ActionServerBase):
             for red_b in red_buoys:
                 for green_b in green_buoys:
                     if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
-                        self.get_logger().info(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))} < {self.inter_buoy_pair_dist}')
+                        self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))} < {self.inter_buoy_pair_dist}')
                         continue
                     elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
-                        self.get_logger().info(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} BETTER, DIST FROM ROBOT: {self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True)))}')
+                        self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} BETTER, DIST FROM ROBOT: {self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True)))}')
                         green_to = green_b
                         red_to = red_b
             if green_to is None:
@@ -337,11 +341,11 @@ class FollowBuoyPath(ActionServerBase):
             if self.ccw((0, 0), self.ob_coords(green_to, local=True), self.ob_coords(red_to, local=True)):
                 self.red_left = True
                 self.pair_to = InternalBuoyPair(red_to, green_to)
-                self.get_logger().info("RED BUOYS LEFT, GREEN BUOYS RIGHT")
+                self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
             else:
                 self.red_left = False
                 self.pair_to = InternalBuoyPair(green_to, red_to)
-                self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
+                self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
             self.first_setup = False
             return True
         else:
@@ -847,7 +851,7 @@ class FollowBuoyPath(ActionServerBase):
         self.start_process("Follow buoy path started!")
 
         while rclpy.ok() and self.obstacles is None:
-            time.sleep(1.0) # TODO: maybe change this
+            time.sleep(self.timer_period)
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 return Task.Result()
@@ -855,7 +859,7 @@ class FollowBuoyPath(ActionServerBase):
         success = False
         while not success:
             success = self.setup_buoys()
-            time.sleep(1.0)
+            time.sleep(self.timer_period)
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 return Task.Result()
