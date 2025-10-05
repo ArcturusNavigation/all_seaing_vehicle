@@ -42,9 +42,9 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
-            {"conf": 0.4},
+            {"conf": 0.6},
             {"use_color_names": False},
         ],
         remappings=[
@@ -58,9 +58,9 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
-            {"conf": 0.4},
+            {"conf": 0.6},
             {"use_color_names": False},
         ],
         remappings=[
@@ -75,9 +75,9 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
-            {"conf": 0.4},
+            {"conf": 0.6},
             {"use_color_names": False},
         ],
         remappings=[
@@ -228,7 +228,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"range_radius": [0.5, 60.0]},
+            {"range_radius": [1.0, 60.0]},
             {"leaf_size": 0.2},
             {"local_range_z": [-100000.0, 0.0]},
         ],

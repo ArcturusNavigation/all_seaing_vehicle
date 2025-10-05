@@ -138,8 +138,10 @@ class CentralHubROS(Node):
     def estop_cb(self, _, response):
         response.success = True
         response.mode = 1 if self.estop.manual() else 0
-        response.drive_x = -self.estop.drive_x2()
-        response.drive_y = -self.estop.drive_y2()
+        response.drive_x2 = -self.estop.drive_x2()
+        response.drive_y2 = -self.estop.drive_y2()
+        response.drive_x1 = -self.estop.drive_x1()
+        response.drive_y1 = -self.estop.drive_y1()
         # TODO: Implement side strafe using drive x2 and y2 (add those to the .srv as well)
         response.is_connected = bool(self.estop.connected())
         response.is_estopped = bool(self.main_pow.estop())

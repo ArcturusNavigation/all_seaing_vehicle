@@ -80,7 +80,7 @@ class NavigationServer(ActionServerBase):
 
         self.planner = PlannerExecutor(goal_handle.request.planner)
         path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
-        path.poses = path.poses[:: goal_handle.request.choose_every]
+        path.poses = path.poses[(len(path.poses) - 1) % goal_handle.request.choose_every :: goal_handle.request.choose_every]
 
         self.stopped_plan()  # Release the semaphore
         return path
