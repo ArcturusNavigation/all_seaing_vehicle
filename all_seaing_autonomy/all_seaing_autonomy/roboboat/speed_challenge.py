@@ -48,9 +48,6 @@ class SpeedChange(ActionServerBase):
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
         )
-        self.odometry_sub = self.create_subscription(
-            Odometry, "/odometry/filtered", self.odometry_cb, 10
-        )
         self.camera_info_sub = self.create_subscription(
             CameraInfo, "camera_info", self.camera_info_cb, 10
         )
@@ -74,8 +71,8 @@ class SpeedChange(ActionServerBase):
         self.declare_parameter("turn_offset", 1.0)
         self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
 
-        self.robot_pos = (0, 0)
-        self.robot_dir = (0, 0)
+        # self.robot_pos = (0, 0)
+        # self.robot_dir = (0, 0)
         self.home_pos = (0, 0)
         self.blue_buoy_pos = (0, 0)
         self.runnerActivated = False
@@ -88,6 +85,7 @@ class SpeedChange(ActionServerBase):
         self.buoy_direction = (0,0)
         self.buoy_found = False
         self.following_guide = False
+        self.moved_to_point = False
 
         self.obstacles = None
         self.image_size = (400,400)
@@ -143,7 +141,22 @@ class SpeedChange(ActionServerBase):
                 self.blue_labels.add(label_mappings[buoy_label])
 
         self.obstacles = []
+    
+    @property
+    def robot_pos(self):
+        '''
+        Gets the robot position as a tuple (x,y)
+        '''
+        position = self.get_robot_pose()[0:2]
+        return (float(position[0]), float(position[1]))
 
+    @property
+    def robot_dir(self):
+        '''
+        Gets the robot direction as a tuple, containing the unit vector in the same direction as heading
+        '''
+        heading = self.get_robot_pose()[2]
+        return (math.cos(heading), math.sin(heading))
 
     def reset_challenge(self):
         '''
@@ -160,6 +173,7 @@ class SpeedChange(ActionServerBase):
         self.get_logger().info("Speed challenge setup completed.")
 
         # station keep logic
+        self.get_logger().info(f"robot pose {self.robot_pos}")
         self.move_to_point(self.robot_pos)
 
 
@@ -241,12 +255,6 @@ class SpeedChange(ActionServerBase):
         '''
         self.obstacles = msg.obstacles
 
-    def odometry_cb(self, msg):
-        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
-        quat = msg.pose.pose.orientation
-        (row, pitch, yaw) = euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
-        self.robot_dir = (math.cos(yaw), math.sin(yaw))
-
     def camera_info_cb(self, msg):
         '''
         Gets camera image info from all_seaing_perception.
@@ -268,7 +276,8 @@ class SpeedChange(ActionServerBase):
         future.add_done_callback(self.future_done)
         while self.following_guide:
             if self.blue_buoy_detected():
-                self.move_to_point(self.robot_pos,is_stationary=False)
+                # self.move_to_point(self.robot_pos,is_stationary=False)
+                self.following_guide = 1
                 break
             time.sleep(TIMER_PERIOD)
         return self.circle_blue_buoy()
@@ -287,7 +296,7 @@ class SpeedChange(ActionServerBase):
         self.get_logger().info("Circling blue buoy")
         if not self.blue_buoy_detected():
             self.get_logger().info("task 4 blue buoy probing exited without finding blue buoy")
-            return Task.Result(success=False)
+            return Task.Result(success=Falseaccepted)
         
         #circle the blue buoy like a baseball diamond
         # a better way to do this might be to have the astar run to original cell, 
@@ -303,8 +312,12 @@ class SpeedChange(ActionServerBase):
         third_base = self.add_tuple(self.blue_buoy_pos, third_dir)
         
         self.move_to_point(first_base)
-        self.move_to_point(second_base)
-        self.move_to_point(third_base)
+        while self.moved_to_point == False:
+            self.move_to_point(second_base)
+            time.sleep(TIMER_PERIOD)
+        while self.moved_to_point == False:
+            self.move_to_point(third_base)
+            time.sleep(TIMER_PERIOD)
 
         return self.return_to_start()
     
@@ -314,7 +327,7 @@ class SpeedChange(ActionServerBase):
         '''
         self.get_logger().info("Returning to start")
         self.move_to_point(self.home_pos)
-        return Task.result(success=True)
+        return Task.Result(success=True)
 
     # robust realtime visual signal processing
     def led_changed(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
@@ -452,6 +465,7 @@ class SpeedChange(ActionServerBase):
         Moves the boat to the specified position using the follow path action server.
         Returns the future of the server request.
         '''
+        self.moved_to_point = False
         self.follow_path_client.wait_for_server()
         goal_msg = FollowPath.Goal()
         goal_msg.planner = self.get_parameter("planner").value
@@ -468,7 +482,29 @@ class SpeedChange(ActionServerBase):
         self.send_goal_future = self.follow_path_client.send_goal_async(
             goal_msg
         )
+        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
         return self.send_goal_future
+
+    def follow_path_response_cb(self, future):
+        '''
+        Responds to follow path action server goal response.
+        '''
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Waypoint rejected')
+            return
+
+        self.get_logger().info("Waypoint accepted")
+        self._get_result_future = goal_handle.get_result_async()
+        self._get_result_future.add_done_callback(self.get_result_cb)
+
+    def get_result_cb(self, future):
+        '''
+        Flags the path following as complete for move_to_point
+        '''
+        # TODO: have this check if the result is success?
+        self.moved_to_point = True
+
 
     def blue_buoy_detected(self):
         '''

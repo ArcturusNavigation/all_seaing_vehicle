@@ -365,6 +365,21 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ],
+        remappings=[
+            ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
+        ]
+    )
+
+    speed_challenge = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -449,8 +464,8 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             # "world": "rb2025/rb2025_task1_task2.sdf",
-            "world": "follow_path_task.sdf",
-            # "world": "speed_course_world.sdf",
+            # "world": "follow_path_task.sdf",
+            "world": "speed_course_world.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -478,8 +493,9 @@ def launch_setup(context, *args, **kwargs):
         onshore_node,
         run_tasks,
         task_init_server,
-        follow_buoy_path,
+        # follow_buoy_path,
         # follow_buoy_pid,
+        speed_challenge,
         # speed_challenge_pid,
         rviz_waypoint_sender,
         # map_to_odom,
