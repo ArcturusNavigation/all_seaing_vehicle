@@ -108,6 +108,10 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("timer_period", 1/30.0)
         self.timer_period = self.get_parameter("timer_period").get_parameter_value().double_value
 
+        # every station_hold_period seconds, it switches from looking 30 deg left to 30 deg right
+        self.declare_parameter("station_hold_period", 3.0)
+        self.station_hold_period = self.get_parameter("station_hold_period").get_parameter_value().double_value
+
         self.green_labels = set()
         self.red_labels = set()
 
@@ -159,9 +163,6 @@ class FollowBuoyPath(ActionServerBase):
         self.lastSelectedGoal = None
         self.waypoint_sent_future = None
         self.send_goal_future = None
-
-        self.station_hold_period = 0.3
-        # every station_hold_period seconds, it switches from looking 30 deg left to 30 deg right
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -930,7 +931,7 @@ class FollowBuoyPath(ActionServerBase):
 
         self.start_process("Follow buoy path started!")
 
-        self.station_hold()
+        # self.station_hold()
 
         while rclpy.ok() and self.obstacles is None:
             time.sleep(self.timer_period)
