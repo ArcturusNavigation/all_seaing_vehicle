@@ -121,7 +121,7 @@ def launch_setup(context, *args, **kwargs):
             ),
             (
                 "imu",
-                "/mavros/imu/data"
+                "/mavros/imu/data/filtered"
             ),
             ("obstacle_map/labeled", "obstacle_map/local")
         ],
