@@ -352,7 +352,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         # grid_map_generator,
-        # buoy_yolo_node,
+        buoy_yolo_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
         # imu_reframe_node,

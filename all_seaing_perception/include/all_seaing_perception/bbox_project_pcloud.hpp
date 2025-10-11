@@ -143,6 +143,7 @@ private:
 
     double m_contour_bbox_area_thres;
     double m_cluster_bbox_area_thres;
+    double m_overlap_filter_thres;
 
     std_msgs::msg::Header m_local_header;
 
