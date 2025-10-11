@@ -33,9 +33,6 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     this->declare_parameter<bool>("label_list", true);
     m_label_list = this->get_parameter("label_list").as_bool();
 
-    this->declare_parameter<bool>("only_project", false);
-    m_only_project = this->get_parameter("only_project").as_bool();
-
     // for color segmentation
     this->declare_parameter("color_label_mappings_file", "");
 
@@ -236,14 +233,13 @@ void BBoxProjectPCloud::bb_pcl_project(
         // TODO: When checking overlaps, don't check overlap with e.g. shapes, they are usually on the background
         std::sort(sorted_bboxes.begin(), sorted_bboxes.end(), [](all_seaing_interfaces::msg::LabeledBoundingBox2D a, all_seaing_interfaces::msg::LabeledBoundingBox2D b){return area(a) < area(b);});
 
-        RCLCPP_INFO(this->get_logger(), "FILTERING BBOXES OVERLAP");
         for (int i = 0; i < sorted_bboxes.size()-1; i++){
-            RCLCPP_INFO(this->get_logger(), "BBOX %d AREA: %lf", i, area(sorted_bboxes[i]));
+            // RCLCPP_INFO(this->get_logger(), "BBOX %d AREA: %lf", i, area(sorted_bboxes[i]));
             bool should_filter = false;
             for (int j = i+1; j < sorted_bboxes.size(); j++){
-                RCLCPP_INFO(this->get_logger(), "BBOX %d,%d OVERLAP: %lf, RATIO: %lf", i, j, overlap(sorted_bboxes[i], sorted_bboxes[j]), overlap(sorted_bboxes[i], sorted_bboxes[j])/area(sorted_bboxes[i]));
+                // RCLCPP_INFO(this->get_logger(), "BBOX %d,%d OVERLAP: %lf, RATIO: %lf", i, j, overlap(sorted_bboxes[i], sorted_bboxes[j]), overlap(sorted_bboxes[i], sorted_bboxes[j])/area(sorted_bboxes[i]));
                 if (overlap(sorted_bboxes[i], sorted_bboxes[j])/area(sorted_bboxes[i]) > m_overlap_filter_thres){
-                    RCLCPP_INFO(this->get_logger(), "FILTERED");
+                    // RCLCPP_INFO(this->get_logger(), "FILTERED");
                     should_filter = true;
                     break;
                 }
@@ -254,10 +250,10 @@ void BBoxProjectPCloud::bb_pcl_project(
 
         filtered_bboxes.push_back(sorted_bboxes.back());
     }
-
+    m_local_header.stamp = in_cloud_msg->header.stamp;
+    m_local_header.frame_id = m_base_link_frame;
+    object_pcls.header = m_local_header;
     for (all_seaing_interfaces::msg::LabeledBoundingBox2D bbox : filtered_bboxes){
-        if(!label_color_map.count(bbox.label)) continue; //ignore objects that are not registered buoy types
-
         auto labeled_pcl = all_seaing_interfaces::msg::LabeledObjectPointCloud();
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         labeled_pcl.time = in_cloud_msg->header.stamp;
@@ -267,7 +263,10 @@ void BBoxProjectPCloud::bb_pcl_project(
         // Add padding to bbox
         all_seaing_perception::addBBoxPadding(bbox, m_bbox_margin, cv_hsv.rows, cv_hsv.cols);
         all_seaing_perception::PCLInBBoxHSV(in_cloud_tf_ptr, obj_cloud_ptr, bbox, cv_hsv, m_cam_model, m_is_sim);
-        pcl::toROSMsg(*obj_cloud_ptr, labeled_pcl.cloud);
+        if (obj_cloud_ptr->points.empty()) continue;
+        pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr_tf(new pcl::PointCloud<pcl::PointXYZHSV>);
+        all_seaing_perception::transformPCLCloud(*obj_cloud_ptr, *obj_cloud_ptr_tf, m_cam_base_link_tf);
+        pcl::toROSMsg(*obj_cloud_ptr_tf, labeled_pcl.cloud);
         labeled_pcl.cloud.header.stamp = in_cloud_msg->header.stamp;
         object_pcls.objects.push_back(labeled_pcl);
         obj_cloud_vec.push_back(*obj_cloud_ptr);
@@ -280,13 +279,9 @@ void BBoxProjectPCloud::bb_pcl_project(
     pcl::toROSMsg(*all_obj_pcls_ptr, obj_pcls_msg);
     obj_pcls_msg.header.stamp = in_cloud_msg->header.stamp;
     m_object_pcl_viz_pub->publish(obj_pcls_msg);
-
-    if(m_only_project) return;
-
+    
     // REFINE OBJECT POINT CLOUDS
     auto refined_objects_msg = all_seaing_interfaces::msg::ObstacleMap();
-    m_local_header.stamp = in_cloud_msg->header.stamp;
-    m_local_header.frame_id = m_base_link_frame;
     refined_objects_msg.local_header = m_local_header;
     refined_objects_msg.ns = "labeled";
     refined_objects_msg.is_labeled = true;
@@ -298,6 +293,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     for(auto bbox_pcloud_pair : bbox_pcloud_objects){
         all_seaing_interfaces::msg::LabeledBoundingBox2D bbox = bbox_pcloud_pair.first;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
+        if(!label_color_map.count(bbox.label)) continue; //ignore objects that are not registered buoy types
 
         // image & bbox relation & adjustment (make sure in-bounds)
         if(bbox.min_x > bbox.max_x || bbox.min_y > bbox.max_y) continue;
