@@ -500,7 +500,7 @@ def generate_launch_description():
                 "no_gui", default_value="false", choices=["true", "false"]
             ),
             DeclareLaunchArgument(
-                "use_waypoint_client", default_value="false", choices=["true", "false"]
+                "use_waypoint_client", default_value="true", choices=["true", "false"]
             ),
             OpaqueFunction(function=launch_setup),
         ]

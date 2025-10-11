@@ -56,10 +56,11 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/color_segmentation.py
     ${PROJECT_NAME}/color_segmentation_ycrcb.py
+    ${PROJECT_NAME}/dock_detector.py
     ${PROJECT_NAME}/yolov8_node.py
     ${PROJECT_NAME}/perception_eval.py
     ${PROJECT_NAME}/multicam_detection_merge.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
-ament_auto_package(INSTALL_TO_SHARE launch models)
+ament_auto_package(INSTALL_TO_SHARE launch models point_clouds)
