@@ -32,6 +32,13 @@ ament_auto_add_executable(
     ${PROJECT_NAME}/perception_utilities.cpp
     ${PROJECT_NAME}/obstacle.cpp
 )
+
+ament_auto_add_executable(
+    ransac_detector
+    ${PROJECT_NAME}/ransac_detector.cpp
+    ${PROJECT_NAME}/perception_utilities.cpp
+)
+
 ament_auto_add_executable(
     object_tracking_map
     ${PROJECT_NAME}/object_tracking_map.cpp
@@ -43,11 +50,13 @@ ament_auto_add_executable(
 
 target_link_libraries(bbox_project_pcloud yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 target_link_libraries(object_tracking_map yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+target_link_libraries(ransac_detector yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 
 install(TARGETS
     obstacle_detector
     point_cloud_filter
     bbox_project_pcloud
+    ransac_detector
     object_tracking_map
     DESTINATION lib/${PROJECT_NAME}
 )

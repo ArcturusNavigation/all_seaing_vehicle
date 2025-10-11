@@ -148,4 +148,12 @@ namespace all_seaing_perception{
     template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZI> pcl_in, typename pcl::PointCloud<pcl::PointXYZI> &pcl_out, geometry_msgs::msg::TransformStamped tf);
     template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZHSV> pcl_in, typename pcl::PointCloud<pcl::PointXYZHSV> &pcl_out, geometry_msgs::msg::TransformStamped tf);
     template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZRGB> pcl_in, typename pcl::PointCloud<pcl::PointXYZRGB> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+
+    template<typename PointT>
+    std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<PointT>::Ptr pcl_ptr){
+        
+    }
+
+    template std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr);
+    template std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_ptr);
 }

@@ -46,6 +46,9 @@ def launch_setup(context, *args, **kwargs):
     contour_matching_color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
+    ransac_params = os.path.join(
+        bringup_prefix, "config", "perception", "ransac_params.yaml"
+    )
 
     set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
@@ -257,6 +260,18 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    ransac_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="ransac_detector",
+        output="screen",
+        remappings=[
+        ],
+        parameters=[
+            {"ransac_params_file": ransac_params},
+            {"label_mappings_file": buoy_label_mappings},
+        ]
+    )
+
     object_tracking_map_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="object_tracking_map",
@@ -354,6 +369,7 @@ def launch_setup(context, *args, **kwargs):
         # grid_map_generator,
         buoy_yolo_node,
         bbox_project_pcloud_node,
+        ransac_node,
         object_tracking_map_node,
         # imu_reframe_node,
         # pcl_to_scan_node,

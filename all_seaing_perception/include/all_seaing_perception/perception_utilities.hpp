@@ -124,6 +124,11 @@ namespace all_seaing_perception{
         return std::make_tuple(centr, eigenvecs, axes_length);
     }
 
+    // given a PCL point cloud, perform RANSAC to find the plane the points are in and compute the size of that plane excluding outliers
+    // (centroid, normal, size)
+    template<typename PointT>
+    std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<PointT>::Ptr pcl_ptr);
+
 } // namespace all_seaing_perception
 
 #endif // ALL_SEAING_PERCEPTION__PERCEPTION_UTILITIES_HPP

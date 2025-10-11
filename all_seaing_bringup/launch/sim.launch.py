@@ -498,7 +498,7 @@ def launch_setup(context, *args, **kwargs):
         follow_buoy_path,
         # follow_buoy_pid,
         # speed_challenge_pid,
-        docking,
+        # docking,
         rviz_waypoint_sender,
         # map_to_odom,
         keyboard_ld,
