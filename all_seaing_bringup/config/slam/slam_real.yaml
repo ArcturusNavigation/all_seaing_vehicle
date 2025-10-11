@@ -11,7 +11,7 @@ object_tracking_map:
     bearing_uncertainty: 5.0
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 1.0 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
-    odom_refresh_rate: 30.0
+    odom_refresh_rate: 30.0 # beware, was 10 before but changed it to 30 bc that's mavros publish rate, change it back if issues
     update_gps_xy_uncertainty: 15.0 # for only labeled
     include_odom_theta: True
     include_odom_only_theta: False
