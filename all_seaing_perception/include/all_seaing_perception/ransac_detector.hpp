@@ -64,7 +64,7 @@ private:
         const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &in_pcl_msg);
 
     // Converts the output of the RANSAC utility function to the desired msg
-    all_seaing_interfaces::msg::LabeledObjectPlane to_plane_msg(int label, Eigen::Vector3d centroid, Eigen::Vector3d normal, Eigen::Vector3d size);
+    all_seaing_interfaces::msg::LabeledObjectPlane to_plane_msg(int label, Eigen::Vector3d centroid, Eigen::Matrix3d normal, Eigen::Vector3d size);
 
     visualization_msgs::msg::MarkerArray visualize_plane(all_seaing_interfaces::msg::LabeledObjectPlane msg, int& marker_id);
 
@@ -83,6 +83,10 @@ private:
     std::map<int, std::vector<std::pair<int, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>>> m_coplanar_pcls; // (id_merge, [(id, pcl), ...])
 
     std_msgs::msg::Header m_header;
+
+    // ransac params
+    int m_max_iters;
+    double m_dist_thres;
 
 public:
     RANSACDetector();

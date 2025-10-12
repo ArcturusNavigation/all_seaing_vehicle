@@ -150,10 +150,49 @@ namespace all_seaing_perception{
     template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZRGB> pcl_in, typename pcl::PointCloud<pcl::PointXYZRGB> &pcl_out, geometry_msgs::msg::TransformStamped tf);
 
     template<typename PointT>
-    std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<PointT>::Ptr pcl_ptr){
+    std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<PointT>::Ptr pcl_ptr, double dist_thres, int max_iter){
+        pcl::SampleConsensusModelPlane<PointT>::Ptr model_p (new pcl::SampleConsensusModelPlane<PointT> (pcl_ptr));
+        pcl::RandomSampleConsensus<PointT> ransac (model_p);
+
+        ransac.setDistanceThreshold(dist_thres);
+        ransac.setMaxIterations(max_iter);
+        ransac.computeModel();
         
+        std::vector<int> inliers;
+        ransac.getInliers(inliers);
+        pcl::PointCloud<PointT>::Ptr inlier_pcl_ptr (new pcl::PointCloud<PointT>);
+        pcl::copyPointCloud (*pcl_ptr, inliers, *inlier_pcl_ptr);
+
+        Eigen::Vector3d x_axis, y_axis, z_axis;
+        x_axis = ransac.getModelCoefficients().head(3).cast<double>;
+        y_axis = x_axis.cross(Eigen::Vector3d(0,0,1)).normalized();
+        z_axis = x_axis.cross(y_axis);
+        Eigen::Matrix3d normal;
+        normal << x_axis, y_axis, z_axis;
+
+        // PCA or clustering & minimum bbox? -> PCA better, to not deal with clustering thresholds and other issues
+        // just compute min bbox after converting to the normal frame, shouldn't have any outliers
+        Eigen::Vector3d ctr, sz;
+
+        Eigen::Vector4f ctr_4;
+        pcl::compute3DCentroid(inlier_pcl_ptr, ctr_4);
+        ctr = ctr_4.head(3).cast<double>;
+        
+        // Transform to normal frame
+        Eigen::Matrix4d projectionTransform(Eigen::Matrix4d::Identity());
+        projectionTransform.block<3,3>(0,0) = normal.transpose();
+        projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * ctr.head<3>());
+        pcl::PointCloud<pcl::PointXYZI>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::transformPointCloud(inlier_pcl_ptr, *cloudPointsProjected, projectionTransform);
+
+        // Get the minimum and maximum points of the transformed cloud.
+        pcl::PointXYZI minPoint, maxPoint;
+        pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
+        sz = Eigen::Vector3d(maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z);
+
+        return std::make_tuple(ctr, normal, sz);
     }
 
-    template std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr);
-    template std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_ptr);
+    template std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr, double dist_thres, int max_iter);
+    template std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_ptr, double dist_thres, int max_iter);
 }

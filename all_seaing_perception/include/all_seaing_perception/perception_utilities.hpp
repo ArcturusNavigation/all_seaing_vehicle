@@ -13,6 +13,8 @@
 #include <pcl/common/impl/common.hpp>
 #include <pcl/common/centroid.h>
 #include <pcl/common/transforms.h>
+#include <pcl/sample_consensus/ransac.h>
+#include <pcl/sample_consensus/sac_model_plane.h>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -126,8 +128,9 @@ namespace all_seaing_perception{
 
     // given a PCL point cloud, perform RANSAC to find the plane the points are in and compute the size of that plane excluding outliers
     // (centroid, normal, size)
+    // normal x axis is the plane normal, y axis is left horizontal to the ground, and z is up
     template<typename PointT>
-    std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<PointT>::Ptr pcl_ptr);
+    std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<PointT>::Ptr pcl_ptr, double dist_thres, int max_iter);
 
 } // namespace all_seaing_perception
 

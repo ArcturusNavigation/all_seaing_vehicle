@@ -31,6 +31,9 @@ RANSACDetector::RANSACDetector() : Node("ransac_detector"){
                 m_coplanar[coplanar_label].push_back(it->first.as<int>());
             }
         }
+
+        m_max_iters = m_ransac_params_config_yaml["max_iters"].as<int>();
+        m_dist_thres = m_ransac_params_config_yaml["dist_thres"].as<double>();
     } 
     else {
         RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", m_ransac_params_file.c_str());
@@ -53,7 +56,7 @@ RANSACDetector::RANSACDetector() : Node("ransac_detector"){
     label_yaml.close();
 }
 
-all_seaing_interfaces::msg::LabeledObjectPlane RANSACDetector::to_plane_msg(int label, Eigen::Vector3d centroid, Eigen::Vector3d normal, Eigen::Vector3d size){
+all_seaing_interfaces::msg::LabeledObjectPlane RANSACDetector::to_plane_msg(int label, Eigen::Vector3d centroid, Eigen::Matrix3d normal, Eigen::Vector3d size){
     auto object_plane = all_seaing_interfaces::msg::LabeledObjectPlane();
     object_plane.label = label;
     object_plane.normal_ctr.position.x = centroid[0];
@@ -61,14 +64,10 @@ all_seaing_interfaces::msg::LabeledObjectPlane RANSACDetector::to_plane_msg(int 
     object_plane.normal_ctr.position.z = centroid[2];
 
     tf2::Quaternion quat;
-    // Fill matrix, s.t. x is the normal, y is left (horizontal to ground), z is up
-    Eigen::Vector3d y_axis, z_axis;
-    y_axis = normal.cross(Eigen::Vector3d(0,0,1)).normalized();
-    z_axis = normal.cross(y_axis);
     tf2::Matrix3x3 mat(
-        normal[0], y_axis[0], z_axis[0],
-        normal[1], y_axis[1], z_axis[1],
-        normal[2], y_axis[2], z_axis[2]
+        normal(0,0), normal(0,1), normal(0,2),
+        normal(1,0), normal(1,1), normal(1,2),
+        normal(2,0), normal(2,1), normal(2,2),
     );
     mat.getRotation(quat);
     object_plane.normal_ctr.orientation = tf2::toMsg(quat);
@@ -149,8 +148,9 @@ void RANSACDetector::object_pcl_cb(
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr = labeled_pcl.second;
         if (m_labels.count(m_id_label_map[label])){
             // get centroid, normal, and size, and add to object_planes.objects
-            Eigen::Vector3d centroid, normal, size;
-            std::tie(centroid, normal, size) = all_seaing_perception::PCLRANSAC(pcl_ptr);
+            Eigen::Vector3d centroid, size;
+            Eigen::Matrix3d normal;
+            std::tie(centroid, normal, size) = all_seaing_perception::PCLRANSAC(pcl_ptr, m_dist_thres, m_max_iters);
             object_planes.objects.push_back(to_plane_msg(label, centroid, normal, size));
         }
         // check if in a coplanar set
@@ -174,8 +174,9 @@ void RANSACDetector::object_pcl_cb(
         }
 
         // get centroid, normal, and size, and add to object_planes.coplanar_merged
-        Eigen::Vector3d merged_ctr, merged_normal, merged_size;
-        std::tie(merged_ctr, merged_normal, merged_size) = all_seaing_perception::PCLRANSAC(merged_pcloud_ptr);
+        Eigen::Vector3d merged_ctr, merged_size;
+        Eigen::Matrix3d merged_normal;
+        std::tie(merged_ctr, merged_normal, merged_size) = all_seaing_perception::PCLRANSAC(merged_pcloud_ptr, m_dist_thres, m_max_iters);
         object_planes.coplanar_merged.push_back(to_plane_msg(id_merge, merged_ctr, merged_normal, merged_size));
 
         // get indiv refined planes
