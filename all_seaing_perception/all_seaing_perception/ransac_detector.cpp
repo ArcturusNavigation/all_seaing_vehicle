@@ -35,6 +35,7 @@ RANSACDetector::RANSACDetector() : Node("ransac_detector"){
         m_max_iters = m_ransac_params_config_yaml["max_iters"].as<int>();
         m_dist_thres = m_ransac_params_config_yaml["dist_thres"].as<double>();
         m_min_inliers = m_ransac_params_config_yaml["min_inliers"].as<int>();
+        m_clust_dist = m_ransac_params_config_yaml["clust_dist"].as<double>();
     } 
     else {
         RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", m_ransac_params_file.c_str());
@@ -80,13 +81,13 @@ all_seaing_interfaces::msg::LabeledObjectPlane RANSACDetector::to_plane_msg(int 
     return object_plane;
 }
 
-visualization_msgs::msg::MarkerArray RANSACDetector::visualize_plane(all_seaing_interfaces::msg::LabeledObjectPlane msg, int& marker_id){
+visualization_msgs::msg::MarkerArray RANSACDetector::visualize_plane(all_seaing_interfaces::msg::LabeledObjectPlane msg, int& marker_id, double r, double g, double b){
     visualization_msgs::msg::MarkerArray marker_arr;
 
     visualization_msgs::msg::Marker normal_marker;
     normal_marker.type = visualization_msgs::msg::Marker::ARROW;
     normal_marker.pose = msg.normal_ctr;
-    normal_marker.scale.x = 1;
+    normal_marker.scale.x = 0.2;
     normal_marker.scale.y = 0.01;
     normal_marker.scale.z = 0.01;
     normal_marker.color.a = 1;
@@ -102,7 +103,9 @@ visualization_msgs::msg::MarkerArray RANSACDetector::visualize_plane(all_seaing_
     plane_marker.scale.y = msg.size.y;
     plane_marker.scale.z = msg.size.z;
     plane_marker.color.a = 1;
-    plane_marker.color.b = 1;
+    plane_marker.color.r = r;
+    plane_marker.color.g = g;
+    plane_marker.color.b = b;
     plane_marker.header = m_header;
     plane_marker.id = marker_id++;
     marker_arr.markers.push_back(plane_marker);
@@ -119,13 +122,13 @@ visualization_msgs::msg::MarkerArray RANSACDetector::visualize_planes(all_seaing
     int marker_id = 0;
     visualization_msgs::msg::MarkerArray marker_arr;
     for (auto plane : msg.objects){
-        vector_extend(marker_arr.markers, visualize_plane(plane, marker_id).markers);
+        vector_extend(marker_arr.markers, visualize_plane(plane, marker_id, 0, 0, 1).markers);
     }
     for (auto plane : msg.coplanar_merged){
-        vector_extend(marker_arr.markers, visualize_plane(plane, marker_id).markers);
+        vector_extend(marker_arr.markers, visualize_plane(plane, marker_id, 0, 1, 0).markers);
     }
     for (auto plane : msg.coplanar_indiv){
-        vector_extend(marker_arr.markers, visualize_plane(plane, marker_id).markers);
+        vector_extend(marker_arr.markers, visualize_plane(plane, marker_id, 1, 0, 0).markers);
     }
     return marker_arr;
 }
@@ -133,38 +136,43 @@ visualization_msgs::msg::MarkerArray RANSACDetector::visualize_planes(all_seaing
 void RANSACDetector::object_pcl_cb(
     const all_seaing_interfaces::msg::LabeledObjectPointCloudArray::ConstSharedPtr &in_pcl_msg){
 
+    std::vector<std::pair<int, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>> labeled_pcls; // (id, pcl)
+    
     for (all_seaing_interfaces::msg::LabeledObjectPointCloud labeled_pcl : in_pcl_msg->objects){
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr in_cloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
         pcl::fromROSMsg(labeled_pcl.cloud, *in_cloud_ptr);
-        m_labeled_pcls.push_back(std::make_pair(labeled_pcl.label, in_cloud_ptr));
+        labeled_pcls.push_back(std::make_pair(labeled_pcl.label, in_cloud_ptr));
     }
 
     m_header = in_pcl_msg->header;
 
     auto object_planes = all_seaing_interfaces::msg::LabeledObjectPlaneArray();
     object_planes.header = m_header;
-
+    std::map<int, std::vector<std::pair<int, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>>> coplanar_pcls; // (id_merge, [(id, pcl), ...])
     // Deal with individual banners
-    for (auto labeled_pcl : m_labeled_pcls){
+    for (auto labeled_pcl : labeled_pcls){
         int label = labeled_pcl.first;
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr = labeled_pcl.second;
         if (m_labels.count(m_id_label_map[label])){
             // get centroid, normal, and size, and add to object_planes.objects
             Eigen::Vector3d centroid, size;
             Eigen::Matrix3d normal;
-            std::tie(centroid, normal, size) = all_seaing_perception::PCLRANSAC(*pcl_ptr, m_dist_thres, m_max_iters);
-            object_planes.objects.push_back(to_plane_msg(label, centroid, normal, size));
+            int num_inliers;
+            std::tie(centroid, normal, size, num_inliers) = all_seaing_perception::PCLRANSAC(*pcl_ptr, m_dist_thres, m_max_iters, true, m_clust_dist);
+            if (num_inliers >= m_min_inliers){
+                object_planes.objects.push_back(to_plane_msg(label, centroid, normal, size));
+            }
         }
         // check if in a coplanar set
         if (m_coplanar_id.count(m_id_label_map[label])){
             for (int merge_id : m_coplanar_id[m_id_label_map[label]]){
-                m_coplanar_pcls[merge_id].push_back(labeled_pcl);
+                coplanar_pcls[merge_id].push_back(labeled_pcl);
             }
         }
     }
 
     // Deal with coplanar sets
-    for(auto iter = m_coplanar_pcls.begin(); iter != m_coplanar_pcls.end(); ++iter)
+    for(auto iter = coplanar_pcls.begin(); iter != coplanar_pcls.end(); ++iter)
     {
         int id_merge = iter->first;
         auto labeled_pcls = iter->second;
@@ -178,17 +186,31 @@ void RANSACDetector::object_pcl_cb(
         // get centroid, normal, and size, and add to object_planes.coplanar_merged
         Eigen::Vector3d merged_ctr, merged_size;
         Eigen::Matrix3d merged_normal;
-        std::tie(merged_ctr, merged_normal, merged_size) = all_seaing_perception::PCLRANSAC(*merged_pcloud_ptr, m_dist_thres, m_max_iters);
-        object_planes.coplanar_merged.push_back(to_plane_msg(id_merge, merged_ctr, merged_normal, merged_size));
+        int merged_num_inliers;
+        std::tie(merged_ctr, merged_normal, merged_size, merged_num_inliers) = all_seaing_perception::PCLRANSAC(*merged_pcloud_ptr, m_dist_thres, m_max_iters, (labeled_pcls.size() == 1)?true:false, (labeled_pcls.size() == 1)?m_clust_dist:0.0f);
+        if (merged_num_inliers < m_min_inliers) continue;
+        
+        pcl::PointCloud<pcl::PointXYZ>::Ptr refined_merged_pcloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
         // get indiv refined planes
         for (auto labeled_pcl : labeled_pcls){
             int label = labeled_pcl.first;
             pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr = labeled_pcl.second;
 
-            // TODO: Project the inliers wrt the merged frame, remove outliers for the resulting point cloud, and add refined frame to object_planes.coplanar_indiv
+            // Project the inliers wrt the merged frame, remove outliers for the resulting point cloud, and add refined frame to object_planes.coplanar_indiv
             // Can probably use some of the helper functions for RANSAC in perception_utilities, do that
+            pcl::PointCloud<pcl::PointXYZ> pcl_inliers = all_seaing_perception::pickLargestCluster(all_seaing_perception::pickInliers(*pcl_ptr, merged_ctr, merged_normal, m_dist_thres), m_clust_dist);
+            if (pcl_inliers.size() < 2) continue;
+            Eigen::Vector3d indiv_ctr, indiv_size;
+            std::tie(indiv_ctr, indiv_size) = all_seaing_perception::centroidDims(pcl_inliers, merged_normal);
+            object_planes.coplanar_indiv.push_back(to_plane_msg(label, indiv_ctr, merged_normal, indiv_size));
+            
+            *refined_merged_pcloud_ptr += pcl_inliers;
         }
+
+        // Compute centroid & size of merged refined pcloud
+        std::tie(merged_ctr, merged_size) = all_seaing_perception::centroidDims(*refined_merged_pcloud_ptr, merged_normal);
+        object_planes.coplanar_merged.push_back(to_plane_msg(id_merge, merged_ctr, merged_normal, merged_size));
     }
     
     // Visualize RANSAC output

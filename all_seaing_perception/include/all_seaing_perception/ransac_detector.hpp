@@ -66,7 +66,7 @@ private:
     // Converts the output of the RANSAC utility function to the desired msg
     all_seaing_interfaces::msg::LabeledObjectPlane to_plane_msg(int label, Eigen::Vector3d centroid, Eigen::Matrix3d normal, Eigen::Vector3d size);
 
-    visualization_msgs::msg::MarkerArray visualize_plane(all_seaing_interfaces::msg::LabeledObjectPlane msg, int& marker_id);
+    visualization_msgs::msg::MarkerArray visualize_plane(all_seaing_interfaces::msg::LabeledObjectPlane msg, int& marker_id, double r = 0, double g = 0, double b = 1);
 
     visualization_msgs::msg::MarkerArray visualize_planes(all_seaing_interfaces::msg::LabeledObjectPlaneArray msg);
 
@@ -79,15 +79,13 @@ private:
     std::map<int, std::string> m_id_label_map;
     std::map<std::string, int> m_label_id_map;
     std::map<std::string, std::vector<int>> m_coplanar_id;
-    std::vector<std::pair<int, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>> m_labeled_pcls; // (id, pcl)
-    std::map<int, std::vector<std::pair<int, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>>> m_coplanar_pcls; // (id_merge, [(id, pcl), ...])
-
     std_msgs::msg::Header m_header;
 
     // ransac params
     int m_max_iters;
     double m_dist_thres;
     int m_min_inliers;
+    double m_clust_dist;
 
 public:
     RANSACDetector();

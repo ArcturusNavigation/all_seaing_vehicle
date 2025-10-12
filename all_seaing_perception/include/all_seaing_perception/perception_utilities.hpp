@@ -96,6 +96,9 @@ namespace all_seaing_perception{
     // @overload
     void euclideanClustering(const pcl::PointCloud<pcl::PointXYZI>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance = 0.0f, int obstacle_sz_min = 1, int obstacle_sz_max = std::numeric_limits<int>::max (), bool conditional = false, std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)> cond_func = std::function<bool(const pcl::PointXYZI&, const pcl::PointXYZI&, float)>());
 
+    // @overload
+    void euclideanClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance = 0.0f, int obstacle_sz_min = 1, int obstacle_sz_max = std::numeric_limits<int>::max (), bool conditional = false, std::function<bool(const pcl::PointXYZ&, const pcl::PointXYZ&, float)> cond_func = std::function<bool(const pcl::PointXYZ&, const pcl::PointXYZ&, float)>());
+
     // project bbox to point cloud and assign HSV colors
     void PCLInBBoxHSV(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, const pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim = false);
 
@@ -126,11 +129,23 @@ namespace all_seaing_perception{
         return std::make_tuple(centr, eigenvecs, axes_length);
     }
 
+    // pick largest cluster
+    template<typename PointT>
+    pcl::PointCloud<pcl::PointXYZ> pickLargestCluster(typename pcl::PointCloud<PointT> pcl_in, double clust_dist);
+
+    // given axes & pcloud, compute centroid (in original frame) & dimensions (in given axes)
+    template<typename PointT>
+    std::pair<Eigen::Vector3d, Eigen::Vector3d> centroidDims(typename pcl::PointCloud<PointT> pcl_in, Eigen::Matrix3d axes);
+
+    // given pcl, and centroid, and normal of fitted plane, pick the inliers
+    template<typename PointT>
+    pcl::PointCloud<pcl::PointXYZ> pickInliers(typename pcl::PointCloud<PointT> pcl_in, Eigen::Vector3d ctr, Eigen::Matrix3d normal, double dist_thres);
+
     // given a PCL point cloud, perform RANSAC to find the plane the points are in and compute the size of that plane excluding outliers
-    // (centroid, normal, size)
+    // (centroid, normal, size, num_inliers)
     // normal x axis is the plane normal, y axis is left horizontal to the ground, and z is up
     template<typename PointT>
-    std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d> PCLRANSAC(typename pcl::PointCloud<PointT> pcl_ptr, double dist_thres, int max_iter);
+    std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d, int> PCLRANSAC(typename pcl::PointCloud<PointT> pcl_in, double dist_thres, int max_iter, bool cluster = false, double clust_dist = 0.0f);
 
 } // namespace all_seaing_perception
 
