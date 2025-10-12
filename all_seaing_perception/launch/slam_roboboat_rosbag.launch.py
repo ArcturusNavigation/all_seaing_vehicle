@@ -46,6 +46,9 @@ def launch_setup(context, *args, **kwargs):
     contour_matching_color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
+    ransac_params = os.path.join(
+        bringup_prefix, "config", "perception", "ransac_params.yaml"
+    )
 
     set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
@@ -154,7 +157,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="point_cloud_filter",
         remappings=[
-            ("point_cloud", "/point_cloud/filtered_fake"),
+            # ("point_cloud", "/point_cloud/filtered_fake"),
+            ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
             {"global_frame_id": "map"},
@@ -218,8 +222,10 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "best"},
-            {"label_config": "buoy_label_mappings"},
+            # {"model": "best"},
+            {"model": "roboboat_shape_2025"},
+            # {"label_config": "buoy_label_mappings"},
+            {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -254,6 +260,19 @@ def launch_setup(context, *args, **kwargs):
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
             {"is_sim": False},
             {"label_list": True},
+        ]
+    )
+
+    ransac_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="ransac_detector",
+        output="screen",
+        remappings=[
+        ],
+        parameters=[
+            {"ransac_params_file": ransac_params},
+            # {"label_mappings_file": buoy_label_mappings},
+            {"label_mappings_file": shape_label_mappings},
         ]
     )
 
@@ -352,8 +371,9 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         # grid_map_generator,
-        # buoy_yolo_node,
+        buoy_yolo_node,
         bbox_project_pcloud_node,
+        ransac_node,
         object_tracking_map_node,
         # imu_reframe_node,
         # pcl_to_scan_node,

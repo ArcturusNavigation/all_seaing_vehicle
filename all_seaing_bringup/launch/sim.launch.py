@@ -409,6 +409,21 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": False},
+            {"buoy_label_mappings_file": buoy_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
@@ -452,6 +467,7 @@ def launch_setup(context, *args, **kwargs):
             # "world": "rb2025/rb2025_task1_task2.sdf",
             "world": "follow_path_task.sdf",
             # "world": "speed_course_world.sdf",
+            # "world": "scan_dock_deliver_task.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -482,6 +498,7 @@ def launch_setup(context, *args, **kwargs):
         follow_buoy_path,
         # follow_buoy_pid,
         # speed_challenge_pid,
+        # docking,
         rviz_waypoint_sender,
         # map_to_odom,
         keyboard_ld,

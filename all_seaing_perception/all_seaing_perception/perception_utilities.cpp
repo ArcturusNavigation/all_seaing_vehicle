@@ -120,6 +120,33 @@ namespace all_seaing_perception{
         }
     }
 
+    void euclideanClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr pcloud_ptr, std::vector<pcl::PointIndices>& clusters_indices, double clustering_distance, int obstacle_sz_min, int obstacle_sz_max, bool conditional, std::function<bool(const pcl::PointXYZ&, const pcl::PointXYZ&, float)> cond_func){
+        // extract clusters
+        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+        if (!pcloud_ptr->points.empty())
+            tree->setInputCloud(pcloud_ptr);
+    
+        // EUCLIDEAN CLUSTERING
+        if (conditional){
+            pcl::ConditionalEuclideanClustering<pcl::PointXYZ> ec;
+            ec.setClusterTolerance(clustering_distance);
+            ec.setMinClusterSize(obstacle_sz_min);
+            ec.setMaxClusterSize(obstacle_sz_max);
+            ec.setSearchMethod(tree);
+            ec.setInputCloud(pcloud_ptr);
+            ec.setConditionFunction(cond_func);
+            ec.segment(clusters_indices);
+        }else{
+            pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+            ec.setClusterTolerance(clustering_distance);
+            ec.setMinClusterSize(obstacle_sz_min);
+            ec.setMaxClusterSize(obstacle_sz_max);
+            ec.setSearchMethod(tree);
+            ec.setInputCloud(pcloud_ptr);
+            ec.extract(clusters_indices);
+        }
+    }
+
     void PCLInBBoxHSV(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr, all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, cv::Mat& img, image_geometry::PinholeCameraModel& cmodel, bool is_sim){
         for (pcl::PointXYZI &point_tf : cloud->points) {
             cv::Point2d xy_rect = all_seaing_perception::projectPCLPtToPixel(cmodel, point_tf, is_sim);
@@ -148,4 +175,125 @@ namespace all_seaing_perception{
     template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZI> pcl_in, typename pcl::PointCloud<pcl::PointXYZI> &pcl_out, geometry_msgs::msg::TransformStamped tf);
     template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZHSV> pcl_in, typename pcl::PointCloud<pcl::PointXYZHSV> &pcl_out, geometry_msgs::msg::TransformStamped tf);
     template void transformPCLCloud(const typename pcl::PointCloud<pcl::PointXYZRGB> pcl_in, typename pcl::PointCloud<pcl::PointXYZRGB> &pcl_out, geometry_msgs::msg::TransformStamped tf);
+
+    template<typename PointT>
+    pcl::PointCloud<pcl::PointXYZ> pickLargestCluster(typename pcl::PointCloud<PointT> pcl_in, double clust_dist){
+        pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_in_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::copyPointCloud(pcl_in, *pcl_in_ptr);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_pcl_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        std::vector<pcl::PointIndices> clusters_indices;
+        euclideanClustering(pcl_in_ptr, clusters_indices, clust_dist);
+        int opt_clust = -1;
+        for (int i = 0; i < clusters_indices.size(); i++){
+            if (opt_clust == -1 || clusters_indices[i].indices.size() > clusters_indices[opt_clust].indices.size()){
+                opt_clust = i;
+            }
+        }
+        pcl::copyPointCloud(pcl_in, clusters_indices[opt_clust], *filtered_pcl_ptr);
+        return *filtered_pcl_ptr;
+    }
+
+    template pcl::PointCloud<pcl::PointXYZ> pickLargestCluster(typename pcl::PointCloud<pcl::PointXYZ> pcl_in, double clust_dist);
+
+    template<typename PointT>
+    std::pair<Eigen::Vector3d, Eigen::Vector3d> centroidDims(typename pcl::PointCloud<PointT> pcl_in, Eigen::Matrix3d axes){
+        pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_in_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::copyPointCloud(pcl_in, *pcl_in_ptr);
+
+        Eigen::Vector3d ctr, sz;
+
+        Eigen::Vector4f ctr_4;
+        pcl::compute3DCentroid(*pcl_in_ptr, ctr_4);
+        ctr = ctr_4.head(3).cast<double>();
+        
+        // Transform to normal frame
+        Eigen::Matrix4d projectionTransform(Eigen::Matrix4d::Identity());
+        projectionTransform.block<3,3>(0,0) = axes.transpose();
+        projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * ctr.head<3>());
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::transformPointCloud(*pcl_in_ptr, *cloudPointsProjected, projectionTransform);
+
+        // Get the minimum and maximum points of the transformed cloud.
+        pcl::PointXYZ minPoint, maxPoint;
+        pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
+        sz = Eigen::Vector3d(maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z);
+
+        return std::make_pair(ctr, sz);
+    }
+
+    template std::pair<Eigen::Vector3d, Eigen::Vector3d> centroidDims(typename pcl::PointCloud<pcl::PointXYZ> pcl_in, Eigen::Matrix3d axes);
+    
+    template<typename PointT>
+    pcl::PointCloud<pcl::PointXYZ> pickInliers(typename pcl::PointCloud<PointT> pcl_in, Eigen::Vector3d ctr, Eigen::Matrix3d normal, double dist_thres){
+        pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_in_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::copyPointCloud(pcl_in, *pcl_in_ptr);
+        std::vector<int> inliers;
+        pcl::SampleConsensusModelPlane<pcl::PointXYZ>::Ptr model_p (new pcl::SampleConsensusModelPlane<pcl::PointXYZ> (pcl_in_ptr));
+        Eigen::VectorXf model_coeff;
+        model_coeff.resize(4);
+        model_coeff.head(3) = ((Eigen::Vector3d)normal.block<3,1>(0,0)).cast<float>();
+        model_coeff[3] = -normal.block<3,1>(0,0).dot(ctr);
+        model_p->selectWithinDistance(model_coeff, dist_thres, inliers);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_out_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::copyPointCloud(*pcl_in_ptr, inliers, *pcl_out_ptr);
+        return *pcl_out_ptr;
+    }
+
+    template pcl::PointCloud<pcl::PointXYZ> pickInliers(typename pcl::PointCloud<pcl::PointXYZHSV> pcl_in, Eigen::Vector3d ctr, Eigen::Matrix3d normal, double dist_thres);
+
+    template<typename PointT>
+    std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d, int> PCLRANSAC(typename pcl::PointCloud<PointT> pcl_in, double dist_thres, int max_iter, bool cluster, double clust_dist){
+        pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_in_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::copyPointCloud(pcl_in, *pcl_in_ptr);
+
+        // Cluster before RANSAC, sometimes pcls of banners of boats inside dock include points from the slot banner, so those get picked up in the plane too
+        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_pcl_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        if (cluster){
+            *filtered_pcl_ptr = pickLargestCluster(*pcl_in_ptr, clust_dist);
+        }else{
+            filtered_pcl_ptr = pcl_in_ptr;
+        }
+
+        if (filtered_pcl_ptr->size() < 3){
+            return std::make_tuple(Eigen::Vector3d(), Eigen::Matrix3d(), Eigen::Vector3d(), -1);
+        }
+
+        pcl::SampleConsensusModelPlane<pcl::PointXYZ>::Ptr model_p (new pcl::SampleConsensusModelPlane<pcl::PointXYZ> (filtered_pcl_ptr));
+        pcl::RandomSampleConsensus<pcl::PointXYZ> ransac (model_p);
+
+        ransac.setDistanceThreshold(dist_thres);
+        ransac.setMaxIterations(max_iter);
+        ransac.computeModel();
+        
+        std::vector<int> inliers;
+        ransac.getInliers(inliers);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr inlier_pcl_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::copyPointCloud(*filtered_pcl_ptr, inliers, *inlier_pcl_ptr);
+
+        Eigen::Vector3d ctr, sz;
+
+        Eigen::Vector3d x_axis, y_axis, z_axis;
+        Eigen::VectorXf model_coef;
+        ransac.getModelCoefficients(model_coef);
+        x_axis = ((Eigen::Vector3f)model_coef.head(3)).cast<double>();
+        y_axis = x_axis.cross(Eigen::Vector3d(0,0,1)).normalized();
+        z_axis = x_axis.cross(y_axis);
+        Eigen::Matrix3d normal;
+        normal << x_axis, y_axis, z_axis;
+        
+        std::tie(ctr, sz) = centroidDims(*inlier_pcl_ptr, normal);
+
+        // Negate x axis & y axis if x axis away from robot (take dot product with centroid coordinates, should be negative)
+        // Sizes are the same
+        if (normal.col(0).dot(ctr) > 0){
+            normal.col(0) *= -1;
+            normal.col(1) *= -1;
+        }
+
+        return std::make_tuple(ctr, normal, sz, inliers.size());
+    }
+    
+    template std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d, int> PCLRANSAC(typename pcl::PointCloud<pcl::PointXYZHSV> pcl_in, double dist_thres, int max_iter, bool cluster, double clust_dist);
+    template std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d, int> PCLRANSAC(typename pcl::PointCloud<pcl::PointXYZI> pcl_in, double dist_thres, int max_iter, bool cluster, double clust_dist);
 }

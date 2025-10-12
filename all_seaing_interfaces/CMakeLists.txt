@@ -22,6 +22,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/ObstacleCounterArray.msg"
     "msg/LabeledObjectPointCloud.msg"
     "msg/LabeledObjectPointCloudArray.msg"
+    "msg/LabeledObjectPlane.msg"
+    "msg/LabeledObjectPlaneArray.msg"
     "msg/KeyboardButton.msg"
     "srv/CommandAdj.srv"
     "srv/CommandFan.srv"

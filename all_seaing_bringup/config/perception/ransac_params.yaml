@@ -1,0 +1,38 @@
+labels: [
+  "black_circle",
+  "black_cross",
+  "black_triangle",
+  "blue_circle",
+  "blue_cross",
+  "blue_square",
+  "blue_triangle",
+  "green_circle",
+  "green_square",
+  "green_cross",
+  "green_triangle",
+  "red_circle",
+  "red_square",
+  "red_cross",
+  "red_triangle"
+]
+
+coplanar:
+  100: [ # dock banners
+    "blue_circle",
+    "blue_cross",
+    "blue_square",
+    "blue_triangle",
+    "green_circle",
+    "green_square",
+    "green_cross",
+    "green_triangle",
+    "red_circle",
+    "red_square",
+    "red_cross",
+    "red_triangle"
+    ]
+
+max_iters: 70
+dist_thres: 0.1
+min_inliers: 25
+clust_dist: 0.5

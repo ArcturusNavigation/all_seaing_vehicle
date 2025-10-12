@@ -62,7 +62,7 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("theta_threshold", 180.0)
         self.declare_parameter("goal_tol", 0.5)
         self.declare_parameter("obstacle_tol", 50)
-        self.declare_parameter("choose_every", 1)
+        self.declare_parameter("choose_every", 1) # TODO: Change back to 5? it's probably not the issue, if it's 1 it's extremely slow
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
         self.declare_parameter("bypass_planner", False)
