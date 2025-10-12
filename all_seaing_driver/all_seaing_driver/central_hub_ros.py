@@ -15,7 +15,7 @@ class CentralHubROS(Node):
             "port", "/dev/ttyACM0").get_parameter_value().string_value
     
         self.low_battery_threshold = self.declare_parameter(
-            "low_battery_threshold", 2000000.0
+            "low_battery_threshold", 2000.0
         ).get_parameter_value().double_value
 
         ser = serial.Serial(port, 115200, timeout=1)
