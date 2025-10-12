@@ -34,6 +34,7 @@ RANSACDetector::RANSACDetector() : Node("ransac_detector"){
 
         m_max_iters = m_ransac_params_config_yaml["max_iters"].as<int>();
         m_dist_thres = m_ransac_params_config_yaml["dist_thres"].as<double>();
+        m_min_inliers = m_ransac_params_config_yaml["min_inliers"].as<int>();
     } 
     else {
         RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", m_ransac_params_file.c_str());
@@ -72,8 +73,9 @@ all_seaing_interfaces::msg::LabeledObjectPlane RANSACDetector::to_plane_msg(int 
     mat.getRotation(quat);
     object_plane.normal_ctr.orientation = tf2::toMsg(quat);
 
-    object_plane.size.x = size[0];
+    object_plane.size.x = 0.01;
     object_plane.size.y = size[1];
+    object_plane.size.z = size[2];
 
     return object_plane;
 }
@@ -85,8 +87,8 @@ visualization_msgs::msg::MarkerArray RANSACDetector::visualize_plane(all_seaing_
     normal_marker.type = visualization_msgs::msg::Marker::ARROW;
     normal_marker.pose = msg.normal_ctr;
     normal_marker.scale.x = 1;
-    normal_marker.scale.y = 1;
-    normal_marker.scale.z = 1;
+    normal_marker.scale.y = 0.01;
+    normal_marker.scale.z = 0.01;
     normal_marker.color.a = 1;
     normal_marker.color.r = 1;
     normal_marker.header = m_header;

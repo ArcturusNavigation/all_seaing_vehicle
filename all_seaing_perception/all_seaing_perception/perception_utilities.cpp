@@ -165,10 +165,20 @@ namespace all_seaing_perception{
         pcl::PointCloud<pcl::PointXYZ>::Ptr inlier_pcl_ptr (new pcl::PointCloud<pcl::PointXYZ>);
         pcl::copyPointCloud (*pcl_in_ptr, inliers, *inlier_pcl_ptr);
 
+        Eigen::Vector3d ctr, sz;
+
+        Eigen::Vector4f ctr_4;
+        pcl::compute3DCentroid(*inlier_pcl_ptr, ctr_4);
+        ctr = ctr_4.head(3).cast<double>();
+
         Eigen::Vector3d x_axis, y_axis, z_axis;
         Eigen::VectorXf model_coef;
         ransac.getModelCoefficients(model_coef);
         x_axis = ((Eigen::Vector3f)model_coef.head(3)).cast<double>();
+        // Negate x_axis if away from robot (take dot product with centroid coordinates, should be negative)
+        if (x_axis.dot(ctr) > 0){
+            x_axis *= -1;
+        }
         y_axis = x_axis.cross(Eigen::Vector3d(0,0,1)).normalized();
         z_axis = x_axis.cross(y_axis);
         Eigen::Matrix3d normal;
@@ -176,11 +186,6 @@ namespace all_seaing_perception{
 
         // PCA or clustering & minimum bbox? -> PCA better, to not deal with clustering thresholds and other issues
         // just compute min bbox after converting to the normal frame, shouldn't have any outliers
-        Eigen::Vector3d ctr, sz;
-
-        Eigen::Vector4f ctr_4;
-        pcl::compute3DCentroid(*inlier_pcl_ptr, ctr_4);
-        ctr = ctr_4.head(3).cast<double>();
         
         // Transform to normal frame
         Eigen::Matrix4d projectionTransform(Eigen::Matrix4d::Identity());

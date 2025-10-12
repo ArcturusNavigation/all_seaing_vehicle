@@ -87,6 +87,7 @@ private:
     // ransac params
     int m_max_iters;
     double m_dist_thres;
+    int m_min_inliers;
 
 public:
     RANSACDetector();

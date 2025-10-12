@@ -157,7 +157,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="point_cloud_filter",
         remappings=[
-            ("point_cloud", "/point_cloud/filtered_fake"),
+            # ("point_cloud", "/point_cloud/filtered_fake"),
+            ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
             {"global_frame_id": "map"},
@@ -221,8 +222,10 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "best"},
-            {"label_config": "buoy_label_mappings"},
+            # {"model": "best"},
+            {"model": "roboboat_shape_2025"},
+            # {"label_config": "buoy_label_mappings"},
+            {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -268,7 +271,8 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"ransac_params_file": ransac_params},
-            {"label_mappings_file": buoy_label_mappings},
+            # {"label_mappings_file": buoy_label_mappings},
+            {"label_mappings_file": shape_label_mappings},
         ]
     )
 

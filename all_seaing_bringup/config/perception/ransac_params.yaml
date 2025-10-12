@@ -32,5 +32,6 @@ coplanar:
     "red_triangle"
     ]
 
-max_iters: 50
-dist_thres: 0.001
+max_iters: 100
+dist_thres: 0.1
+min_inliers: 100
