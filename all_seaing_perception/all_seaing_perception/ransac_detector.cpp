@@ -28,7 +28,7 @@ RANSACDetector::RANSACDetector() : Node("ransac_detector"){
         for (YAML::const_iterator it = coplanar.begin(); it != coplanar.end(); ++it) {
             std::vector<std::string> coplanars = it->second.as<std::vector<std::string>>();
             for (std::string coplanar_label : coplanars){
-                m_coplanar[coplanar_label].push_back(it->first.as<int>());
+                m_coplanar_id[coplanar_label].push_back(it->first.as<int>());
             }
         }
 
@@ -67,7 +67,7 @@ all_seaing_interfaces::msg::LabeledObjectPlane RANSACDetector::to_plane_msg(int 
     tf2::Matrix3x3 mat(
         normal(0,0), normal(0,1), normal(0,2),
         normal(1,0), normal(1,1), normal(1,2),
-        normal(2,0), normal(2,1), normal(2,2),
+        normal(2,0), normal(2,1), normal(2,2)
     );
     mat.getRotation(quat);
     object_plane.normal_ctr.orientation = tf2::toMsg(quat);
@@ -109,7 +109,7 @@ visualization_msgs::msg::MarkerArray RANSACDetector::visualize_plane(all_seaing_
 }
 
 template<typename type_t>
-void vector_extend(const typename std::vector<type_t> &v1, const typename std::vector<type_t> &v2){
+void vector_extend(typename std::vector<type_t> &v1, const typename std::vector<type_t> &v2){
     v1.insert(v1.end(), v2.begin(), v2.end());
 }
 
@@ -150,12 +150,12 @@ void RANSACDetector::object_pcl_cb(
             // get centroid, normal, and size, and add to object_planes.objects
             Eigen::Vector3d centroid, size;
             Eigen::Matrix3d normal;
-            std::tie(centroid, normal, size) = all_seaing_perception::PCLRANSAC(pcl_ptr, m_dist_thres, m_max_iters);
+            std::tie(centroid, normal, size) = all_seaing_perception::PCLRANSAC(*pcl_ptr, m_dist_thres, m_max_iters);
             object_planes.objects.push_back(to_plane_msg(label, centroid, normal, size));
         }
         // check if in a coplanar set
-        if (m_coplanar.count(m_id_label_map[label)){
-            for (int merge_id : m_coplanar[m_id_label_map[label]]){
+        if (m_coplanar_id.count(m_id_label_map[label])){
+            for (int merge_id : m_coplanar_id[m_id_label_map[label]]){
                 m_coplanar_pcls[merge_id].push_back(labeled_pcl);
             }
         }
@@ -176,7 +176,7 @@ void RANSACDetector::object_pcl_cb(
         // get centroid, normal, and size, and add to object_planes.coplanar_merged
         Eigen::Vector3d merged_ctr, merged_size;
         Eigen::Matrix3d merged_normal;
-        std::tie(merged_ctr, merged_normal, merged_size) = all_seaing_perception::PCLRANSAC(merged_pcloud_ptr, m_dist_thres, m_max_iters);
+        std::tie(merged_ctr, merged_normal, merged_size) = all_seaing_perception::PCLRANSAC(*merged_pcloud_ptr, m_dist_thres, m_max_iters);
         object_planes.coplanar_merged.push_back(to_plane_msg(id_merge, merged_ctr, merged_normal, merged_size));
 
         // get indiv refined planes

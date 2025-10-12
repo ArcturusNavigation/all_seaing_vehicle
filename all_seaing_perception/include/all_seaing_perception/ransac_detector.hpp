@@ -56,7 +56,7 @@ class RANSACDetector : public rclcpp::Node{
 private:
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::LabeledObjectPlaneArray>::SharedPtr m_object_ransac_pub;
-    rclcpp::Publisher<visualization_mgs::msg::MarkerArray>::SharedPtr m_ransac_viz_pub;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_ransac_viz_pub;
     rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPointCloudArray>::SharedPtr m_object_pcl_sub;
 
     // Get the object point clouds, filter the ones that represent banners, and do RANSAC on those

@@ -117,10 +117,10 @@ namespace all_seaing_perception{
         Eigen::Matrix4d projectionTransform(Eigen::Matrix4d::Identity());
         projectionTransform.block<3,3>(0,0) = eigenvecs.transpose();
         projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * centr.head<3>());
-        pcl::PointCloud<pcl::PointXYZI>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZI>);
+        typename pcl::PointCloud<PointT>::Ptr cloudPointsProjected (new pcl::PointCloud<PointT>);
         pcl::transformPointCloud(pcl_in, *cloudPointsProjected, projectionTransform);
         // Get the minimum and maximum points of the transformed cloud.
-        pcl::PointXYZI minPoint, maxPoint;
+        PointT minPoint, maxPoint;
         pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
         Eigen::Vector3d axes_length = Eigen::Vector3d(maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z);
         return std::make_tuple(centr, eigenvecs, axes_length);
@@ -130,7 +130,7 @@ namespace all_seaing_perception{
     // (centroid, normal, size)
     // normal x axis is the plane normal, y axis is left horizontal to the ground, and z is up
     template<typename PointT>
-    std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d> PCLRANSAC(const typename pcl::PointCloud<PointT>::Ptr pcl_ptr, double dist_thres, int max_iter);
+    std::tuple<Eigen::Vector3d, Eigen::Matrix3d, Eigen::Vector3d> PCLRANSAC(typename pcl::PointCloud<PointT> pcl_ptr, double dist_thres, int max_iter);
 
 } // namespace all_seaing_perception
 
