@@ -48,6 +48,9 @@ def launch_setup(context, *args, **kwargs):
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
+    ransac_params = os.path.join(
+        bringup_prefix, "config", "perception", "ransac_params.yaml"
+    )
     contour_matching_color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
@@ -80,7 +83,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
@@ -96,7 +99,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
@@ -113,7 +116,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
@@ -460,10 +463,10 @@ def launch_setup(context, *args, **kwargs):
         # buoy_yolo_node,
         # buoy_yolo_node_back_left,
         # buoy_yolo_node_back_right,
-        # bbox_project_pcloud_node,
-        # bbox_project_pcloud_node_back_left,
-        # bbox_project_pcloud_node_back_right,
-        # multicam_detection_merge_node,
+        bbox_project_pcloud_node,
+        bbox_project_pcloud_node_back_left,
+        bbox_project_pcloud_node_back_right,
+        multicam_detection_merge_node,
         # odometry_publisher_node,
         object_tracking_map_node,
         tf_filtering,

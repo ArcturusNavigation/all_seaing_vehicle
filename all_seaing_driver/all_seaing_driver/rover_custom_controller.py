@@ -65,14 +65,19 @@ class RoverCustomController(Node):
         self.heartbeat_publisher.publish(self.heartbeat_message)
 
         if self.heartbeat_message.in_teleop and not self.heartbeat_message.e_stopped:
-            self.send_controls(result)
+            if result.battery_ok:
+                self.send_controls(result)
+            else:
+                self.get_logger().info("Battery low, preventing boat from moving. ")
+                self.get_logger().info("Please run the command: ros2 service call /acknowledge_low_battery all_seaing_interfaces/srv/AcknowledgeLowBattery \"{acknowledge: true}\" in order to continue.")
+                
 
     def send_controls(self, result):
         control_option = ControlOption()
         control_option.priority = 0  # TeleOp has the highest priority value
-        control_option.twist.linear.x = result.drive_y * self.joy_x_scale
-        control_option.twist.linear.y = 0.0
-        control_option.twist.angular.z = result.drive_x * self.joy_ang_scale
+        control_option.twist.linear.x = result.drive_y1 * self.joy_x_scale
+        control_option.twist.linear.y = -result.drive_x1 * self.joy_x_scale
+        control_option.twist.angular.z = result.drive_x2 * self.joy_ang_scale
         self.control_option_pub.publish(control_option)
 
 

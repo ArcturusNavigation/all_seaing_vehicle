@@ -22,11 +22,14 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/ObstacleCounterArray.msg"
     "msg/LabeledObjectPointCloud.msg"
     "msg/LabeledObjectPointCloudArray.msg"
+    "msg/LabeledObjectPlane.msg"
+    "msg/LabeledObjectPlaneArray.msg"
     "msg/KeyboardButton.msg"
     "srv/CommandAdj.srv"
     "srv/CommandFan.srv"
     "srv/CommandServo.srv"
     "srv/GetEstopStatus.srv"
+    "srv/AcknowledgeLowBattery.srv"
     DEPENDENCIES
     geometry_msgs
     sensor_msgs

@@ -31,7 +31,7 @@ class Yolov8Node(Node):
 
         # Declare/get ROS parameters
         model_name = self.declare_parameter(
-            "model", "roboboat_2025").get_parameter_value().string_value
+            "model", "best").get_parameter_value().string_value
         self.device = self.declare_parameter(
             "device", "default").get_parameter_value().string_value
         self.conf = self.declare_parameter(

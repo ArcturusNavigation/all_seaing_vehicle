@@ -147,7 +147,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "color_label_mappings"},
             {"conf": 0.6},
         ],
@@ -365,6 +365,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -405,6 +406,21 @@ def launch_setup(context, *args, **kwargs):
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
             ),
             ("obstacle_map/labeled", "obstacle_map/local")
+        ],
+    )
+
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": False},
+            {"buoy_label_mappings_file": buoy_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/zed/zed_node/rgb/camera_info",
+            ),
         ],
     )
 
@@ -451,6 +467,7 @@ def launch_setup(context, *args, **kwargs):
             # "world": "rb2025/rb2025_task1_task2.sdf",
             "world": "follow_path_task.sdf",
             # "world": "speed_course_world.sdf",
+            # "world": "scan_dock_deliver_task.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -481,6 +498,7 @@ def launch_setup(context, *args, **kwargs):
         follow_buoy_path,
         # follow_buoy_pid,
         # speed_challenge_pid,
+        # docking,
         rviz_waypoint_sender,
         # map_to_odom,
         keyboard_ld,

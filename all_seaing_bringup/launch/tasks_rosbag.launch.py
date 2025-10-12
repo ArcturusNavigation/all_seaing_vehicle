@@ -71,6 +71,10 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
+            {"duplicate_dist": 0.3},
+            {"forward_dist": 1.5},
+            {"inter_buoy_pair_dist": 0.5},
+            {"buoy_pair_dist_thres": 0.2},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),

@@ -51,6 +51,9 @@ def launch_setup(context, *args, **kwargs):
     contour_matching_color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
+    ransac_params = os.path.join(
+        bringup_prefix, "config", "perception", "ransac_params.yaml"
+    )
 
     set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
@@ -130,7 +133,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
@@ -146,7 +149,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
@@ -163,7 +166,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            {"model": "roboboat_2025"},
+            {"model": "best"},
             {"label_config": "buoy_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},

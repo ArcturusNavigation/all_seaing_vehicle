@@ -20,6 +20,7 @@
     <depend>mavros_extras</depend>
     <depend>sensor_msgs</depend>
     <depend>std_msgs</depend>
+    <depend>imu_filter_madgwick</depend>
 
     <export>
         <build_type>ament_cmake</build_type>
