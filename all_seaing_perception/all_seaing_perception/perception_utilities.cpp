@@ -277,7 +277,7 @@ namespace all_seaing_perception{
         Eigen::VectorXf model_coef;
         ransac.getModelCoefficients(model_coef);
         x_axis = ((Eigen::Vector3f)model_coef.head(3)).cast<double>();
-        y_axis = x_axis.cross(Eigen::Vector3d(0,0,1)).normalized();
+        y_axis = Eigen::Vector3d(0,0,1).cross(x_axis).normalized();
         z_axis = x_axis.cross(y_axis);
         Eigen::Matrix3d normal;
         normal << x_axis, y_axis, z_axis;
