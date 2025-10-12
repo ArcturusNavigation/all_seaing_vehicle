@@ -4,6 +4,7 @@ from rclpy.node import Node
 from all_seaing_interfaces.msg import ObstacleMap
 from rclpy.qos import qos_profile_sensor_data
 from message_filters import Subscriber, TimeSynchronizer, ApproximateTimeSynchronizer
+from custom_time_synchronizers import ResistantTimeSynchronizer
 
 class MulticamDetectionMerge(Node):
     def __init__(self):
@@ -14,6 +15,7 @@ class MulticamDetectionMerge(Node):
         self.declare_parameter("enable_back_right", True)
         self.declare_parameter("individual", False)
         self.declare_parameter("approximate", False)
+        self.declare_parameter("resistant", True)
         self.declare_parameter("delay", 0.1) # only if not individual and also approximate
 
         self.enable_front = self.get_parameter("enable_front").get_parameter_value().bool_value
@@ -21,6 +23,7 @@ class MulticamDetectionMerge(Node):
         self.enable_back_right = self.get_parameter("enable_back_right").get_parameter_value().bool_value
         self.individual = self.get_parameter("individual").get_parameter_value().bool_value
         self.approximate = self.get_parameter("approximate").get_parameter_value().bool_value
+        self.resistant = self.get_parameter("resistant").get_parameter_value().bool_value
         self.delay = self.get_parameter("delay").get_parameter_value().double_value
     
         if not self.individual:
@@ -35,9 +38,15 @@ class MulticamDetectionMerge(Node):
                 self.detection_back_right_sub = Subscriber(self, ObstacleMap, "detections/back_right")
                 self.detection_subs.append(self.detection_back_right_sub)
             if not self.approximate:
-                self.sync = TimeSynchronizer(self.detection_subs, 10)
+                if not self.resistant:
+                    self.sync = TimeSynchronizer(self.detection_subs, 10)
+                else:
+                    self.sync = ResistantTimeSynchronizer(self.detection_subs, 10, 0.2, True)
             else:
-                self.sync = ApproximateTimeSynchronizer(self.detection_subs, 10, self.delay)
+                if not self.resistant:
+                    self.sync = ApproximateTimeSynchronizer(self.detection_subs, 10, self.delay)
+                else:
+                    raise NotImplementedError
             self.sync.registerCallback(self.detection_sync_callback)
         else:
             if self.enable_front:
