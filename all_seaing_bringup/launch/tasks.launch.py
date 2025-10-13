@@ -50,6 +50,9 @@ def launch_setup(context, *args, **kwargs):
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
+    shape_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
+    )
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
@@ -127,6 +130,21 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    docking_fallback = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking_fallback.py",
+        parameters=[
+            {"is_sim": False},
+            {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": shape_label_mappings},
+            # {"dock_width": 2.0},
+            # {"dock_length": 11.0},
+        ],
+        remappings=[
+            
+        ],
+    )
+
     control_mux = launch_ros.actions.Node(
         package="all_seaing_controller",
         executable="control_mux.py",
@@ -196,7 +214,9 @@ def launch_setup(context, *args, **kwargs):
         task_init_server, 
         follow_buoy_path,
         # follow_buoy_pid,
+        # speed_challenge_pid
         # delivery_server
+        # docking_fallback
     ]
 
 

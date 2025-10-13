@@ -224,6 +224,7 @@ void RANSACDetector::object_pcl_cb(
     m_ransac_viz_pub->publish(delete_arr);
     // publish new ones
     m_ransac_viz_pub->publish(visualize_planes(object_planes));
+    m_object_ransac_pub->publish(object_planes);
 }
 
 RANSACDetector::~RANSACDetector() {}
