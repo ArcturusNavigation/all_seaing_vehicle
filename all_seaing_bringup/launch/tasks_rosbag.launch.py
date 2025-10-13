@@ -130,7 +130,10 @@ def launch_setup(context, *args, **kwargs):
         executable="docking_fallback.py",
         parameters=[
             {"is_sim": False},
-            {"shape_label_mappings_file": shape_label_mappings}
+            {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": shape_label_mappings},
+            # {"dock_width": 2.0},
+            # {"dock_length": 11.0},
         ],
         remappings=[
             
@@ -237,10 +240,10 @@ def launch_setup(context, *args, **kwargs):
         # navigation_server_nomap,
         run_tasks,
         task_init_server, 
-        # follow_buoy_path,
+        follow_buoy_path,
         # follow_buoy_pid,
         # delivery_server,
-        docking_fallback,
+        # docking_fallback,
         keyboard_ld, # only for rosbag
         onshore_node, # only for rosbag
         rviz_waypoint_sender,

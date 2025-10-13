@@ -31,11 +31,22 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
     )
 
+    buoy_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+    )
+
+    shape_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
+    )
+
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
     contour_matching_color_ranges = os.path.join(
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
+    )
+    ransac_params = os.path.join(
+        bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
 
     buoy_yolo_node = launch_ros.actions.Node(
@@ -219,6 +230,19 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    ransac_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="ransac_detector",
+        output="screen",
+        remappings=[
+        ],
+        parameters=[
+            {"ransac_params_file": ransac_params},
+            {"label_mappings_file": buoy_label_mappings},
+            # {"label_mappings_file": shape_label_mappings},
+        ]
+    )
+
     point_cloud_filter_downsampled_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -340,6 +364,7 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,
         multicam_detection_merge_node,
+        # ransac_node,
         point_cloud_filter_downsampled_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
