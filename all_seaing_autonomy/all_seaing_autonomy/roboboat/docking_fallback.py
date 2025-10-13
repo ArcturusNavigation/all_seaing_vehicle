@@ -9,7 +9,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from ament_index_python.packages import get_package_share_directory
 
 from all_seaing_common.action_server_base import ActionServerBase
-from all_seaing_controller.pid_controller import PIDController
+from all_seaing_controller.pid_controller import PIDController, CircularPID
 from all_seaing_interfaces.action import Task
 from all_seaing_interfaces.msg import LabeledObjectPlaneArray, LabeledObjectPlane, ControlOption
 
@@ -51,14 +51,14 @@ class DockingFallback(ActionServerBase):
         self.cam_base_link_tf = None
         self.got_tf = False
         
-        pid_vals = (
-            self.declare_parameter("pid_vals", [0.003, 0.001, 0.001]) # TODO: fine-tune values (especially D term)
-            .get_parameter_value()
-            .double_array_value
-        )
+        # pid_vals = (
+        #     self.declare_parameter("pid_vals", [0.1, 0.0, 0.0]) # TODO: fine-tune values (especially D term)
+        #     .get_parameter_value()
+        #     .double_array_value
+        # )
 
-        self.declare_parameter("forward_speed", 5.0)
-        self.declare_parameter("max_yaw", 1.0)
+        self.declare_parameter("forward_speed", 2.0)
+        self.declare_parameter("max_yaw", 0.7)
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
         self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
 
@@ -79,15 +79,35 @@ class DockingFallback(ActionServerBase):
         self.declare_parameter("dock_merged_id", 100)
         self.dock_merged_id = self.get_parameter("dock_merged_id").get_parameter_value().integer_value
 
-        # RANSAC PARAMS
-        self.inlier_threshold = 0.001
-        self.num_ransac_iters = 15
-        self.inlier_num = 20
-        # self.pair_space = 3
+        self.declare_parameter("slow_dist", 0.1) # larger->smoother decline, starts slowing down further away
+        self.slow_dist = self.get_parameter("slow_dist").get_parameter_value().double_value
 
-        self.pid = PIDController(*pid_vals)
-        self.pid.set_effort_min(-self.max_yaw_rate)
-        self.pid.set_effort_max(self.max_yaw_rate)
+        Kpid_x = (
+            self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        Kpid_y = (
+            self.declare_parameter("Kpid_y", [0.75, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        Kpid_theta = (
+            self.declare_parameter("Kpid_theta", [0.75, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        self.max_vel = (
+            self.declare_parameter("max_vel", [2.0, 1.0, 0.4])
+            .get_parameter_value()
+            .double_array_value
+        )
+
+        self.x_pid = PIDController(*Kpid_x)
+        self.y_pid = PIDController(*Kpid_y)
+        self.theta_pid = CircularPID(*Kpid_theta)
+        self.theta_pid.set_effort_min(-self.max_vel[2])
+        self.theta_pid.set_effort_max(self.max_vel[2])
         self.prev_update_time = self.get_clock().now()
         self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
@@ -103,6 +123,7 @@ class DockingFallback(ActionServerBase):
 
         self.got_dock = False
         self.picked_slot = False
+        self.started_task = False
 
         self.state = None
         self.result = False
@@ -135,6 +156,8 @@ class DockingFallback(ActionServerBase):
         return ((center_pt[0]+np.cos(theta)*plane.size.y, center_pt[1]+np.sin(theta)*plane.size.y), (center_pt[0]-np.cos(theta)*plane.size.y, center_pt[1]-np.sin(theta)*plane.size.y))
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
+        if not self.started_task:
+            return
         # self.get_logger().info('GOT OBJECTS')
         new_dock_banners = []
         new_boat_banners = []
@@ -157,7 +180,7 @@ class DockingFallback(ActionServerBase):
             if (merged_obj_indiv.label in self.dock_labels):
                 pt_left, pt_right = self.pt_left_right(merged_obj_indiv)
                 new_dock_banners.append((merged_obj_indiv.label, (pt_left, pt_right)))
-                self.get_logger().info(f'DOCK: {self.inv_label_mappings[merged_obj_indiv.label]} -> {(pt_left, pt_right).__str__()}')
+                # self.get_logger().info(f'DOCK: {self.inv_label_mappings[merged_obj_indiv.label]} -> {(pt_left, pt_right).__str__()}')
 
         # update global variables
         self.dock_banners = new_dock_banners
@@ -187,7 +210,10 @@ class DockingFallback(ActionServerBase):
                     # we're cooked
                     self.selected_slot = None
                     self.picked_slot = False
-                    self.pid.reset()
+                    # self.pid.reset()
+                    self.x_pid.reset()
+                    self.y_pid.reset()
+                    self.theta_pid.reset()
                 self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                 continue
             # found empty docking slot
@@ -195,7 +221,10 @@ class DockingFallback(ActionServerBase):
                 # found an empty one closer
                 self.selected_slot = (dock_label, (dock_left, dock_right))
                 self.picked_slot = True
-                self.pid.reset()
+                # self.pid.reset()
+                self.x_pid.reset()
+                self.y_pid.reset()
+                self.theta_pid.reset()
 
         if(self.picked_slot):
             self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]]}')
@@ -226,33 +255,91 @@ class DockingFallback(ActionServerBase):
         x2, y2 = self.difference(p2left, p2right)
         return math.acos(abs(x1*x2+y1*y2)/(self.norm((x1,y1))*self.norm((x2,y2))))
     
+    def fit_pair(self, point_pair):
+        (x1,y1), (x2,y2) = point_pair
+        # (y-y1)(x2-x1) = (y2-y1)*(x-x1) -> y(x2-x1)+x(y1-y2)+x1(y2-y1)+y1(x1-x2) = 0 -> y(x2-x1)+x(y1-y2)+x1y2-x2y1
+        return (y1-y2, x2-x1, x1*y2-x2*y1), abs(x1*y2-x2*y1)/math.sqrt((y1-y2)**2+(x2-x1)**2)
+    
+    def set_pid_setpoints(self, x, y, theta):
+        self.x_pid.set_setpoint(x)
+        self.y_pid.set_setpoint(y)
+        self.theta_pid.set_setpoint(theta)
+
+    def update_pid(self, x, y, heading):
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        self.x_pid.update(x, dt)
+        self.y_pid.update(y, dt)
+        self.theta_pid.update(heading, dt)
+        self.prev_update_time = self.get_clock().now()
+
+    def scale_thrust(self, x_vel, y_vel):
+        if abs(x_vel) <= self.max_vel[0] and abs(y_vel) <= self.max_vel[1]:
+            return x_vel, y_vel
+
+        scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
+        return scale * x_vel, scale * y_vel
+    
     def control_loop(self):
         if(not self.picked_slot):
             return # maybe stop the robot? or just go forward/steer to the left
-        
+        marker_arr = MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)])
+        mark_id = 1
+        # self.get_logger().info(f'CONTROL LOOP')
         # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
         slot_back_mid = self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])
-        ((a, b, c), _), _ = self.dock_banner_line
+        (a, b, c), _ = self.fit_pair(self.dock_banner_line)
         perp_dock_line_params = (-b, a, 
                                  b*slot_back_mid[0] - a*slot_back_mid[1])
+        
+        marker_arr.markers.append(VisualizationTools.visualize_line((perp_dock_line_params,0), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
+        mark_id = mark_id + 1
+        
+        # if perp_dock_line_params[0] < 0:
+        #     perp_dock_line_params = -perp_dock_line_params[0], -perp_dock_line_params[1], -perp_dock_line_params[2] # normal points to the right
 
-        # go to that line and forward (positive error if boat left of line, negative if right)
-        # TODO: check the signs
-        offset = -math.copysign(1.0, -perp_dock_line_params[0]*perp_dock_line_params[2])*abs(perp_dock_line_params[2]/math.sqrt(perp_dock_line_params[0]**2+perp_dock_line_params[1]**2))
+        # go to that line and forward (megative error if boat left of line, positive if right)
+        offset = math.copysign(1.0, perp_dock_line_params[1]*perp_dock_line_params[2])*abs(perp_dock_line_params[2]/math.sqrt(perp_dock_line_params[0]**2+perp_dock_line_params[1]**2))
         if(abs(perp_dock_line_params[1]) < 0.0001):
             approach_angle = np.pi/2.0
         else:
             approach_angle = math.atan(-perp_dock_line_params[0]/perp_dock_line_params[1])
-        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.pid.update(offset + self.boat_angle_coeff*approach_angle, dt)            
-        yaw_rate = self.pid.get_effort()
-        self.prev_update_time = self.get_clock().now()
+        
+        # dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        # self.pid.update(offset + self.boat_angle_coeff*approach_angle, dt)            
+        # yaw_rate = self.pid.get_effort()
+        # self.prev_update_time = self.get_clock().now()
 
+        # control_msg = ControlOption()
+        # control_msg.priority = 1
+
+        # forward speed decreasing exponentially as we get closer
+        dist_diff = self.norm(slot_back_mid) - self.dock_length/2.0 # can improve to compute distance from projected center of dock instead, more accurate but not needed since we're gonna be aligned with it at some point anyways
+        # subtract half the dock length when further than the half the width sideways
+        if abs(offset) > self.dock_width/2.0:
+            dist_diff -= self.dock_length/2.0
+        # forward_speed = self.forward_speed*(1-np.exp(-dist_diff/self.slow_dist))
+
+        # control_msg.twist.linear.x = float(forward_speed)
+        # control_msg.twist.linear.y = 0.0
+        # control_msg.twist.angular.z = float(yaw_rate)
+        # self.control_pub.publish(control_msg)
+
+        self.get_logger().info(f'side offset: {offset}')
+        self.get_logger().info(f'forward distance: {dist_diff}')
+        self.update_pid(-dist_diff, offset, -approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
+        x_output = self.x_pid.get_effort()
+        y_output = self.y_pid.get_effort()
+        theta_output = self.theta_pid.get_effort()
+        x_vel = x_output
+        # x_vel = forward_speed
+        y_vel = y_output
+
+        x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
         control_msg = ControlOption()
-        control_msg.priority = 1
-        control_msg.twist.linear.x = float(self.forward_speed)
-        control_msg.twist.linear.y = 0.0
-        control_msg.twist.angular.z = float(yaw_rate)
+        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+        control_msg.twist.linear.x = x_vel
+        control_msg.twist.linear.y = y_vel
+        control_msg.twist.angular.z = theta_output
         self.control_pub.publish(control_msg)
 
         self.got_dock = False
@@ -260,8 +347,12 @@ class DockingFallback(ActionServerBase):
         self.picked_slot = False
         self.selected_slot = None
 
+        self.marker_pub.publish(marker_arr)
+
     def execute_callback(self, goal_handle):
         self.start_process("docking starting")
+        self.started_task = True
+        self.set_pid_setpoints(0, 0, 0)
 
         while not self.result:
 
