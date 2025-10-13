@@ -19,9 +19,9 @@ class ResistantTimeSynchronizer(SimpleFilter):
         self.queue_size = queue_size
         self.lock = threading.Lock()
         self.toggle_tolerance = toggle_tolerance
-        self.toggles = None
-        self.prev_timeStamp = None
-        self.firstStamp = None
+        # self.toggles = None
+        # self.prev_timeStamp = None
+        # self.firstStamp = None
         self.prune_aggro = prune_aggressively
             # prune_aggressively allows toggles to be turned off without an actual response from the camera in question
             # it should be on if we need to tolerate the case where a camera is fully broken
@@ -51,6 +51,7 @@ class ResistantTimeSynchronizer(SimpleFilter):
             self.prev_timeStamp[my_queue_index] = stamp.nanoseconds
             for i in range(0,len(self.toggles)):
                 self.toggles[i] = (stamp.nanoseconds - (self.firstStamp if self.prev_timeStamp[i] == None else self.prev_timeStamp[i]) < self.toggle_tolerance * 1000000000)
+
 
         while len(my_queue) > self.queue_size:
             del my_queue[min(my_queue)]

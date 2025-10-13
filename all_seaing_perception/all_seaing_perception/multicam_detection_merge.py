@@ -16,7 +16,7 @@ class MulticamDetectionMerge(Node):
         self.declare_parameter("individual", False)
         self.declare_parameter("approximate", False)
         self.declare_parameter("resistant", True)
-        self.declare_parameter("delay", 0.1) # only if not individual and also approximate
+        self.declare_parameter("delay", 0.1) # only if not individual
 
         self.enable_front = self.get_parameter("enable_front").get_parameter_value().bool_value
         self.enable_back_left = self.get_parameter("enable_back_left").get_parameter_value().bool_value
@@ -49,12 +49,12 @@ class MulticamDetectionMerge(Node):
                     self.sync = TimeSynchronizer(self.detection_subs, 10)
                     self.pcl_sync = TimeSynchronizer(self.pcl_subs, 10)
                 else:
-                    self.sync = ResistantTimeSynchronizer(self.detection_subs, 10, 0.2, True)
-                    self.pcl_sync = ResistantTimeSynchronizer(self.detection_subs, 10, 0.2, True)
+                    self.sync = ResistantTimeSynchronizer(self.detection_subs, 10, self.delay, True)
+                    self.pcl_sync = ResistantTimeSynchronizer(self.pcl_subs, 10, self.delay, True)
             else:
                 if not self.resistant:
                     self.sync = ApproximateTimeSynchronizer(self.detection_subs, 10, self.delay)
-                    self.pcl_sync = ApproximateTimeSynchronizer(self.detection_subs, 10, self.delay)
+                    self.pcl_sync = ApproximateTimeSynchronizer(self.pcl_subs, 10, self.delay)
                 else:
                     raise NotImplementedError
             self.sync.registerCallback(self.detection_sync_callback)
