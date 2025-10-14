@@ -14,6 +14,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/rosbag_to_image.py
     ${PROJECT_NAME}/rosbag_to_mp4.py
     ${PROJECT_NAME}/filter_tf.py
+    ${PROJECT_NAME}/rosbag_pcl_to_numpy.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
