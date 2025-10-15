@@ -176,7 +176,7 @@ def launch_setup(context, *args, **kwargs):
 
     shape_buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
-        executable="yolov11_node_shapes+buoys",
+        executable="yolov11_node_shapes_buoys.py",
         parameters=[
             {"label_config": "color_label_mappings"},
             {"conf": 0.6},
