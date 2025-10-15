@@ -174,6 +174,20 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    shape_buoy_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov11_node_shapes+buoys.py",
+        parameters=[
+            {"label_config": "color_label_mappings"},
+            {"conf": 0.6},
+        ],
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
     static_shape_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
@@ -467,6 +481,7 @@ def launch_setup(context, *args, **kwargs):
         ycrcb_color_segmentation_node,
         # yolov8_node,
         # buoy_yolo_node,
+        shape_buoy_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         object_tracking_map_node,
