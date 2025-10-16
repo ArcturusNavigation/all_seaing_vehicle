@@ -42,7 +42,7 @@ class ResistantTimeSynchronizer(SimpleFilter):
         if self.firstStamp == None:
             self.firstStamp = stamp.nanoseconds
         if not self.prune_aggro:
-            if self.prev_timeStamp[my_queue_index] != None and stamp.nanoseconds - self.prev_timeStamp[my_queue_index] > self.toggle_tolerance * 1000000000:
+            if self.prev_timeStamp[my_queue_index] is not None and stamp.nanoseconds - self.prev_timeStamp[my_queue_index] > self.toggle_tolerance * 1000000000:
                 self.toggles[my_queue_index] = False
             else:
                 self.toggles[my_queue_index] = True
@@ -50,7 +50,7 @@ class ResistantTimeSynchronizer(SimpleFilter):
         else:
             self.prev_timeStamp[my_queue_index] = stamp.nanoseconds
             for i in range(0,len(self.toggles)):
-                self.toggles[i] = (stamp.nanoseconds - (self.firstStamp if self.prev_timeStamp[i] == None else self.prev_timeStamp[i]) < self.toggle_tolerance * 1000000000)
+                self.toggles[i] = (stamp.nanoseconds - (self.firstStamp if self.prev_timeStamp[i] is None else self.prev_timeStamp[i]) < self.toggle_tolerance * 1000000000)
 
 
         while len(my_queue) > self.queue_size:

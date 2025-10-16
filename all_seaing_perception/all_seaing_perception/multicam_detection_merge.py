@@ -15,7 +15,7 @@ class MulticamDetectionMerge(Node):
         self.declare_parameter("enable_back_right", True)
         self.declare_parameter("individual", False)
         self.declare_parameter("approximate", False)
-        self.declare_parameter("resistant", True)
+        self.declare_parameter("resistant", False)
         self.declare_parameter("delay", 0.1) # only if not individual
 
         self.enable_front = self.get_parameter("enable_front").get_parameter_value().bool_value
@@ -49,6 +49,7 @@ class MulticamDetectionMerge(Node):
                     self.sync = TimeSynchronizer(self.detection_subs, 10)
                     self.pcl_sync = TimeSynchronizer(self.pcl_subs, 10)
                 else:
+                    self.get_logger().info(f'USING RESISTANT MULTICAM MERGER')
                     self.sync = ResistantTimeSynchronizer(self.detection_subs, 10, self.delay, True)
                     self.pcl_sync = ResistantTimeSynchronizer(self.pcl_subs, 10, self.delay, True)
             else:

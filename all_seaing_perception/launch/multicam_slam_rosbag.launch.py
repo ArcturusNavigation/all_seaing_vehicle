@@ -223,7 +223,8 @@ def launch_setup(context, *args, **kwargs):
             {"enable_back_right": True},
             {"individual": False},
             {"approximate": False},
-            {"delay": 0.1},
+            {"resistant": True},
+            {"delay": 0.7},
         ]
     )
 
