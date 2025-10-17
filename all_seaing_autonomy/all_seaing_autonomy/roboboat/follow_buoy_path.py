@@ -75,8 +75,6 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("inter_buoy_pair_dist", 1.0)
         self.inter_buoy_pair_dist = self.get_parameter("inter_buoy_pair_dist").get_parameter_value().double_value
 
-        self.robot_pos = (0, 0)
-
         self.declare_parameter("safe_margin", 0.2)
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
