@@ -12,6 +12,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
+from all_seaing_common.task_server_base import TaskServerBase
 from action_msgs.msg import GoalStatus
 
 import math
@@ -32,18 +33,9 @@ class InternalBuoyPair:
             self.right = right_buoy
 
 
-class FollowBuoyPath(ActionServerBase):
+class FollowBuoyPath(TaskServerBase):
     def __init__(self):
-        super().__init__("follow_path_server")
-
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "follow_buoy_path",
-            execute_callback=self.execute_callback,
-            cancel_callback=self.default_cancel_callback,
-
-        )
+        super().__init__("follow_path_server", 1.0 / 30.0)
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
@@ -723,7 +715,7 @@ class FollowBuoyPath(ActionServerBase):
                 self.sent_forward = False
             elif len(self.buoy_pairs) == 1:
                 if time.time() - self.time_last_seen_buoys > 5:
-                    self.result = True
+                    self.mark_successful()
                     return
                 else:
                     if self.sent_forward:
@@ -748,7 +740,7 @@ class FollowBuoyPath(ActionServerBase):
                     return
             else:
                 if time.time() - self.time_last_seen_buoys > 5:
-                    self.result = True
+                    self.mark_successful()
                 return
         else:
             self.sent_forward = False
@@ -926,49 +918,16 @@ class FollowBuoyPath(ActionServerBase):
         self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
         self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
 
+    def init_setup(self):
+        if self.obstacles is None:
+            return
+        success = self.setup_buoys()
+        if success:
+            self.mark_successful()
 
-    def execute_callback(self, goal_handle):
-
-        self.start_process("Follow buoy path started!")
-
+    def control_loop(self):
         # self.station_hold()
-
-        while rclpy.ok() and self.obstacles is None:
-            time.sleep(self.timer_period)
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                return Task.Result()
-        
-        success = False
-        while not success:
-            success = self.setup_buoys()
-            time.sleep(self.timer_period)
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                return Task.Result()
-
-        self.get_logger().info("Setup buoys succeeded!")
-
-        while not self.result:
-            # Check if we should abort/cancel if a new goal arrived
-            if self.should_abort():
-                self.end_process("New request received. Aborting path following.")
-                goal_handle.abort()
-                return Task.Result()
-
-            if goal_handle.is_cancel_requested:
-                self.end_process("Cancel requested. Aborting path following.")
-                goal_handle.canceled()
-                return Task.Result()
-            
-            self.generate_waypoints()
-
-            time.sleep(self.timer_period)
-
-        self.end_process("Follow buoy path completed!")
-        goal_handle.succeed()
-        return Task.Result(success=True)
-
+        self.generate_waypoints()
 
 def main(args=None):
     rclpy.init(args=args)

@@ -9,6 +9,7 @@ from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption, ObstacleMap
 from all_seaing_common.action_server_base import ActionServerBase
+from all_seaing_common.task_server_base import TaskServerBase
 from sensor_msgs.msg import CameraInfo
 
 import os
@@ -16,17 +17,9 @@ import yaml
 import time
 import math
 
-class FollowBuoyPID(ActionServerBase):
+class FollowBuoyPID(TaskServerBase):
     def __init__(self):
-        super().__init__("follow_path_pid_server")
-
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "follow_buoy_pid",
-            execute_callback=self.execute_callback,
-            cancel_callback=self.default_cancel_callback,
-        )
+        super().__init__("follow_path_pid_server", timer_period = 1 / 30.0)
 
         # Replaced by obstacle map
         self.bbox_sub = self.create_subscription(
@@ -116,8 +109,6 @@ class FollowBuoyPID(ActionServerBase):
         self.width = None
         self.bboxes = [] # To be commented out
         self.obstacleboxes = []
-
-        self.timer_period = 1 / 30.0
 
         self.green_labels = set()
         self.red_labels = set()
@@ -378,7 +369,7 @@ class FollowBuoyPID(ActionServerBase):
                 # wait 1 second, then send a stopping control msg (in case we haven't fully passed the buoys)
                 time.sleep(1)
 
-                self.result = True
+                self.mark_successful()
             self.get_logger().info('KILLING THRUSTERS')
             control_msg = ControlOption()
             control_msg.priority = 1
@@ -407,128 +398,6 @@ class FollowBuoyPID(ActionServerBase):
         control_msg.twist.linear.y = y_vel
         control_msg.twist.angular.z = theta_output
         self.control_pub.publish(control_msg)
-
-
-# OLD CODE DON'T NEED?
-
-#         if left_x is None:
-#  #           if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9:
-#  #               yaw0 = True
-#  #               left_x = 0 # this doesn't actually do anything, just to prevent erroring gate_ctr calculation
-#             if right_x < img_ctr:
-#                 left_x = right_x - (self.width * 0.75)
-#             else:
-#                 left_x = 0
-#         if right_x is None:
-#             # if forward and (self.get_clock().now()-self.forward_start).nanoseconds < 2e9:
-#               #   yaw0 = True
-#                 # right_x = 0
-#             if left_x >= img_ctr:
-#                 right_x = left_x + (self.width * 0.75)
-#             else:
-#                 right_x = self.width - 1
-
-#         gate_ctr = (left_x + right_x) / 2.0
-#         left_ctr_thresh = img_ctr * 0.45
-#         right_ctr_thresh = img_ctr * 0.55
-#         offset = None
-
-        #Current obstacle avoidance that should be changed
-        # Currently based on location in image not local points
-
-        # yellow buoy exists
-        # if yellow_left is not None:
-        #     # if yellow_left <= right_ctr_thresh and yellow_right >= right_ctr_thresh:
-
-        #     yellow_ctr = (yellow_left + yellow_right) / 2.0
-        #     if yellow_left <= img_ctr and yellow_right >= img_ctr and left_x <= yellow_ctr <= right_x:
-        #         # yellow buoy is in the middle (on both sides of camera)
-        #         left_diff = img_ctr - yellow_left
-        #         right_diff = yellow_right - img_ctr
-        #         if left_diff < right_diff:
-        #             # yellow buoy is on the right side
-        #             # want to turn left
-        #             # goal is to get yellow_left to align with right_ctr_thresh
-        #             # should overshoot a bit ?
-        #             # bc this would stop running once its past the center.
-        #             self.get_logger().info("yellow buoy on the right side. turning left. ")
-        #             offset = yellow_left - right_ctr_thresh
-
-        #         else:
-        #             self.get_logger().info("yellow buoy is on the left side. turning right.")
-        #             offset = yellow_right - left_ctr_thresh
-        #             # yellow buoy is on the left side
-        #             # want to turn right
-        #             # goal is to get yellow_right to align with left_ctr_thresh
-        # if offset is None:
-        #     offset = gate_ctr - self.width / 2.0
-
-
-        #     if yellow_left > img_ctr and yellow_right > img_ctr:
-        #         # both vals are on the right of center
-
-        #     elif yellow_left <= img_ctr and yellow_right <= img_ctr:
-        #         # both vals are on the left of center
-        # if yellow_center_x is not None:
-        #     if yellow_area > green_area*0.8 or yellow_area < green_area*2:
-        #         if yellow_center_x > left_x and yellow_center_x < right_x:
-        #             if gate_ctr > yellow_center_x:
-        #                 ctr = (right_x + yellow_center_x) / 2.0
-        #                 offset = ctr - self.width / 2.0
-        #             elif gate_ctr <= yellow_center_x:
-        #                 ctr = (left_x + yellow_center_x) / 2.0
-        #                 offset = ctr - self.width / 2.0
-                # else:
-                #     # self.width / 2.0 is img ctr
-                #     offset = gate_ctr - self.width / 2.0
-
-
-
-        # self.width / 2.0 is img ctr
-        # offset = gate_ctr - self.width / 2.0
-
-        # OLD PID CODE!!!! (346-361)
-
-        # dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        # self.pid.update(offset, dt)
-        # self.get_logger().info(f"offset: {offset}")
-        # yaw_rate = self.pid.get_effort()
-        # if yaw_rate < 0.0: # 3/6: if turning rihgt, make turn larger
-        #     yaw_rate = max(yaw_rate * self.scale_right, -self.max_yaw_rate)
-        # if yaw0:
-        #     yaw_rate = 0.0
-        # self.prev_update_time = self.get_clock().now()
-
-        # control_msg = ControlOption()
-        # control_msg.priority = 1
-        # control_msg.twist.linear.x = float(self.forward_speed)
-        # control_msg.twist.linear.y = 0.0
-        # control_msg.twist.angular.z = float(yaw_rate)
-        # self.control_pub.publish(control_msg)
-
-    def execute_callback(self, goal_handle):
-        self.start_process("follow buoy pid starting")
-        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
-        self.set_pid_setpoints(0, 0, 0) #want angle to point to be 0 radians
-
-        while not self.result:
-
-            if self.should_abort():
-                self.end_process("aborting follow buoy pid")
-                goal_handle.abort()
-                return Task.Result()
-
-            if goal_handle.is_cancel_requested:
-                self.end_process("cancelling follow buoy pid")
-                goal_handle.canceled()
-                return Task.Result()
-
-            self.control_loop()
-            time.sleep(self.timer_period)
-
-        self.end_process("follow buoy pid completed!")
-        goal_handle.succeed()
-        return Task.Result(success=True)
 
 
 
