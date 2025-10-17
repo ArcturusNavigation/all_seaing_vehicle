@@ -48,9 +48,6 @@ class FollowBuoyPath(ActionServerBase):
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
         )
-        self.odometry_sub = self.create_subscription(
-            Odometry, "/odometry/filtered", self.odometry_cb, 10
-        )
         self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
@@ -77,8 +74,6 @@ class FollowBuoyPath(ActionServerBase):
 
         self.declare_parameter("inter_buoy_pair_dist", 1.0)
         self.inter_buoy_pair_dist = self.get_parameter("inter_buoy_pair_dist").get_parameter_value().double_value
-
-        self.robot_pos = (0, 0)
 
         self.declare_parameter("safe_margin", 0.2)
 
@@ -199,6 +194,14 @@ class FollowBuoyPath(ActionServerBase):
         midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
 
         return midpoint
+
+    @property
+    def robot_pos(self):
+        '''
+        Gets the robot position as a tuple (x,y)
+        '''
+        position = self.get_robot_pose()[0:2]
+        return (float(position[0]), float(position[1]))
 
     def split_buoys(self, obstacles):
         """
@@ -846,9 +849,6 @@ class FollowBuoyPath(ActionServerBase):
         the buoy pair / waypoint sequence
         """
         self.obstacles = msg.obstacles
-
-    def odometry_cb(self, msg):
-        self.robot_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
 
     def station_hold(self):
         nav_x, nav_y, heading = self.get_robot_pose()

@@ -109,6 +109,20 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    speed_challenge = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": buoy_label_mappings},
+            {"robot_frame_id": "base_link"},
+        ],
+        remappings=[
+            ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
+        ]
+    )
+
     speed_challenge_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="speed_challenge_pid.py",
@@ -214,6 +228,7 @@ def launch_setup(context, *args, **kwargs):
         task_init_server, 
         follow_buoy_path,
         # follow_buoy_pid,
+        speed_challenge,
         # speed_challenge_pid
         # delivery_server
         # docking_fallback
