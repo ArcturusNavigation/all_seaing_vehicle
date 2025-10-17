@@ -59,7 +59,10 @@ class PIDController:
 
 class CircularPID(PIDController):
     def is_done(self, feedback, threshold):
-        return abs(self.setpoint - feedback) % math.pi <= threshold
+        feedback_mod = feedback % (2*math.pi)
+        threshold_mod = threshold % (2*math.pi)
+        diff_abs = abs(feedback_mod - threshold_mod)
+        return min(diff_abs, 2*math.pi - diff_abs) <= threshold
 
     def update(self, feedback, dt):
         if dt == 0:

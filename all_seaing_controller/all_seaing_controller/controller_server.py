@@ -144,7 +144,7 @@ class ControllerServer(ActionServerBase):
         while (
             not self.x_pid.is_done(nav_x, xy_threshold)
             or not self.y_pid.is_done(nav_y, xy_threshold)
-            or not self.theta_pid.is_done(heading, math.radians(theta_threshold))
+            or not (is_stationary or self.theta_pid.is_done(heading, math.radians(theta_threshold)))
             or is_stationary
         ):
 

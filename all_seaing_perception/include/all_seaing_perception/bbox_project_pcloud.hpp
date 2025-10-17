@@ -137,12 +137,13 @@ private:
     double m_cluster_area_ratio_weight;
     std::map<std::string, std::vector<int>> contour_matching_color_range_map;
 
-    bool m_is_sim, m_label_list, m_only_project;
+    bool m_is_sim, m_label_list;
     double m_bbox_margin;
     std::string m_camera_name;
 
     double m_contour_bbox_area_thres;
     double m_cluster_bbox_area_thres;
+    double m_overlap_filter_thres;
 
     std_msgs::msg::Header m_local_header;
 

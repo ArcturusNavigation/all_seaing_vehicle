@@ -51,6 +51,12 @@ def launch_setup(context, *args, **kwargs):
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
+    shape_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
+    )
+    ransac_params = os.path.join(
+        bringup_prefix, "config", "perception", "ransac_params.yaml"
+    )
 
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
@@ -129,27 +135,16 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    yolov8_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        output="screen",
-        remappings=[
-            ("image_raw", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
-        ],
-        parameters=[
-            {
-                "use_color_names": True,
-            }
-        ]
-    )
-
     buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
             {"model": "best"},
-            {"label_config": "color_label_mappings"},
-            {"conf": 0.6},
+            # {"model": "roboboat_shape_2025"},
+            {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
+            # {"use_color_names": False},
+            {"conf": 0.3},
         ],
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
@@ -265,6 +260,19 @@ def launch_setup(context, *args, **kwargs):
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
             {"is_sim": True},
             {"label_list": True}
+        ]
+    )
+
+    ransac_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="ransac_detector",
+        output="screen",
+        remappings=[
+        ],
+        parameters=[
+            {"ransac_params_file": ransac_params},
+            # {"label_mappings_file": buoy_label_mappings},
+            {"label_mappings_file": shape_label_mappings},
         ]
     )
 
@@ -423,6 +431,22 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    docking_fallback = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking_fallback.py",
+        parameters=[
+            {"is_sim": True},
+            {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": shape_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"dock_width": 2.0},
+            {"dock_length": 11.0},
+        ],
+        remappings=[
+            
+        ],
+    )
+
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
@@ -466,6 +490,7 @@ def launch_setup(context, *args, **kwargs):
             # "world": "rb2025/rb2025_task1_task2.sdf",
             # "world": "follow_path_task.sdf",
             "world": "speed_course_world.sdf",
+            # "world": "scan_dock_deliver_task.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
@@ -484,6 +509,7 @@ def launch_setup(context, *args, **kwargs):
         # buoy_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
+        ransac_node,
         object_tracking_map_node,
         rviz_node,
         control_mux,
@@ -497,6 +523,7 @@ def launch_setup(context, *args, **kwargs):
         # follow_buoy_pid,
         speed_challenge,
         # speed_challenge_pid,
+        # docking_fallback,
         rviz_waypoint_sender,
         # map_to_odom,
         keyboard_ld,

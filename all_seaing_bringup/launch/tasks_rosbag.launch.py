@@ -50,6 +50,9 @@ def launch_setup(context, *args, **kwargs):
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
+    shape_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
+    )
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
@@ -71,9 +74,10 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
-            {"duplicate_dist": 0.7},
+            {"duplicate_dist": 0.3},
             {"forward_dist": 1.5},
-            {"inter_buoy_pair_dist": 1.5},
+            {"inter_buoy_pair_dist": 0.5},
+            {"buoy_pair_dist_thres": 0.2},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -118,6 +122,21 @@ def launch_setup(context, *args, **kwargs):
                 "/mavros/imu/data"
             ),
             ("obstacle_map/labeled", "obstacle_map/local")
+        ],
+    )
+
+    docking_fallback = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking_fallback.py",
+        parameters=[
+            {"is_sim": False},
+            {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": shape_label_mappings},
+            # {"dock_width": 2.0},
+            # {"dock_length": 11.0},
+        ],
+        remappings=[
+            
         ],
     )
 
@@ -224,6 +243,7 @@ def launch_setup(context, *args, **kwargs):
         follow_buoy_path,
         # follow_buoy_pid,
         # delivery_server,
+        # docking_fallback,
         keyboard_ld, # only for rosbag
         onshore_node, # only for rosbag
         rviz_waypoint_sender,
