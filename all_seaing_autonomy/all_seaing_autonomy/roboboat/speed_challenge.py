@@ -9,18 +9,14 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle, LabeledBoundingBox2DArray, LabeledBoundingBox2D
 from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
-from nav_msgs.msg import Odometry
-from std_msgs.msg import Header, ColorRGBA
 from sensor_msgs.msg import CameraInfo
-from visualization_msgs.msg import Marker, MarkerArray
+from visualization_msgs.msg import MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
-from tf_transformations import euler_from_quaternion
 
 import os
 import yaml
 import math
 import time
-import asyncio
 from collections import deque
 
 TIMER_PERIOD = 1 / 60
@@ -92,14 +88,11 @@ class SpeedChallenge(ActionServerBase):
         self.seg_bboxes = deque()
         self.max_seg_bboxes = 10 # guarantee this is even
 
-
-
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
         self.blue_labels = set()
         self.red_labels = set()
         self.green_labels = set()
-
 
         # TODO: change the param to be the same between is_sim and not
         # too sleepy, dont want to break things.
@@ -122,7 +115,6 @@ class SpeedChallenge(ActionServerBase):
 
         if self.is_sim:
             # hardcoded from reading YAML
-            # self.blue_labels.add(label_mappings["blue"])
             # TODO: for SIM ONLY (no blue buoy)
             self.blue_labels.add(label_mappings["green"])
         else:
@@ -165,6 +157,7 @@ class SpeedChallenge(ActionServerBase):
         self.buoy_found = False
         self.runnerActivated = False
         self.following_guide = True
+        self.moved_to_point = False
 
     def execute_callback(self, goal_handle):
         self.start_process("Speed challenge task started!")
@@ -194,8 +187,6 @@ class SpeedChallenge(ActionServerBase):
                 self.buoy_direction = self.robot_dir
                 self.get_logger().info(f"Facing direction: {self.buoy_direction}")
                 task_result = self.run_actions()
-                # task_result = await self.run_actions()
-                # task_result = self.probe_blue_buoy()
                 self.end_process("Speed challenge task ended.")
                 return task_result
                 
@@ -268,22 +259,12 @@ class SpeedChallenge(ActionServerBase):
     def run_actions(self):
         '''
         Run all the actions, interrupted if an action fails
-
-        Current mapping:
-        0--> probing blue buoys
-        1--> circling blue buoy
-        2--> return to start
         '''
-
         actions = [self.probe_blue_buoy, self.circle_blue_buoy, self.return_to_start]
         for action in actions:
             action_result = action()
             if action_result.success == False:
                 return action_result
-        # for action in actions:
-        #     action_result = await action()
-        #     if action_result.success == False:
-        #         return action_result
         return Task.Result(success=True)
 
     def probe_blue_buoy(self):
@@ -297,27 +278,13 @@ class SpeedChallenge(ActionServerBase):
                         max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
 
-        # future = self.move_to_point(guide_point)
-        # future.add_done_callback(self.reached_guide_future_done)
         self.move_to_point(guide_point)
-        # while self.following_guide:
         while not self.moved_to_point:
             if self.blue_buoy_detected():
-                # self.move_to_point(self.robot_pos,is_stationary=False)
-                # self.following_guide = True
                 return Task.Result(success=True)
-                # break
             time.sleep(TIMER_PERIOD)
 
         return Task.Result(success=False)
-        # return self.circle_blue_buoy()
-
-    # def reached_guide_future_done(self, future):
-    #     '''
-    #     Set self.following_guide to False when the future is done.
-    #     '''
-    #     self.following_guide = False
-    #     pass
 
     def circle_blue_buoy(self):
         '''
@@ -352,7 +319,6 @@ class SpeedChallenge(ActionServerBase):
             self.get_logger().info(f"moved to point = {self.moved_to_point}")
 
         return Task.Result(success=True)
-        # return self.return_to_start()
     
     def return_to_start(self):
         '''
@@ -522,7 +488,6 @@ class SpeedChallenge(ActionServerBase):
         if busy_wait:
             while not self.moved_to_point:
                 time.sleep(TIMER_PERIOD)
-        # return self.send_goal_future
 
     def follow_path_response_cb(self, future):
         '''
@@ -535,9 +500,9 @@ class SpeedChallenge(ActionServerBase):
 
         self.get_logger().info("Waypoint accepted")
         self._get_result_future = goal_handle.get_result_async()
-        self._get_result_future.add_done_callback(self.get_result_cb)
+        self._get_result_future.add_done_callback(self.get_point_result_cb)
 
-    def get_result_cb(self, future):
+    def get_point_result_cb(self, future):
         '''
         Flags the path following as complete for move_to_point
         '''
@@ -546,8 +511,6 @@ class SpeedChallenge(ActionServerBase):
         result = future.result().result
         if result.is_finished:
             self.moved_to_point = True
-
-
 
     def blue_buoy_detected(self):
         '''
@@ -561,21 +524,10 @@ class SpeedChallenge(ActionServerBase):
                 self.buoy_found = True
                 self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
                 break
-        # self.get_logger().info(f"blue buoy found: {self.buoy_found}.") 
         return self.buoy_found
-
-# async def run(args, loop):
-#     rclpy.init(args=args)
-#     node = SpeedChallenge()
-
-
 
 
 def main(args=None):
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(run(args, loop=loop))
-
-
     rclpy.init(args=args)
     node = SpeedChallenge()
     executor = MultiThreadedExecutor(num_threads=2)
