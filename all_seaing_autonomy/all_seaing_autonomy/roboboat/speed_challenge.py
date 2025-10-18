@@ -61,7 +61,7 @@ class SpeedChallenge(ActionServerBase):
         self.declare_parameter("theta_threshold", 180.0)
         self.declare_parameter("goal_tol", 0.5)
         self.declare_parameter("obstacle_tol", 50)
-        self.declare_parameter("choose_every", 5)
+        self.declare_parameter("choose_every", 10)
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
 
@@ -109,13 +109,13 @@ class SpeedChallenge(ActionServerBase):
         ).value
         with open(color_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
-        self.red_labels.add(label_mappings["red"])
-        self.green_labels.add(label_mappings["green"])
 
 
         if self.is_sim:
             # hardcoded from reading YAML
             # TODO: for SIM ONLY (no blue buoy)
+            self.red_labels.add(label_mappings["red"])
+            self.green_labels.add(label_mappings["green"])
             self.blue_labels.add(label_mappings["green"])
         else:
             self.declare_parameter(
@@ -130,6 +130,11 @@ class SpeedChallenge(ActionServerBase):
             with open(buoy_label_mappings_file, "r") as f:
                 label_mappings = yaml.safe_load(f)
             for buoy_label in ["blue_buoy", "blue_circle", "blue_racquet_ball"]:
+                self.blue_labels.add(label_mappings[buoy_label])
+            for buoy_label in ["red_buoy", "red_circle", "red_racquet_ball"]:
+                self.red_labels.add(label_mappings[buoy_label])
+            for buoy_label in ["green_buoy", "green_circle"]:
+                self.green_labels.add(label_mappings[buoy_label])
                 self.blue_labels.add(label_mappings[buoy_label])
 
         self.obstacles = []
@@ -273,7 +278,7 @@ class SpeedChallenge(ActionServerBase):
         Keeps on appending waypoints to the north/south until it finds 
         '''
         self.get_logger().info("Probing for blue buoy")
-        max_guide_d = 30
+        max_guide_d = 10
         guide_point = (max_guide_d*self.buoy_direction[0] + self.robot_pos[0], 
                         max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")

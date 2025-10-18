@@ -38,9 +38,6 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
     
-    locations_file = os.path.join(
-        bringup_prefix, "config", "localization", "locations.yaml"
-    )
     color_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "color_label_mappings.yaml"
     )
@@ -60,11 +57,6 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
 
-    with open(locations_file, "r") as f:
-        locations = yaml.safe_load(f)
-
-    location = context.perform_substitution(LaunchConfiguration("location"))
-    is_indoors = str(locations[location]["indoors"]).lower()
     use_waypoint_client = LaunchConfiguration("use_waypoint_client")
 
     run_tasks = launch_ros.actions.Node(
@@ -83,6 +75,8 @@ def launch_setup(context, *args, **kwargs):
             {"forward_dist": 1.5},
             {"inter_buoy_pair_dist": 0.5},
             {"buoy_pair_dist_thres": 0.2},
+            {"xy_threshold": 2.0},
+            {"choose_every": 10}
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -116,6 +110,8 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"color_label_mappings_file": buoy_label_mappings},
             {"robot_frame_id": "base_link"},
+            {"turn_offset": 1.5},
+            {"choose_every": 100},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -170,10 +166,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
-            {"Kpid_x": [0.3, 0.0, 0.0]},
+            {"Kpid_x": [1.0, 0.0, 0.0]},
             {"Kpid_y": [0.3, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
-            {"max_vel": [2.5, 1.0, 0.1]},
+            {"max_vel": [2.5, 0.6, 0.1]},
         ],
         output="screen",
     )
@@ -238,7 +234,6 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="boathouse"),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),

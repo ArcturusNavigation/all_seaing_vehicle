@@ -21,7 +21,7 @@ def launch_setup(context, *args, **kwargs):
     description_prefix = get_package_share_directory("all_seaing_description")
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-    set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
+    # set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
@@ -377,7 +377,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument('use_sim_time', default_value='true'),
+            # DeclareLaunchArgument('use_sim_time', default_value='true'),
             DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
             DeclareLaunchArgument("use_gps", default_value='true'),
