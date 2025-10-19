@@ -15,7 +15,7 @@ class CentralHubROS(Node):
             "port", "/dev/ttyACM0").get_parameter_value().string_value
     
         self.low_battery_threshold = self.declare_parameter(
-            "low_battery_threshold", 2000.0
+            "low_battery_threshold", 2200.0
         ).get_parameter_value().double_value
 
         ser = serial.Serial(port, 115200, timeout=1)
@@ -96,6 +96,7 @@ class CentralHubROS(Node):
     # TRUE if battery is OKAY, FALSE if battery is LOW
     def battery_check(self):
         current_voltage = self.bms.stack_voltage()
+        # self.get_logger().warn(f"Voltage: {current_voltage}V")
         if current_voltage < self.low_battery_threshold and not self.estop.manual():
             if not self.battery_ack:
                 self.get_logger().warn(f"Warning: battery is low! {current_voltage}V < {self.low_battery_threshold}V")

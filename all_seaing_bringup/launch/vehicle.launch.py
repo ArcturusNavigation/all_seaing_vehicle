@@ -216,7 +216,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM0"}],
+        parameters=[{"port": "/dev/ttyACM2"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -236,7 +236,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1"
+            "port": "/dev/ttyACM0"
         }.items(),
     )
 
