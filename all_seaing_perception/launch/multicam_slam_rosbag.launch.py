@@ -223,7 +223,8 @@ def launch_setup(context, *args, **kwargs):
             {"enable_back_right": True},
             {"individual": False},
             {"approximate": False},
-            {"delay": 0.1},
+            {"resistant": True},
+            {"delay": 0.7},
         ]
     )
 
@@ -463,9 +464,9 @@ def launch_setup(context, *args, **kwargs):
         # buoy_yolo_node,
         # buoy_yolo_node_back_left,
         # buoy_yolo_node_back_right,
-        bbox_project_pcloud_node,
-        bbox_project_pcloud_node_back_left,
-        bbox_project_pcloud_node_back_right,
+        # bbox_project_pcloud_node,
+        # bbox_project_pcloud_node_back_left,
+        # bbox_project_pcloud_node_back_right,
         multicam_detection_merge_node,
         # odometry_publisher_node,
         object_tracking_map_node,
