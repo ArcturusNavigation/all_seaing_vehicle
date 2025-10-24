@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 import launch_ros
 from ament_index_python.packages import get_package_share_directory
@@ -40,6 +40,13 @@ def generate_launch_description():
                     # ("mavros/local_position/odom", "odometry/filtered") # to just use the internal EKF
                 ],
                 output="both",
+            ),
+            TimerAction( # after 5 seconds, increase mavros rate
+                period=5.0,
+                actions=[ExecuteProcess(
+                    cmd=['ros2', 'run', 'mavros', 'mav', 'sys', 'rate', '--all', '30'],
+                    output='screen'
+                )]
             ),
             launch_ros.actions.Node(
                 package="all_seaing_driver",
