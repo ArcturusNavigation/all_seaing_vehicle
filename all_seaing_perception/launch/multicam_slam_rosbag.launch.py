@@ -304,7 +304,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="point_cloud_filter",
         remappings=[
-            ("point_cloud", "/velodyne_points"),
+            ("point_cloud", "/point_cloud/filtered"),
             ("point_cloud/filtered", "point_cloud/filtered_downsampled"),
         ],
         parameters=[
@@ -312,6 +312,7 @@ def launch_setup(context, *args, **kwargs):
             {"range_radius": [0.5, 60.0]},
             {"leaf_size": 0.2},
             {"local_range_z": [-100000.0, 0.0]},
+            {"min_pts_per_voxel": 4},
         ],
     )
 
@@ -325,7 +326,7 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
             {"clustering_distance": 0.2},
-            {"obstacle_size_min": 2},
+            {"obstacle_size_min": 4},
             {"range_max": 50.0},
         ],
     )
@@ -340,12 +341,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 1.0},
-            {"obstacle_size_min": 2},
+            {"clustering_distance": 0.4},
+            {"obstacle_size_min": 4},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},
-            {"obstacle_filter_length_max": 0.5},
+            {"obstacle_filter_length_max": 0.3},
             # {"range_max": 50.0},
         ],
     )
@@ -474,8 +475,9 @@ def launch_setup(context, *args, **kwargs):
         # robot_state_publisher,
         # static_transforms_ld,
         # point_cloud_filter_node,
-        # point_cloud_filter_downsampled_node,
-        # obstacle_detector_raw_node,
+        point_cloud_filter_downsampled_node,
+        obstacle_detector_raw_node,
+        obstacle_detector_unlabeled_node,
         # grid_map_generator,
         # rotate_imu_accel,
         # imu_reframe_node,

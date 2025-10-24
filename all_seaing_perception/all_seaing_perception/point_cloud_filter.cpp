@@ -30,6 +30,7 @@ public:
         this->declare_parameter<std::vector<double>>("local_range_y", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("local_range_z", {-100000.0, 100000.0});
         this->declare_parameter<double>("leaf_size", 0.0);
+        this->declare_parameter<int>("min_pts_per_voxel", 1);
 
         // Initialize tf_listener pointer
         m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -57,6 +58,7 @@ public:
         m_local_range_y = this->get_parameter("local_range_y").as_double_array();
         m_local_range_z = this->get_parameter("local_range_z").as_double_array();
         m_leaf_size = this->get_parameter("leaf_size").as_double();
+        m_min_pts_per_voxel = this->get_parameter("min_pts_per_voxel").as_int();
     }
 
 private:
@@ -76,6 +78,7 @@ private:
         pcl::VoxelGrid<pcl::PointXYZI> vg;
         vg.setInputCloud(in_cloud_ptr);
         vg.setLeafSize(m_leaf_size, m_leaf_size, m_leaf_size);
+        vg.setMinimumPointsNumberPerVoxel(m_min_pts_per_voxel);
         vg.filter(*out_cloud_ptr);
     }
 
@@ -155,6 +158,7 @@ private:
     std::vector<double> m_local_range_y;
     std::vector<double> m_local_range_z;
     double m_leaf_size;
+    int m_min_pts_per_voxel;
 };
 
 int main(int argc, char **argv) {
