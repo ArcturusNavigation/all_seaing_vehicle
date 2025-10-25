@@ -253,9 +253,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [1.0, 60.0]},
-            {"leaf_size": 0.2},
+            {"leaf_size_xy": 0.2},
+            {"leaf_size_z": 0.2},
             {"local_range_z": [-100000.0, 0.0]},
-            {"min_pts_per_voxel": 4},
+            {"min_pts_per_voxel": 2},
         ],
     )
 

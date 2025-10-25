@@ -29,7 +29,8 @@ public:
         this->declare_parameter<std::vector<double>>("local_range_x", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("local_range_y", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("local_range_z", {-100000.0, 100000.0});
-        this->declare_parameter<double>("leaf_size", 0.0);
+        this->declare_parameter<double>("leaf_size_xy", 0.0);
+        this->declare_parameter<double>("leaf_size_z", 0.0);
         this->declare_parameter<int>("min_pts_per_voxel", 1);
 
         // Initialize tf_listener pointer
@@ -57,7 +58,8 @@ public:
         m_local_range_x = this->get_parameter("local_range_x").as_double_array();
         m_local_range_y = this->get_parameter("local_range_y").as_double_array();
         m_local_range_z = this->get_parameter("local_range_z").as_double_array();
-        m_leaf_size = this->get_parameter("leaf_size").as_double();
+        m_leaf_size_xy = this->get_parameter("leaf_size_xy").as_double();
+        m_leaf_size_z = this->get_parameter("leaf_size_z").as_double();
         m_min_pts_per_voxel = this->get_parameter("min_pts_per_voxel").as_int();
     }
 
@@ -77,7 +79,7 @@ private:
                           pcl::PointCloud<pcl::PointXYZI>::Ptr &out_cloud_ptr) {
         pcl::VoxelGrid<pcl::PointXYZI> vg;
         vg.setInputCloud(in_cloud_ptr);
-        vg.setLeafSize(m_leaf_size, m_leaf_size, m_leaf_size);
+        vg.setLeafSize(m_leaf_size_xy, m_leaf_size_xy, m_leaf_size_z);
         vg.setMinimumPointsNumberPerVoxel(m_min_pts_per_voxel);
         vg.filter(*out_cloud_ptr);
     }
@@ -121,7 +123,7 @@ private:
         // Downsample cloud if leaf size is not equal to 0
         pcl::PointCloud<pcl::PointXYZI>::Ptr downsampled_cloud_ptr(
             new pcl::PointCloud<pcl::PointXYZI>);
-        if (m_leaf_size > 0)
+        if (m_leaf_size_xy > 0)
             downsample_cloud(in_cloud_ptr, downsampled_cloud_ptr);
         else
             downsampled_cloud_ptr = in_cloud_ptr;
@@ -157,7 +159,7 @@ private:
     std::vector<double> m_local_range_x;
     std::vector<double> m_local_range_y;
     std::vector<double> m_local_range_z;
-    double m_leaf_size;
+    double m_leaf_size_xy, m_leaf_size_z;
     int m_min_pts_per_voxel;
 };
 
