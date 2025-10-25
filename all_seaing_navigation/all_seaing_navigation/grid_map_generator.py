@@ -34,18 +34,6 @@ class GridMapGenerator(Node):
             .double_value
         )
 
-        self.obstacle_radius_sigma = (
-            self.declare_parameter("obstacle_radius_sigma", 3.0)
-            .get_parameter_value()
-            .double_value
-        )
-
-        self.search_radius_sigma = (
-            self.declare_parameter("search_radius_sigma", 5.0)
-            .get_parameter_value()
-            .double_value
-        )
-
         self.grid_dim = (
             self.declare_parameter("grid_dim", [2000, 2000])  # [width, height]
             .get_parameter_value()

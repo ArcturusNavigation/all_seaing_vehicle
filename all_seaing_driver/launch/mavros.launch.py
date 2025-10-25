@@ -41,7 +41,7 @@ def generate_launch_description():
                 ],
                 output="both",
             ),
-            TimerAction( # after 5 seconds, increase mavros rate
+            TimerAction( # increase mavros rate after mavros itself has been launched
                 period=5.0,
                 actions=[ExecuteProcess(
                     cmd=['ros2', 'run', 'mavros', 'mav', 'sys', 'rate', '--all', '30'],

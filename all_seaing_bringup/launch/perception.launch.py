@@ -253,8 +253,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [1.0, 60.0]},
-            {"leaf_size": 0.2},
+            {"leaf_size_xy": 0.2},
+            {"leaf_size_z": 0.2},
             {"local_range_z": [-100000.0, 0.0]},
+            {"min_pts_per_voxel": 2},
         ],
     )
 
@@ -267,8 +269,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 0.2},
-            {"obstacle_size_min": 2},
+            {"clustering_distance": 0.25},
+            {"obstacle_size_min": 3},
             {"range_max": 50.0},
         ],
     )
@@ -283,8 +285,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 1.0},
-            {"obstacle_size_min": 2},
+            {"clustering_distance": 0.4},
+            {"obstacle_size_min": 3},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},

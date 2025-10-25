@@ -157,7 +157,6 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="point_cloud_filter",
         remappings=[
-            # ("point_cloud", "/point_cloud/filtered_fake"),
             ("point_cloud", "/velodyne_points"),
         ],
         parameters=[
@@ -166,17 +165,34 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    point_cloud_filter_downsampled_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/velodyne_points"),
+            ("point_cloud/filtered", "point_cloud/filtered_downsampled"),
+        ],
+        parameters=[
+            {"global_frame_id": "map"},
+            {"range_radius": [0.5, 60.0]},
+            {"leaf_size_xy": 0.2},
+            {"leaf_size_z": 0.2},
+            {"local_range_z": [-100000.0, 0.0]},
+            {"min_pts_per_voxel": 2},
+        ],
+    )
+
     obstacle_detector_raw_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_detector",
         remappings=[
-            ("point_cloud", "point_cloud/filtered"),
+            ("point_cloud", "point_cloud/filtered_downsampled"),
         ],
         parameters=[
             {"base_link_frame": "actual_base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 1.0},
-            {"obstacle_size_min": 5},
+            {"clustering_distance": 0.25},
+            {"obstacle_size_min": 3},
             {"range_max": 50.0},
         ],
     )
@@ -185,18 +201,18 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="obstacle_detector",
         remappings=[
-            ("point_cloud", "point_cloud/filtered"),
+            ("point_cloud", "point_cloud/filtered_downsampled"),
             ("obstacle_map/raw", "obstacle_map/unlabeled")
         ],
         parameters=[
             {"base_link_frame": "actual_base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 1.0},
-            {"obstacle_size_min": 5},
+            {"clustering_distance": 0.4},
+            {"obstacle_size_min": 3},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},
-            {"obstacle_filter_length_max": 0.5},
+            {"obstacle_filter_length_max": 0.3},
             # {"range_max": 50.0},
         ],
     )
@@ -222,10 +238,10 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            # {"model": "best"},
-            {"model": "roboboat_shape_2025"},
-            # {"label_config": "buoy_label_mappings"},
-            {"label_config": "shape_label_mappings"},
+            {"model": "best"},
+            # {"model": "roboboat_shape_2025"},
+            {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -368,13 +384,14 @@ def launch_setup(context, *args, **kwargs):
         static_transforms_ld,
         tf_filtering,
         point_cloud_filter_node,
+        point_cloud_filter_downsampled_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         # grid_map_generator,
         buoy_yolo_node,
         bbox_project_pcloud_node,
         ransac_node,
-        # object_tracking_map_node,
+        object_tracking_map_node,
         # imu_reframe_node,
         # pcl_to_scan_node,
         # rf2o_node,

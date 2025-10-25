@@ -197,7 +197,6 @@ def launch_setup(context, *args, **kwargs):
             {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
             {"range_intensity": [0.0, 50.0]},
-            {"leaf_size": 0.0},
         ],
     )
 
