@@ -325,8 +325,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 0.2},
-            {"obstacle_size_min": 4},
+            {"clustering_distance": 0.25},
+            {"obstacle_size_min": 2},
             {"range_max": 50.0},
         ],
     )
@@ -342,7 +342,7 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
             {"clustering_distance": 0.4},
-            {"obstacle_size_min": 4},
+            {"obstacle_size_min": 2},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},
@@ -478,7 +478,7 @@ def launch_setup(context, *args, **kwargs):
         point_cloud_filter_downsampled_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
-        # grid_map_generator,
+        grid_map_generator,
         # rotate_imu_accel,
         # imu_reframe_node,
         # imu_filter_node,
