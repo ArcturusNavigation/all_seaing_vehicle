@@ -315,6 +315,8 @@ def launch_setup(context, *args, **kwargs):
         'track_robot': str(context.perform_substitution(LaunchConfiguration('use_slam')).lower() == "true"),
         'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false") or 
                                        (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")),
+        'track_banners': str(context.perform_substitution(LaunchConfiguration('track_banners')).lower() == "true"),
+        'banners_slam': str(context.perform_substitution(LaunchConfiguration('banners_slam')).lower() == "true"),
     }
 
     configured_params = RewrittenYaml(
@@ -383,6 +385,8 @@ def generate_launch_description():
             DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
             DeclareLaunchArgument("use_gps", default_value='true'),
+            DeclareLaunchArgument("track_banners", default_value='false'),
+            DeclareLaunchArgument("banners_slam", default_value='true'),
             DeclareLaunchArgument("use_lio", default_value='false'),
             OpaqueFunction(function=launch_setup),
         ]

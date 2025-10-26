@@ -11,6 +11,15 @@ namespace all_seaing_perception{
         is_dead = false;
     }
 
+    Banner::Banner(rclcpp::Time t, int l, all_seaing_interfaces::msg::LabeledObjectPlane msg){
+        label = l;
+        time_seen = t;
+        last_dead = rclcpp::Time(0);
+        time_dead = rclcpp::Duration(0, 0);
+        is_dead = false;
+        plane_msg = msg;
+    }
+
     template<typename PointT>
     std::shared_ptr<ObjectCloud<PointT>> clone(typename std::shared_ptr<ObjectCloud<PointT>> orig){
         std::shared_ptr<ObjectCloud<PointT>> new_ocl = std::make_shared<ObjectCloud<PointT>>(*orig);
@@ -59,12 +68,29 @@ namespace all_seaing_perception{
         return mod_2pi(angle+M_PI)-M_PI;
     }
 
+    double bidirectional_angle_to_pi_range(double angle){
+        double pi_range_angle = angle_to_pi_range(angle);
+        return abs(pi_range_angle) < M_PI/((float)2) ? pi_range_angle : angle_to_pi_range(angle+M_PI);
+    }
+
     //(range, bearing, signature)
     template<typename PointT>
     std::tuple<float, float, int> local_to_range_bearing_signature(PointT point, int label) {
         double range = std::hypot(point.x, point.y);
         double bearing = mod_2pi(std::atan2(point.y, point.x));
         return std::make_tuple(range, bearing, label);
+    }
+
+    //(range, bearing, phi, signature)
+    std::tuple<float, float, float, int> local_banner_to_range_bearing_signature(geometry_msgs::msg::Pose pose, int label){
+        double range = std::hypot(pose.position.x, pose.position.y);
+        double bearing = mod_2pi(std::atan2(pose.position.y, pose.position.x));
+        tf2::Quaternion q;
+        tf2::fromMsg(pose.orientation, q);
+        tf2::Matrix3x3 mat(q);
+        double r, p, phi;
+        mat.getRPY(r, p, phi);
+        return std::make_tuple(range, bearing, phi, label);
     }
 
     geometry_msgs::msg::TransformStamped get_tf(const std::unique_ptr<tf2_ros::Buffer> &tf_buffer, const std::string &in_target_frame,
@@ -274,6 +300,38 @@ namespace all_seaing_perception{
             }
         }
         return std::make_tuple(weight, match, chosen_detected, chosen_tracked); 
+    }
+
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_banner_data_association(std::vector<std::shared_ptr<Banner>> tracked_obstacles,
+        std::vector<std::shared_ptr<Banner>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres){
+        // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
+        std::vector<int> match(detected_obstacles.size(), -1);
+        float min_p = 0;
+        std::unordered_set<int> chosen_detected, chosen_tracked;
+        while (min_p < new_obj_thres) {
+            min_p = new_obj_thres;
+            std::pair<int, int> best_match = std::make_pair(-1, -1);
+            for (int i = 0; i < detected_obstacles.size(); i++) {
+                if (chosen_detected.count(i))
+                    continue;
+                for (int tracked_id = 0; tracked_id < tracked_obstacles.size(); tracked_id++) {
+                    if (chosen_tracked.count(tracked_id) ||
+                        (detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label))
+                        continue;
+                    if (p[i][tracked_id] < min_p) {
+                        best_match = std::make_pair(i, tracked_id);
+                        min_p = p[i][tracked_id];
+                    }
+                }
+            }
+            if (min_p < new_obj_thres) {
+                match[best_match.first] = best_match.second;
+                chosen_tracked.insert(best_match.second);
+                chosen_detected.insert(best_match.first);
+            }
+        }
+        return std::make_tuple(match, chosen_detected, chosen_tracked);
     }
 
     template class ObjectCloud<pcl::PointXYZ>;

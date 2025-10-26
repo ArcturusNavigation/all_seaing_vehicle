@@ -66,6 +66,8 @@ def launch_setup(context, *args, **kwargs):
     location = context.perform_substitution(LaunchConfiguration("location"))
     use_slam = context.perform_substitution(LaunchConfiguration("use_slam"))
     use_gps = context.perform_substitution(LaunchConfiguration("use_gps"))
+    track_banners = context.perform_substitution(LaunchConfiguration("track_banners"))
+    banners_slam = context.perform_substitution(LaunchConfiguration("banners_slam"))
     use_lio = LaunchConfiguration("use_lio")
     comms = LaunchConfiguration("comms")
     is_indoors = str(locations[location]["indoors"]).lower()
@@ -370,6 +372,8 @@ def launch_setup(context, *args, **kwargs):
             "location": location,
             "use_slam": use_slam,
             "use_gps": use_gps,
+            "track_banners": track_banners,
+            "banners_slam": banners_slam,
             "use_lio": context.perform_substitution(use_lio),
         }.items(),
     )
@@ -423,6 +427,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument("use_slam", default_value="true", choices=["true", "false"]),
             DeclareLaunchArgument("use_gps", default_value="true", choices=["true", "false"]),
+            DeclareLaunchArgument("track_banners", default_value="false", choices=["true", "false"]),
+            DeclareLaunchArgument("banners_slam", default_value="true", choices=["true", "false"]),
             DeclareLaunchArgument("use_lio", default_value="false", choices=["true", "false"]),
             OpaqueFunction(function=launch_setup),
         ]

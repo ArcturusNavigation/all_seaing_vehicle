@@ -9,6 +9,9 @@ object_tracking_map:
     normalize_drop_thresh: False
     range_uncertainty: 15.0
     bearing_uncertainty: 5.0
+    banner_range_uncertainty: 15.0
+    banner_bearing_uncertainty: 5.0
+    banner_orientation_uncertainty: 5.0
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 1.0 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 30.0 # beware, was 10 before but changed it to 30 bc that's mavros publish rate, change it back if issues
@@ -18,10 +21,15 @@ object_tracking_map:
     rotate_odom: False
     update_odom_theta_uncertainty: 10.0
     new_object_slam_threshold: 0.03
+    new_banner_slam_threshold: 0.5 # all banners have different labels on them, and the ones that have the same (boats to shoot) are very far away, but there is the chance for YOLO misdetections
     init_xy_noise: 0.7
     init_theta_noise: 0.25
     init_new_cov: 50.0
+    banner_init_new_cov: 50.0
+    banner_init_new_theta_cov: 10.0
     track_robot: True
+    track_banners: False
+    banners_slam: True
     imu_predict: True
     gps_update: True
     direct_tf: False
