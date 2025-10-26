@@ -55,7 +55,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_imu_predict = this->get_parameter("imu_predict").as_bool();
     m_gps_update = this->get_parameter("gps_update").as_bool();
 
-    RCLCPP_INFO(this->get_logger(), m_track_robot? "SLAM: ON" : "SLAM: OFF");
+    RCLCPP_INFO(this->get_logger(), m_track_robot ? "SLAM: ON" : "SLAM: OFF");
     
     m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
     m_odom_refresh_rate = this->get_parameter("odom_refresh_rate").as_double();
@@ -84,7 +84,7 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("include_odom_only_theta", true);
     m_include_odom_only_theta = this->get_parameter("include_odom_only_theta").as_bool();
 
-    RCLCPP_INFO(this->get_logger(), m_include_odom_only_theta? "GPS: OFF" : "GPS: ON");
+    RCLCPP_INFO(this->get_logger(), m_include_odom_only_theta ? "GPS: OFF" : "GPS: ON");
 
     this->declare_parameter<std::string>("data_association", "greedy_exclusive");
     m_data_association_algo = this->get_parameter("data_association").as_string();
@@ -101,8 +101,12 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("track_banners", false);
     m_track_banners = this->get_parameter("track_banners").as_bool();
 
+    RCLCPP_INFO(this->get_logger(), m_track_banners ? "TRACK BANNERS: ON" : "TRACK BANNERS: OFF");
+
     this->declare_parameter<bool>("banners_slam", false);
     m_banners_slam = this->get_parameter("banners_slam").as_bool();
+
+    RCLCPP_INFO(this->get_logger(), m_banners_slam ? "BANNERS SLAM: ON" : "BANNERS SLAM: OFF");
 
     // Initialize navigation & odometry variables to 0
     m_nav_x = 0;
@@ -346,7 +350,6 @@ void ObjectTrackingMap::odom_callback() {
 
     //update odometry transforms
     //TODO: add a flag for each one that says if they succedeed, to know to continue or not
-    // RCLCPP_INFO(this->get_logger(), "ODOM CALLBACK");
     m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
     m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
@@ -1059,6 +1062,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             to_remove.push_back(i);
         }
     }
+    for (int i = 0; i < m_tracked_banners.size(); i++){
+        if (m_track_robot) {
+            to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * m_num_obj + 3*i, 3 + 2 * m_num_obj + 3*i + 1, 3 + 2 * m_num_obj + 3*i + 2});
+        }
+    }
 
     // update vectors & matrices
     if (!to_remove.empty()) {
@@ -1069,8 +1077,8 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
 
         if (m_track_robot) {
-            Eigen::MatrixXf new_state(3 + 2 * to_keep.size(), 1);
-            Eigen::MatrixXf new_cov(3 + 2 * to_keep.size(), 3 + 2 * to_keep.size());
+            Eigen::MatrixXf new_state(3 + 2 * to_keep.size() + 3*m_num_banners, 1);
+            Eigen::MatrixXf new_cov(3 + 2 * to_keep.size() + 3*m_num_banners, 3 + 2 * to_keep.size() + 3*m_num_banners);
             int new_i = 0;
             for (int i : to_keep_flat) {
                 new_state(new_i) = m_state(i);
@@ -1121,8 +1129,6 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
 
     if(m_track_robot && m_first_state) return;
 
-    RCLCPP_INFO(this->get_logger(), "START BANNERS SLAM");
-
     std::vector<std::shared_ptr<all_seaing_perception::Banner>> detected_banners;
     for (all_seaing_interfaces::msg::LabeledObjectPlane banner_msg : msg->objects) {
         std::shared_ptr<all_seaing_perception::Banner> banner(new all_seaing_perception::Banner(rclcpp::Time(m_local_header.stamp), banner_msg.label, banner_msg));
@@ -1147,8 +1153,6 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         }
     }
 
-    RCLCPP_INFO(this->get_logger(), "BEFORE HANDLING DETECTIONS");
-
     m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
     for (std::shared_ptr<all_seaing_perception::Banner> det_obs : detected_banners) {
         float range, bearing, phi;
@@ -1166,10 +1170,10 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 float d_theta = m_state(3 + 2*m_num_obj + 3 * tracked_id + 2) - m_state(2);
                 float q = d_x * d_x + d_y * d_y;
                 z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::bidirectional_angle_to_pi_range(d_theta));
-                Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, m_mat_size);
+                Eigen::MatrixXf F = Eigen::MatrixXf::Zero(6, m_mat_size);
                 F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
                 F.block(3, 3 + 2*m_num_obj + 3 * tracked_id, 3, 3) = Eigen::Matrix3f::Identity();
-                Eigen::Matrix<float, 3, 5> h{
+                Eigen::Matrix<float, 3, 6> h{
                     {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
                      std::sqrt(q) * d_y, 0},
                     {d_y, -d_x, -q, -d_y, d_x, 0},
@@ -1208,14 +1212,10 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         }
     }
 
-    RCLCPP_INFO(this->get_logger(), "AFTER HANDLING DETECTIONS");
-
     std::vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
     double assoc_threshold = m_new_banner_slam_thres;
     std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_banner_data_association(m_tracked_banners, detected_banners, p, assoc_threshold);
-
-    RCLCPP_INFO(this->get_logger(), "AFTER DATA ASSOCIATION");
     
     // Update vectors, now with known correspondence
     for (size_t i = 0; i < detected_banners.size(); i++) {
@@ -1266,13 +1266,13 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             float d_theta = m_state(3 + 2*m_num_obj + 3 * tracked_id + 2) - m_state(2);
             float q = d_x * d_x + d_y * d_y;
             Eigen::Vector3f z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::bidirectional_angle_to_pi_range(d_theta));
-            Eigen::Matrix<float, 3, 5> h{
+            Eigen::Matrix<float, 3, 6> h{
                 {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
                     std::sqrt(q) * d_y, 0},
                 {d_y, -d_x, -q, -d_y, d_x, 0},
                 {0, 0, -q, 0, 0, q},
             };
-            Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, m_mat_size);
+            Eigen::MatrixXf F = Eigen::MatrixXf::Zero(6, m_mat_size);
             F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
             F.block(3, 3 + 2*m_num_obj + 3 * tracked_id, 3, 3) = Eigen::Matrix3f::Identity();
             Eigen::MatrixXf H = h * F / q;
@@ -1314,12 +1314,8 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         detected_banners[i]->is_dead = m_tracked_banners[tracked_id]->is_dead;
         m_tracked_banners[tracked_id] = detected_banners[i];
     }
-
-    RCLCPP_INFO(this->get_logger(), "AFTER UPDATING WITH KNOWN ASSOCIATIONS");
     
     this->update_maps();
-
-    RCLCPP_INFO(this->get_logger(), "AFTER UPDATING MAPS");
 
     // Filter old obstacles
     std::unordered_set<int> to_keep_set;
@@ -1338,7 +1334,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 rclcpp::Time(m_local_header.stamp) -
                 m_tracked_banners[tracked_id]->last_dead +
                 m_tracked_banners[tracked_id]->time_dead;
-            pcl::PointXYZ p0(0, 0, 0);
+            pcl::PointXYZ p0 = m_track_robot ? pcl::PointXYZ(m_state(0), m_state(1), 0) : pcl::PointXYZ(m_nav_x, m_nav_y, 0);
             float dist = pcl::euclideanDistance(
                 p0,
                 pcl::PointXYZ(m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.x, 
@@ -1352,8 +1348,6 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         m_tracked_banners[tracked_id]->last_dead = m_local_header.stamp;
         to_keep_set.insert(tracked_id);
     }
-
-    RCLCPP_INFO(this->get_logger(), "AFTER FILTERING OLD OBSTACLES");
 
     // Clear out duplicates
     // TODO: optimize to N^2 (now is N^3) by making a priority queue of pairs of indices based on minimum distance and popping if index already removed and removing if distance < threshold
@@ -1434,7 +1428,6 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         m_num_banners = to_keep.size();
     }
 
-    RCLCPP_INFO(this->get_logger(), "AFTER CLEARING OUT DUPLICATES");
 
     m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
 
@@ -1445,16 +1438,12 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
 
     this->publish_maps();
 
-    RCLCPP_INFO(this->get_logger(), "AFTER PUBLISHING MAPS");
-
     if(m_got_nav){
         this->visualize_predictions();
     }
     if(m_track_robot && m_got_nav && m_got_odom){
         publish_slam();
     }
-
-    RCLCPP_INFO(this->get_logger(), "END BANNERS SLAM");
 }
 
 ObjectTrackingMap::~ObjectTrackingMap() {}
