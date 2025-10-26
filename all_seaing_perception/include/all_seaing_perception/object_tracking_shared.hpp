@@ -26,6 +26,7 @@
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "geometry_msgs/msg/point.hpp"
+#include "geometry_msgs/msg/pose.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -52,6 +53,8 @@
 
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud_array.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud.hpp"
+#include "all_seaing_interfaces/msg/labeled_object_plane_array.hpp"
+#include "all_seaing_interfaces/msg/labeled_object_plane.hpp"
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
 
 #include "all_seaing_perception/obstacle.hpp"
@@ -83,6 +86,20 @@ namespace all_seaing_perception {
         ObjectCloud(rclcpp::Time t, int l, all_seaing_perception::Obstacle<PointT> obs);
     };
 
+    struct Banner{
+        int label;
+        rclcpp::Time time_seen;
+        rclcpp::Time last_dead;
+        rclcpp::Duration time_dead = rclcpp::Duration(0,0);
+        bool is_dead;
+        Eigen::Vector3f mean_pred;
+        Eigen::Matrix3f cov;
+        all_seaing_interfaces::msg::LabeledObjectPlane plane_msg;
+
+        Banner();
+        Banner(rclcpp::Time t, int l, all_seaing_interfaces::msg::LabeledObjectPlane msg);
+    };
+
     template<typename PointT>
     std::shared_ptr<std::shared_ptr<ObjectCloud<PointT>>> clone(typename std::shared_ptr<ObjectCloud<PointT>> orig);
 
@@ -91,9 +108,12 @@ namespace all_seaing_perception {
 
     double mod_2pi(double angle);
     double angle_to_pi_range(double angle);
+    double bidirectional_angle_to_pi_range(double angle);
 
     template<typename PointT>
     std::tuple<float, float, int> local_to_range_bearing_signature(PointT point, int label);
+
+    std::tuple<float, float, float, int> local_banner_to_range_bearing_signature(geometry_msgs::msg::Pose pose, int label);
 
     // Get transform from source frame to target frame
     geometry_msgs::msg::TransformStamped get_tf(const std::unique_ptr<tf2_ros::Buffer> &tf_buffer,
@@ -130,6 +150,11 @@ namespace all_seaing_perception {
     std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
         typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
         std::vector<std::vector<float>> p, std::vector<std::vector<float>> probs, float new_obj_thres);
+
+    // for banners
+    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_banner_data_association(std::vector<std::shared_ptr<Banner>> tracked_obstacles,
+        std::vector<std::shared_ptr<Banner>> detected_obstacles,
+        std::vector<std::vector<float>> p, float new_obj_thres);
 
 } // namespace all_seaing_perception
 

@@ -51,6 +51,8 @@
 
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud_array.hpp"
 #include "all_seaing_interfaces/msg/labeled_object_point_cloud.hpp"
+#include "all_seaing_interfaces/msg/labeled_object_plane_array.hpp"
+#include "all_seaing_interfaces/msg/labeled_object_plane.hpp"
 #include "all_seaing_interfaces/msg/obstacle_map.hpp"
 
 #include "all_seaing_perception/obstacle.hpp"
@@ -67,6 +69,8 @@ private:
     void object_track_map_publish(const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr &msg);
     void odom_callback();
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
+    void banners_cb(const all_seaing_interfaces::msg::LabeledObjectPlaneArray::ConstSharedPtr &msg);
+
     template <typename T>
     T convert_to_global(T point, bool untracked = false);
     template <typename T>
@@ -82,6 +86,7 @@ private:
 
     // Member variables
     std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>> m_tracked_obstacles;
+    std::vector<std::shared_ptr<all_seaing_perception::Banner>> m_tracked_banners;
     std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
     std_msgs::msg::Header m_local_header;
     std_msgs::msg::Header m_global_header, m_global_untracked_header;
@@ -89,7 +94,7 @@ private:
     
     double m_duplicate_thresh;
     double m_obstacle_drop_thresh, m_range_drop_thresh;
-    double m_init_new_cov, m_init_xy_noise, m_init_theta_noise;
+    double m_init_new_cov, m_banner_init_new_cov, m_banner_init_new_theta_cov, m_init_xy_noise, m_init_theta_noise;
     bool m_track_robot, m_imu_predict, m_gps_update;
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;
@@ -101,6 +106,7 @@ private:
     double m_trace_time;
     bool m_include_unlabeled, m_drop_ignore_unlabeled;
     double m_unlabeled_assoc_threshold;
+    bool m_track_banners, m_banners_slam;
 
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
@@ -109,11 +115,13 @@ private:
 
     // Publishers and subscribers
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
+    rclcpp::Publisher<all_seaing_interfaces::msg::LabeledObjectPlaneArray>::SharedPtr m_tracked_banners_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_map_cov_viz_pub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr m_slam_pub;
     rclcpp::Subscription<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_object_sub;
     rclcpp::Subscription<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_unlabeled_sub;
+    rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPlaneArray>::SharedPtr m_banners_sub;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
@@ -123,11 +131,11 @@ private:
     rclcpp::TimerBase::SharedPtr odom_timer;
 
     //SLAM matrices & variables
-    float m_range_std, m_bearing_std, m_new_obj_slam_thres;
+    float m_range_std, m_bearing_std, m_banner_range_std, m_banner_bearing_std, m_banner_phi_std, m_new_obj_slam_thres, m_new_banner_slam_thres;
     float m_gps_xy_noise, m_gps_theta_noise;
     float m_imu_xy_noise, m_imu_theta_noise;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
-    int m_num_obj;
+    int m_num_obj, m_num_banners, m_mat_size;
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
