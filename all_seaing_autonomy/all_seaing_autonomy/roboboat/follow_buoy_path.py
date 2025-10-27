@@ -18,6 +18,7 @@ import math
 import os
 import yaml
 import time
+from enum import Enum
 
 class InternalBuoyPair:
     def __init__(self, left_buoy=None, right_buoy=None):
@@ -30,6 +31,13 @@ class InternalBuoyPair:
             self.right = Obstacle()
         else:
             self.right = right_buoy
+
+class FollowPathState(Enum):
+    SETTING_UP = 1
+    FOLLOWING_FIRST_PASS = 2
+    FOLLOWING_BACK = 3
+    WAITING_GREEN_BEACON = 4
+    CIRCLING_GREEN_BEACON = 5
 
 
 class FollowBuoyPath(ActionServerBase):
@@ -54,11 +62,11 @@ class FollowBuoyPath(ActionServerBase):
 
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
 
-        self.declare_parameter("xy_threshold", 0.5)
+        self.declare_parameter("xy_threshold", 2.0)
         self.declare_parameter("theta_threshold", 180.0)
         self.declare_parameter("goal_tol", 0.5)
         self.declare_parameter("obstacle_tol", 50)
-        self.declare_parameter("choose_every", 5)
+        self.declare_parameter("choose_every", 10)
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
         self.declare_parameter("bypass_planner", False)
@@ -106,8 +114,19 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("station_hold_period", 3.0)
         self.station_hold_period = self.get_parameter("station_hold_period").get_parameter_value().double_value
 
+        self.declare_parameter("circle_beacon", True)
+        self.circle_beacon = self.get_parameter("circle_beacon").get_parameter_value().bool_value
+
+        self.declare_parameter("beacon_probe_dist", 10.0)
+        self.beacon_probe_dist = self.get_parameter("beacon_probe_dist").get_parameter_value().double_value
+
+        self.declare_parameter("turn_offset", 5.0)
+        self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
+
         self.green_labels = set()
         self.red_labels = set()
+        self.red_beacon_labels = set()
+        self.green_beacon_labels = set()
 
         self.declare_parameter(
             "color_label_mappings_file", 
@@ -125,6 +144,8 @@ class FollowBuoyPath(ActionServerBase):
         if self.is_sim:
             self.green_labels.add(label_mappings["green"])
             self.red_labels.add(label_mappings["red"])
+            self.green_beacon_labels.add(label_mappings["yellow"])
+            self.green_beacon_labels.add(label_mappings["blue"])
         else:
             # self.green_labels.add(11) # just to use old rosbags
             # self.red_labels.add(17) # just to use old rosbags
@@ -135,6 +156,8 @@ class FollowBuoyPath(ActionServerBase):
             self.red_labels.add(label_mappings["red_circle"])
             self.red_labels.add(label_mappings["red_pole_buoy"])
             self.red_labels.add(label_mappings["red_racquet_ball"])
+            self.green_beacon_labels.add(label_mappings["yellow_buoy"])
+            self.green_beacon_labels.add(label_mappings["yellow_racquet_ball"])
         
         self.sent_waypoints = set()
 
@@ -158,8 +181,10 @@ class FollowBuoyPath(ActionServerBase):
         self.waypoint_sent_future = None
         self.send_goal_future = None
 
-        self.first_pass = True
+        self.state = FollowPathState.SETTING_UP
         self.last_pair = None
+
+        self.green_beacon_found = False
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -204,6 +229,14 @@ class FollowBuoyPath(ActionServerBase):
         '''
         position = self.get_robot_pose()[0:2]
         return (float(position[0]), float(position[1]))
+
+    @property
+    def robot_dir(self):
+        '''
+        Gets the robot direction as a tuple, containing the unit vector in the same direction as heading
+        '''
+        heading = self.get_robot_pose()[2]
+        return (math.cos(heading), math.sin(heading))
 
     def split_buoys(self, obstacles):
         """
@@ -729,11 +762,13 @@ class FollowBuoyPath(ActionServerBase):
                 self.sent_forward = False
             elif len(self.buoy_pairs) == 1:
                 if time.time() - self.time_last_seen_buoys > 5:
-                    if self.first_pass:
-                        self.first_pass = False
-                        self.buoy_pairs = [self.last_pair]
+                    if self.state == FollowPathState.FOLLOWING_FIRST_PASS:
+                        self.state = FollowPathState.WAITING_GREEN_BEACON if self.circle_beacon else FollowPathState.FOLLOWING_BACK
+                        self.pair_to = self.last_pair
+                        self.first_buoy_pair = True
                         self.red_left = not self.red_left
-                        self.buoy_pairs[0].left, self.buoy_pairs[0].right = self.buoy_pairs[0].right, self.buoy_pairs[0].left
+                        self.pair_to.left, self.pair_to.right = self.pair_to.right, self.pair_to.left
+                        return
                     else:
                         self.result = True
                         return
@@ -760,11 +795,13 @@ class FollowBuoyPath(ActionServerBase):
                     return
             else:
                 if time.time() - self.time_last_seen_buoys > 5:
-                    if self.first_pass:
-                        self.first_pass = False
-                        self.buoy_pairs = [self.last_pair]
+                    if self.state == FollowPathState.FOLLOWING_FIRST_PASS:
+                        self.state = FollowPathState.WAITING_GREEN_BEACON if self.circle_beacon else FollowPathState.FOLLOWING_BACK
+                        self.pair_to = self.last_pair
+                        self.first_buoy_pair = True
                         self.red_left = not self.red_left
-                        self.buoy_pairs[0].left, self.buoy_pairs[0].right = self.buoy_pairs[0].right, self.buoy_pairs[0].left
+                        self.pair_to.left, self.pair_to.right = self.pair_to.right, self.pair_to.left
+                        return
                     else:
                         self.result = True
                         return
@@ -865,6 +902,135 @@ class FollowBuoyPath(ActionServerBase):
         """
         self.obstacles = msg.obstacles
 
+    def probe_green_beacon(self):
+        '''
+        Function to find the green beacon by moving near it (general direction).
+        Keeps on appending waypoints to the north/south until it finds 
+        '''
+        self.get_logger().info("Probing for green beacon")
+        max_guide_d = self.beacon_probe_dist
+        guide_point = (max_guide_d*self.buoy_direction[0] + self.robot_pos[0], 
+                        max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
+        self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
+
+        self.move_to_point(guide_point)
+        while not self.moved_to_point:
+            if self.green_beacon_detected():
+                return Task.Result(success=True)
+            time.sleep(self.timer_period)
+
+        return Task.Result(success=False)
+    
+    def move_to_point(self, point, is_stationary=False, busy_wait=False):
+        '''
+        Moves the boat to the specified position using the follow path action server.
+        # Returns the future of the server request.
+
+        Busy waits until the boat moved to the point (bad, should be fixed with asyncio patterns)
+        '''
+        self.get_logger().info(f"Moving to point {point}")
+        self.moved_to_point = False
+        self.follow_path_client.wait_for_server()
+        goal_msg = FollowPath.Goal()
+        goal_msg.planner = self.get_parameter("planner").value
+        goal_msg.x = point[0]
+        goal_msg.y = point[1]
+        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
+        goal_msg.goal_tol = self.get_parameter("goal_tol").value
+        goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
+        goal_msg.choose_every = self.get_parameter("choose_every").value
+        goal_msg.is_stationary = is_stationary
+
+        self.follow_path_client.wait_for_server()
+        self.send_goal_future = self.follow_path_client.send_goal_async(
+            goal_msg
+        )
+        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
+        if busy_wait:
+            while not self.moved_to_point:
+                time.sleep(self.timer_period)
+
+    def follow_path_response_cb(self, future):
+        '''
+        Responds to follow path action server goal response.
+        '''
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Waypoint rejected')
+            return
+
+        self.get_logger().info("Waypoint accepted")
+        self._get_result_future = goal_handle.get_result_async()
+        self._get_result_future.add_done_callback(self.get_point_result_cb)
+
+    def get_point_result_cb(self, future):
+        '''
+        Flags the path following as complete for move_to_point
+        '''
+        # Marks path following as finished/ moved to path following point
+        # if path following is interrupted, does not affect moved to point
+        result = future.result().result
+        if result.is_finished:
+            self.moved_to_point = True
+
+    def green_beacon_detected(self):
+        '''
+        Check if the green beacon for turning is detected (returns boolean).
+        Also sets the position of the green beacon if it is found.
+        '''
+        for obstacle in self.obstacles:
+            if obstacle.label in self.green_beacon_labels:
+                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
+                self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
+                self.green_beacon_found = True
+                self.green_beacon_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                break
+        return self.green_beacon_found
+
+    def circle_green_beacon(self):
+        '''
+        Function to circle the green beacon.
+        '''
+        self.get_logger().info("Circling green beacon")
+        if not self.green_beacon_detected():
+            self.get_logger().info("speed challenge probing exited without finding green beacon")
+            return Task.Result(success=False)
+        
+        # circle the green beacon like a baseball diamond
+        # a better way to do this might be to have the astar run to original cell, 
+        # but require the path to go around buoy
+
+        t_o = self.turn_offset
+        first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
+        second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
+        third_dir = (-first_dir[0], -first_dir[1])
+
+
+        add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
+        first_base = add_tuple(self.green_beacon_pos, first_dir)
+        second_base = add_tuple(self.green_beacon_pos, second_dir)
+        third_base = add_tuple(self.green_beacon_pos, third_dir)
+
+        bases = [first_base, second_base, third_base]
+        self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
+        self.get_logger().info(f"green beacon pose: {self.green_beacon_pos}")
+        self.get_logger().info(f"bases: {bases}")
+        for base in bases:
+            self.move_to_point(base, busy_wait=True)
+            self.get_logger().info(f"moved to point = {self.moved_to_point}")
+
+        return Task.Result(success=True)
+    
+    def return_to_start(self):
+        '''
+        After circling the buoy, return to the starting position.
+        '''
+        self.get_logger().info("Returning to start")
+        self.move_to_point(self.home_pos, busy_wait=True)
+        return Task.Result(success=True)
+
+
     def station_hold(self):
         nav_x, nav_y, heading = self.get_robot_pose()
 
@@ -896,7 +1062,7 @@ class FollowBuoyPath(ActionServerBase):
         goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
         goal_msg.x = nav_x
         goal_msg.y = nav_y
-        goal_msg.theta = heading - (30.0 * 2 * math.pi / 360)
+        goal_msg.theta = heading + (30.0 * 2 * math.pi / 360)
         goal_msg.ignore_theta = False
         goal_msg.is_stationary = True
         self.result = False
@@ -915,7 +1081,7 @@ class FollowBuoyPath(ActionServerBase):
         goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
         goal_msg.x = nav_x
         goal_msg.y = nav_y
-        goal_msg.theta = heading + (30.0 * 2 * math.pi / 360)
+        goal_msg.theta = heading - (30.0 * 2 * math.pi / 360)
         goal_msg.ignore_theta = False
         goal_msg.is_stationary = True
         self.result = False
@@ -964,6 +1130,8 @@ class FollowBuoyPath(ActionServerBase):
 
         self.get_logger().info("Setup buoys succeeded!")
 
+        self.state = FollowPathState.FOLLOWING_FIRST_PASS
+
         while not self.result:
             # Check if we should abort/cancel if a new goal arrived
             if self.should_abort():
@@ -976,7 +1144,41 @@ class FollowBuoyPath(ActionServerBase):
                 goal_handle.canceled()
                 return Task.Result()
             
-            self.generate_waypoints()
+            if self.state in [FollowPathState.FOLLOWING_FIRST_PASS, FollowPathState.FOLLOWING_BACK]:
+                self.generate_waypoints()
+            elif self.state == FollowPathState.WAITING_GREEN_BEACON:
+                self.get_logger().info(f"Turning right to find green beacon")
+        
+                nav_x, nav_y, heading = self.get_robot_pose()
+                goal_msg = Waypoint.Goal()
+                goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+                goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
+                goal_msg.x = nav_x
+                goal_msg.y = nav_y
+                goal_msg.theta = heading - (30.0 * 2 * math.pi / 360)
+                goal_msg.ignore_theta = False
+                goal_msg.is_stationary = True
+                self.result = False
+                self.waypoint_client.wait_for_server()
+                self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
+                self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
+
+                time.sleep(5.0)
+                
+                self.get_logger().info(f'Detecting green beacon')
+                self.home_pos = self.robot_pos # keep track of home position
+                self.buoy_direction = self.robot_dir
+                self.get_logger().info(f"Facing direction: {self.buoy_direction}")
+                action_result = self.probe_green_beacon()
+                if action_result.success == False:
+                    self.state = FollowPathState.FOLLOWING_BACK
+                else:
+                    self.state = FollowPathState.CIRCLING_GREEN_BEACON
+            elif self.state == FollowPathState.CIRCLING_GREEN_BEACON:
+                self.get_logger().info(f'Circling green beacon')
+                action_result = self.circle_green_beacon()
+                # action_result = self.return_to_start()
+                self.state = FollowPathState.FOLLOWING_BACK
 
             time.sleep(self.timer_period)
 
