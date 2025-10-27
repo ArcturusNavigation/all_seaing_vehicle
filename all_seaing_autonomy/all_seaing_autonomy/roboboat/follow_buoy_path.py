@@ -42,7 +42,6 @@ class FollowBuoyPath(ActionServerBase):
             "follow_buoy_path",
             execute_callback=self.execute_callback,
             cancel_callback=self.default_cancel_callback,
-
         )
 
         self.map_sub = self.create_subscription(
@@ -158,6 +157,9 @@ class FollowBuoyPath(ActionServerBase):
         self.lastSelectedGoal = None
         self.waypoint_sent_future = None
         self.send_goal_future = None
+
+        self.first_pass = True
+        self.last_pair = None
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -704,6 +706,7 @@ class FollowBuoyPath(ActionServerBase):
 
         passed_previous = False
         # Check if we passed that pair of buoys (the robot is in front of the pair), then move on to the next one
+        self.last_pair = self.pair_to
         left_coords = self.ob_coords(self.pair_to.left)
         right_coords = self.ob_coords(self.pair_to.right)
         x, y = self.midpoint(left_coords, right_coords)
@@ -726,8 +729,14 @@ class FollowBuoyPath(ActionServerBase):
                 self.sent_forward = False
             elif len(self.buoy_pairs) == 1:
                 if time.time() - self.time_last_seen_buoys > 5:
-                    self.result = True
-                    return
+                    if self.first_pass:
+                        self.first_pass = False
+                        self.buoy_pairs = [self.last_pair]
+                        self.red_left = not self.red_left
+                        self.buoy_pairs[0].left, self.buoy_pairs[0].right = self.buoy_pairs[0].right, self.buoy_pairs[0].left
+                    else:
+                        self.result = True
+                        return
                 else:
                     if self.sent_forward:
                         return
@@ -751,8 +760,14 @@ class FollowBuoyPath(ActionServerBase):
                     return
             else:
                 if time.time() - self.time_last_seen_buoys > 5:
-                    self.result = True
-                return
+                    if self.first_pass:
+                        self.first_pass = False
+                        self.buoy_pairs = [self.last_pair]
+                        self.red_left = not self.red_left
+                        self.buoy_pairs[0].left, self.buoy_pairs[0].right = self.buoy_pairs[0].right, self.buoy_pairs[0].left
+                    else:
+                        self.result = True
+                        return
         else:
             self.sent_forward = False
             self.time_last_seen_buoys = time.time()
