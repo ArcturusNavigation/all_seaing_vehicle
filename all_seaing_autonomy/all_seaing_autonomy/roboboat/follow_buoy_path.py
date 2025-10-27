@@ -64,6 +64,7 @@ class FollowBuoyPath(ActionServerBase):
 
         self.declare_parameter("xy_threshold", 2.0)
         self.declare_parameter("theta_threshold", 180.0)
+        self.declare_parameter("wpt_theta_threshold", 10.0)
         self.declare_parameter("goal_tol", 0.5)
         self.declare_parameter("obstacle_tol", 50)
         self.declare_parameter("choose_every", 10)
@@ -110,10 +111,6 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("timer_period", 1/30.0)
         self.timer_period = self.get_parameter("timer_period").get_parameter_value().double_value
 
-        # every station_hold_period seconds, it switches from looking 30 deg left to 30 deg right
-        self.declare_parameter("station_hold_period", 3.0)
-        self.station_hold_period = self.get_parameter("station_hold_period").get_parameter_value().double_value
-
         self.declare_parameter("circle_beacon", True)
         self.circle_beacon = self.get_parameter("circle_beacon").get_parameter_value().bool_value
 
@@ -122,7 +119,7 @@ class FollowBuoyPath(ActionServerBase):
 
         self.declare_parameter("turn_offset", 5.0)
         self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
-
+        
         self.green_labels = set()
         self.red_labels = set()
         self.red_beacon_labels = set()
@@ -761,6 +758,8 @@ class FollowBuoyPath(ActionServerBase):
                 self.pair_to = self.buoy_pairs[0]
                 self.sent_forward = False
             elif len(self.buoy_pairs) == 1:
+                # TODO: Add a check for whether we searched for buoys by going right and left, and search if not, return, then if we already searched move on
+                # TODO: Replace timer with callback on whether we reached the forward waypoint
                 if time.time() - self.time_last_seen_buoys > 5:
                     if self.state == FollowPathState.FOLLOWING_FIRST_PASS:
                         self.state = FollowPathState.WAITING_GREEN_BEACON if self.circle_beacon else FollowPathState.FOLLOWING_BACK
@@ -951,6 +950,28 @@ class FollowBuoyPath(ActionServerBase):
             while not self.moved_to_point:
                 time.sleep(self.timer_period)
 
+    def move_to_waypoint(self, point, is_stationary=False, busy_wait=False):
+        self.get_logger().info(f"Moving to waypoint {point}")
+        self.moved_to_point = False
+        goal_msg = Waypoint.Goal()
+        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+        goal_msg.theta_threshold = self.get_parameter("wpt_theta_threshold").value
+        goal_msg.x = point[0]
+        goal_msg.y = point[1]
+        if len(point) >= 3:
+            goal_msg.theta = point[2]
+            goal_msg.ignore_theta = False
+        else:
+            goal_msg.ignore_theta = True
+        goal_msg.is_stationary = is_stationary
+        self.result = False
+        self.waypoint_client.wait_for_server()
+        self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
+        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
+        if busy_wait:
+            while not self.moved_to_point:
+                time.sleep(self.timer_period)
+        
     def follow_path_response_cb(self, future):
         '''
         Responds to follow path action server goal response.
@@ -985,6 +1006,10 @@ class FollowBuoyPath(ActionServerBase):
                 self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
                 self.green_beacon_found = True
                 self.green_beacon_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                robot_x, robot_y = self.robot_pos
+                robot_buoy_vector = (self.green_beacon_pos[0]-robot_x, self.green_beacon_pos[1]-robot_y)
+                robot_buoy_dist = self.norm(robot_buoy_vector)
+                self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
                 break
         return self.green_beacon_found
 
@@ -1036,77 +1061,47 @@ class FollowBuoyPath(ActionServerBase):
 
         self.get_logger().info(f"Station hold at ({nav_x:.2f}, {nav_y:.2f}, {heading:.1f})")
 
-        # HOLD FORWARD
-
-        goal_msg = Waypoint.Goal()
-        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-        goal_msg.x = nav_x
-        goal_msg.y = nav_y
-        goal_msg.theta = heading 
-        goal_msg.ignore_theta = False
-        goal_msg.is_stationary = True
-        self.result = False
-        self.waypoint_client.wait_for_server()
-        self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
-        self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
-
-        time.sleep(self.station_hold_period)
-
         # LOOK LEFT 30 DEG
 
-        self.get_logger().info(f"Turning left since nothing found")
-
-        goal_msg = Waypoint.Goal()
-        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-        goal_msg.x = nav_x
-        goal_msg.y = nav_y
-        goal_msg.theta = heading + (30.0 * 2 * math.pi / 360)
-        goal_msg.ignore_theta = False
-        goal_msg.is_stationary = True
-        self.result = False
-        self.waypoint_client.wait_for_server()
-        self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
-        self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
-
-        time.sleep(self.station_hold_period)
+        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
 
         # LOOK RIGHT 30 DEG
 
-        self.get_logger().info(f"Turning right since nothing found")
-        
-        goal_msg = Waypoint.Goal()
-        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-        goal_msg.x = nav_x
-        goal_msg.y = nav_y
-        goal_msg.theta = heading - (30.0 * 2 * math.pi / 360)
-        goal_msg.ignore_theta = False
-        goal_msg.is_stationary = True
-        self.result = False
-        self.waypoint_client.wait_for_server()
-        self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
-        self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
-
-        time.sleep(self.station_hold_period)
+        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
 
         # BACK TO FORWARD
-        self.get_logger().info(f"Returning to station hold forward")
 
-        goal_msg = Waypoint.Goal()
-        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-        goal_msg.x = nav_x
-        goal_msg.y = nav_y
-        goal_msg.theta = heading 
-        goal_msg.ignore_theta = False
-        goal_msg.is_stationary = True
-        self.result = False
-        self.waypoint_client.wait_for_server()
-        self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
-        self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
+        self.move_to_waypoint([nav_x, nav_y, heading], is_stationary=True, busy_wait=False)
 
+    def search_buoys(self):
+        nav_x, nav_y, heading = self.get_robot_pose()
+
+        # LOOK LEFT 30 DEG
+
+        self.get_logger().info(f"Turning left")
+
+        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+
+        # LOOK RIGHT 30 DEG
+
+        self.get_logger().info(f"Turning right")
+
+        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+
+    def search_beacon(self):
+        nav_x, nav_y, heading = self.get_robot_pose()
+
+        # # LOOK LEFT 30 DEG
+
+        # self.get_logger().info(f"Turning left")
+
+        # self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+
+        # LOOK RIGHT 30 DEG
+
+        # self.get_logger().info(f"Turning right")
+
+        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
 
     def execute_callback(self, goal_handle):
 
@@ -1147,23 +1142,9 @@ class FollowBuoyPath(ActionServerBase):
             if self.state in [FollowPathState.FOLLOWING_FIRST_PASS, FollowPathState.FOLLOWING_BACK]:
                 self.generate_waypoints()
             elif self.state == FollowPathState.WAITING_GREEN_BEACON:
-                self.get_logger().info(f"Turning right to find green beacon")
+                self.get_logger().info(f"Searching green beacon")
         
-                nav_x, nav_y, heading = self.get_robot_pose()
-                goal_msg = Waypoint.Goal()
-                goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-                goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-                goal_msg.x = nav_x
-                goal_msg.y = nav_y
-                goal_msg.theta = heading - (30.0 * 2 * math.pi / 360)
-                goal_msg.ignore_theta = False
-                goal_msg.is_stationary = True
-                self.result = False
-                self.waypoint_client.wait_for_server()
-                self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
-                self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
-
-                time.sleep(5.0)
+                self.search_beacon()
                 
                 self.get_logger().info(f'Detecting green beacon')
                 self.home_pos = self.robot_pos # keep track of home position
