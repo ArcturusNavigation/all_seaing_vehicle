@@ -19,6 +19,7 @@ import os
 import yaml
 import time
 from enum import Enum
+from functools import partial
 
 class InternalBuoyPair:
     def __init__(self, left_buoy=None, right_buoy=None):
@@ -96,8 +97,11 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
 
-        self.declare_parameter("adapt_dist", 0.3)
+        self.declare_parameter("adapt_dist", 0.7)
         self.adapt_dist = self.get_parameter("adapt_dist").get_parameter_value().double_value
+
+        self.declare_parameter("circle_adapt_dist", 0.3)
+        self.circle_adapt_dist = self.get_parameter("circle_adapt_dist").get_parameter_value().double_value
 
         self.declare_parameter("thresh_dist", 0.5)
         self.thresh_dist = self.get_parameter("thresh_dist").get_parameter_value().double_value
@@ -917,7 +921,21 @@ class FollowBuoyPath(ActionServerBase):
 
         return Task.Result(success=success)
     
-    def move_to_point(self, point, is_stationary=False, busy_wait=False, abort_func=None):
+    def update_green_beacon_pos(self, offset_pos):
+        '''
+        Updates the position of the green beacon if too far away based on its global map position (and stored previous position) and the offset
+        Returns a tuple (update_bool, new_pos) with whether we want to update the goal point and the new point respectively
+        '''
+        for obstacle in self.obstacles:
+            if obstacle.label in self.green_beacon_labels:
+                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy (e.g. make it pick closest one or smth)
+                self.green_beacon_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                if self.norm(self.green_beacon_pos, self.prev_sent_beacon_pos) > self.circle_adapt_dist:
+                    self.prev_sent_beacon_pos = self.green_beacon_pos
+                    return (True, (self.green_beacon_pos[0]+offset_pos[0], self.green_beacon_pos[1]+offset_pos[1]))
+        return (False, None)
+
+    def move_to_point(self, point, is_stationary=False, busy_wait=False, abort_func=None, goal_update_func=None):
         '''
         Moves the boat to the specified position using the follow path action server.
         # Returns the future of the server request.
@@ -925,6 +943,7 @@ class FollowBuoyPath(ActionServerBase):
         Busy waits until the boat moved to the point (bad, should be fixed with asyncio patterns)
 
         Returns true if aborted by the function
+        Sends new waypoint if desired by the goal_update_func
         '''
         self.get_logger().info(f"Moving to point {point}")
         self.moved_to_point = False
@@ -948,9 +967,22 @@ class FollowBuoyPath(ActionServerBase):
         self.send_goal_future.add_done_callback(self.follow_path_response_cb)
         if busy_wait:
             while not self.moved_to_point:
-                if abort_func is not None:
-                    if abort_func():
-                        return True
+                if (abort_func is not None) and abort_func():
+                    return True
+                if (goal_update_func is not None):
+                    update_goal, new_goal = goal_update_func()
+                    if update_goal:
+                        goal_msg.x = new_goal[0]
+                        goal_msg.y = new_goal[1]
+
+                        self.get_logger().info('ADAPTING GOAL POINT')
+                        self.follow_path_client.wait_for_server()
+                        self.send_goal_future = self.follow_path_client.send_goal_async(
+                            goal_msg
+                        )
+                        self._get_result_future = None
+                        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
+
                 goal_result = self.send_goal_future.result()
                 if ((goal_result is not None) and (not goal_result.accepted)) or (self._get_result_future != None and
                                                   self._get_result_future.result() != None and 
@@ -960,11 +992,12 @@ class FollowBuoyPath(ActionServerBase):
                     self.send_goal_future = self.follow_path_client.send_goal_async(
                         goal_msg
                     )
+                    self._get_result_future = None
                     self.send_goal_future.add_done_callback(self.follow_path_response_cb)
                 time.sleep(self.timer_period)
         return False
 
-    def move_to_waypoint(self, point, is_stationary=False, busy_wait=False, abort_func=None):
+    def move_to_waypoint(self, point, is_stationary=False, busy_wait=False, abort_func=None, goal_update_func=None):
         self.get_logger().info(f"Moving to waypoint {point}")
         self.moved_to_point = False
         goal_msg = Waypoint.Goal()
@@ -984,9 +1017,19 @@ class FollowBuoyPath(ActionServerBase):
         self.send_goal_future.add_done_callback(self.follow_path_response_cb)
         if busy_wait:
             while not self.moved_to_point:
-                if abort_func is not None:
-                    if abort_func():
-                        return True
+                if (abort_func is not None) and abort_func():
+                    return True
+                if (goal_update_func is not None):
+                    update_goal, new_goal = goal_update_func()
+                    if update_goal:
+                        goal_msg.x = new_goal[0]
+                        goal_msg.y = new_goal[1]
+
+                        self.get_logger().info('ADAPTING WAYPOINT')
+                        self.result = False
+                        self.waypoint_client.wait_for_server()
+                        self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
+                        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
                 time.sleep(self.timer_period)
         return False
         
@@ -1020,7 +1063,7 @@ class FollowBuoyPath(ActionServerBase):
         '''
         for obstacle in self.obstacles:
             if obstacle.label in self.green_beacon_labels:
-                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
+                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy (e.g. make it pick closest one or smth)
                 self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
                 self.green_beacon_found = True
                 self.green_beacon_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
@@ -1059,8 +1102,9 @@ class FollowBuoyPath(ActionServerBase):
         self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
         self.get_logger().info(f"green beacon pose: {self.green_beacon_pos}")
         self.get_logger().info(f"bases: {bases}")
-        for base in bases:
-            self.move_to_point(base, busy_wait=True)
+        self.prev_sent_beacon_pos = self.green_beacon_pos
+        for base, offset in zip(bases, [first_dir, second_dir, third_dir]):
+            self.move_to_point(base, busy_wait=True, goal_update_func=partial(self.update_green_beacon_pos, offset))
             self.get_logger().info(f"moved to point = {self.moved_to_point}")
 
         return Task.Result(success=True)
