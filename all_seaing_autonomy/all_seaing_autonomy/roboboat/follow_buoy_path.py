@@ -186,6 +186,7 @@ class FollowBuoyPath(ActionServerBase):
         self.last_pair = None
 
         self.green_beacon_found = False
+        self.waypoint_reject = True
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -843,9 +844,9 @@ class FollowBuoyPath(ActionServerBase):
                 self.first_buoy_pair = False
             elif self.send_goal_future != None and self.lastSelectedGoal != None:
                 goal_result = self.send_goal_future.result()
-                if ((goal_result is not None) and (not goal_result.accepted)) or (self.waypoint_sent_future != None and
+                if self.waypoint_reject or (((goal_result is not None) and (not goal_result.accepted)) or (self.waypoint_sent_future != None and
                                                   self.waypoint_sent_future.result() != None and 
-                                                  self.waypoint_sent_future.result().status == GoalStatus.STATUS_ABORTED):
+                                                  self.waypoint_sent_future.result().status == GoalStatus.STATUS_ABORTED)):
                     self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
                     self.send_waypoint_to_server(self.lastSelectedGoal)
                     # Waypoint has already been sent before, should be fine to avoid adding it to set?
@@ -858,6 +859,7 @@ class FollowBuoyPath(ActionServerBase):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().info("Strange - sent waypoint rejected immediately.")
+            self.waypoint_reject = True
             return
         self.waypoint_sent_future = goal_handle.get_result_async()
 
@@ -865,6 +867,7 @@ class FollowBuoyPath(ActionServerBase):
         # self.get_logger().info('SENDING WAYPOINT TO SERVER')
         # sending waypoints to navigation server
         self.waypoint_sent_future = None # Reset this... Make sure chance of going backwards is 0
+        self.waypoint_reject = False
 
         self.sent_waypoint = waypoint
         if not self.bypass_planner:
@@ -964,6 +967,7 @@ class FollowBuoyPath(ActionServerBase):
             goal_msg
         )
         self._get_result_future = None
+        self.waypoint_reject = False
         self.send_goal_future.add_done_callback(self.follow_path_response_cb)
         if busy_wait:
             while not self.moved_to_point:
@@ -984,9 +988,9 @@ class FollowBuoyPath(ActionServerBase):
                         self.send_goal_future.add_done_callback(self.follow_path_response_cb)
 
                 goal_result = self.send_goal_future.result()
-                if ((goal_result is not None) and (not goal_result.accepted)) or (self._get_result_future != None and
+                if self.waypoint_reject or (((goal_result is not None) and (not goal_result.accepted)) or (self._get_result_future != None and
                                                   self._get_result_future.result() != None and 
-                                                  self._get_result_future.result().status == GoalStatus.STATUS_ABORTED):
+                                                  self._get_result_future.result().status == GoalStatus.STATUS_ABORTED)):
                     self.get_logger().info('RESENDING GOAL')
                     self.follow_path_client.wait_for_server()
                     self.send_goal_future = self.follow_path_client.send_goal_async(
@@ -1040,6 +1044,7 @@ class FollowBuoyPath(ActionServerBase):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().info('Waypoint rejected')
+            self.waypoint_reject = True
             return
 
         self.get_logger().info("Waypoint accepted")
