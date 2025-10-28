@@ -1207,6 +1207,11 @@ class FollowBuoyPath(ActionServerBase):
                 return Task.Result()
             
             if self.state in [FollowPathState.FOLLOWING_FIRST_PASS, FollowPathState.FOLLOWING_BACK]:
+                if self.state == FollowPathState.FOLLOWING_BACK:
+                    if "green_pole_buoy" in self.green_labels:
+                        self.green_labels.remove("green_pole_buoy")
+                    if "red_pole_buoy" in self.red_labels:
+                        self.red_labels.remove("red_pole_buoy")
                 self.generate_waypoints()
             elif self.state == FollowPathState.WAITING_GREEN_BEACON:
                 self.get_logger().info(f"Searching green beacon")
