@@ -36,6 +36,7 @@ RANSACDetector::RANSACDetector() : Node("ransac_detector"){
         m_dist_thres = m_ransac_params_config_yaml["dist_thres"].as<double>();
         m_min_inliers = m_ransac_params_config_yaml["min_inliers"].as<int>();
         m_clust_dist = m_ransac_params_config_yaml["clust_dist"].as<double>();
+        m_plane_angle_thres = m_ransac_params_config_yaml["plane_angle_thres"].as<double>();
     } 
     else {
         RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", m_ransac_params_file.c_str());
@@ -161,7 +162,7 @@ void RANSACDetector::object_pcl_cb(
             int num_inliers;
             if (pcl_ptr->size() < 3) continue;
             std::tie(centroid, normal, size, num_inliers) = all_seaing_perception::PCLRANSAC(*pcl_ptr, m_dist_thres, m_max_iters, true, m_clust_dist);
-            if (num_inliers >= m_min_inliers){
+            if (num_inliers >= m_min_inliers && std::asin(std::abs(normal(2,0)/normal.col(0).norm())) <= m_plane_angle_thres*M_PI/((float)180)){
                 object_planes.objects.push_back(to_plane_msg(label, centroid, normal, size));
             }
         }
@@ -178,45 +179,60 @@ void RANSACDetector::object_pcl_cb(
     {
         int id_merge = iter->first;
         auto labeled_pcls = iter->second;
-        pcl::PointCloud<pcl::PointXYZHSV>::Ptr merged_pcloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
-        for (auto labeled_pcl : labeled_pcls){
-            int label = labeled_pcl.first;
-            pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr = labeled_pcl.second;
-            *merged_pcloud_ptr += *pcl_ptr;
-        }
+        std::set<std::pair<int, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>> active_pcls(labeled_pcls.begin(), labeled_pcls.end());
+        while(!active_pcls.empty()){
+            pcl::PointCloud<pcl::PointXYZHSV>::Ptr merged_pcloud_ptr(new pcl::PointCloud<pcl::PointXYZHSV>);
+            for (auto labeled_pcl : active_pcls){
+                int label = labeled_pcl.first;
+                pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr = labeled_pcl.second;
+                *merged_pcloud_ptr += *pcl_ptr;
+            }
 
-        // get centroid, normal, and size, and add to object_planes.coplanar_merged
-        Eigen::Vector3d merged_ctr, merged_size;
-        Eigen::Matrix3d merged_normal;
-        int merged_num_inliers;
-        if (merged_pcloud_ptr->size() < 3) continue;
-        std::tie(merged_ctr, merged_normal, merged_size, merged_num_inliers) = all_seaing_perception::PCLRANSAC(*merged_pcloud_ptr, m_dist_thres, m_max_iters, (labeled_pcls.size() == 1)?true:false, (labeled_pcls.size() == 1)?m_clust_dist:0.0f);
-        if (merged_num_inliers < m_min_inliers) continue;
-        
-        pcl::PointCloud<pcl::PointXYZ>::Ptr refined_merged_pcloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-
-        // get indiv refined planes
-        for (auto labeled_pcl : labeled_pcls){
-            int label = labeled_pcl.first;
-            pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr = labeled_pcl.second;
-
-            // Project the inliers wrt the merged frame, remove outliers for the resulting point cloud, and add refined frame to object_planes.coplanar_indiv
-            // Can probably use some of the helper functions for RANSAC in perception_utilities, do that
-            if (pcl_ptr->size() == 0) continue;
-            pcl::PointCloud<pcl::PointXYZ> pcl_inliers_all = all_seaing_perception::pickInliers(*pcl_ptr, merged_ctr, merged_normal, m_dist_thres);
-            if (pcl_inliers_all.size() == 0) continue;
-            pcl::PointCloud<pcl::PointXYZ> pcl_inliers = all_seaing_perception::pickLargestCluster(all_seaing_perception::pickInliers(*pcl_ptr, merged_ctr, merged_normal, m_dist_thres), m_clust_dist);
-            if (pcl_inliers.size() < 2) continue;
-            Eigen::Vector3d indiv_ctr, indiv_size;
-            std::tie(indiv_ctr, indiv_size) = all_seaing_perception::centroidDims(pcl_inliers, merged_normal);
-            object_planes.coplanar_indiv.push_back(to_plane_msg(label, indiv_ctr, merged_normal, indiv_size));
+            // get centroid, normal, and size, and add to object_planes.coplanar_merged
+            Eigen::Vector3d merged_ctr, merged_size;
+            Eigen::Matrix3d merged_normal;
+            int merged_num_inliers;
+            if (merged_pcloud_ptr->size() < 3) continue;
+            // TODO: Do the clustering if we only have one banner with inliers, after doing the merged RANSAC and getting each banner's inliers for it
+            std::tie(merged_ctr, merged_normal, merged_size, merged_num_inliers) = all_seaing_perception::PCLRANSAC(*merged_pcloud_ptr, m_dist_thres, m_max_iters, (active_pcls.size() == 1)?true:false, (active_pcls.size() == 1)?m_clust_dist:0.0f);
+            // TODO: Change this to a threshold larger than m_min_inliers if we see that we have many misdetections
+            if (merged_num_inliers < m_min_inliers || std::asin(std::abs(merged_normal(2,0)/merged_normal.col(0).norm())) > m_plane_angle_thres*M_PI/((float)180)) continue;
             
-            *refined_merged_pcloud_ptr += pcl_inliers;
+            pcl::PointCloud<pcl::PointXYZ>::Ptr refined_merged_pcloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+
+            // get indiv refined planes
+            std::vector<std::set<std::pair<int, pcl::PointCloud<pcl::PointXYZHSV>::Ptr>>::iterator> remove_list;
+            for (auto iter = active_pcls.begin(); iter != active_pcls.end(); iter++){
+                auto labeled_pcl = *iter;
+                int label = labeled_pcl.first;
+                pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcl_ptr = labeled_pcl.second;
+
+                // Project the inliers wrt the merged frame, remove outliers for the resulting point cloud, and add refined frame to object_planes.coplanar_indiv
+                // Can probably use some of the helper functions for RANSAC in perception_utilities, do that
+                if (pcl_ptr->size() == 0) continue;
+                pcl::PointCloud<pcl::PointXYZ> pcl_inliers_all = all_seaing_perception::pickInliers(*pcl_ptr, merged_ctr, merged_normal, m_dist_thres);
+                if (pcl_inliers_all.size() == 0) continue;
+                pcl::PointCloud<pcl::PointXYZ> pcl_inliers = all_seaing_perception::pickLargestCluster(all_seaing_perception::pickInliers(*pcl_ptr, merged_ctr, merged_normal, m_dist_thres), m_clust_dist);
+                if (pcl_inliers.size() < 2) continue; // TODO: Change this to m_min_inliers or some other threshold if we see that we have many misdetections
+                Eigen::Vector3d indiv_ctr, indiv_size;
+                std::tie(indiv_ctr, indiv_size) = all_seaing_perception::centroidDims(pcl_inliers, merged_normal);
+                object_planes.coplanar_indiv.push_back(to_plane_msg(label, indiv_ctr, merged_normal, indiv_size));
+                
+                *refined_merged_pcloud_ptr += pcl_inliers;
+                
+                remove_list.push_back(iter);
+            }
+            if (refined_merged_pcloud_ptr->size() < 2) continue;
+            // Compute centroid & size of merged refined pcloud
+            std::tie(merged_ctr, merged_size) = all_seaing_perception::centroidDims(*refined_merged_pcloud_ptr, merged_normal);
+            object_planes.coplanar_merged.push_back(to_plane_msg(id_merge, merged_ctr, merged_normal, merged_size));
+
+            // Remove banners already included in a plane
+            if (remove_list.empty()) break; // didn't add a new plane, which means there isn't any, remove
+            for (auto iter : remove_list){
+                active_pcls.erase(iter);
+            }
         }
-        if (refined_merged_pcloud_ptr->size() < 2) continue;
-        // Compute centroid & size of merged refined pcloud
-        std::tie(merged_ctr, merged_size) = all_seaing_perception::centroidDims(*refined_merged_pcloud_ptr, merged_normal);
-        object_planes.coplanar_merged.push_back(to_plane_msg(id_merge, merged_ctr, merged_normal, merged_size));
     }
     
     // Visualize RANSAC output

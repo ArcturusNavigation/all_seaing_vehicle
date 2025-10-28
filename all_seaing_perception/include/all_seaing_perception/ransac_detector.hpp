@@ -86,6 +86,7 @@ private:
     double m_dist_thres;
     int m_min_inliers;
     double m_clust_dist;
+    double m_plane_angle_thres;
 
 public:
     RANSACDetector();
