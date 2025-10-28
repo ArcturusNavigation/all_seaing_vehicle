@@ -76,7 +76,8 @@ def launch_setup(context, *args, **kwargs):
             {"inter_buoy_pair_dist": 0.5},
             {"buoy_pair_dist_thres": 0.2},
             {"xy_threshold": 2.0},
-            {"choose_every": 10}
+            {"choose_every": 10},
+            {"turn_offset": 1.5},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),

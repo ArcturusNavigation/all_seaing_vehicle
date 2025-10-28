@@ -62,10 +62,10 @@ class FollowBuoyPath(ActionServerBase):
 
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
 
-        self.declare_parameter("xy_threshold", 2.0)
+        self.declare_parameter("xy_threshold", 1.0)
         self.declare_parameter("theta_threshold", 180.0)
         self.declare_parameter("wpt_theta_threshold", 10.0)
-        self.declare_parameter("goal_tol", 0.5)
+        self.declare_parameter("goal_tol", 1.0)
         self.declare_parameter("obstacle_tol", 50)
         self.declare_parameter("choose_every", 10)
         self.declare_parameter("use_waypoint_client", False)
@@ -879,6 +879,7 @@ class FollowBuoyPath(ActionServerBase):
             self.send_goal_future = self.follow_path_client.send_goal_async(
                 goal_msg
             )
+            self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
         else:
             goal_msg = Waypoint.Goal()
             goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
@@ -912,20 +913,18 @@ class FollowBuoyPath(ActionServerBase):
                         max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
 
-        self.move_to_point(guide_point)
-        while not self.moved_to_point:
-            if self.green_beacon_detected():
-                return Task.Result(success=True)
-            time.sleep(self.timer_period)
+        success = self.move_to_point(guide_point, busy_wait=True, abort_func=self.green_beacon_detected)
 
-        return Task.Result(success=False)
+        return Task.Result(success=success)
     
-    def move_to_point(self, point, is_stationary=False, busy_wait=False):
+    def move_to_point(self, point, is_stationary=False, busy_wait=False, abort_func=None):
         '''
         Moves the boat to the specified position using the follow path action server.
         # Returns the future of the server request.
 
         Busy waits until the boat moved to the point (bad, should be fixed with asyncio patterns)
+
+        Returns true if aborted by the function
         '''
         self.get_logger().info(f"Moving to point {point}")
         self.moved_to_point = False
@@ -945,12 +944,27 @@ class FollowBuoyPath(ActionServerBase):
         self.send_goal_future = self.follow_path_client.send_goal_async(
             goal_msg
         )
+        self._get_result_future = None
         self.send_goal_future.add_done_callback(self.follow_path_response_cb)
         if busy_wait:
             while not self.moved_to_point:
+                if abort_func is not None:
+                    if abort_func():
+                        return True
+                goal_result = self.send_goal_future.result()
+                if ((goal_result is not None) and (not goal_result.accepted)) or (self._get_result_future != None and
+                                                  self._get_result_future.result() != None and 
+                                                  self._get_result_future.result().status == GoalStatus.STATUS_ABORTED):
+                    self.get_logger().info('RESENDING GOAL')
+                    self.follow_path_client.wait_for_server()
+                    self.send_goal_future = self.follow_path_client.send_goal_async(
+                        goal_msg
+                    )
+                    self.send_goal_future.add_done_callback(self.follow_path_response_cb)
                 time.sleep(self.timer_period)
+        return False
 
-    def move_to_waypoint(self, point, is_stationary=False, busy_wait=False):
+    def move_to_waypoint(self, point, is_stationary=False, busy_wait=False, abort_func=None):
         self.get_logger().info(f"Moving to waypoint {point}")
         self.moved_to_point = False
         goal_msg = Waypoint.Goal()
@@ -970,7 +984,11 @@ class FollowBuoyPath(ActionServerBase):
         self.send_goal_future.add_done_callback(self.follow_path_response_cb)
         if busy_wait:
             while not self.moved_to_point:
+                if abort_func is not None:
+                    if abort_func():
+                        return True
                 time.sleep(self.timer_period)
+        return False
         
     def follow_path_response_cb(self, future):
         '''
