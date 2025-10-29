@@ -35,6 +35,7 @@ public:
         this->declare_parameter<double>("obstacle_filter_area_max", 100000.0);
         this->declare_parameter<double>("obstacle_filter_length_max", 100000.0);
         this->declare_parameter<double>("range_max", 200.0);
+        this->declare_parameter<bool>("flatten", false);
 
         // Initialize member variables from parameters
         m_base_link_frame = this->get_parameter("base_link_frame").as_string();
@@ -46,6 +47,7 @@ public:
         m_obstacle_filter_area_max = this->get_parameter("obstacle_filter_area_max").as_double();
         m_obstacle_filter_length_max = this->get_parameter("obstacle_filter_length_max").as_double();
         m_range_max = this->get_parameter("range_max").as_double();
+        m_flatten = this->get_parameter("flatten").as_bool();
 
         // Initialize tf_listener pointer
         m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -68,8 +70,11 @@ private:
         // Flatten input point cloud to 2D
         pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZI>);
         pcl::copyPointCloud(*in_cloud_ptr, *cloud_2d);
-        for (size_t i = 0; i < cloud_2d->points.size(); i++)
-            cloud_2d->points[i].z = 0;
+        if (m_flatten){
+            for (size_t i = 0; i < cloud_2d->points.size(); i++){
+                cloud_2d->points[i].z = 0;
+            }
+        }
 
         // Extract clusters from point cloud and save indices in obstacle_indices
         std::vector<pcl::PointIndices> obstacles_indices;
@@ -193,6 +198,7 @@ private:
     double m_obstacle_filter_area_max;
     double m_obstacle_filter_length_max;
     double m_range_max;
+    bool m_flatten;
 
     // Transform variables
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};

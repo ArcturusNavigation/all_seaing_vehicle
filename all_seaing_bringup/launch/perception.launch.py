@@ -21,7 +21,7 @@ def launch_setup(context, *args, **kwargs):
     description_prefix = get_package_share_directory("all_seaing_description")
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-    set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
+    # set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
@@ -253,8 +253,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [1.0, 60.0]},
-            {"leaf_size": 0.2},
+            {"leaf_size_xy": 0.2},
+            {"leaf_size_z": 0.2},
             {"local_range_z": [-100000.0, 0.0]},
+            {"min_pts_per_voxel": 2},
         ],
     )
 
@@ -267,8 +269,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 0.2},
-            {"obstacle_size_min": 2},
+            {"clustering_distance": 0.25},
+            {"obstacle_size_min": 3},
             {"range_max": 50.0},
         ],
     )
@@ -283,8 +285,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 1.0},
-            {"obstacle_size_min": 2},
+            {"clustering_distance": 0.4},
+            {"obstacle_size_min": 3},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},
@@ -313,6 +315,8 @@ def launch_setup(context, *args, **kwargs):
         'track_robot': str(context.perform_substitution(LaunchConfiguration('use_slam')).lower() == "true"),
         'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false") or 
                                        (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")),
+        'track_banners': str(context.perform_substitution(LaunchConfiguration('track_banners')).lower() == "true"),
+        'banners_slam': str(context.perform_substitution(LaunchConfiguration('banners_slam')).lower() == "true"),
     }
 
     configured_params = RewrittenYaml(
@@ -377,10 +381,12 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument('use_sim_time', default_value='true'),
+            # DeclareLaunchArgument('use_sim_time', default_value='true'),
             DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
             DeclareLaunchArgument("use_gps", default_value='true'),
+            DeclareLaunchArgument("track_banners", default_value='false'),
+            DeclareLaunchArgument("banners_slam", default_value='true'),
             DeclareLaunchArgument("use_lio", default_value='false'),
             OpaqueFunction(function=launch_setup),
         ]

@@ -66,6 +66,8 @@ def launch_setup(context, *args, **kwargs):
     location = context.perform_substitution(LaunchConfiguration("location"))
     use_slam = context.perform_substitution(LaunchConfiguration("use_slam"))
     use_gps = context.perform_substitution(LaunchConfiguration("use_gps"))
+    track_banners = context.perform_substitution(LaunchConfiguration("track_banners"))
+    banners_slam = context.perform_substitution(LaunchConfiguration("banners_slam"))
     use_lio = LaunchConfiguration("use_lio")
     comms = LaunchConfiguration("comms")
     is_indoors = str(locations[location]["indoors"]).lower()
@@ -163,7 +165,6 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [1.0, 60.0]},
-            {"leaf_size": 0.0},
         ],
     )
 
@@ -193,7 +194,7 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_custom_controller.py",
         parameters=[
             {"joy_x_scale": -1.0},
-            {"joy_ang_scale": 0.4},
+            {"joy_ang_scale": 0.3},
         ],
         condition=IfCondition(
             PythonExpression([
@@ -216,7 +217,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM0"}],
+        parameters=[{"port": "/dev/ttyACM2"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -236,7 +237,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1"
+            "port": "/dev/ttyACM0"
         }.items(),
     )
 
@@ -371,6 +372,8 @@ def launch_setup(context, *args, **kwargs):
             "location": location,
             "use_slam": use_slam,
             "use_gps": use_gps,
+            "track_banners": track_banners,
+            "banners_slam": banners_slam,
             "use_lio": context.perform_substitution(use_lio),
         }.items(),
     )
@@ -424,6 +427,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument("use_slam", default_value="true", choices=["true", "false"]),
             DeclareLaunchArgument("use_gps", default_value="true", choices=["true", "false"]),
+            DeclareLaunchArgument("track_banners", default_value="false", choices=["true", "false"]),
+            DeclareLaunchArgument("banners_slam", default_value="true", choices=["true", "false"]),
             DeclareLaunchArgument("use_lio", default_value="false", choices=["true", "false"]),
             OpaqueFunction(function=launch_setup),
         ]

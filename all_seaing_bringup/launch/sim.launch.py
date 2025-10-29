@@ -197,7 +197,6 @@ def launch_setup(context, *args, **kwargs):
             {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
             {"range_intensity": [0.0, 50.0]},
-            {"leaf_size": 0.0},
         ],
     )
 
@@ -381,6 +380,20 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    speed_challenge = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ],
+        remappings=[
+            ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
+        ]
+    )
+
     speed_challenge_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="speed_challenge_pid.py",
@@ -474,7 +487,8 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             # "world": "rb2025/rb2025_task1_task2.sdf",
-            "world": "follow_path_task.sdf",
+            "world": "rb2025/follow_path_new.sdf",
+            # "world": "follow_path_task.sdf",
             # "world": "speed_course_world.sdf",
             # "world": "scan_dock_deliver_task.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
@@ -507,6 +521,7 @@ def launch_setup(context, *args, **kwargs):
         task_init_server,
         follow_buoy_path,
         # follow_buoy_pid,
+        speed_challenge,
         # speed_challenge_pid,
         # docking_fallback,
         rviz_waypoint_sender,
