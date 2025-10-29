@@ -12,6 +12,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
+from task_server_base import TaskServerBase
 from action_msgs.msg import GoalStatus
 
 import math
@@ -41,17 +42,9 @@ class FollowPathState(Enum):
     CIRCLING_GREEN_BEACON = 5
 
 
-class FollowBuoyPath(ActionServerBase):
+class FollowBuoyPath(TaskServerBase):
     def __init__(self):
-        super().__init__("follow_path_server")
-
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "follow_buoy_path",
-            execute_callback=self.execute_callback,
-            cancel_callback=self.default_cancel_callback,
-        )
+        super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path", timer_period = 1.0 / 30.0)
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
@@ -774,7 +767,7 @@ class FollowBuoyPath(ActionServerBase):
                         self.pair_to.left, self.pair_to.right = self.pair_to.right, self.pair_to.left
                         return
                     else:
-                        self.result = True
+                        self.mark_successful()
                         return
                 else:
                     if self.sent_forward:
@@ -807,7 +800,7 @@ class FollowBuoyPath(ActionServerBase):
                         self.pair_to.left, self.pair_to.right = self.pair_to.right, self.pair_to.left
                         return
                     else:
-                        self.result = True
+                        self.mark_successful()
                         return
         else:
             self.sent_forward = False
@@ -1178,75 +1171,42 @@ class FollowBuoyPath(ActionServerBase):
 
         self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, abort_func=self.green_beacon_detected)
 
-    def execute_callback(self, goal_handle):
-
-        self.start_process("Follow buoy path started!")
-
+    def init_setup(self):
+        if self.obstacles is None:
+            return
+        success = self.setup_buoys()
+        if success:
+            self.state = FollowPathState.FOLLOWING_FIRST_PASS
+            self.mark_successful()
+        
+    def control_loop(self):
         # self.station_hold()
+        if self.state in [FollowPathState.FOLLOWING_FIRST_PASS, FollowPathState.FOLLOWING_BACK]:
+            if self.state == FollowPathState.FOLLOWING_BACK:
+                if "green_pole_buoy" in self.green_labels:
+                    self.green_labels.remove("green_pole_buoy")
+                if "red_pole_buoy" in self.red_labels:
+                    self.red_labels.remove("red_pole_buoy")
+            self.generate_waypoints()
+        elif self.state == FollowPathState.WAITING_GREEN_BEACON:
+            self.get_logger().info(f"Searching green beacon")
 
-        while rclpy.ok() and self.obstacles is None:
-            time.sleep(self.timer_period)
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                return Task.Result()
-        
-        success = False
-        while not success:
-            success = self.setup_buoys()
-            time.sleep(self.timer_period)
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                return Task.Result()
+            self.search_beacon()
 
-        self.get_logger().info("Setup buoys succeeded!")
-
-        self.state = FollowPathState.FOLLOWING_FIRST_PASS
-
-        while not self.result:
-            # Check if we should abort/cancel if a new goal arrived
-            if self.should_abort():
-                self.end_process("New request received. Aborting path following.")
-                goal_handle.abort()
-                return Task.Result()
-
-            if goal_handle.is_cancel_requested:
-                self.end_process("Cancel requested. Aborting path following.")
-                goal_handle.canceled()
-                return Task.Result()
-            
-            if self.state in [FollowPathState.FOLLOWING_FIRST_PASS, FollowPathState.FOLLOWING_BACK]:
-                if self.state == FollowPathState.FOLLOWING_BACK:
-                    if "green_pole_buoy" in self.green_labels:
-                        self.green_labels.remove("green_pole_buoy")
-                    if "red_pole_buoy" in self.red_labels:
-                        self.red_labels.remove("red_pole_buoy")
-                self.generate_waypoints()
-            elif self.state == FollowPathState.WAITING_GREEN_BEACON:
-                self.get_logger().info(f"Searching green beacon")
-        
-                self.search_beacon()
-                
-                self.get_logger().info(f'Detecting green beacon')
-                self.home_pos = self.robot_pos # keep track of home position
-                self.buoy_direction = self.robot_dir
-                self.get_logger().info(f"Facing direction: {self.buoy_direction}")
-                action_result = self.probe_green_beacon()
-                if action_result.success == False:
-                    self.state = FollowPathState.FOLLOWING_BACK
-                else:
-                    self.state = FollowPathState.CIRCLING_GREEN_BEACON
-            elif self.state == FollowPathState.CIRCLING_GREEN_BEACON:
-                self.get_logger().info(f'Circling green beacon')
-                action_result = self.circle_green_beacon()
-                # action_result = self.return_to_start()
+            self.get_logger().info(f'Detecting green beacon')
+            self.home_pos = self.robot_pos # keep track of home position
+            self.buoy_direction = self.robot_dir
+            self.get_logger().info(f"Facing direction: {self.buoy_direction}")
+            action_result = self.probe_green_beacon()
+            if action_result.success == False:
                 self.state = FollowPathState.FOLLOWING_BACK
-
-            time.sleep(self.timer_period)
-
-        self.end_process("Follow buoy path completed!")
-        goal_handle.succeed()
-        return Task.Result(success=True)
-
+            else:
+                self.state = FollowPathState.CIRCLING_GREEN_BEACON
+        elif self.state == FollowPathState.CIRCLING_GREEN_BEACON:
+            self.get_logger().info(f'Circling green beacon')
+            action_result = self.circle_green_beacon()
+            # action_result = self.return_to_start()
+            self.state = FollowPathState.FOLLOWING_BACK
 
 def main(args=None):
     rclpy.init(args=args)
