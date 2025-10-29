@@ -901,6 +901,11 @@ class FollowBuoyPath(ActionServerBase):
         self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
         self.lastSelectedGoal = waypoint
 
+    def adapt_pair_to(self):
+        green_buoys, red_buoys = self.split_buoys(self.obstacles)
+        self.pair_to.left, _ = self.replace_closest(self.pair_to.left, red_buoys if self.red_left else green_buoys)
+        self.pair_to.right, _ = self.replace_closest(self.pair_to.right, green_buoys if self.red_left else red_buoys)
+
     def map_cb(self, msg):
         """
         When a new map is received, check if it is the first one (we haven't set up the starting buoys)
@@ -908,6 +913,9 @@ class FollowBuoyPath(ActionServerBase):
         the buoy pair / waypoint sequence
         """
         self.obstacles = msg.obstacles
+
+        if self.state in [FollowPathState.WAITING_GREEN_BEACON, FollowPathState.CIRCLING_GREEN_BEACON]:
+            self.adapt_pair_to()
 
     def probe_green_beacon(self):
         '''
@@ -1168,7 +1176,7 @@ class FollowBuoyPath(ActionServerBase):
 
         # self.get_logger().info(f"Turning right")
 
-        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, abort_func=self.green_beacon_detected)
 
     def execute_callback(self, goal_handle):
 
