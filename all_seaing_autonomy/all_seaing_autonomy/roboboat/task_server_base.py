@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse 
 from rclpy.executors import MultiThreadedExecutor
@@ -13,14 +12,14 @@ import time
 import math
 
 class TaskServerBase(ActionServerBase):
-    def __init__(self, server_name, timer_period = 1.0 / 30.0):
+    def __init__(self, server_name, action_name, timer_period = 1.0 / 30.0):
         super().__init__(server_name)
         self.server_name = server_name
 
         self._action_server = ActionServer(
             self,
             Task,
-            server_name,
+            action_name,
             execute_callback=self.execute_callback,
             cancel_callback=self.default_cancel_callback,
             goal_callback=self.goal_callback
@@ -34,7 +33,7 @@ class TaskServerBase(ActionServerBase):
         self._succeed = True
         self.result = True
     
-    # Mark result of task as unsuccessful (useful if we start a task and realize something went wrong), exit control loop
+    # Mark result of task as unsuccessful (useful if we start a task and realize something went wrong), exit control loop or setup loop
     def mark_unsuccessful(self):
         self._succeed = False
         self.result = True
@@ -66,8 +65,12 @@ class TaskServerBase(ActionServerBase):
         self.result = False
         self._succeed = True
 
+        firstLoop = True
+
         while (not self.result) and rclpy.ok():
-            time.sleep(self.timer_period)
+            if not firstLoop:
+                time.sleep(self.timer_period)
+            firstLoop = False
             if self.should_abort():
                 self.end_process(f"Task Server [{self.server_name}] aborted due to new request in setup")
                 goal_handle.abort()
@@ -76,6 +79,8 @@ class TaskServerBase(ActionServerBase):
                 self.end_process(f"Task Server [{self.server_name}] cancelled due to request cancellation in setup")
                 goal_handle.canceled()
                 return Task.Result()
+            
+            self.init_setup()
 
         if not self.result:
             self.get_logger().info("ROS shutdown detected or loop ended unexpectedly in setup")

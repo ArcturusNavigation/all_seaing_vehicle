@@ -62,11 +62,13 @@ class RunTasks(Node):
             self.attempt_task(self.init_tasks[self.next_init_index.val], self.next_init_index, None)
             return
 
+        # print(self.task_list)
+
         for _ in range(len(self.task_list)):
             self.next_task_index += 1
             if self.next_task_index >= len(self.task_list):
                 self.next_task_index -= len(self.task_list)
-            if self.task_list[self.next_task_index][1] == 0 and self.task_list[self.next_task_index][2] < self.max_attempt_count:
+            if self.task_list[self.next_task_index][1].val == 0 and self.task_list[self.next_task_index][2].val < self.max_attempt_count:
                 self.attempt_task(*self.task_list[self.next_task_index])
                 return
         

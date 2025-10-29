@@ -9,7 +9,8 @@ from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption, ObstacleMap
 from all_seaing_common.action_server_base import ActionServerBase
-from all_seaing_common.task_server_base import TaskServerBase
+from task_server_base import TaskServerBase
+
 from sensor_msgs.msg import CameraInfo
 
 import os
@@ -19,7 +20,7 @@ import math
 
 class FollowBuoyPID(TaskServerBase):
     def __init__(self):
-        super().__init__("follow_path_pid_server", timer_period = 1 / 30.0)
+        super().__init__(server_name = "follow_path_pid_server", action_name = "follow_buoy_pid", timer_period = 1 / 30.0)
 
         # Replaced by obstacle map
         self.bbox_sub = self.create_subscription(

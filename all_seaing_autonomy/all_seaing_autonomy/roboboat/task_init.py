@@ -4,15 +4,14 @@ from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
 from all_seaing_interfaces.action import Task
 from all_seaing_interfaces.msg import KeyboardButton 
-from all_seaing_common.action_server_base import ActionServerBase
-from all_seaing_common.task_server_base import TaskServerBase
+from task_server_base import TaskServerBase
 
 from sensor_msgs.msg import Joy
 import time
 
 class TaskInitServer(TaskServerBase):
     def __init__(self):
-        super().__init__("task_init_server", timer_period = 1.0)
+        super().__init__(server_name = "task_init_server", action_name = "task_init", timer_period = 1.0)
 
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value

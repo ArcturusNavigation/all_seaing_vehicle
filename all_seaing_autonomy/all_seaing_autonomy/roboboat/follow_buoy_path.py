@@ -12,7 +12,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
-from all_seaing_common.task_server_base import TaskServerBase
+from task_server_base import TaskServerBase
 from action_msgs.msg import GoalStatus
 
 import math
@@ -35,7 +35,7 @@ class InternalBuoyPair:
 
 class FollowBuoyPath(TaskServerBase):
     def __init__(self):
-        super().__init__("follow_path_server", 1.0 / 30.0)
+        super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path", timer_period = 1.0 / 30.0)
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
