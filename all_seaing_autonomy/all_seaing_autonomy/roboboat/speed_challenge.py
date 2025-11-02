@@ -138,22 +138,6 @@ class SpeedChallenge(ActionServerBase):
                 self.blue_labels.add(label_mappings[buoy_label])
 
         self.obstacles = []
-    
-    @property
-    def robot_pos(self):
-        '''
-        Gets the robot position as a tuple (x,y)
-        '''
-        position = self.get_robot_pose()[0:2]
-        return (float(position[0]), float(position[1]))
-
-    @property
-    def robot_dir(self):
-        '''
-        Gets the robot direction as a tuple, containing the unit vector in the same direction as heading
-        '''
-        heading = self.get_robot_pose()[2]
-        return (math.cos(heading), math.sin(heading))
 
     def reset_challenge(self):
         '''
