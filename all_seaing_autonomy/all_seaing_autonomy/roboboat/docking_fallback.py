@@ -48,15 +48,6 @@ class DockingFallback(ActionServerBase):
 
         self.marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
 
-        self.cam_base_link_tf = None
-        self.got_tf = False
-        
-        # pid_vals = (
-        #     self.declare_parameter("pid_vals", [0.1, 0.0, 0.0]) # TODO: fine-tune values (especially D term)
-        #     .get_parameter_value()
-        #     .double_array_value
-        # )
-
         self.declare_parameter("forward_speed", 2.0)
         self.declare_parameter("max_yaw", 0.7)
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
