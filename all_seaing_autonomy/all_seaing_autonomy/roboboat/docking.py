@@ -98,6 +98,12 @@ class Docking(ActionServerBase):
         self.declare_parameter("navigation_dist_thres", 7.0)
         self.navigation_dist_thres = self.get_parameter("navigation_dist_thres").get_parameter_value().double_value
 
+        self.declare_parameter("update_slot_dist_thres", 3.0)
+        self.update_slot_dist_thres = self.get_parameter("update_slot_dist_thres").get_parameter_value().double_value
+
+        self.declare_parameter("adapt_dist", 0.7)
+        self.adapt_dist = self.get_parameter("adapt_dist").get_parameter_value().double_value
+
         Kpid_x = (
             self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
             .get_parameter_value()
@@ -165,6 +171,18 @@ class Docking(ActionServerBase):
         for key, value in self.label_mappings.items():
             self.inv_label_mappings[value] = key
 
+        self.waypoint_sent_future = None
+        self.send_goal_future = None
+
+        self.state = DockingState.WAITING_DOCK
+
+        self.lastSelectedGoal = None
+
+        self.waypoint_reject = False
+        self.waypoint_done = False
+
+        self.sent_waypoint = None
+
     @property
     def robot_pos(self):
         '''
@@ -187,6 +205,7 @@ class Docking(ActionServerBase):
             self.get_logger().info("Strange - sent waypoint rejected immediately.")
             self.waypoint_reject = True
             return
+        self.waypoint_done = True
         self.waypoint_sent_future = goal_handle.get_result_async()
 
     def send_waypoint_to_server(self, waypoint):
@@ -194,6 +213,7 @@ class Docking(ActionServerBase):
         # sending waypoints to navigation server
         self.waypoint_sent_future = None # Reset this... Make sure chance of going backwards is 0
         self.waypoint_reject = False
+        self.waypoint_done = False
 
         self.sent_waypoint = waypoint
         if not self.bypass_planner:
@@ -226,129 +246,11 @@ class Docking(ActionServerBase):
             self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
         self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
         self.lastSelectedGoal = waypoint
-
-    def move_to_point(self, point, is_stationary=False, busy_wait=False, abort_func=None, goal_update_func=None):
-        '''
-        Moves the boat to the specified position using the follow path action server.
-        # Returns the future of the server request.
-
-        Busy waits until the boat moved to the point (bad, should be fixed with asyncio patterns)
-
-        Returns true if aborted by the function
-        Sends new waypoint if desired by the goal_update_func
-        '''
-        self.get_logger().info(f"Moving to point {point}")
-        self.moved_to_point = False
-        self.follow_path_client.wait_for_server()
-        goal_msg = FollowPath.Goal()
-        goal_msg.planner = self.get_parameter("planner").value
-        goal_msg.x = point[0]
-        goal_msg.y = point[1]
-        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-        goal_msg.goal_tol = self.get_parameter("goal_tol").value
-        goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
-        goal_msg.choose_every = self.get_parameter("choose_every").value
-        goal_msg.is_stationary = is_stationary
-
-        self.follow_path_client.wait_for_server()
-        self.send_goal_future = self.follow_path_client.send_goal_async(
-            goal_msg
-        )
-        self._get_result_future = None
-        self.waypoint_reject = False
-        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
-        if busy_wait:
-            while not self.moved_to_point:
-                if (abort_func is not None) and abort_func():
-                    return True
-                if (goal_update_func is not None):
-                    update_goal, new_goal = goal_update_func()
-                    if update_goal:
-                        goal_msg.x = new_goal[0]
-                        goal_msg.y = new_goal[1]
-
-                        self.get_logger().info('ADAPTING GOAL POINT')
-                        self.follow_path_client.wait_for_server()
-                        self.send_goal_future = self.follow_path_client.send_goal_async(
-                            goal_msg
-                        )
-                        self._get_result_future = None
-                        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
-
-                goal_result = self.send_goal_future.result()
-                if self.waypoint_reject or (((goal_result is not None) and (not goal_result.accepted)) or (self._get_result_future != None and
-                                                  self._get_result_future.result() != None and 
-                                                  self._get_result_future.result().status == GoalStatus.STATUS_ABORTED)):
-                    self.get_logger().info('RESENDING GOAL')
-                    self.follow_path_client.wait_for_server()
-                    self.send_goal_future = self.follow_path_client.send_goal_async(
-                        goal_msg
-                    )
-                    self._get_result_future = None
-                    self.send_goal_future.add_done_callback(self.follow_path_response_cb)
-                time.sleep(self.timer_period)
-        return False
-
-    def move_to_waypoint(self, point, is_stationary=False, busy_wait=False, abort_func=None, goal_update_func=None):
-        self.get_logger().info(f"Moving to waypoint {point}")
-        self.moved_to_point = False
-        goal_msg = Waypoint.Goal()
-        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-        goal_msg.theta_threshold = self.get_parameter("wpt_theta_threshold").value
-        goal_msg.x = point[0]
-        goal_msg.y = point[1]
-        if len(point) >= 3:
-            goal_msg.theta = point[2]
-            goal_msg.ignore_theta = False
-        else:
-            goal_msg.ignore_theta = True
-        goal_msg.is_stationary = is_stationary
-        self.result = False
-        self.waypoint_client.wait_for_server()
-        self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
-        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
-        if busy_wait:
-            while not self.moved_to_point:
-                if (abort_func is not None) and abort_func():
-                    return True
-                if (goal_update_func is not None):
-                    update_goal, new_goal = goal_update_func()
-                    if update_goal:
-                        goal_msg.x = new_goal[0]
-                        goal_msg.y = new_goal[1]
-
-                        self.get_logger().info('ADAPTING WAYPOINT')
-                        self.result = False
-                        self.waypoint_client.wait_for_server()
-                        self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
-                        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
-                time.sleep(self.timer_period)
-        return False
-        
-    def follow_path_response_cb(self, future):
-        '''
-        Responds to follow path action server goal response.
-        '''
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            self.get_logger().info('Waypoint rejected')
-            self.waypoint_reject = True
-            return
-
-        self.get_logger().info("Waypoint accepted")
-        self._get_result_future = goal_handle.get_result_async()
-        self._get_result_future.add_done_callback(self.get_point_result_cb)
-
-    def get_point_result_cb(self, future):
-        '''
-        Flags the path following as complete for move_to_point
-        '''
-        # Marks path following as finished/ moved to path following point
-        # if path following is interrupted, does not affect moved to point
-        result = future.result().result
-        if result.is_finished:
-            self.moved_to_point = True
+    
+    def cancel_navigation(self):
+        if not self.waypoint_done:
+            while (self.send_goal_future is not None) and (not self.send_goal_future.cancelled()):
+                self.send_goal_future.cancel()
 
     def ctr_normal(self, plane: LabeledObjectPlane):
         center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
@@ -359,6 +261,7 @@ class Docking(ActionServerBase):
         center_pt, normal = self.ctr_normal(plane)
         line_unit = self.perp_vec(normal)
         return ((center_pt[0]-line_unit[0]*plane.size.y, center_pt[1]-line_unit[1]*plane.size.y), (center_pt[0]+line_unit[0]*plane.size.y, center_pt[1]+line_unit[1]*plane.size.y))
+
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         if not self.started_task:
@@ -416,11 +319,15 @@ class Docking(ActionServerBase):
                     self.x_pid.reset()
                     self.y_pid.reset()
                     self.theta_pid.reset()
-                    # TODO: Cancel navigation to dock if it was being done
+                    if self.state == DockingState.NAVIGATING_DOCK:
+                        self.state = DockingState.WAITING_DOCK
+                        self.cancel_navigation()
                 self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                 continue
             # found empty docking slot
-            if(self.selected_slot is None or (self.norm(self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1]), self.robot_pos) > self.norm(dock_ctr, self.robot_pos))):
+            if(self.selected_slot is None or (self.norm(self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1]), self.robot_pos) > self.norm(dock_ctr, self.robot_pos)) + self.update_slot_dist_thres):
+                if self.state == DockingState.NAVIGATING_DOCK:
+                    self.cancel_navigation()
                 # found an empty one closer
                 self.selected_slot = (dock_label, (dock_ctr, dock_normal))
                 self.picked_slot = True
@@ -468,6 +375,12 @@ class Docking(ActionServerBase):
     def negative(self, vec):
         return (-vec[0], -vec[1])
     
+    def sum(self, vec1, vec2):
+        return (vec1[0]+vec2[0], vec1[1]+vec2[1])
+    
+    def scalar_prod(self, vec, scalar):
+        return (scalar*vec[0], scalar*vec[1])
+    
     def cross(self, vec1, vec2):
         return vec1[0]*vec2[1]-vec1[1]*vec2[0]
 
@@ -505,6 +418,7 @@ class Docking(ActionServerBase):
     
     def control_loop(self):
         if(not self.picked_slot):
+            self.state = DockingState.WAITING_DOCK
             return # maybe stop the robot? or just go forward/steer to the left
         marker_arr = MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)])
         mark_id = 1
@@ -512,12 +426,14 @@ class Docking(ActionServerBase):
         # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
         slot_back_mid = self.selected_slot[1][0]
         slot_dir = self.selected_slot[1][1]
-        # TODO Rewrite based on slot pos & dir & robot pos instead of that BS down there
         
         marker_arr.markers.append(VisualizationTools.visualize_line(slot_back_mid, self.perp_vec(slot_dir), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
 
-        if (self.norm(slot_back_mid, self.robot_pos) < self.navigation_dist_thres):
+        if self.norm(slot_back_mid, self.robot_pos) < self.navigation_dist_thres:
+            if self.state == DockingState.NAVIGATING_DOCK:
+                self.cancel_navigation()
+            self.state = DockingState.DOCKING
             # go to that line and forward (negative error if boat left of line, positive if right)
             offset = self.dot(self.difference(slot_back_mid, self.robot_pos), self.perp_vec(slot_dir))
             approach_angle = self.angle_vec(self.negative(slot_dir), self.robot_dir) # TODO Check sign
@@ -564,9 +480,20 @@ class Docking(ActionServerBase):
             self.picked_slot = False
             self.selected_slot = None
         else:
-            # TODO Navigation using navigation server
-            raise NotImplementedError
-
+            waypoint = self.sum(slot_back_mid, self.scalar_prod(slot_dir, self.dock_length/2.0))
+            if self.state != DockingState.NAVIGATING_DOCK or ((self.sent_waypoint is not None) and (self.norm(waypoint, self.sent_waypoint) > self.adapt_dist)):
+                self.get_logger().info('SENDING WAYPOINT')
+                # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
+                self.send_waypoint_to_server(waypoint)
+                self.state = DockingState.NAVIGATING_DOCK
+            elif self.send_goal_future != None and self.lastSelectedGoal != None:
+                goal_result = self.send_goal_future.result()
+                if self.waypoint_reject or (((goal_result is not None) and (not goal_result.accepted)) or (self.waypoint_sent_future != None and
+                    self.waypoint_sent_future.result() != None and 
+                    self.waypoint_sent_future.result().status == GoalStatus.STATUS_ABORTED)):
+                    self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
+                    self.send_waypoint_to_server(self.lastSelectedGoal)
+            
         self.marker_pub.publish(marker_arr)
 
     def execute_callback(self, goal_handle):
@@ -596,7 +523,7 @@ class Docking(ActionServerBase):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = DockingFallback()
+    node = Docking()
     executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
     executor.spin()

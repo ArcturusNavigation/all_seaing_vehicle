@@ -186,7 +186,7 @@ class FollowBuoyPath(ActionServerBase):
         self.last_pair = None
 
         self.green_beacon_found = False
-        self.waypoint_reject = True
+        self.waypoint_reject = False
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
