@@ -111,6 +111,7 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"color_label_mappings_file": buoy_label_mappings},
             {"robot_frame_id": "base_link"},
+            {"probe_distance": 10},
             {"turn_offset": 1.5},
             {"choose_every": 100},
         ],

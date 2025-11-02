@@ -64,11 +64,10 @@ class SpeedChallenge(ActionServerBase):
         self.declare_parameter("choose_every", 10)
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
+        self.declare_parameter("probe_distance", 10)
 
         self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
         self.declare_parameter("turn_offset", 5.0)
-        self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
 
         self.home_pos = (0, 0)
         self.blue_buoy_pos = (0, 0)
@@ -111,7 +110,7 @@ class SpeedChallenge(ActionServerBase):
             label_mappings = yaml.safe_load(f)
 
 
-        if self.is_sim:
+        if self.get_parameter("is_sim").get_parameter_value().bool_value:
             # hardcoded from reading YAML
             # TODO: for SIM ONLY (no blue buoy)
             self.red_labels.add(label_mappings["red"])
@@ -262,7 +261,7 @@ class SpeedChallenge(ActionServerBase):
         Keeps on appending waypoints to the north/south until it finds 
         '''
         self.get_logger().info("Probing for blue buoy")
-        max_guide_d = 10
+        max_guide_d = self.get_parameter("probe_distance").value
         guide_point = (max_guide_d*self.buoy_direction[0] + self.robot_pos[0], 
                         max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
@@ -288,7 +287,7 @@ class SpeedChallenge(ActionServerBase):
         # a better way to do this might be to have the astar run to original cell, 
         # but require the path to go around buoy
 
-        t_o = self.turn_offset
+        t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
         first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
         second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
         third_dir = (-first_dir[0], -first_dir[1])

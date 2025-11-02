@@ -387,6 +387,7 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"probe_distance": 30},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
