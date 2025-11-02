@@ -104,6 +104,9 @@ class Docking(ActionServerBase):
         self.declare_parameter("adapt_dist", 0.7)
         self.adapt_dist = self.get_parameter("adapt_dist").get_parameter_value().double_value
 
+        self.declare_parameter("wpt_banner_dist", 4.0)
+        self.wpt_banner_dist = self.get_parameter("wpt_banner_dist").get_parameter_value().double_value
+
         Kpid_x = (
             self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
             .get_parameter_value()
@@ -256,12 +259,6 @@ class Docking(ActionServerBase):
         center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
         _,_,theta = euler_from_quaternion([plane.normal_ctr.orientation.x, plane.normal_ctr.orientation.y, plane.normal_ctr.orientation.z, plane.normal_ctr.orientation.w])
         return (center_pt, (np.cos(theta), np.sin(theta)))
-    
-    def pt_left_right(self, plane: LabeledObjectPlane):
-        center_pt, normal = self.ctr_normal(plane)
-        line_unit = self.perp_vec(normal)
-        return ((center_pt[0]-line_unit[0]*plane.size.y, center_pt[1]-line_unit[1]*plane.size.y), (center_pt[0]+line_unit[0]*plane.size.y, center_pt[1]+line_unit[1]*plane.size.y))
-
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         if not self.started_task:
@@ -272,9 +269,6 @@ class Docking(ActionServerBase):
         obj_plane: LabeledObjectPlane
         for obj_plane in msg.objects:
             if(obj_plane.label in self.boat_labels):
-                # pt_left, pt_right = self.pt_left_right(obj_plane)
-                # new_boat_banners.append((obj_plane.label, (pt_left, pt_right)))
-                # self.get_logger().info(f'BOAT: {self.inv_label_mappings[obj_plane.label]} -> {(pt_left, pt_right).__str__()}')
                 ctr, normal = self.ctr_normal(obj_plane)
                 new_boat_banners.append((obj_plane.label, (ctr, normal)))
                 self.get_logger().info(f'BOAT: {self.inv_label_mappings[obj_plane.label]} -> {(ctr, normal).__str__()}')
@@ -284,8 +278,6 @@ class Docking(ActionServerBase):
             if (merged_obj_indiv.label in self.dock_labels):
                 self.get_logger().info(f'GOT DOCK')
                 self.got_dock = True
-                # pt_left, pt_right = self.pt_left_right(merged_obj_indiv)
-                # new_dock_banners.append((merged_obj_indiv.label, (pt_left, pt_right)))
                 ctr, normal = self.ctr_normal(merged_obj_indiv)
                 new_dock_banners.append((merged_obj_indiv.label, (ctr, normal)))
 
@@ -447,7 +439,7 @@ class Docking(ActionServerBase):
             # control_msg.priority = 1
 
             # forward speed decreasing exponentially as we get closer
-            dist_diff = self.norm(slot_back_mid, self.robot_pos) - self.dock_length/2.0 # can improve to compute distance from projected center of dock instead, more accurate but not needed since we're gonna be aligned with it at some point anyways
+            dist_diff = self.dot(self.difference(slot_back_mid, self.robot_pos), slot_dir) - self.dock_length/2.0
             # subtract half the dock length when further than the half the width sideways
             if abs(offset) > self.dock_width/2.0:
                 dist_diff -= self.dock_length/2.0
@@ -480,7 +472,7 @@ class Docking(ActionServerBase):
             self.picked_slot = False
             self.selected_slot = None
         else:
-            waypoint = self.sum(slot_back_mid, self.scalar_prod(slot_dir, self.dock_length/2.0))
+            waypoint = self.sum(slot_back_mid, self.scalar_prod(slot_dir, self.wpt_banner_dist))
             if self.state != DockingState.NAVIGATING_DOCK or ((self.sent_waypoint is not None) and (self.norm(waypoint, self.sent_waypoint) > self.adapt_dist)):
                 self.get_logger().info('SENDING WAYPOINT')
                 # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
