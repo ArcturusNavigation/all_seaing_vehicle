@@ -179,8 +179,14 @@ class Docking(ActionServerBase):
         with open(shape_label_mappings_file, "r") as f:
             self.label_mappings = yaml.safe_load(f)
         
-        self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
-        self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
+        if self.is_sim:
+            self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
+            self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
+        else:
+            # TODO replace w/ numbers for the dock banner labels, as in the roboboat course
+            self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
+            self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
+        
         self.inv_label_mappings = {}
         for key, value in self.label_mappings.items():
             self.inv_label_mappings[value] = key
