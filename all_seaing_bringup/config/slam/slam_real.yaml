@@ -28,7 +28,7 @@ object_tracking_map:
     banner_init_new_cov: 50.0
     banner_init_new_theta_cov: 10.0
     track_robot: True
-    track_banners: True
+    track_banners: False
     banners_slam: True
     imu_predict: True
     gps_update: True
