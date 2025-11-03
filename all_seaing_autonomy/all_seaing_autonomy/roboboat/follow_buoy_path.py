@@ -863,7 +863,7 @@ class FollowBuoyPath(ActionServerBase):
             return
         self.waypoint_sent_future = goal_handle.get_result_async()
 
-    def send_waypoint_to_server(self, waypoint):
+    def send_waypoint_to_server(self, waypoint, is_stationary=False):
         # self.get_logger().info('SENDING WAYPOINT TO SERVER')
         # sending waypoints to navigation server
         self.waypoint_sent_future = None # Reset this... Make sure chance of going backwards is 0
@@ -881,12 +881,11 @@ class FollowBuoyPath(ActionServerBase):
             goal_msg.goal_tol = self.get_parameter("goal_tol").value
             goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
             goal_msg.choose_every = self.get_parameter("choose_every").value
-            goal_msg.is_stationary = True
+            goal_msg.is_stationary = is_stationary
             self.follow_path_client.wait_for_server()
             self.send_goal_future = self.follow_path_client.send_goal_async(
                 goal_msg
             )
-            self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
         else:
             goal_msg = Waypoint.Goal()
             goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
@@ -894,7 +893,7 @@ class FollowBuoyPath(ActionServerBase):
             goal_msg.x = waypoint[0]
             goal_msg.y = waypoint[1]
             goal_msg.ignore_theta = True
-            goal_msg.is_stationary = True
+            goal_msg.is_stationary = is_stationary
             self.result = False
             self.waypoint_client.wait_for_server()
             self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)

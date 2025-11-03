@@ -30,6 +30,8 @@ class DockingState(Enum):
     WAITING_DOCK = 1
     NAVIGATING_DOCK = 2
     DOCKING = 3
+    CANCELLING_NAVIGATION = 4
+    NEW_NAVIGATION = 5
 
 class Docking(ActionServerBase):
     def __init__(self):
@@ -53,9 +55,10 @@ class Docking(ActionServerBase):
             LabeledObjectPlaneArray, "object_planes/global", self.plane_cb, qos_profile_sensor_data
         )
 
-        self.marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
+        self.docking_marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
 
         self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
+        self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
         
         self.declare_parameter("xy_threshold", 1.0)
         self.declare_parameter("theta_threshold", 180.0)
@@ -66,6 +69,8 @@ class Docking(ActionServerBase):
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
         self.declare_parameter("bypass_planner", False)
+
+        self.bypass_planner = self.get_parameter("bypass_planner").get_parameter_value().bool_value
 
         self.declare_parameter("forward_speed", 2.0)
         self.declare_parameter("max_yaw", 0.7)
@@ -106,6 +111,12 @@ class Docking(ActionServerBase):
 
         self.declare_parameter("wpt_banner_dist", 4.0)
         self.wpt_banner_dist = self.get_parameter("wpt_banner_dist").get_parameter_value().double_value
+
+        self.declare_parameter("docked_xy_thres", 0.2)
+        self.docked_xy_thres = self.get_parameter("docked_xy_thres").get_parameter_value().double_value
+
+        self.declare_parameter("duplicate_dist", 0.5)
+        self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
 
         Kpid_x = (
             self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
@@ -176,13 +187,13 @@ class Docking(ActionServerBase):
 
         self.waypoint_sent_future = None
         self.send_goal_future = None
+        self.wpt_goal_handle = None
 
         self.state = DockingState.WAITING_DOCK
 
         self.lastSelectedGoal = None
 
         self.waypoint_reject = False
-        self.waypoint_done = False
 
         self.sent_waypoint = None
 
@@ -203,20 +214,18 @@ class Docking(ActionServerBase):
         return (math.cos(heading), math.sin(heading))
 
     def _waypoint_sent_callback(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
+        self.wpt_goal_handle = future.result()
+        if not self.wpt_goal_handle.accepted:
             self.get_logger().info("Strange - sent waypoint rejected immediately.")
             self.waypoint_reject = True
             return
-        self.waypoint_done = True
-        self.waypoint_sent_future = goal_handle.get_result_async()
+        self.waypoint_sent_future = self.wpt_goal_handle.get_result_async()
 
-    def send_waypoint_to_server(self, waypoint):
+    def send_waypoint_to_server(self, waypoint, is_stationary=False):
         # self.get_logger().info('SENDING WAYPOINT TO SERVER')
         # sending waypoints to navigation server
         self.waypoint_sent_future = None # Reset this... Make sure chance of going backwards is 0
         self.waypoint_reject = False
-        self.waypoint_done = False
 
         self.sent_waypoint = waypoint
         if not self.bypass_planner:
@@ -230,12 +239,11 @@ class Docking(ActionServerBase):
             goal_msg.goal_tol = self.get_parameter("goal_tol").value
             goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
             goal_msg.choose_every = self.get_parameter("choose_every").value
-            goal_msg.is_stationary = True
+            goal_msg.is_stationary = is_stationary
             self.follow_path_client.wait_for_server()
             self.send_goal_future = self.follow_path_client.send_goal_async(
                 goal_msg
             )
-            self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
         else:
             goal_msg = Waypoint.Goal()
             goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
@@ -243,7 +251,7 @@ class Docking(ActionServerBase):
             goal_msg.x = waypoint[0]
             goal_msg.y = waypoint[1]
             goal_msg.ignore_theta = True
-            goal_msg.is_stationary = True
+            goal_msg.is_stationary = is_stationary
             self.result = False
             self.waypoint_client.wait_for_server()
             self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
@@ -251,9 +259,14 @@ class Docking(ActionServerBase):
         self.lastSelectedGoal = waypoint
     
     def cancel_navigation(self):
-        if not self.waypoint_done:
-            while (self.send_goal_future is not None) and (not self.send_goal_future.cancelled()):
-                self.send_goal_future.cancel()
+        self.get_logger().info('TRYING TO CANCEL NAVIGATION')
+        if self.waypoint_sent_future is None or self.wpt_goal_handle is None: # TODO how to handle waypoint sent (& goal handle received) after us trying to cancel it? maybe ROS delay + retry for 3 times or smth
+            self.get_logger().info('FUTURE IS NONE')
+            return
+        if ((self.waypoint_sent_future.result() is None) or 
+            (self.waypoint_sent_future.result().status not in [GoalStatus.STATUS_ABORTED, GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED, GoalStatus.STATUS_CANCELING])):
+            self.wpt_goal_handle.cancel_goal_async()
+            self.get_logger().info('CANCELLED NAVIGATION')
 
     def ctr_normal(self, plane: LabeledObjectPlane):
         center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
@@ -264,6 +277,9 @@ class Docking(ActionServerBase):
         if not self.started_task:
             return
         # self.get_logger().info('GOT OBJECTS')
+        self.got_dock = False
+        self.picked_slot = False
+        self.updated_slot_pos = False
         new_dock_banners = []
         new_boat_banners = []
         obj_plane: LabeledObjectPlane
@@ -271,65 +287,80 @@ class Docking(ActionServerBase):
             if(obj_plane.label in self.boat_labels):
                 ctr, normal = self.ctr_normal(obj_plane)
                 new_boat_banners.append((obj_plane.label, (ctr, normal)))
-                self.get_logger().info(f'BOAT: {self.inv_label_mappings[obj_plane.label]} -> {(ctr, normal).__str__()}')
-
-        merged_obj_indiv: LabeledObjectPlane
-        for merged_obj_indiv in msg.coplanar_indiv:
-            if (merged_obj_indiv.label in self.dock_labels):
-                self.get_logger().info(f'GOT DOCK')
+                # self.get_logger().info(f'BOAT: {self.inv_label_mappings[obj_plane.label]} -> {(ctr, normal).__str__()}')
+            if (obj_plane.label in self.dock_labels):
                 self.got_dock = True
-                ctr, normal = self.ctr_normal(merged_obj_indiv)
-                new_dock_banners.append((merged_obj_indiv.label, (ctr, normal)))
-
+                ctr, normal = self.ctr_normal(obj_plane)
+                new_dock_banners.append((obj_plane.label, (ctr, normal)))
+                # self.get_logger().info(f'SLOT: {self.inv_label_mappings[obj_plane.label]} -> {(ctr, normal).__str__()}')
+        
         # update global variables
         self.dock_banners = new_dock_banners
         self.boat_banners = new_boat_banners
 
-        self.get_logger().info(f'GOT {len(self.dock_banners)} SLOTS AND {len(self.boat_banners)} BOATS')
+        # self.get_logger().info(f'GOT {len(self.dock_banners)} SLOTS AND {len(self.boat_banners)} BOATS')
 
-        if(not self.got_dock):
-            return
-
-        # check for taken docks and stuff
-        for dock_label, (dock_ctr, dock_normal) in self.dock_banners:
-            if (dock_label in self.taken):
-                continue # just ignore, since we saw that it was taken once it's always taken
-            # check if any boat is in that slot
-            taken = False
-            for boat_label, (boat_ctr, boat_normal) in self.boat_banners:
-                # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
-                if self.norm(boat_ctr, dock_ctr) < self.boat_dock_dist_thres and abs(self.angle_vec(self.difference(dock_ctr, boat_ctr), dock_normal)) < self.boat_taken_angle_thres:
-                    # taken
-                    taken = True
-            if taken:
-                self.taken.append(dock_label)
-                if(self.picked_slot and self.selected_slot[0] == dock_label):
-                    # we're cooked
-                    self.selected_slot = None
-                    self.picked_slot = False
+        if self.got_dock:
+            # check for taken docks and stuff
+            for dock_label, (dock_ctr, dock_normal) in self.dock_banners:
+                if (dock_label in self.taken):
+                    continue # just ignore, since we saw that it was taken once it's always taken
+                # check if any boat is in that slot
+                taken = False
+                for boat_label, (boat_ctr, boat_normal) in self.boat_banners:
+                    # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
+                    if self.norm(boat_ctr, dock_ctr) < self.boat_dock_dist_thres and abs(self.angle_vec(self.difference(dock_ctr, boat_ctr), dock_normal)) < self.boat_taken_angle_thres:
+                        # taken
+                        taken = True
+                if taken:
+                    self.taken.append(dock_label)
+                    if(self.picked_slot and self.selected_slot[0] == dock_label):
+                        # we're cooked
+                        self.selected_slot = None
+                        self.picked_slot = False
+                        # self.pid.reset()
+                        self.x_pid.reset()
+                        self.y_pid.reset()
+                        self.theta_pid.reset()
+                        if self.state == DockingState.NAVIGATING_DOCK:
+                            self.state = DockingState.CANCELLING_NAVIGATION
+                        else:
+                            self.state = DockingState.WAITING_DOCK
+                        self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
+                    continue
+                # found empty docking slot
+                self.picked_slot = True
+                if self.selected_slot is None:
+                    self.updated_slot_pos = True
+                if (self.selected_slot is not None) and (self.selected_slot[0] == dock_label) and (self.norm(self.selected_slot[1][0], dock_ctr) < self.duplicate_dist):
+                    # same slot, update position & normal
+                    self.selected_slot = (dock_label, (dock_ctr, dock_normal))
+                    self.updated_slot_pos = True
+                if (self.selected_slot is None) or (self.norm(self.selected_slot[1][0], self.robot_pos) > self.norm(dock_ctr, self.robot_pos) + self.update_slot_dist_thres):
+                    self.state = DockingState.NEW_NAVIGATION
+                    # found an empty one closer
+                    self.selected_slot = (dock_label, (dock_ctr, dock_normal))
                     # self.pid.reset()
                     self.x_pid.reset()
                     self.y_pid.reset()
                     self.theta_pid.reset()
-                    if self.state == DockingState.NAVIGATING_DOCK:
-                        self.state = DockingState.WAITING_DOCK
-                        self.cancel_navigation()
-                self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
-                continue
-            # found empty docking slot
-            if(self.selected_slot is None or (self.norm(self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1]), self.robot_pos) > self.norm(dock_ctr, self.robot_pos)) + self.update_slot_dist_thres):
-                if self.state == DockingState.NAVIGATING_DOCK:
-                    self.cancel_navigation()
-                # found an empty one closer
-                self.selected_slot = (dock_label, (dock_ctr, dock_normal))
-                self.picked_slot = True
-                # self.pid.reset()
-                self.x_pid.reset()
-                self.y_pid.reset()
-                self.theta_pid.reset()
+                    self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]]}')
 
-        if(self.picked_slot):
-            self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]]}')
+        # if (not self.picked_slot) or (not self.updated_slot_pos):
+        if (not self.picked_slot):
+            if self.state == DockingState.NAVIGATING_DOCK:
+                # was going to a fake slot (misdetection)
+                self.state = DockingState.CANCELLING_NAVIGATION
+            else:
+                self.state = DockingState.WAITING_DOCK
+        
+        # if not self.updated_slot_pos:
+        #     self.selected_slot = None
+        #     self.picked_slot = False
+        #     self.get_logger().info("COULDN'T TRACK SLOT POSITION")
+        #     self.x_pid.reset()
+        #     self.y_pid.reset()
+        #     self.theta_pid.reset()
     
     def distance(self, point, wall_params):
         x, y = point
@@ -409,9 +440,12 @@ class Docking(ActionServerBase):
         return scale * x_vel, scale * y_vel
     
     def control_loop(self):
-        if(not self.picked_slot):
+        if self.state == DockingState.WAITING_DOCK:
+            return # TODO stationkeep/search for dock by steering right and left
+        if self.state == DockingState.CANCELLING_NAVIGATION:
+            self.cancel_navigation()
             self.state = DockingState.WAITING_DOCK
-            return # maybe stop the robot? or just go forward/steer to the left
+            return
         marker_arr = MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)])
         mark_id = 1
         # self.get_logger().info(f'CONTROL LOOP')
@@ -424,10 +458,12 @@ class Docking(ActionServerBase):
 
         if self.norm(slot_back_mid, self.robot_pos) < self.navigation_dist_thres:
             if self.state == DockingState.NAVIGATING_DOCK:
+                self.get_logger().info('CANCELLING NAVIGATION')
                 self.cancel_navigation()
+            self.get_logger().info('DOCKING PID')
             self.state = DockingState.DOCKING
             # go to that line and forward (negative error if boat left of line, positive if right)
-            offset = self.dot(self.difference(slot_back_mid, self.robot_pos), self.perp_vec(slot_dir))
+            offset = -self.dot(self.difference(slot_back_mid, self.robot_pos), self.perp_vec(slot_dir))
             approach_angle = self.angle_vec(self.negative(slot_dir), self.robot_dir) # TODO Check sign
 
             # dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
@@ -453,6 +489,9 @@ class Docking(ActionServerBase):
             self.get_logger().info(f'side offset: {offset}')
             self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
+            if abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
+                self.result = True
+                return
             x_output = self.x_pid.get_effort()
             y_output = self.y_pid.get_effort()
             theta_output = self.theta_pid.get_effort()
@@ -467,13 +506,9 @@ class Docking(ActionServerBase):
             control_msg.twist.linear.y = y_vel
             control_msg.twist.angular.z = theta_output
             self.control_pub.publish(control_msg)
-
-            self.got_dock = False
-            self.picked_slot = False
-            self.selected_slot = None
         else:
             waypoint = self.sum(slot_back_mid, self.scalar_prod(slot_dir, self.wpt_banner_dist))
-            if self.state != DockingState.NAVIGATING_DOCK or ((self.sent_waypoint is not None) and (self.norm(waypoint, self.sent_waypoint) > self.adapt_dist)):
+            if self.state == DockingState.NEW_NAVIGATION or ((self.sent_waypoint is not None) and (self.norm(waypoint, self.sent_waypoint) > self.adapt_dist)):
                 self.get_logger().info('SENDING WAYPOINT')
                 # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
                 self.send_waypoint_to_server(waypoint)
@@ -483,10 +518,11 @@ class Docking(ActionServerBase):
                 if self.waypoint_reject or (((goal_result is not None) and (not goal_result.accepted)) or (self.waypoint_sent_future != None and
                     self.waypoint_sent_future.result() != None and 
                     self.waypoint_sent_future.result().status == GoalStatus.STATUS_ABORTED)):
+                    # follow path failed, retry sending
                     self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
                     self.send_waypoint_to_server(self.lastSelectedGoal)
             
-        self.marker_pub.publish(marker_arr)
+        self.docking_marker_pub.publish(marker_arr)
 
     def execute_callback(self, goal_handle):
         self.start_process("docking starting")
