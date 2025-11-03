@@ -4,7 +4,7 @@ object_tracking_map:
     slam_frame_id: "map"
     duplicate_thresh: 1.0
     obstacle_drop_thresh: 15.0
-    range_drop_thresh: 30.0
+    range_drop_thresh: 15.0
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False
     range_uncertainty: 15.0
@@ -28,7 +28,7 @@ object_tracking_map:
     banner_init_new_cov: 50.0
     banner_init_new_theta_cov: 10.0
     track_robot: True
-    track_banners: False
+    track_banners: True
     banners_slam: True
     imu_predict: True
     gps_update: True

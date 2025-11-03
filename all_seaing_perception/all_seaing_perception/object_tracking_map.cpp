@@ -1130,6 +1130,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
     if(m_track_robot && m_first_state) return;
 
     std::vector<std::shared_ptr<all_seaing_perception::Banner>> detected_banners;
+    // TODO: For the objects that are in a coplanar set (check labels), take them from there (coplanar_indiv) instead of objects
     for (all_seaing_interfaces::msg::LabeledObjectPlane banner_msg : msg->objects) {
         std::shared_ptr<all_seaing_perception::Banner> banner(new all_seaing_perception::Banner(rclcpp::Time(m_local_header.stamp), banner_msg.label, banner_msg));
         detected_banners.push_back(banner);

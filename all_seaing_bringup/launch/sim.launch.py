@@ -394,6 +394,40 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": True},
+            # {"shape_label_mappings_file": buoy_label_mappings},
+            {"shape_label_mappings_file": shape_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"dock_width": 2.0},
+            {"dock_length": 11.0},
+            {"wpt_banner_dist": 12.0},
+            {"navigation_dist_thres": 15.0},
+        ],
+        remappings=[
+            
+        ],
+    )
+
+    follow_buoy_pid = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="follow_buoy_pid.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+        ],
+        remappings=[
+            (
+                "camera_info",
+                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
+            ),
+            ("obstacle_map/labeled", "obstacle_map/local")
+        ],
+    )
+
     speed_challenge_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="speed_challenge_pid.py",
@@ -409,22 +443,6 @@ def launch_setup(context, *args, **kwargs):
             (
                 "imu",
                 "/wamv/sensors/imu/imu/data"
-            ),
-            ("obstacle_map/labeled", "obstacle_map/local")
-        ],
-    )
-
-    follow_buoy_pid = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="follow_buoy_pid.py",
-        parameters=[
-            {"is_sim": True},
-            {"color_label_mappings_file": color_label_mappings},
-        ],
-        remappings=[
-            (
-                "camera_info",
-                "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
             ),
             ("obstacle_map/labeled", "obstacle_map/local")
         ],
@@ -504,9 +522,8 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         color_segmentation_node,
-        ycrcb_color_segmentation_node,
-        # yolov8_node,
-        # buoy_yolo_node,
+        # ycrcb_color_segmentation_node,
+        buoy_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         ransac_node,
@@ -520,8 +537,9 @@ def launch_setup(context, *args, **kwargs):
         run_tasks,
         task_init_server,
         follow_buoy_path,
-        # follow_buoy_pid,
         speed_challenge,
+        docking,
+        # follow_buoy_pid,
         # speed_challenge_pid,
         # docking_fallback,
         rviz_waypoint_sender,

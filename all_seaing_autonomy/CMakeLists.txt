@@ -16,6 +16,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/roboboat/follow_buoy_pid.py
     ${PROJECT_NAME}/roboboat/run_tasks.py
     ${PROJECT_NAME}/roboboat/task_init.py
+    ${PROJECT_NAME}/roboboat/docking.py
     ${PROJECT_NAME}/roboboat/docking_fallback.py
     ${PROJECT_NAME}/roboboat/speed_challenge.py
     ${PROJECT_NAME}/roboboat/speed_challenge_pid.py

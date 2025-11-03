@@ -20,9 +20,10 @@ class RunTasks(Node):
         self.task_list = [
             ActionClient(self, Task, "task_init"),
             ActionClient(self, Task, "follow_buoy_path"),
+            # ActionClient(self, Task, "speed_challenge"),
+            # ActionClient(self, Task, "docking"),
             # ActionClient(self, Task, "follow_buoy_pid"),
             # ActionClient(self, Task, "speed_challenge_pid"),
-            # ActionClient(self, Task, "speed_challenge")
             # ActionClient(self, Task, "docking_fallback"),
         ]
         self.current_task = None

@@ -235,6 +235,7 @@ def launch_setup(context, *args, **kwargs):
         executable="ransac_detector",
         output="screen",
         remappings=[
+            ("labeled_object_point_clouds", "labeled_object_point_clouds/merged"),
         ],
         parameters=[
             {"ransac_params_file": ransac_params},
