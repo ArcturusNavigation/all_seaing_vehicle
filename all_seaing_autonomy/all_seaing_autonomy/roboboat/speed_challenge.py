@@ -82,7 +82,7 @@ class SpeedChallenge(ActionServerBase):
         self.buoy_found = False
         self.following_guide = False
         self.moved_to_point = False
-        self.waypoint_reject = False
+        self.waypoint_rejected = False
         self.left_first = True # goes left of buoy first
 
         self.obstacles = None
@@ -473,6 +473,7 @@ class SpeedChallenge(ActionServerBase):
         '''
         self.get_logger().info(f"Moving to point {point}")
         self.moved_to_point = False
+        self.waypoint_rejected = False
         self.follow_path_client.wait_for_server()
         goal_msg = FollowPath.Goal()
         goal_msg.planner = self.get_parameter("planner").value
@@ -497,9 +498,10 @@ class SpeedChallenge(ActionServerBase):
                         goal_msg.y = new_goal[1]
                         self.get_logger().info('ADAPTING GOAL POINT')
                         self._send_goal(goal_msg)
-                if self.waypoint_reject:
+                if self.waypoint_rejected:  # Retry functionality
                     self.get_logger().info('RESENDING GOAL')
                     self._send_goal(goal_msg)
+                    self.waypoint_rejected = False
                 time.sleep(TIMER_PERIOD)
         return False
 
@@ -510,7 +512,7 @@ class SpeedChallenge(ActionServerBase):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().info('Waypoint rejected')
-            self.waypoint_reject = True
+            self.waypoint_rejected = True
             return
 
         self.get_logger().info("Waypoint accepted")
@@ -526,7 +528,7 @@ class SpeedChallenge(ActionServerBase):
         result = future.result().result
         status = future.result().status
         if status == GoalStatus.STATUS_ABORTED:
-            self.waypoint_reject = True
+            self.waypoint_rejected = True
         if result.is_finished:
             self.moved_to_point = True
 
