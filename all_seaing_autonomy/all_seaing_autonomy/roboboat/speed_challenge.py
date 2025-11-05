@@ -81,6 +81,7 @@ class SpeedChallenge(ActionServerBase):
         self.buoy_found = False
         self.following_guide = False
         self.moved_to_point = False
+        self.left_first = True # goes left of buoy first
 
         self.obstacles = None
         self.image_size = (400,400)
@@ -291,6 +292,8 @@ class SpeedChallenge(ActionServerBase):
         first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
         second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
         third_dir = (-first_dir[0], -first_dir[1])
+        if not self.left_first:
+            first_dir, third_dir = third_dir, first_dir
 
 
         add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
