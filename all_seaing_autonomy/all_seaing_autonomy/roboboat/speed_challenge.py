@@ -12,6 +12,7 @@ from ament_index_python.packages import get_package_share_directory
 from sensor_msgs.msg import CameraInfo
 from visualization_msgs.msg import MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
+from action_msgs.msg import GoalStatus
 
 import os
 import yaml
@@ -81,6 +82,7 @@ class SpeedChallenge(ActionServerBase):
         self.buoy_found = False
         self.following_guide = False
         self.moved_to_point = False
+        self.waypoint_reject = False
         self.left_first = True # goes left of buoy first
 
         self.obstacles = None
@@ -450,12 +452,24 @@ class SpeedChallenge(ActionServerBase):
         # check for any probability exceeding confidence threshold
         return any(fmap(changed, pairProbabilities))
 
-    def move_to_point(self, point, is_stationary=False, busy_wait=False):
+
+    def _send_goal(self, goal_msg):
+        self.follow_path_client.wait_for_server()
+        self.send_goal_future = self.follow_path_client.send_goal_async(
+            goal_msg
+        )
+        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
+
+    def move_to_point(self, point, is_stationary=False, busy_wait=False, exit_func=None, goal_update_func=None):
         '''
         Moves the boat to the specified position using the follow path action server.
-        # Returns the future of the server request.
+        If busy_wait=true, then the returned truth value indicates success of point following
 
         Busy waits until the boat moved to the point (bad, should be fixed with asyncio patterns)
+
+        Returns true if exit condition is met (exit_func)
+        Sends new waypoint if desired by the goal_update_func
+        - goal_update_func() -> should_update, (new_goal.x, new_goal.y)
         '''
         self.get_logger().info(f"Moving to point {point}")
         self.moved_to_point = False
@@ -471,14 +485,23 @@ class SpeedChallenge(ActionServerBase):
         goal_msg.choose_every = self.get_parameter("choose_every").value
         goal_msg.is_stationary = is_stationary
 
-        self.follow_path_client.wait_for_server()
-        self.send_goal_future = self.follow_path_client.send_goal_async(
-            goal_msg
-        )
-        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
+        self._send_goal(goal_msg)
         if busy_wait:
             while not self.moved_to_point:
+                if (exit_func is not None) and exit_func():
+                    return True
+                if (goal_update_func is not None):
+                    update_goal, new_goal = goal_update_func()
+                    if update_goal:
+                        goal_msg.x = new_goal[0]
+                        goal_msg.y = new_goal[1]
+                        self.get_logger().info('ADAPTING GOAL POINT')
+                        self._send_goal(goal_msg)
+                if self.waypoint_reject:
+                    self.get_logger().info('RESENDING GOAL')
+                    self._send_goal(goal_msg)
                 time.sleep(TIMER_PERIOD)
+        return False
 
     def follow_path_response_cb(self, future):
         '''
@@ -487,6 +510,7 @@ class SpeedChallenge(ActionServerBase):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().info('Waypoint rejected')
+            self.waypoint_reject = True
             return
 
         self.get_logger().info("Waypoint accepted")
@@ -500,6 +524,9 @@ class SpeedChallenge(ActionServerBase):
         # Marks path following as finished/ moved to path following point
         # if path following is interrupted, does not affect moved to point
         result = future.result().result
+        status = future.result().status
+        if status == GoalStatus.STATUS_ABORTED:
+            self.waypoint_reject = True
         if result.is_finished:
             self.moved_to_point = True
 
