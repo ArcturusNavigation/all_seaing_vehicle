@@ -85,6 +85,44 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    speed_challenge = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": buoy_label_mappings},
+            {"robot_frame_id": "base_link"},
+            {"turn_offset": 1.5},
+            {"choose_every": 100},
+            {"probe_distance": 10},
+        ],
+        remappings=[
+            ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
+        ]
+    )
+
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": False},
+            {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": shape_label_mappings},
+            {"robot_frame_id": "base_link"},
+            # {"dock_width": 2.0},
+            # {"dock_length": 7.0},
+            # {"wpt_banner_dist": 10.0},
+            # {"navigation_dist_thres": 12.0},
+            {"duplicate_dist": 0.3},
+            {"xy_threshold": 2.0},
+            {"choose_every": 10},
+        ],
+        remappings=[
+            
+        ],
+    )
+
     follow_buoy_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_pid.py",
@@ -102,23 +140,6 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
             ("obstacle_map/labeled", "obstacle_map/local"),
         ],
-    )
-
-    speed_challenge = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="speed_challenge.py",
-        parameters=[
-            {"is_sim": False},
-            {"color_label_mappings_file": buoy_label_mappings},
-            {"robot_frame_id": "base_link"},
-            {"probe_distance": 10},
-            {"turn_offset": 1.5},
-            {"choose_every": 100},
-        ],
-        remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
-            ("odometry/filtered", "odometry/tracked"),
-        ]
     )
 
     speed_challenge_pid = launch_ros.actions.Node(
@@ -225,11 +246,12 @@ def launch_setup(context, *args, **kwargs):
         run_tasks,
         task_init_server, 
         follow_buoy_path,
-        # follow_buoy_pid,
         speed_challenge,
+        docking,
+        # follow_buoy_pid,
         # speed_challenge_pid
-        # delivery_server
         # docking_fallback
+        # delivery_server
     ]
 
 
