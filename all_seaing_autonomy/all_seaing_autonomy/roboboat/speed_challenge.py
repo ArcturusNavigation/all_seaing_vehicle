@@ -19,6 +19,7 @@ import yaml
 import math
 import time
 from collections import deque
+from functools import partial
 
 TIMER_PERIOD = 1 / 60
 
@@ -66,6 +67,8 @@ class SpeedChallenge(ActionServerBase):
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
         self.declare_parameter("probe_distance", 10)
+        self.declare_parameter("adaptive_distance", 0.7)
+        self.get_parameter("adaptive_distance").get_parameter_value().double_value
 
         self.declare_parameter("is_sim", False)
         self.declare_parameter("turn_offset", 5.0)
@@ -257,6 +260,25 @@ class SpeedChallenge(ActionServerBase):
             if action_result.success == False:
                 return action_result
         return Task.Result(success=True)
+    
+    def update_point(self, point_name, update_func):
+        '''
+        update_func: returns the new point value (x,y)
+        point_name: the attribute name of the point
+        Provides a wrapper for point updaters to be passed into move_to_point
+        '''
+        new_point = update_func()
+        if not hasattr(self, point_name):
+            setattr(self, point_name, new_point)
+            return False, None
+        else:
+            # already exists attribute
+            old_point = getattr(self, point_name)
+            dist_squared = old_point[0] * new_point[0] + old_point[1] * new_point[1]
+            if (dist_squared > self.adaptive_distance):
+                setattr(self, point_name, new_point)
+                return True, new_point
+            return False, None
 
     def probe_blue_buoy(self):
         '''
@@ -265,16 +287,16 @@ class SpeedChallenge(ActionServerBase):
         '''
         self.get_logger().info("Probing for blue buoy")
         max_guide_d = self.get_parameter("probe_distance").value
-        guide_point = (max_guide_d*self.buoy_direction[0] + self.robot_pos[0], 
+        current_guide_point = lambda: (max_guide_d*self.buoy_direction[0] + self.robot_pos[0], 
                         max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
-        self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
-
-        self.move_to_point(guide_point)
-        while not self.moved_to_point:
-            if self.blue_buoy_detected():
-                return Task.Result(success=True)
-            time.sleep(TIMER_PERIOD)
-
+        self.guide_point = current_guide_point()
+        self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {self.guide_point}.")
+            
+        detection_success = self.move_to_point(self.guide_point, busy_wait=True,
+                                                goal_update_func=partial(self.update_point, "guide_point", current_guide_point), 
+                                                exit_func=self.blue_buoy_detected)
+        if detection_success:
+            return Task.Result(success=True)
         return Task.Result(success=False)
 
     def circle_blue_buoy(self):
@@ -297,18 +319,23 @@ class SpeedChallenge(ActionServerBase):
         if not self.left_first:
             first_dir, third_dir = third_dir, first_dir
 
-
         add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
         first_base = add_tuple(self.blue_buoy_pos, first_dir)
         second_base = add_tuple(self.blue_buoy_pos, second_dir)
         third_base = add_tuple(self.blue_buoy_pos, third_dir)
 
         bases = [first_base, second_base, third_base]
+        dirs = [first_dir, second_dir, third_dir]
         self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
         self.get_logger().info(f"blue buoy pose: {self.blue_buoy_pos}")
         self.get_logger().info(f"bases: {bases}")
-        for base in bases:
-            self.move_to_point(base, busy_wait=True)
+        for base, dir in zip(bases, dirs):
+            def update_current_point():
+                self.blue_buoy_detected()
+                return add_tuple(self.blue_buoy_pos, dir)
+            self.base_point = base
+            self.move_to_point(self.base_point, busy_wait=True,
+                               goal_update_func=partial(self.update_point, "base_point", update_current_point) )
             self.get_logger().info(f"moved to point = {self.moved_to_point}")
 
         return Task.Result(success=True)
@@ -540,7 +567,7 @@ class SpeedChallenge(ActionServerBase):
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
                 # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
-                self.get_logger().info(f"Found blue buoy at {obstacle.global_point.point}")
+                # self.get_logger().info(f"Found blue buoy at {obstacle.global_point.point}")
                 self.buoy_found = True
                 self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
                 break
