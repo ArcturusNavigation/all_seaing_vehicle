@@ -1062,9 +1062,11 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             to_remove.push_back(i);
         }
     }
-    for (int i = 0; i < m_tracked_banners.size(); i++){
-        if (m_track_robot) {
-            to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * m_num_obj + 3*i, 3 + 2 * m_num_obj + 3*i + 1, 3 + 2 * m_num_obj + 3*i + 2});
+    if (m_track_banners && m_banners_slam){
+        for (int i = 0; i < m_tracked_banners.size(); i++){
+            if (m_track_robot) {
+                to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * m_num_obj + 3*i, 3 + 2 * m_num_obj + 3*i + 1, 3 + 2 * m_num_obj + 3*i + 2});
+            }
         }
     }
 
@@ -1077,8 +1079,9 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
 
         if (m_track_robot) {
-            Eigen::MatrixXf new_state(3 + 2 * to_keep.size() + 3*m_num_banners, 1);
-            Eigen::MatrixXf new_cov(3 + 2 * to_keep.size() + 3*m_num_banners, 3 + 2 * to_keep.size() + 3*m_num_banners);
+            int new_size = 3 + 2 * to_keep.size() + ((m_track_banners && m_banners_slam)? 3*m_num_banners : 0);
+            Eigen::MatrixXf new_state(new_size, 1);
+            Eigen::MatrixXf new_cov(new_size, new_size);
             int new_i = 0;
             for (int i : to_keep_flat) {
                 new_state(new_i) = m_state(i);
