@@ -67,7 +67,7 @@ class SpeedChallenge(ActionServerBase):
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
         self.declare_parameter("probe_distance", 10)
-        self.declare_parameter("adaptive_distance", 0.1)
+        self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
 
         self.declare_parameter("is_sim", False)
