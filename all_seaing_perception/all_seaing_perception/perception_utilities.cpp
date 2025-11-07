@@ -151,7 +151,7 @@ namespace all_seaing_perception{
         for (pcl::PointXYZI &point_tf : cloud->points) {
             cv::Point2d xy_rect = all_seaing_perception::projectPCLPtToPixel(cmodel, point_tf, is_sim);
             // Check if within bounds & in front of the boat
-            if (all_seaing_perception::inBounds(cmodel, xy_rect) && (is_sim? point_tf.x : point_tf.z) >= 0) {      
+            if (all_seaing_perception::inBounds(cmodel, xy_rect) && ((is_sim? point_tf.x : point_tf.z) >= 0)) {      
                 // Check if point is in bbox
                 if(all_seaing_perception::inBBox(xy_rect, bbox)){
                     std::vector<float> hsv_pcl = all_seaing_perception::HSVOpenCVToPCL<float>(img.at<cv::Vec3b>(xy_rect));
