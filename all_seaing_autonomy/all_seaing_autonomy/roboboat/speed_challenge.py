@@ -59,7 +59,7 @@ class SpeedChallenge(ActionServerBase):
             MarkerArray, "waypoint_markers", 10
         )
 
-        self.declare_parameter("xy_threshold", 0.5)
+        self.declare_parameter("xy_threshold", 1.0)
         self.declare_parameter("theta_threshold", 180.0)
         self.declare_parameter("goal_tol", 0.5)
         self.declare_parameter("obstacle_tol", 50)
@@ -67,8 +67,8 @@ class SpeedChallenge(ActionServerBase):
         self.declare_parameter("use_waypoint_client", False)
         self.declare_parameter("planner", "astar")
         self.declare_parameter("probe_distance", 10)
-        self.declare_parameter("adaptive_distance", 0.7)
-        self.get_parameter("adaptive_distance").get_parameter_value().double_value
+        self.declare_parameter("adaptive_distance", 0.1)
+        self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
 
         self.declare_parameter("is_sim", False)
         self.declare_parameter("turn_offset", 5.0)
@@ -121,7 +121,8 @@ class SpeedChallenge(ActionServerBase):
             # TODO: for SIM ONLY (no blue buoy)
             self.red_labels.add(label_mappings["red"])
             self.green_labels.add(label_mappings["green"])
-            self.blue_labels.add(label_mappings["green"])
+            # self.blue_labels.add(label_mappings["green"])
+            self.blue_labels.add(label_mappings["black"])
         else:
             self.declare_parameter(
                 "buoy_label_mappings_file",
@@ -274,8 +275,8 @@ class SpeedChallenge(ActionServerBase):
         else:
             # already exists attribute
             old_point = getattr(self, point_name)
-            dist_squared = old_point[0] * new_point[0] + old_point[1] * new_point[1]
-            if (dist_squared > self.adaptive_distance):
+            dist_squared = (old_point[0] - new_point[0])**2 + (old_point[1] - new_point[1])**2
+            if (math.sqrt(dist_squared) > self.adaptive_distance):
                 setattr(self, point_name, new_point)
                 return True, new_point
             return False, None
@@ -292,8 +293,10 @@ class SpeedChallenge(ActionServerBase):
         self.guide_point = current_guide_point()
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {self.guide_point}.")
             
+        # detection_success = self.move_to_point(self.guide_point, busy_wait=True,
+        #                                         goal_update_func=partial(self.update_point, "guide_point", current_guide_point), 
+        #                                         exit_func=self.blue_buoy_detected)
         detection_success = self.move_to_point(self.guide_point, busy_wait=True,
-                                                goal_update_func=partial(self.update_point, "guide_point", current_guide_point), 
                                                 exit_func=self.blue_buoy_detected)
         if detection_success:
             return Task.Result(success=True)
@@ -554,8 +557,9 @@ class SpeedChallenge(ActionServerBase):
         # if path following is interrupted, does not affect moved to point
         result = future.result().result
         status = future.result().status
-        if status == GoalStatus.STATUS_ABORTED:
-            self.waypoint_rejected = True
+        # if status == GoalStatus.STATUS_ABORTED:
+        #     self.get_logger().info('WAYPOINT ABORTED')
+        #     self.waypoint_rejected = True
         if result.is_finished:
             self.moved_to_point = True
 
