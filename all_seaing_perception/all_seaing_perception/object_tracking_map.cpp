@@ -918,11 +918,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
             if (m_track_robot) {
                 m_state.conservativeResize(m_mat_size);
+                m_state.tail(3*m_num_banners) = m_state.segment(3 + 2 * m_num_obj-2, 3*m_num_banners);
                 m_state.segment(3 + 2 * m_num_obj - 2, 2) = Eigen::Vector2f(m_state(0), m_state(1)) +
                                   range * Eigen::Vector2f(std::cos(bearing + m_state(2)),
                                                           std::sin(bearing + m_state(2)));
                 m_cov.conservativeResizeLike(
                     Eigen::MatrixXf::Zero(m_mat_size, m_mat_size));
+                m_cov.bottomRightCorner(3*m_num_banners, 3*m_num_banners) = m_cov.block(3 + 2 * m_num_obj - 2, 3 + 2 * m_num_obj - 2, 3*m_num_banners, 3*m_num_banners);
                 m_cov.block(3 + 2 * m_num_obj - 2, 3 + 2 * m_num_obj - 2, 2, 2) = init_new_cov;
             } else {
                 m_tracked_obstacles.back()->mean_pred =
@@ -1133,8 +1135,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
     if(m_track_robot && m_first_state) return;
 
     std::vector<std::shared_ptr<all_seaing_perception::Banner>> detected_banners;
-    // TODO: For the objects that are in a coplanar set (check labels), take them from there (coplanar_indiv) instead of objects
-    for (all_seaing_interfaces::msg::LabeledObjectPlane banner_msg : msg->objects) {
+    for (all_seaing_interfaces::msg::LabeledObjectPlane banner_msg : msg->coplanar_indiv) {
         std::shared_ptr<all_seaing_perception::Banner> banner(new all_seaing_perception::Banner(rclcpp::Time(m_local_header.stamp), banner_msg.label, banner_msg));
         detected_banners.push_back(banner);
     }
