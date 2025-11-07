@@ -458,7 +458,7 @@ class FollowBuoyPath(ActionServerBase):
             f"robot pos: {self.robot_pos}, front red buoys: {self.obs_to_pos(front_red)}, front green buoys: {self.obs_to_pos(front_green)}"
         )
 
-        if not front_red or not front_green:
+        if ((not front_red) and (not front_green)) or ((prev_pair is None) and ((not front_red) or (not front_green))):
             prev_coords = self.ob_coords(prev_pair.left), self.ob_coords(
                 prev_pair.right
             )
@@ -480,14 +480,27 @@ class FollowBuoyPath(ActionServerBase):
             # If duplicate distance for both reject, if one is duplicate distance check angles
             left_duplicate, left_next = self.pick_buoy(front_red if self.red_left else front_green, prev_pair_midpoint, prev_pair.left)
             right_duplicate, right_next = self.pick_buoy(front_green if self.red_left else front_red, prev_pair_midpoint, prev_pair.right)
-            if left_duplicate and right_duplicate:
-                return None
-            elif (left_duplicate and (not self.check_better_one_side(prev_pair.left, right_next, prev_pair.right))) or (right_duplicate and (not self.check_better_one_side(prev_pair.right, left_next, prev_pair.left))):
-                return None
-            elif self.norm(self.ob_coords(left_next), self.ob_coords(right_next)) < self.inter_buoy_pair_dist:
-                return None
-            else:
-                return InternalBuoyPair(left_next, right_next)
+
+            ret = None
+
+            for left_buoy in ((True, prev_pair.left), (left_duplicate, left_next)):
+                for right_buoy in ((True, prev_pair.right), (right_duplicate, right_next)):
+                    if left_buoy[0] and right_buoy[0]:
+                        continue
+                    
+                    if left_buoy[0] and (not self.check_better_one_side(prev_pair.left, prev_pair.right, right_buoy[1])):
+                        continue
+                    
+                    if right_buoy[0] and (not self.check_better_one_side(prev_pair.right, prev_pair.left, left_buoy[1])):
+                        continue
+
+                    if self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) < self.inter_buoy_pair_dist:
+                        continue
+                    
+                    cur = InternalBuoyPair(left_buoy[1], right_buoy[1]) 
+                    if (ret is None) or self.better_buoy_pair_transition(ret, cur, prev_pair):
+                        ret = cur
+            return ret
         else:
             self.get_logger().debug("No previous pair!")
             # TODO: change those to: self.get_closest_to((0,0), red/green, local=True) to not have to use odometry position but just local obstacle positions (wrt the robot)?
@@ -603,15 +616,15 @@ class FollowBuoyPath(ActionServerBase):
         E----F
         CD is better than AB wrt EF (closer to right angles wrt to E, F)
         """
-        old_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(old_pair.left)))
-        old_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(old_pair.right)))
-        new_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(new_pair.left)))
-        new_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(new_pair.right)))
+        old_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(old_pair.left)) < self.duplicate_dist)
+        old_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(old_pair.right)) < self.duplicate_dist)
+        new_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(new_pair.left)) < self.duplicate_dist)
+        new_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(new_pair.right)) < self.duplicate_dist)
 
-        old_left = self.get_triangle_angle(ref_pair.left, old_pair.left, old_pair.right)
-        old_right = self.get_triangle_angle(ref_pair.right, old_pair.right, old_pair.left)
-        new_left = self.get_triangle_angle(ref_pair.left, new_pair.left, new_pair.right)
-        new_right = self.get_triangle_angle(ref_pair.right, new_pair.right, new_pair.left)
+        old_left = 0 if old_left_duplicate else self.get_triangle_angle(ref_pair.left, old_pair.left, old_pair.right)
+        old_right = 0 if old_right_duplicate else self.get_triangle_angle(ref_pair.right, old_pair.right, old_pair.left)
+        new_left = 0 if new_left_duplicate else self.get_triangle_angle(ref_pair.left, new_pair.left, new_pair.right)
+        new_right = 0 if new_right_duplicate else self.get_triangle_angle(ref_pair.right, new_pair.right, new_pair.left)
 
         # old and new can't be duplicate in both, because they would not be considered as potential next pairs
         if ((old_left_duplicate or old_right_duplicate) and (new_left_duplicate or new_right_duplicate)):
@@ -734,7 +747,7 @@ class FollowBuoyPath(ActionServerBase):
                     break
             # Find potential better next pair
             next_pair = self.next_pair(self.buoy_pairs[ind], red_buoys, green_buoys)
-            if next_pair is not None and ((ind == (len(self.buoy_pairs)-1) and self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair) > self.buoy_pair_dist_thres) or (ind < (len(self.buoy_pairs)-1) and self.better_buoy_pair_transition(self.buoy_pairs[ind+1],next_pair,self.buoy_pairs[ind]))):
+            if next_pair is not None and ((ind == (len(self.buoy_pairs)-1) and self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair, "mid") > self.buoy_pair_dist_thres) or (ind < (len(self.buoy_pairs)-1) and self.better_buoy_pair_transition(self.buoy_pairs[ind+1],next_pair,self.buoy_pairs[ind]))):
                 self.buoy_pairs = self.buoy_pairs[:ind+1]
                 self.buoy_pairs.append(next_pair)
             ind += 1
