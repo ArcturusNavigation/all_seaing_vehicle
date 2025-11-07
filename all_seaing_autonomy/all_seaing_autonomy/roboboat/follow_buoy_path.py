@@ -1004,6 +1004,7 @@ class FollowBuoyPath(ActionServerBase):
                         goal_msg
                     )
                     self._get_result_future = None
+                    self.waypoint_reject = False
                     self.send_goal_future.add_done_callback(self.follow_path_response_cb)
                 time.sleep(self.timer_period)
         return False

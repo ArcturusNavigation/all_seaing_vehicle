@@ -164,6 +164,9 @@ void RANSACDetector::object_pcl_cb(
             std::tie(centroid, normal, size, num_inliers) = all_seaing_perception::PCLRANSAC(*pcl_ptr, m_dist_thres, m_max_iters, true, m_clust_dist);
             if (num_inliers >= m_min_inliers && std::asin(std::abs(normal(2,0)/normal.col(0).norm())) <= m_plane_angle_thres*M_PI/((float)180)){
                 object_planes.objects.push_back(to_plane_msg(label, centroid, normal, size));
+                if (!m_coplanar_id.count(m_id_label_map[label])){
+                    object_planes.coplanar_indiv.push_back(to_plane_msg(label, centroid, normal, size));
+                }
             }
         }
         // check if in a coplanar set
@@ -213,7 +216,7 @@ void RANSACDetector::object_pcl_cb(
                 pcl::PointCloud<pcl::PointXYZ> pcl_inliers_all = all_seaing_perception::pickInliers(*pcl_ptr, merged_ctr, merged_normal, m_dist_thres);
                 if (pcl_inliers_all.size() == 0) continue;
                 pcl::PointCloud<pcl::PointXYZ> pcl_inliers = all_seaing_perception::pickLargestCluster(all_seaing_perception::pickInliers(*pcl_ptr, merged_ctr, merged_normal, m_dist_thres), m_clust_dist);
-                if (pcl_inliers.size() < 2) continue; // TODO: Change this to m_min_inliers or some other threshold if we see that we have many misdetections
+                if (pcl_inliers.size() < m_min_inliers) continue;
                 Eigen::Vector3d indiv_ctr, indiv_size;
                 std::tie(indiv_ctr, indiv_size) = all_seaing_perception::centroidDims(pcl_inliers, merged_normal);
                 object_planes.coplanar_indiv.push_back(to_plane_msg(label, indiv_ctr, merged_normal, indiv_size));
