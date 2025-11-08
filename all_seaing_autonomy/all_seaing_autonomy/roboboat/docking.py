@@ -203,22 +203,6 @@ class Docking(ActionServerBase):
 
         self.sent_waypoint = None
 
-    @property
-    def robot_pos(self):
-        '''
-        Gets the robot position as a tuple (x,y)
-        '''
-        position = self.get_robot_pose()[0:2]
-        return (float(position[0]), float(position[1]))
-
-    @property
-    def robot_dir(self):
-        '''
-        Gets the robot direction as a tuple, containing the unit vector in the same direction as heading
-        '''
-        heading = self.get_robot_pose()[2]
-        return (math.cos(heading), math.sin(heading))
-
     def _waypoint_sent_callback(self, future):
         self.wpt_goal_handle = future.result()
         if not self.wpt_goal_handle.accepted:

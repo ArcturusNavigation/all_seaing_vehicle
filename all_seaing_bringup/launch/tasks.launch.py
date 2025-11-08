@@ -94,6 +94,7 @@ def launch_setup(context, *args, **kwargs):
             {"robot_frame_id": "base_link"},
             {"turn_offset": 1.5},
             {"choose_every": 100},
+            {"probe_distance": 10},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
