@@ -78,6 +78,7 @@ def launch_setup(context, *args, **kwargs):
             {"xy_threshold": 2.0},
             {"choose_every": 10},
             {"turn_offset": 1.5},
+            {"beacon_probe_dist": 1.5},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -92,9 +93,10 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"color_label_mappings_file": buoy_label_mappings},
             {"robot_frame_id": "base_link"},
-            {"turn_offset": 1.5},
+            {"turn_offset": 2.0},
             {"choose_every": 100},
             {"probe_distance": 10},
+            {"xy_threshold": 0.5},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -189,10 +191,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
-            {"Kpid_x": [1.0, 0.0, 0.0]},
-            {"Kpid_y": [0.3, 0.0, 0.0]},
+            {"Kpid_x": [0.5, 0.0, 0.0]},
+            {"Kpid_y": [0.5, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
-            {"max_vel": [2.5, 0.6, 0.1]},
+            {"max_vel": [1.0, 1.0, 0.3]},
         ],
         output="screen",
     )

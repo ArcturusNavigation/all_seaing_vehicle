@@ -139,9 +139,10 @@ class SpeedChallenge(ActionServerBase):
                 self.blue_labels.add(label_mappings[buoy_label])
             for buoy_label in ["red_buoy", "red_circle", "red_racquet_ball"]:
                 self.red_labels.add(label_mappings[buoy_label])
+                self.blue_labels.add(label_mappings[buoy_label])
             for buoy_label in ["green_buoy", "green_circle"]:
                 self.green_labels.add(label_mappings[buoy_label])
-                self.blue_labels.add(label_mappings[buoy_label])
+                # self.blue_labels.add(label_mappings[buoy_label])
 
         self.obstacles = []
 
@@ -316,6 +317,10 @@ class SpeedChallenge(ActionServerBase):
         # but require the path to go around buoy
 
         t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
+        robot_x, robot_y = self.robot_pos
+        robot_buoy_vector = (self.blue_buoy_pos[0]-robot_x, self.blue_buoy_pos[1]-robot_y)
+        robot_buoy_dist = self.norm(robot_buoy_vector)
+        self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
         first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
         second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
         third_dir = (-first_dir[0], -first_dir[1])
@@ -557,11 +562,18 @@ class SpeedChallenge(ActionServerBase):
         # if path following is interrupted, does not affect moved to point
         result = future.result().result
         status = future.result().status
-        # if status == GoalStatus.STATUS_ABORTED:
-        #     self.get_logger().info('WAYPOINT ABORTED')
-        #     self.waypoint_rejected = True
-        if result.is_finished:
+        if status == GoalStatus.STATUS_ABORTED:
+            self.get_logger().info('WAYPOINT ABORTED')
+            # self.waypoint_rejected = True
+            self.moved_to_point = False
+        elif result.is_finished:
             self.moved_to_point = True
+
+    def norm_squared(self, vec, ref=(0, 0)):
+        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
+
+    def norm(self, vec, ref=(0, 0)):
+        return math.sqrt(self.norm_squared(vec, ref))
 
     def blue_buoy_detected(self):
         '''
