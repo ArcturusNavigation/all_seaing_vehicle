@@ -564,8 +564,8 @@ class SpeedChallenge(ActionServerBase):
         status = future.result().status
         if status == GoalStatus.STATUS_ABORTED:
             self.get_logger().info('WAYPOINT ABORTED')
-            # self.waypoint_rejected = True
-            self.moved_to_point = False
+            self.waypoint_rejected = True
+            # self.moved_to_point = False
         elif result.is_finished:
             self.moved_to_point = True
 
