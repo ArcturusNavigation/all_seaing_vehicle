@@ -64,7 +64,7 @@ class PotentialField:
             partialy += (pos[1]-self.goal[1])*((pos[0]-self.goal[0])**2 + (pos[1]-self.goal[1]))**-0.5
         
         # normalize
-        mag = (partialx**2 + partialy**2)**0.5
+        mag = -(partialx**2 + partialy**2)**0.5
         return [partialx/mag, partialy/mag]
 
 
@@ -74,8 +74,10 @@ class PotentialField:
         for _ in range(max_iters):
             if self.dist(pos, self.goal) < tol:
                 break
+
+            
             grad = self.sketchy_gradient_descent_step(pos)
             pos[0]+=grad[0]*step_size
             pos[1]+=grad[1]*step_size
-            path.append(pos)
+            path.append(pos.copy())
         return path
