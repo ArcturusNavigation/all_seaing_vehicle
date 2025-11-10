@@ -79,6 +79,7 @@ def launch_setup(context, *args, **kwargs):
             {"choose_every": 10},
             {"turn_offset": 1.5},
             {"beacon_probe_dist": 1.5},
+            {"midpoint_pair_forward_dist": 0.5},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -98,6 +99,8 @@ def launch_setup(context, *args, **kwargs):
             {"probe_distance": 10},
             {"xy_threshold": 0.5},
             {"duplicate_dist": 0.3},
+            {"init_gate_dist": 0.5},
+            {"gate_dist_back": 0.5},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),

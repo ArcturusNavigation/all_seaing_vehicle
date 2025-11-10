@@ -373,6 +373,7 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            # {"midpoint_pair_forward_dist": 5.0},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -388,6 +389,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
             {"probe_distance": 30},
+            # {"init_gate_dist": 5.0},
+            # {"gate_dist_back": 5.0},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -506,9 +509,9 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             # "world": "rb2025/rb2025_task1_task2.sdf",
-            # "world": "rb2025/follow_path_new.sdf",
+            "world": "rb2025/follow_path_new.sdf",
             # "world": "follow_path_task.sdf",
-            "world": "speed_course_world.sdf",
+            # "world": "speed_course_world.sdf",
             # "world": "scan_dock_deliver_task.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
