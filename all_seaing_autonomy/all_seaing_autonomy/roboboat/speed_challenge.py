@@ -43,9 +43,6 @@ class SpeedChallenge(ActionServerBase):
             cancel_callback=self.default_cancel_callback,
         )
 
-        self.seg_image_bbox_sub = self.create_subscription(
-            LabeledBoundingBox2DArray, "bounding_boxes_ycrcb", self.seg_bbox_cb, 10
-        )
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
         )
@@ -86,6 +83,8 @@ class SpeedChallenge(ActionServerBase):
         self.following_guide = False
         self.moved_to_point = False
         self.waypoint_rejected = False
+        self.waypoint_aborted = False
+        self.active_waypoint_request = 0 # keeps track of the number of active waypoint requests
         self.left_first = True # goes left of buoy first
 
         self.obstacles = None
@@ -166,9 +165,6 @@ class SpeedChallenge(ActionServerBase):
         # self.get_logger().info(f"robot pose {self.robot_pos}")
         # self.move_to_point(self.robot_pos, is_stationary=True)
 
-
-        # TODO: GET RID OF THIS, FOR TESTING IN SIM ONLY
-        # assumes LED has already shifted color
         self.runnerActivated = True
 
         while rclpy.ok():
@@ -192,53 +188,6 @@ class SpeedChallenge(ActionServerBase):
         self.get_logger().info("ROS shutdown detected or loop ended unexpectedly.")
         goal_handle.abort()
         return Task.Result(success=False)
-
-    def seg_bbox_cb(self, msg):
-        '''
-        Handles when an color segmented image gets published
-        '''
-
-        '''
-        For sim
-        '''
-        self.runnerActivated = True
-
-        self.seg_bboxes.append(msg.boxes)
-        if len(self.seg_bboxes) > self.max_seg_bboxes:
-            self.seg_bboxes.popleft()
-        else:
-            return
-        if self.runnerActivated:
-            return
-
-        all_seg_bboxes = list(self.seg_bboxes)
-
-        redBboxes = []
-        greenBboxes = []
-        for frame in all_seg_bboxes: #fixed time, frame= LabeledBoundingBox2D[]
-            redBboxes.append([])
-            greenBboxes.append([])
-            for box in frame:
-                if box.label in self.red_labels:
-                    redBboxes[-1].append(Bbox(box))
-                if box.label in self.green_labels:
-                    greenBboxes[-1].append(Bbox(box))
-
-        cutoff = len(all_seg_bboxes)//2
-        beforeRed = redBboxes[0:cutoff]
-        afterRed = redBboxes[cutoff:len(redBboxes)]
-        beforeGreen = greenBboxes[0:cutoff]
-        afterGreen = greenBboxes[cutoff:len(greenBboxes)]
-
-        # TODO: FIX MAGIC NUMBER TERRITORY
-        epsilon = 0.02*math.sqrt(self.image_size[0]**2 + self.image_size[1]**2)
-        lmbda = epsilon
-        p = 5
-        limit = 0.5
-
-        if self.led_changed(beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
-            self.get_logger().info("Detected LED color change!")
-            self.runnerActivated = True
 
     def map_cb(self, msg):
         '''
@@ -356,140 +305,9 @@ class SpeedChallenge(ActionServerBase):
         self.move_to_point(self.home_pos, busy_wait=True)
         return Task.Result(success=True)
 
-    # robust realtime visual signal processing
-    def led_changed(self, beforeRed, afterRed, beforeGreen, afterGreen, epsilon, lmbda, p, limit):
-        '''
-        beforeRed :: [[Bbox]] | len(beforeRed) > 0
-        frames with red bounding boxes before signal event
-
-        beforeGreen :: [[Bbox]] | len(beforeGreen) = len(beforeRed) > 0
-        same as `beforeRed` but for green bounding boxes
-
-        afterGreen :: [[Bbox]] | len(afterGreen) = len(afterRed) > 0
-        same as `afterRed` but for green bounding boxes
-
-        epsilon :: Num
-        maximum distance at which two bounding boxes are considered the same;
-        also minimum distance needed to identify bounding boxes as unique
-
-        lmda :: Num
-        maximum deviation in position of a bounding box across frames
-
-        p :: Int
-        number of frames to sample from full list to determine main bounding boxes;
-        should be small for performance reasons
-
-        limit :: Prob
-        threshold probability of existence required to detect a change in bounding box color
-
-        → Bool
-        whether signal has changed
-
-        ---
-
-        Bbox := {
-            x :: Num
-            y :: Num
-            w :: Num | w > 0
-            h :: Num | h > 0
-        }
-
-        Prob := Num a | 0 <= a <= 1
-        '''
-        fmap = lambda f, l: [f(x) for x in l]  # A → B → [A] → [B]
-        flatten = lambda l: l[0] + flatten(l[1:]) if len(l) > 0 else []  # [[A]] → [A]
-        filter = lambda p, l: [x for x in l if p(x)]  # (A → Bool) → [A] → [A]
-        product = lambda a, b: flatten([[(alpha, beta) for alpha in a] for beta in b])  # [A] → [B] → [(A, B)]
-        access = lambda l1, l2: [l1[i] for i in l2]  # [A] → [Int] → [A]
-        distinguishable = lambda dist: dist > epsilon  # Num → Bool
-        matching = lambda dist: dist < lmbda  # Num → Bool
-        changed = lambda prob: prob >= limit  # Prob → Bool
-        multiply = lambda x: x[0] * x[1]  # (Num, Num) → Num
-        norm = lambda b1: lambda b2: math.sqrt((b1.x - b2.x) ** 2 + (b1.y - b2.y) ** 2)  # Num → (Num → Num)
-        estimator = lambda trials: sum(trials) / len(trials)  # [Bool] → Num
-
-        # [Bbox] → (Bbox → Bool)
-        # whether the bounding box is distinguishable from all bounding boxes in a list of bounding boxes
-        distinct = lambda boxes: lambda box: all(fmap(distinguishable, fmap(norm(box), boxes)))
-
-        # Int | nBefore > 0
-        # number of "before" frames
-        nBefore = len(beforeRed)
-
-        # Int | nAfter > 0
-        # number of "after" frames
-        nAfter = len(afterGreen)
-
-        # Int → Int → Int | n > 0 → [Int]
-        # generate `n` evenly spaced elements from an arbitrary discrete range
-        linspace = lambda a, b, n: [a] + linspace(a + (b-a)//(n-1), b, n-1) if n > 1 else [a]
-
-        # [Int]
-        # indices of "before" frames to sample
-        beforeSampleIndices = fmap(int, linspace(0, nBefore-1, p))
-
-        # ([Bbox], [Bbox]) → [Bbox]
-        # remove first bounding boxes that are indistinguishable from second ones in the same frame
-        filterFrame = lambda colors: filter(distinct(colors[1]), colors[0])
-
-        # [[Bbox]] → [[Bbox]]
-        # remove red bounding boxes that are indistinguishable from green ones for each frame
-        beforeRedCandidates = fmap(filterFrame, zip(beforeRed, beforeGreen))
-
-        # [[Bbox]]
-        # bounding box data for red before frames
-        beforeSampleRed = access(beforeRedCandidates, beforeSampleIndices)
-
-        # [Bbox]
-        # list of identified red bounding boxes from sample frames
-        redBboxes = flatten(beforeSampleRed)
-
-        # Bbox → ([Bbox] → Bool)
-        # detect whether a particular bounding box exists in a different frame
-        bboxExists = lambda bbox: lambda frame: any(fmap(matching, fmap(norm(bbox), frame)))
-
-        # Bbox → [[Bbox]] → Prob
-        # determine probability that a given bounding box exists in time series
-        probExistence = lambda box, series: estimator(fmap(bboxExists(box), series))
-
-        # [Int]
-        # indices of "after" frames to sample
-        afterSampleIndices = fmap(int, linspace(0, nAfter-1, p))
-
-        # [[Bbox]]
-        # bounding box data for green after frames
-        afterSampleGreen = access(afterGreen, afterSampleIndices)
-
-        # [Bbox]
-        # list of identified green bounding boxes from sample frames
-        greenBoxes = flatten(afterSampleGreen)
-
-        # (Bbox, Bbox) → Bool
-        # check for overlap between bounding box set and a single bounding box
-        overlapping = lambda boxes: matching(norm(boxes[0])(boxes[1]))
-
-        # [(Bbox, Bbox)]
-        # list of potential candidates for a signal switch
-        signalCandidates = filter(overlapping, product(redBboxes, greenBoxes))
-
-        # (Bbox, Bbox) → Prob
-        # probability of specific candidate pair existing
-        candidateProbability = lambda boxes: (probExistence(boxes[0], beforeRed), probExistence(boxes[1], afterGreen))
-
-        # [(Prob, Prob)]
-        # probability of existence of each bounding box in signal candidates
-        probabilities = fmap(candidateProbability, signalCandidates)
-
-        # [Prob]
-        # probability of existence of each bounding box pair in signal candidates
-        pairProbabilities = fmap(multiply, probabilities)
-
-        # check for any probability exceeding confidence threshold
-        return any(fmap(changed, pairProbabilities))
-
-
     def _send_goal(self, goal_msg):
         self.follow_path_client.wait_for_server()
+        self.active_waypoint_request += 1
         self.send_goal_future = self.follow_path_client.send_goal_async(
             goal_msg
         )
@@ -509,6 +327,7 @@ class SpeedChallenge(ActionServerBase):
         self.get_logger().info(f"Moving to point {point}")
         self.moved_to_point = False
         self.waypoint_rejected = False
+        self.waypoint_aborted = False
         self.follow_path_client.wait_for_server()
         goal_msg = FollowPath.Goal()
         goal_msg.planner = self.get_parameter("planner").value
@@ -562,10 +381,9 @@ class SpeedChallenge(ActionServerBase):
         # if path following is interrupted, does not affect moved to point
         result = future.result().result
         status = future.result().status
-        if status == GoalStatus.STATUS_ABORTED:
-            self.get_logger().info('WAYPOINT ABORTED')
-            self.waypoint_rejected = True
-            # self.moved_to_point = False
+        if status == GoalStatus.STATUS_ABORTED and self.active_waypoint_request > 0:
+            self.get_logger().info('CURRENT WAYPOINT ABORTED')
+            self.waypoint_aborted = True
         elif result.is_finished:
             self.moved_to_point = True
 
