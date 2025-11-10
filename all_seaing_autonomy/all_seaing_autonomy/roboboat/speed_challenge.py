@@ -84,6 +84,7 @@ class SpeedChallenge(ActionServerBase):
         self.moved_to_point = False
         self.waypoint_rejected = False
         self.waypoint_aborted = False
+        self.active_future_request = 0 # active future requests
         self.active_waypoint_request = 0 # keeps track of the number of active waypoint requests
         self.left_first = True # goes left of buoy first
 
@@ -307,7 +308,7 @@ class SpeedChallenge(ActionServerBase):
 
     def _send_goal(self, goal_msg):
         self.follow_path_client.wait_for_server()
-        self.active_waypoint_request += 1
+        self.active_future_request += 1
         self.send_goal_future = self.follow_path_client.send_goal_async(
             goal_msg
         )
@@ -352,10 +353,11 @@ class SpeedChallenge(ActionServerBase):
                         goal_msg.y = new_goal[1]
                         self.get_logger().info('ADAPTING GOAL POINT')
                         self._send_goal(goal_msg)
-                if self.waypoint_rejected:  # Retry functionality
+                if self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality
                     self.get_logger().info('RESENDING GOAL')
                     self._send_goal(goal_msg)
                     self.waypoint_rejected = False
+                    self.waypoint_aborted = False
                 time.sleep(TIMER_PERIOD)
         return False
 
@@ -364,6 +366,11 @@ class SpeedChallenge(ActionServerBase):
         Responds to follow path action server goal response.
         '''
         goal_handle = future.result()
+        self.active_future_request -= 1
+        if self.active_future_request > 0:
+            self.get_logger().info('PREVIOUS FUTURE, IGNORING')
+            return
+        
         if not goal_handle.accepted:
             self.get_logger().info('Waypoint rejected')
             self.waypoint_rejected = True
@@ -371,20 +378,27 @@ class SpeedChallenge(ActionServerBase):
 
         self.get_logger().info("Waypoint accepted")
         self._get_result_future = goal_handle.get_result_async()
+        self.active_waypoint_request += 1
         self._get_result_future.add_done_callback(self.get_point_result_cb)
 
     def get_point_result_cb(self, future):
         '''
         Flags the path following as complete for move_to_point
         '''
+        self.active_waypoint_request -= 1
+        if self.active_waypoint_request > 0:
+            self.get_logger().info('PREVIOUS WAYPOINT, IGNORING')
+            return
+        
         # Marks path following as finished/ moved to path following point
         # if path following is interrupted, does not affect moved to point
         result = future.result().result
         status = future.result().status
-        if status == GoalStatus.STATUS_ABORTED and self.active_waypoint_request > 0:
-            self.get_logger().info('CURRENT WAYPOINT ABORTED')
+        if status == GoalStatus.STATUS_ABORTED:
+            self.get_logger().info(f'WAYPOINT ABORTED')
             self.waypoint_aborted = True
         elif result.is_finished:
+            self.get_logger().info(f'MOVED TO WAYPOINT')
             self.moved_to_point = True
 
     def norm_squared(self, vec, ref=(0, 0)):
