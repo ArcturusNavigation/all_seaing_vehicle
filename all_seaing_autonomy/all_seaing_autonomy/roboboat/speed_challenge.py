@@ -67,6 +67,9 @@ class SpeedChallenge(ActionServerBase):
         self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
 
+        self.declare_parameter("duplicate_dist", 0.5)
+        self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
+
         self.declare_parameter("is_sim", False)
         self.declare_parameter("turn_offset", 5.0)
 
@@ -412,16 +415,25 @@ class SpeedChallenge(ActionServerBase):
         Check if the blue buoy for turning is detected (returns boolean).
         Also sets the position of the blue buoy if it is found.
         '''
+        backup_buoy = None
+        updated_pos = False
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
                 # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
                 buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
                             obstacle.global_point.point.y-self.robot_pos[1])
-                dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1] 
-                if dot_prod > 0: #check if buoy position is behind robot i.e. dot product is negative
+                dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
+                buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                if (backup_buoy is None) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy)):
+                    backup_buoy = buoy_pos
+                if dot_prod > 0 and ((not self.buoy_found) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
                     self.buoy_found = True
-                    self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                    updated_pos = True
+                    self.blue_buoy_pos = buoy_pos
                     break
+        if not updated_pos and backup_buoy is not None:
+            self.get_logger().info('SWITCHING TO BACKUP BUOY')
+            self.blue_buoy_pos = backup_buoy
         return self.buoy_found
 
 

@@ -326,18 +326,20 @@ class Docking(ActionServerBase):
                     # same slot, update position & normal
                     self.selected_slot = (dock_label, (dock_ctr, dock_normal))
                     self.updated_slot_pos = True
+                    return
                 if (self.selected_slot is None) or (self.norm(self.selected_slot[1][0], self.robot_pos) > self.norm(dock_ctr, self.robot_pos) + self.update_slot_dist_thres):
                     self.state = DockingState.NEW_NAVIGATION
                     # found an empty one closer
                     self.selected_slot = (dock_label, (dock_ctr, dock_normal))
+                    self.updated_slot_pos = True
                     # self.pid.reset()
                     self.x_pid.reset()
                     self.y_pid.reset()
                     self.theta_pid.reset()
                     self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]]}')
 
-        # if (not self.picked_slot) or (not self.updated_slot_pos):
-        if (not self.picked_slot):
+        if (not self.picked_slot) or (not self.updated_slot_pos):
+        # if (not self.picked_slot):
             if self.state == DockingState.NAVIGATING_DOCK:
                 # was going to a fake slot (misdetection)
                 self.state = DockingState.CANCELLING_NAVIGATION

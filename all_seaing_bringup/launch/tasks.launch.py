@@ -97,6 +97,7 @@ def launch_setup(context, *args, **kwargs):
             {"choose_every": 100},
             {"probe_distance": 10},
             {"xy_threshold": 0.5},
+            {"duplicate_dist": 0.3},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
