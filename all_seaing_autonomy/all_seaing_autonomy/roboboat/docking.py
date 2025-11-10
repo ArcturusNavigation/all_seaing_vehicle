@@ -340,9 +340,16 @@ class Docking(ActionServerBase):
 
         if (not self.picked_slot) or (not self.updated_slot_pos):
         # if (not self.picked_slot):
+            self.selected_slot = None
+            self.picked_slot = False
+            # self.pid.reset()
+            self.x_pid.reset()
+            self.y_pid.reset()
+            self.theta_pid.reset()
             if self.state == DockingState.NAVIGATING_DOCK:
                 # was going to a fake slot (misdetection)
                 self.state = DockingState.CANCELLING_NAVIGATION
+                self.get_logger().info(f'WAS GOING TO A FAKE DOCK, ABORT')
             else:
                 self.state = DockingState.WAITING_DOCK
         

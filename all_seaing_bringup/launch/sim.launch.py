@@ -524,7 +524,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_unlabeled_node,
         color_segmentation_node,
         # ycrcb_color_segmentation_node,
-        buoy_yolo_node,
+        # buoy_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         ransac_node,
