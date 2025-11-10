@@ -123,6 +123,9 @@ class FollowBuoyPath(ActionServerBase):
 
         self.declare_parameter("turn_offset", 5.0)
         self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
+
+        self.declare_parameter("midpoint_pair_forward_dist", 1.0)
+        self.midpoint_pair_forward_dist = self.get_parameter("midpoint_pair_forward_dist").get_parameter_value().double_value
         
         self.green_labels = set()
         self.red_labels = set()
@@ -215,7 +218,7 @@ class FollowBuoyPath(ActionServerBase):
         right_coords = self.ob_coords(pair.right)
         midpoint = self.midpoint(left_coords, right_coords)
         
-        scale = 1 # number of meters to translate forward. TODO: parametrize.
+        scale = self.midpoint_pair_forward_dist # number of meters to translate forward. TODO: parametrize.
         dy = right_coords[1] - left_coords[1]
         dx = right_coords[0] - left_coords[0]
         norm = math.sqrt(dx**2 + dy**2)
@@ -352,7 +355,6 @@ class FollowBuoyPath(ActionServerBase):
         #     self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
         # self.backup_pair = None
         # want to pick the pair that's far apart but has the closest midpoint
-        # TODO: Add more conditions on judging what the best pair is, other than just distance (e.g. should not be really angled wrt the boat etc.)
         if self.first_setup:
             green_to = None
             red_to = None

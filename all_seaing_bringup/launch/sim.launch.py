@@ -373,6 +373,7 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            # {"midpoint_pair_forward_dist": 5.0},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -388,6 +389,8 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
             {"probe_distance": 30},
+            # {"init_gate_dist": 5.0},
+            # {"gate_dist_back": 5.0},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
@@ -524,7 +527,7 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_unlabeled_node,
         color_segmentation_node,
         # ycrcb_color_segmentation_node,
-        buoy_yolo_node,
+        # buoy_yolo_node,
         point_cloud_filter_node,
         bbox_project_pcloud_node,
         ransac_node,
