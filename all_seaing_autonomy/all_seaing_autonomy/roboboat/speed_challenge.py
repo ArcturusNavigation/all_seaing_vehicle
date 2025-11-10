@@ -401,9 +401,12 @@ class SpeedChallenge(ActionServerBase):
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
                 # TODO: perhaps make this check better instead of just checking for a blue circle/buoy
-                # self.get_logger().info(f"Found blue buoy at {obstacle.global_point.point}")
-                self.buoy_found = True
-                self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
+                            obstacle.global_point.point.y-self.robot_pos[1])
+                dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1] 
+                if dot_prod > 0: #check if buoy position is behind robot i.e. dot product is negative
+                    self.buoy_found = True
+                    self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
                 break
         return self.buoy_found
 
