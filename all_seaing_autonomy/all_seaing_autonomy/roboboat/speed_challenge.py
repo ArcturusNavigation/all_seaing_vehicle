@@ -407,7 +407,7 @@ class SpeedChallenge(ActionServerBase):
                 if dot_prod > 0: #check if buoy position is behind robot i.e. dot product is negative
                     self.buoy_found = True
                     self.blue_buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                break
+                    break
         return self.buoy_found
 
 
