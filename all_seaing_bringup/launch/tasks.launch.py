@@ -123,6 +123,12 @@ def launch_setup(context, *args, **kwargs):
             {"duplicate_dist": 0.3},
             {"xy_threshold": 2.0},
             {"choose_every": 10},
+            {"Kpid_x": [0.75, 0.0, 0.0]},
+            {"Kpid_y": [0.75, 0.0, 0.0]},
+            {"Kpid_theta": [0.75, 0.0, 0.0]},
+            {"max_vel": [1.0, 1.0, 0.3]},
+            {"avoid_max_dist": 2.0},
+            {"avoid_vel_coeff": 1.0},
         ],
         remappings=[
             
@@ -199,6 +205,8 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_y": [0.5, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
             {"max_vel": [1.0, 1.0, 0.3]},
+            {"avoid_max_dist": 3.0},
+            {"avoid_vel_coeff": 2.0},
         ],
         output="screen",
     )
@@ -209,6 +217,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
+            {"avoid_obs": True},
         ],
         output="screen",
     )
