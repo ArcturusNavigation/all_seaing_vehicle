@@ -3,12 +3,12 @@ import sensor_msgs_py.point_cloud2 as pc2
 
 
 class PotentialField:
-    def __init__(self, pointcloud, goal, q=2.0, k=3):
+    def __init__(self, pointcloud, q=2.0, goal=None, k=None):
         self.pointcloud = pointcloud   # list of obstacle positions [x, y]
         self.lidar_point_cloud = pc2.read_points_numpy(pointcloud)
         self.goal = goal               # [x, y]
         self.q = q                     # influence distance for repulsion
-        self.k = k                     # number of nearest obstacles to consider
+        self.k = min(k, len(self.lidar_point_cloud)) if (k is not None) else len(self.lidar_point_cloud) # number of nearest obstacles to consider
 
     def dist(self, p1, p2):
         return math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
@@ -46,9 +46,9 @@ class PotentialField:
     #     new_pos = [pos[0] + best_dir[0], pos[1] + best_dir[1]]
     #     return new_pos
 
-    def sketchy_gradient_descent_step(self, pos):
-        # approximate gradient by sampling directions
-        points = sorted(self.lidar_point_cloud, key=lambda o: self.dist(o, pos))
+    def sketchy_gradient_descent_step(self, pos=(0,0), normalize = False):
+        # analytically compute gradient
+        points = self.closest_obstacles(pos, self.k)
 
         partialx = 0
         partialy = 0
@@ -64,8 +64,8 @@ class PotentialField:
             partialy += (pos[1]-self.goal[1])*((pos[0]-self.goal[0])**2 + (pos[1]-self.goal[1]))**-0.5
         
         # normalize
-        mag = -(partialx**2 + partialy**2)**0.5
-        return [partialx/mag, partialy/mag]
+        mag = (partialx**2 + partialy**2)**0.5 if normalize else 1
+        return [-partialx/mag, -partialy/mag]
 
 
     def run(self, start, max_iters=1000, tol=0.1, step_size=0.1):

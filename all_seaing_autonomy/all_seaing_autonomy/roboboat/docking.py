@@ -5,6 +5,12 @@ from rclpy.qos import qos_profile_sensor_data
 from rclpy.action import ActionServer, ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from visualization_msgs.msg import Marker, MarkerArray
+from sensor_msgs.msg import PointCloud2
+from rclpy.qos import qos_profile_sensor_data
+from visualization_msgs.msg import MarkerArray
+from geometry_msgs.msg import Pose, Point, Vector3, Quaternion
+from std_msgs.msg import Header, ColorRGBA
+from tf_transformations import quaternion_from_euler
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -12,6 +18,7 @@ from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_controller.pid_controller import PIDController, CircularPID
 from all_seaing_interfaces.action import FollowPath, Task, Waypoint
 from all_seaing_interfaces.msg import LabeledObjectPlaneArray, LabeledObjectPlane, ControlOption
+from all_seaing_controller.potential_field import PotentialField
 
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
@@ -139,6 +146,30 @@ class Docking(ActionServerBase):
             .double_array_value
         )
 
+        self.avoid_max_dist = (
+            self.declare_parameter("avoid_max_dist", 5.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.avoid_vel_coeff = (
+            self.declare_parameter("avoid_vel_coeff", 0.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.vel_marker_scale = (
+            self.declare_parameter("vel_marker_scale", 1.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.avoid_obs = (
+            self.declare_parameter("avoid_obs", True)
+            .get_parameter_value()
+            .bool_value
+        )
+
         self.x_pid = PIDController(*Kpid_x)
         self.y_pid = PIDController(*Kpid_y)
         self.theta_pid = CircularPID(*Kpid_theta)
@@ -149,6 +180,17 @@ class Docking(ActionServerBase):
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
+
+        # for obstacle avoidance
+        self.point_cloud_sub = self.create_subscription(
+            PointCloud2, "/point_cloud/filtered_obs", self.point_cloud_cb, qos_profile_sensor_data
+        )
+
+        self.lidar_point_cloud = None
+
+        self.controller_marker_pub = self.create_publisher(
+            MarkerArray, "controller_markers", 10
+        )
         
         # update from subs
         self.dock_banners = []
@@ -202,6 +244,21 @@ class Docking(ActionServerBase):
         self.waypoint_reject = False
 
         self.sent_waypoint = None
+
+    def point_cloud_cb(self, msg):
+        self.lidar_point_cloud = msg
+
+    def vel_to_marker(self, vel, scale=1.0, rgb=(1.0, 0.0, 0.0), id=0):
+        orientation = Quaternion()
+        orientation.x, orientation.y, orientation.z, orientation.w = quaternion_from_euler(0, 0, math.atan2(vel[1], vel[0]))
+        return Marker(
+            type=Marker.ARROW,
+            header=Header(frame_id=self.robot_frame_id),
+            pose=Pose(orientation=orientation),
+            scale=Vector3(x=scale*math.sqrt(vel[0]**2+vel[1]**2), y=0.15, z=0.15),
+            color=ColorRGBA(a=1.0, r=rgb[0], g=rgb[1], b=rgb[2]),
+            id=id,
+        )
 
     def _waypoint_sent_callback(self, future):
         self.wpt_goal_handle = future.result()
@@ -498,6 +555,23 @@ class Docking(ActionServerBase):
             # x_vel = forward_speed
             y_vel = y_output
 
+            marker_array = MarkerArray()
+            marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))
+
+            # obstacle avoidance
+            avoid_x_vel, avoid_y_vel = 0.0, 0.0
+            if self.avoid_obs and (self.lidar_point_cloud is not None) and (self.lidar_point_cloud.width > 0):
+                # TODO possibly add the setpoint as a goal in the avoiding velocity & weighted average w/ sum of weights 1, but that will mess w/ the PID more & needs more tuning
+                avoid_x_vel, avoid_y_vel = PotentialField(self.lidar_point_cloud, self.avoid_max_dist).sketchy_gradient_descent_step()
+                # self.get_logger().info(f'{self.lidar_point_cloud.width} points, unscaled avoiding vel: {avoid_x_vel, avoid_y_vel}')
+                avoid_x_vel *= self.avoid_vel_coeff
+                avoid_y_vel *= self.avoid_vel_coeff
+                x_vel += avoid_x_vel
+                y_vel += avoid_y_vel
+
+            marker_array.markers.append(self.vel_to_marker((avoid_x_vel, avoid_y_vel), scale=self.vel_marker_scale, rgb=(1.0, 0.0, 0.0), id=1))
+            marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 0.0, 1.0), id=2))
+
             x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
             control_msg = ControlOption()
             control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
@@ -505,6 +579,7 @@ class Docking(ActionServerBase):
             control_msg.twist.linear.y = y_vel
             control_msg.twist.angular.z = theta_output
             self.control_pub.publish(control_msg)
+            self.controller_marker_pub.publish(marker_array)
         else:
             waypoint = self.sum(slot_back_mid, self.scalar_prod(slot_dir, self.wpt_banner_dist))
             if self.state == DockingState.NEW_NAVIGATION or ((self.sent_waypoint is not None) and (self.norm(waypoint, self.sent_waypoint) > self.adapt_dist)):

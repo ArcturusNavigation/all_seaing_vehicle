@@ -200,6 +200,26 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    point_cloud_filter_obstacle_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/wamv/sensors/lidars/lidar_wamv_sensor/points"),
+            ("point_cloud/filtered", "point_cloud/filtered_obs")
+        ],
+        parameters=[
+            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"global_frame_id": "map"},
+            {"range_radius": [1.0, 15.0]},
+            {"range_intensity": [0.0, 50.0]},
+            {"local_range_z": [-100000.0, 0.0]},
+            {"leaf_size_xy": 3.0},
+            {"leaf_size_z": 3.0},
+            {"min_pts_per_voxel": 10},
+            {"convert_to_robot": True},
+        ],
+    )
+
     obstacle_detector_raw_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="obstacle_detector",
@@ -314,6 +334,8 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_y": [1.0, 0.0, 0.0]},
             {"Kpid_theta": [1.0, 0.0, 0.0]},
             {"max_vel": [5.0, 3.0, 1.5]},
+            {"avoid_max_dist": 10.0},
+            {"avoid_vel_coeff": 5.0},
         ],
         output="screen",
     )
@@ -324,6 +346,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"avoid_obs": True},
         ],
         output="screen",
     )
@@ -410,6 +433,12 @@ def launch_setup(context, *args, **kwargs):
             {"dock_length": 11.0},
             {"wpt_banner_dist": 12.0},
             {"navigation_dist_thres": 15.0},
+            {"Kpid_x": [0.75, 0.0, 0.0]},
+            {"Kpid_y": [0.75, 0.0, 0.0]},
+            {"Kpid_theta": [0.75, 0.0, 0.0]},
+            {"max_vel": [2.0, 1.0, 0.4]},
+            {"avoid_max_dist": 5.0},
+            {"avoid_vel_coeff": 3.0},
         ],
         remappings=[
             
@@ -529,6 +558,7 @@ def launch_setup(context, *args, **kwargs):
         # ycrcb_color_segmentation_node,
         # buoy_yolo_node,
         point_cloud_filter_node,
+        point_cloud_filter_obstacle_node,
         bbox_project_pcloud_node,
         ransac_node,
         object_tracking_map_node,
