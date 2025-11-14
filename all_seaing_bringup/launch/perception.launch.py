@@ -49,7 +49,6 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
 
-    # TODO add voxel num pts filtering to remove noise that might affect obstacle avoidance
     point_cloud_filter_obstacle_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",

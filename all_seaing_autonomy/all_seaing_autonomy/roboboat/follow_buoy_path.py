@@ -103,7 +103,7 @@ class FollowBuoyPath(ActionServerBase):
         self.declare_parameter("circle_adapt_dist", 0.3)
         self.circle_adapt_dist = self.get_parameter("circle_adapt_dist").get_parameter_value().double_value
 
-        self.declare_parameter("thresh_dist", 0.5)
+        self.declare_parameter("thresh_dist", 1.5)
         self.thresh_dist = self.get_parameter("thresh_dist").get_parameter_value().double_value
 
         self.declare_parameter("forward_dist", 5.0)
@@ -744,13 +744,13 @@ class FollowBuoyPath(ActionServerBase):
         self.last_pair = self.pair_to
         left_coords = self.ob_coords(self.pair_to.left)
         right_coords = self.ob_coords(self.pair_to.right)
-        x, y = self.midpoint(left_coords, right_coords)
+        x, y = self.midpoint_pair(self.pair_to)
         rx, ry = self.robot_pos
         if self.ccw(
             left_coords,
             right_coords, 
             self.robot_pos,
-        ) or (x - rx) ** 2 + (y - ry) ** 2 <= self.thresh_dist:
+        ) or (x - rx) ** 2 + (y - ry) ** 2 <= self.thresh_dist ** 2:
             passed_previous = True
 
         if self.first_buoy_pair:
@@ -927,7 +927,7 @@ class FollowBuoyPath(ActionServerBase):
                         max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
 
-        success = self.move_to_point(guide_point, busy_wait=True, abort_func=self.green_beacon_detected)
+        success = self.move_to_point(guide_point, busy_wait=True, abort_func=partial(self.green_beacon_detected, True))
 
         return Task.Result(success=success)
     
@@ -936,13 +936,10 @@ class FollowBuoyPath(ActionServerBase):
         Updates the position of the green beacon if too far away based on its global map position (and stored previous position) and the offset
         Returns a tuple (update_bool, new_pos) with whether we want to update the goal point and the new point respectively
         '''
-        for obstacle in self.obstacles:
-            if obstacle.label in self.green_beacon_labels:
-                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy (e.g. make it pick closest one or smth)
-                self.green_beacon_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                if self.norm(self.green_beacon_pos, self.prev_sent_beacon_pos) > self.circle_adapt_dist:
-                    self.prev_sent_beacon_pos = self.green_beacon_pos
-                    return (True, (self.green_beacon_pos[0]+offset_pos[0], self.green_beacon_pos[1]+offset_pos[1]))
+        self.green_beacon_detected()
+        if self.norm(self.green_beacon_pos, self.prev_sent_beacon_pos) > self.circle_adapt_dist:
+            self.prev_sent_beacon_pos = self.green_beacon_pos
+            return (True, (self.green_beacon_pos[0]+offset_pos[0], self.green_beacon_pos[1]+offset_pos[1]))
         return (False, None)
 
     def move_to_point(self, point, is_stationary=False, busy_wait=False, abort_func=None, goal_update_func=None):
@@ -1069,22 +1066,33 @@ class FollowBuoyPath(ActionServerBase):
         if result.is_finished:
             self.moved_to_point = True
 
-    def green_beacon_detected(self):
+    def green_beacon_detected(self, buoy_front=False):
         '''
         Check if the green beacon for turning is detected (returns boolean).
         Also sets the position of the green beacon if it is found.
-        '''
+        '''    
+        backup_buoy = None
+        updated_pos = False
         for obstacle in self.obstacles:
             if obstacle.label in self.green_beacon_labels:
-                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy (e.g. make it pick closest one or smth)
-                self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
-                self.green_beacon_found = True
-                self.green_beacon_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                robot_x, robot_y = self.robot_pos
-                robot_buoy_vector = (self.green_beacon_pos[0]-robot_x, self.green_beacon_pos[1]-robot_y)
-                robot_buoy_dist = self.norm(robot_buoy_vector)
-                self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
-                break
+                buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
+                            obstacle.global_point.point.y-self.robot_pos[1])
+                dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
+                buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                if (backup_buoy is None) or (self.green_beacon_found and (self.norm(self.green_beacon_pos, buoy_pos) < self.norm(self.green_beacon_pos, backup_buoy))):
+                    backup_buoy = buoy_pos
+                if ((not buoy_front) or (dot_prod > 0)) and ((not self.green_beacon_found) or (self.norm(self.green_beacon_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
+                    if not self.green_beacon_found:
+                        self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
+                    self.green_beacon_found = True
+                    updated_pos = True
+                    self.green_beacon_pos = buoy_pos
+                    robot_buoy_dist = self.norm(buoy_dir)
+                    self.buoy_direction = (buoy_dir[0]/robot_buoy_dist, buoy_dir[1]/robot_buoy_dist)
+                    break
+        if (not updated_pos) and (backup_buoy is not None):
+            self.get_logger().info('SWITCHING TO BACKUP GREEN BEACON BUOY')
+            self.green_beacon_pos = backup_buoy
         return self.green_beacon_found
 
     def circle_green_beacon(self):
@@ -1168,13 +1176,13 @@ class FollowBuoyPath(ActionServerBase):
 
         # # LOOK LEFT 30 DEG
 
-        # self.get_logger().info(f"Turning left")
+        self.get_logger().info(f"Turning left")
 
-        # self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, abort_func=self.green_beacon_detected)
 
         # LOOK RIGHT 30 DEG
 
-        # self.get_logger().info(f"Turning right")
+        self.get_logger().info(f"Turning right")
 
         self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, abort_func=self.green_beacon_detected)
 
