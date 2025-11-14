@@ -131,7 +131,7 @@ class NavigationServer(ActionServerBase):
     def follow_path_callback(self, goal_handle):
         self.get_logger().info("Path following started!")
 
-         # Immediately start and end process if no map is found
+        # Immediately start and end process if no map is found
         if self.map is None:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()

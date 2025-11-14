@@ -334,8 +334,8 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_y": [1.0, 0.0, 0.0]},
             {"Kpid_theta": [1.0, 0.0, 0.0]},
             {"max_vel": [5.0, 3.0, 1.5]},
-            {"avoid_max_dist": 10.0},
-            {"avoid_vel_coeff": 5.0},
+            {"avoid_max_dist": 5.0},
+            {"avoid_vel_coeff": 3.0},
         ],
         output="screen",
     )

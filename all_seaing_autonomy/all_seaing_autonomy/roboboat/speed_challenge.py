@@ -253,10 +253,16 @@ class SpeedChallenge(ActionServerBase):
 
         self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.init_gate_dist)
 
-        self.get_logger().info('going to the gate')
+        self.get_logger().info('going behind the gate')
         while rclpy.ok():
             self.move_to_point(self.gate_wpt, busy_wait=True,
                 goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
+            break
+
+        self.get_logger().info('going in front of the gate')
+        while rclpy.ok():
+            self.move_to_point(self.gate_wpt, busy_wait=True,
+                goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, self.init_gate_dist)))
             break
 
         self.runnerActivated = True
@@ -515,7 +521,7 @@ class SpeedChallenge(ActionServerBase):
                             obstacle.global_point.point.y-self.robot_pos[1])
                 dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
                 buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                if (backup_buoy is None) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy)):
+                if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
                     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
                     self.buoy_found = True

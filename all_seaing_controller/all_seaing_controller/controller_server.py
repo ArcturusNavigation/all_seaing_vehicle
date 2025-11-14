@@ -155,6 +155,14 @@ class ControllerServer(ActionServerBase):
             color=ColorRGBA(a=1.0, r=rgb[0], g=rgb[1], b=rgb[2]),
             id=id,
         )
+    
+    def send_stop_cmd(self):
+        control_msg = ControlOption()
+        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+        control_msg.twist.linear.x = 0.0
+        control_msg.twist.linear.y = 0.0
+        control_msg.twist.angular.z = 0.0
+        self.control_pub.publish(control_msg)
 
     def control_loop(self, nav_x, nav_y, heading):
         self.update_pid(nav_x, nav_y, heading)
@@ -218,12 +226,15 @@ class ControllerServer(ActionServerBase):
         ):
 
             if self.should_abort():
+                self.send_stop_cmd()
                 self.end_process("Waypoint following aborted!")
                 goal_handle.abort()
                 return Waypoint.Result()
 
             if goal_handle.is_cancel_requested:
+                self.send_stop_cmd()
                 self.end_process("Waypoint following canceled!")
+                self.send_stop_cmd()
                 goal_handle.canceled()
                 return Waypoint.Result()
 
@@ -231,6 +242,7 @@ class ControllerServer(ActionServerBase):
             self.control_loop(nav_x, nav_y, heading)
             time.sleep(TIMER_PERIOD)
 
+        self.send_stop_cmd()
         self.end_process("Waypoint following completed!")
         goal_handle.succeed()
         return Waypoint.Result(is_finished=True)
