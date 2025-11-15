@@ -16,6 +16,7 @@ from all_seaing_interfaces.msg import LabeledObjectPlaneArray, LabeledObjectPlan
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
+from all_seaing_common.task_server_base import TaskServerBase
 
 import time
 import math
@@ -24,17 +25,9 @@ import os
 import numpy as np
 import random
 
-class DockingFallback(ActionServerBase):
+class DockingFallback(TaskServerBase):
     def __init__(self):
-        super().__init__("docking_server_fallback")
-
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "docking_fallback",
-            execute_callback=self.execute_callback,
-            cancel_callback=self.default_cancel_callback,
-        )
+        super().__init__(server_name = "docking_server_fallback", action_name = "docking_fallback")
 
         self.control_pub = self.create_publisher(
             ControlOption, 
@@ -63,9 +56,6 @@ class DockingFallback(ActionServerBase):
 
         self.declare_parameter("boat_angle_coeff", 0.8)
         self.boat_angle_coeff = self.get_parameter("boat_angle_coeff").get_parameter_value().double_value
-
-        self.declare_parameter("timer_period", 1/30.0)
-        self.timer_period = self.get_parameter("timer_period").get_parameter_value().double_value
 
         self.declare_parameter("dock_merged_id", 100)
         self.dock_merged_id = self.get_parameter("dock_merged_id").get_parameter_value().integer_value
@@ -282,7 +272,7 @@ class DockingFallback(ActionServerBase):
         perp_dock_line_params = (-b, a, 
                                  b*slot_back_mid[0] - a*slot_back_mid[1])
         
-        marker_arr.markers.append(VisualizationTools.visualize_line((perp_dock_line_params,0), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
+        marker_arr.markers.append(VisualizationTools.visualize_line_params((perp_dock_line_params,0), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
         
         # if perp_dock_line_params[0] < 0:
@@ -340,29 +330,10 @@ class DockingFallback(ActionServerBase):
 
         self.marker_pub.publish(marker_arr)
 
-    def execute_callback(self, goal_handle):
-        self.start_process("docking starting")
+    def init_setup(self):
         self.started_task = True
         self.set_pid_setpoints(0, 0, 0)
-
-        while not self.result:
-
-            if self.should_abort():
-                self.end_process("aborting docking")
-                goal_handle.abort()
-                return Task.Result()
-
-            if goal_handle.is_cancel_requested:
-                self.end_process("cancelling docking")
-                goal_handle.canceled()
-                return Task.Result()
-
-            self.control_loop()
-            time.sleep(self.timer_period)
-        
-        self.end_process("docking completed!")
-        goal_handle.succeed()
-        return Task.Result(success=True)
+        self.mark_successful()
 
 
 def main(args=None):

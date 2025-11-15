@@ -49,7 +49,7 @@ class VisualizationTools:
         return VisualizationTools.plot_line([x_left,x_right],[y_left, y_right], id, color, frame)
     
     @staticmethod
-    def visualize_line(line_params, id = 0, color = (0.0, 0.0, 1.0), frame = '/base_link'):
+    def visualize_line_params(line_params, id = 0, color = (0.0, 0.0, 1.0), frame = '/base_link'):
         (a, b, c), _ = line_params
         if(abs(b) > 0.001):
             return VisualizationTools.plot_line([-5.0,5.0],[(-a*(-5.0)-c)/b, (-a*(5.0)-c)/b], id, color, frame)

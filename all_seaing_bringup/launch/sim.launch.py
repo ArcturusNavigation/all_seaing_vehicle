@@ -486,8 +486,8 @@ def launch_setup(context, *args, **kwargs):
         executable="docking_fallback.py",
         parameters=[
             {"is_sim": True},
-            {"shape_label_mappings_file": buoy_label_mappings},
-            # {"shape_label_mappings_file": shape_label_mappings},
+            # {"shape_label_mappings_file": buoy_label_mappings},
+            {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
             {"dock_width": 2.0},
             {"dock_length": 11.0},
@@ -505,7 +505,10 @@ def launch_setup(context, *args, **kwargs):
     task_init_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="task_init.py",
-        parameters=[{"is_sim": True}],
+        parameters=[
+            {"is_sim": True},
+            {"timer_period": 1.0},
+        ],
     )
 
     rviz_waypoint_sender = launch_ros.actions.Node(
