@@ -57,21 +57,6 @@ class Docking(TaskServerBase):
 
         self.docking_marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
 
-        self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
-        self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
-        
-        self.declare_parameter("xy_threshold", 1.0)
-        self.declare_parameter("theta_threshold", 180.0)
-        self.declare_parameter("wpt_theta_threshold", 10.0)
-        self.declare_parameter("goal_tol", 1.0)
-        self.declare_parameter("obstacle_tol", 50)
-        self.declare_parameter("choose_every", 10)
-        self.declare_parameter("use_waypoint_client", False)
-        self.declare_parameter("planner", "astar")
-        self.declare_parameter("bypass_planner", False)
-
-        self.bypass_planner = self.get_parameter("bypass_planner").get_parameter_value().bool_value
-
         self.declare_parameter("forward_speed", 2.0)
         self.declare_parameter("max_yaw", 0.7)
         self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
@@ -223,17 +208,7 @@ class Docking(TaskServerBase):
         for key, value in self.label_mappings.items():
             self.inv_label_mappings[value] = key
 
-        self.waypoint_sent_future = None
-        self.send_goal_future = None
-        self.wpt_goal_handle = None
-
         self.state = DockingState.WAITING_DOCK
-
-        self.lastSelectedGoal = None
-
-        self.waypoint_reject = False
-
-        self.sent_waypoint = None
 
     def point_cloud_cb(self, msg):
         self.lidar_point_cloud = msg
@@ -249,61 +224,6 @@ class Docking(TaskServerBase):
             color=ColorRGBA(a=1.0, r=rgb[0], g=rgb[1], b=rgb[2]),
             id=id,
         )
-
-    def _waypoint_sent_callback(self, future):
-        self.wpt_goal_handle = future.result()
-        if not self.wpt_goal_handle.accepted:
-            self.get_logger().info("Strange - sent waypoint rejected immediately.")
-            self.waypoint_reject = True
-            return
-        self.waypoint_sent_future = self.wpt_goal_handle.get_result_async()
-
-    def send_waypoint_to_server(self, waypoint, is_stationary=False):
-        # self.get_logger().info('SENDING WAYPOINT TO SERVER')
-        # sending waypoints to navigation server
-        self.waypoint_sent_future = None # Reset this... Make sure chance of going backwards is 0
-        self.waypoint_reject = False
-
-        self.sent_waypoint = waypoint
-        if not self.bypass_planner:
-            self.follow_path_client.wait_for_server()
-            goal_msg = FollowPath.Goal()
-            goal_msg.planner = self.get_parameter("planner").value
-            goal_msg.x = waypoint[0]
-            goal_msg.y = waypoint[1]
-            goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-            goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-            goal_msg.goal_tol = self.get_parameter("goal_tol").value
-            goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
-            goal_msg.choose_every = self.get_parameter("choose_every").value
-            goal_msg.is_stationary = is_stationary
-            self.follow_path_client.wait_for_server()
-            self.send_goal_future = self.follow_path_client.send_goal_async(
-                goal_msg
-            )
-        else:
-            goal_msg = Waypoint.Goal()
-            goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-            goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-            goal_msg.x = waypoint[0]
-            goal_msg.y = waypoint[1]
-            goal_msg.ignore_theta = True
-            goal_msg.is_stationary = is_stationary
-            self.result = False
-            self.waypoint_client.wait_for_server()
-            self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
-        self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
-        self.lastSelectedGoal = waypoint
-    
-    def cancel_navigation(self):
-        self.get_logger().info('TRYING TO CANCEL NAVIGATION')
-        if self.waypoint_sent_future is None or self.wpt_goal_handle is None: # TODO how to handle waypoint sent (& goal handle received) after us trying to cancel it? maybe ROS delay + retry for 3 times or smth
-            self.get_logger().info('FUTURE IS NONE')
-            return
-        if ((self.waypoint_sent_future.result() is None) or 
-            (self.waypoint_sent_future.result().status not in [GoalStatus.STATUS_ABORTED, GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED, GoalStatus.STATUS_CANCELING])):
-            self.wpt_goal_handle.cancel_goal_async()
-            self.get_logger().info('CANCELLED NAVIGATION')
 
     def ctr_normal(self, plane: LabeledObjectPlane):
         center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
@@ -582,14 +502,12 @@ class Docking(TaskServerBase):
                 # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
                 self.send_waypoint_to_server(waypoint)
                 self.state = DockingState.NAVIGATING_DOCK
-            elif self.send_goal_future != None and self.lastSelectedGoal != None:
+            elif self.send_goal_future != None and self.sent_waypoint != None:
                 goal_result = self.send_goal_future.result()
-                if self.waypoint_reject or (((goal_result is not None) and (not goal_result.accepted)) or (self.waypoint_sent_future != None and
-                    self.waypoint_sent_future.result() != None and 
-                    self.waypoint_sent_future.result().status == GoalStatus.STATUS_ABORTED)):
+                if self.waypoint_rejected or self.waypoint_aborted:
                     # follow path failed, retry sending
                     self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
-                    self.send_waypoint_to_server(self.lastSelectedGoal)
+                    self.send_waypoint_to_server(self.sent_waypoint)
             
         self.docking_marker_pub.publish(marker_arr)
 
