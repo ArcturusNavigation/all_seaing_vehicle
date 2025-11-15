@@ -15,6 +15,7 @@ from all_seaing_common.action_server_base import ActionServerBase
 from action_msgs.msg import GoalStatus
 from std_msgs.msg import Header, ColorRGBA
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
+from all_seaing_common.task_server_base import TaskServerBase
 
 import os
 import yaml
@@ -22,6 +23,12 @@ import math
 import time
 from collections import deque
 from functools import partial
+from enum import Enum
+
+class SpeedChallengeState(Enum):
+    SETTING_UP = 1
+    GATES = 2
+    CIRCLING_AND_BACK = 3
 
 class InternalBuoyPair:
     def __init__(self, left_buoy=None, right_buoy=None):
@@ -35,36 +42,19 @@ class InternalBuoyPair:
         else:
             self.right = right_buoy
 
-class SpeedChallenge(ActionServerBase):
+class SpeedChallenge(TaskServerBase):
     def __init__(self):
-        super().__init__("speed_challenge_server")
-
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "speed_challenge",
-            execute_callback=self.execute_callback,
-            callback_group=ReentrantCallbackGroup(),
-            cancel_callback=self.default_cancel_callback,
-        )
+        super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge")
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
         )
 
 
-        self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
         )
 
-        self.declare_parameter("xy_threshold", 1.0)
-        self.declare_parameter("theta_threshold", 180.0)
-        self.declare_parameter("goal_tol", 0.5)
-        self.declare_parameter("obstacle_tol", 50)
-        self.declare_parameter("choose_every", 10)
-        self.declare_parameter("use_waypoint_client", False)
-        self.declare_parameter("planner", "astar")
         self.declare_parameter("probe_distance", 10)
         self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
@@ -81,9 +71,6 @@ class SpeedChallenge(ActionServerBase):
         self.declare_parameter("gate_dist_back", 1.0)
         self.forward_dist_back = self.get_parameter("gate_dist_back").get_parameter_value().double_value
 
-        self.declare_parameter("timer_period", 1/60.0)
-        self.timer_period = self.get_parameter("timer_period").get_parameter_value().double_value
-
         self.declare_parameter("is_sim", False)
         self.declare_parameter("turn_offset", 5.0)
 
@@ -94,14 +81,11 @@ class SpeedChallenge(ActionServerBase):
         self.buoy_direction = (0,0)
         self.buoy_found = False
         self.following_guide = False
-        self.moved_to_point = False
-        self.waypoint_rejected = False
-        self.waypoint_aborted = False
-        self.active_future_request = 0 # active future requests
-        self.active_waypoint_request = 0 # keeps track of the number of active waypoint requests
         self.left_first = True # goes left of buoy first
 
         self.obstacles = None
+
+        self.state = SpeedChallengeState.SETTING_UP
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
@@ -231,60 +215,44 @@ class SpeedChallenge(ActionServerBase):
             angle=0,
         ), 0.0)]))
         return gate_wpt
-        
-    def execute_callback(self, goal_handle):
-        self.start_process("Speed challenge task started!")
+    
+    def init_setup(self):
+        # TODO Add this code to should_accept_task instead, to return False if we don't have the conditions to start the task
+        if self.obstacles is None:
+            return
+        success = self.setup_buoys()
+        if success:
+            self.get_logger().info("Setup buoys succeeded!")
+            self.state = SpeedChallengeState.GATES
+            self.mark_successful()
 
-        self.reset_challenge()
-        self.get_logger().info("Speed challenge setup completed.")
+    def control_loop(self):
+        if self.state == SpeedChallengeState.GATES:
+            self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.init_gate_dist)
 
-        # station keep logic
-        # doesn't work?
-        # self.get_logger().info(f"robot pose {self.robot_pos}")
-        # self.move_to_point(self.robot_pos, is_stationary=True)
+            self.get_logger().info('going behind the gate')
 
-        success = False
-        while not success:
-            success = self.setup_buoys()
-            time.sleep(self.timer_period)
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                return Task.Result()
-
-        self.get_logger().info("Setup buoys succeeded!")
-
-        self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.init_gate_dist)
-
-        self.get_logger().info('going to the gate')
-        while rclpy.ok():
             self.move_to_point(self.gate_wpt, busy_wait=True,
                 goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
-            break
+            
+            self.get_logger().info('going in front of the gate')
+            
+            self.move_to_point(self.gate_wpt, busy_wait=True,
+                goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, self.init_gate_dist)))
+            
+            self.state = SpeedChallengeState.CIRCLING_AND_BACK
+        elif self.state == SpeedChallengeState.CIRCLING_AND_BACK:
+            self.runnerActivated = True
 
-        self.runnerActivated = True
+            self.home_pos = self.robot_pos # keep track of home position
+            # self.buoy_direction = self.robot_dir
 
-        while rclpy.ok():
-            # Check if the action client requested cancel
-            if goal_handle.is_cancel_requested:
-                self.get_logger().info("Cancel requested. Aborting task initialization.")
-                goal_handle.canceled()
-                return Task.Result(success=False)
-
-            if self.runnerActivated:
-                self.home_pos = self.robot_pos # keep track of home position
-                # self.buoy_direction = self.robot_dir
-
-                self.get_logger().info(f"Facing direction: {self.buoy_direction}")
-                task_result = self.run_actions()
-                self.end_process("Speed challenge task ended.")
-                return task_result
-                
-            time.sleep(self.timer_period)
-
-        # If we exit the `while rclpy.ok()` loop somehow
-        self.get_logger().info("ROS shutdown detected or loop ended unexpectedly.")
-        goal_handle.abort()
-        return Task.Result(success=False)
+            self.get_logger().info(f"Facing direction: {self.buoy_direction}")
+            task_result = self.run_actions()
+            if task_result:
+                self.mark_successful()
+            else:
+                self.mark_unsuccessful()
 
     def map_cb(self, msg):
         '''
@@ -403,101 +371,6 @@ class SpeedChallenge(ActionServerBase):
         # self.move_to_point(self.home_pos, busy_wait=True)
         return Task.Result(success=True)
 
-    def _send_goal(self, goal_msg):
-        self.follow_path_client.wait_for_server()
-        self.active_future_request += 1
-        self.send_goal_future = self.follow_path_client.send_goal_async(
-            goal_msg
-        )
-        self.send_goal_future.add_done_callback(self.follow_path_response_cb)
-
-    def move_to_point(self, point, is_stationary=False, busy_wait=False, exit_func=None, goal_update_func=None):
-        '''
-        Moves the boat to the specified position using the follow path action server.
-        If busy_wait=true, then the returned truth value indicates success of point following
-
-        Busy waits until the boat moved to the point (bad, should be fixed with asyncio patterns)
-
-        Returns true if exit condition is met (exit_func)
-        Sends new waypoint if desired by the goal_update_func
-        - goal_update_func() -> should_update, (new_goal.x, new_goal.y)
-        '''
-        self.get_logger().info(f"Moving to point {point}")
-        self.moved_to_point = False
-        self.waypoint_rejected = False
-        self.waypoint_aborted = False
-        self.follow_path_client.wait_for_server()
-        goal_msg = FollowPath.Goal()
-        goal_msg.planner = self.get_parameter("planner").value
-        goal_msg.x = point[0]
-        goal_msg.y = point[1]
-        goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
-        goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
-        goal_msg.goal_tol = self.get_parameter("goal_tol").value
-        goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
-        goal_msg.choose_every = self.get_parameter("choose_every").value
-        goal_msg.is_stationary = is_stationary
-
-        self._send_goal(goal_msg)
-        if busy_wait:
-            while not self.moved_to_point:
-                if (exit_func is not None) and exit_func():
-                    return True
-                if (goal_update_func is not None):
-                    update_goal, new_goal = goal_update_func()
-                    if update_goal:
-                        goal_msg.x = new_goal[0]
-                        goal_msg.y = new_goal[1]
-                        self.get_logger().info('ADAPTING GOAL POINT')
-                        self._send_goal(goal_msg)
-                if self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality
-                    self.get_logger().info('RESENDING GOAL')
-                    self._send_goal(goal_msg)
-                    self.waypoint_rejected = False
-                    self.waypoint_aborted = False
-                time.sleep(self.timer_period)
-        return False
-
-    def follow_path_response_cb(self, future):
-        '''
-        Responds to follow path action server goal response.
-        '''
-        goal_handle = future.result()
-        self.active_future_request -= 1
-        if self.active_future_request > 0:
-            self.get_logger().info('PREVIOUS FUTURE, IGNORING')
-            return
-        
-        if not goal_handle.accepted:
-            self.get_logger().info('Waypoint rejected')
-            self.waypoint_rejected = True
-            return
-
-        self.get_logger().info("Waypoint accepted")
-        self._get_result_future = goal_handle.get_result_async()
-        self.active_waypoint_request += 1
-        self._get_result_future.add_done_callback(self.get_point_result_cb)
-
-    def get_point_result_cb(self, future):
-        '''
-        Flags the path following as complete for move_to_point
-        '''
-        self.active_waypoint_request -= 1
-        if self.active_waypoint_request > 0:
-            self.get_logger().info('PREVIOUS WAYPOINT, IGNORING')
-            return
-        
-        # Marks path following as finished/ moved to path following point
-        # if path following is interrupted, does not affect moved to point
-        result = future.result().result
-        status = future.result().status
-        if status == GoalStatus.STATUS_ABORTED:
-            self.get_logger().info(f'WAYPOINT ABORTED')
-            self.waypoint_aborted = True
-        elif result.is_finished:
-            self.get_logger().info(f'MOVED TO WAYPOINT')
-            self.moved_to_point = True
-
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
 
@@ -517,7 +390,7 @@ class SpeedChallenge(ActionServerBase):
                             obstacle.global_point.point.y-self.robot_pos[1])
                 dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
                 buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                if (backup_buoy is None) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy)):
+                if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
                     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
                     self.buoy_found = True

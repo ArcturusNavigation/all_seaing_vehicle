@@ -49,7 +49,6 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
 
-    # TODO add voxel num pts filtering to remove noise that might affect obstacle avoidance
     point_cloud_filter_obstacle_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="point_cloud_filter",
@@ -274,10 +273,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [1.0, 60.0]},
-            {"leaf_size_xy": 0.2},
-            {"leaf_size_z": 0.2},
+            {"leaf_size_xy": 0.3},
+            {"leaf_size_z": 0.3},
             {"local_range_z": [-100000.0, 0.0]},
-            {"min_pts_per_voxel": 2},
+            {"min_pts_per_voxel": 10},
         ],
     )
 
@@ -306,12 +305,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 0.4},
-            {"obstacle_size_min": 3},
+            {"clustering_distance": 1.0},
+            {"obstacle_size_min": 2},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},
-            {"obstacle_filter_length_max": 0.5},
+            {"obstacle_filter_length_max": 0.3},
             # {"range_max": 50.0},
         ],
     )
