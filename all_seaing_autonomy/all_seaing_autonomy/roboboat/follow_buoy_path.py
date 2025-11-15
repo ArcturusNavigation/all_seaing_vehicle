@@ -12,7 +12,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
-from task_server_base import TaskServerBase
+from all_seaing_common.task_server_base import TaskServerBase
 from action_msgs.msg import GoalStatus
 
 import math
@@ -96,7 +96,7 @@ class FollowBuoyPath(TaskServerBase):
         self.declare_parameter("circle_adapt_dist", 0.3)
         self.circle_adapt_dist = self.get_parameter("circle_adapt_dist").get_parameter_value().double_value
 
-        self.declare_parameter("thresh_dist", 0.5)
+        self.declare_parameter("thresh_dist", 1.5)
         self.thresh_dist = self.get_parameter("thresh_dist").get_parameter_value().double_value
 
         self.declare_parameter("forward_dist", 5.0)
@@ -116,6 +116,9 @@ class FollowBuoyPath(TaskServerBase):
 
         self.declare_parameter("turn_offset", 5.0)
         self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
+
+        self.declare_parameter("midpoint_pair_forward_dist", 1.0)
+        self.midpoint_pair_forward_dist = self.get_parameter("midpoint_pair_forward_dist").get_parameter_value().double_value
         
         self.green_labels = set()
         self.red_labels = set()
@@ -149,9 +152,10 @@ class FollowBuoyPath(TaskServerBase):
             self.red_labels.add(label_mappings["red_buoy"])
             self.red_labels.add(label_mappings["red_circle"])
             self.red_labels.add(label_mappings["red_pole_buoy"])
-            self.red_labels.add(label_mappings["red_racquet_ball"])
-            self.green_beacon_labels.add(label_mappings["yellow_buoy"])
-            self.green_beacon_labels.add(label_mappings["yellow_racquet_ball"])
+            self.red_labels.add(label_mappings["yellow_buoy"])
+            self.red_labels.add(label_mappings["yellow_racquet_ball"])
+            # self.green_beacon_labels.add(label_mappings["yellow_buoy"])
+            # self.green_beacon_labels.add(label_mappings["yellow_racquet_ball"])
         
         self.sent_waypoints = set()
 
@@ -179,7 +183,7 @@ class FollowBuoyPath(TaskServerBase):
         self.last_pair = None
 
         self.green_beacon_found = False
-        self.waypoint_reject = True
+        self.waypoint_reject = False
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -207,7 +211,7 @@ class FollowBuoyPath(TaskServerBase):
         right_coords = self.ob_coords(pair.right)
         midpoint = self.midpoint(left_coords, right_coords)
         
-        scale = 1 # number of meters to translate forward. TODO: parametrize.
+        scale = self.midpoint_pair_forward_dist # number of meters to translate forward. TODO: parametrize.
         dy = right_coords[1] - left_coords[1]
         dx = right_coords[0] - left_coords[0]
         norm = math.sqrt(dx**2 + dy**2)
@@ -216,22 +220,6 @@ class FollowBuoyPath(TaskServerBase):
         midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
 
         return midpoint
-
-    @property
-    def robot_pos(self):
-        '''
-        Gets the robot position as a tuple (x,y)
-        '''
-        position = self.get_robot_pose()[0:2]
-        return (float(position[0]), float(position[1]))
-
-    @property
-    def robot_dir(self):
-        '''
-        Gets the robot direction as a tuple, containing the unit vector in the same direction as heading
-        '''
-        heading = self.get_robot_pose()[2]
-        return (math.cos(heading), math.sin(heading))
 
     def split_buoys(self, obstacles):
         """
@@ -360,7 +348,6 @@ class FollowBuoyPath(TaskServerBase):
         #     self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
         # self.backup_pair = None
         # want to pick the pair that's far apart but has the closest midpoint
-        # TODO: Add more conditions on judging what the best pair is, other than just distance (e.g. should not be really angled wrt the boat etc.)
         if self.first_setup:
             green_to = None
             red_to = None
@@ -451,7 +438,7 @@ class FollowBuoyPath(TaskServerBase):
             f"robot pos: {self.robot_pos}, front red buoys: {self.obs_to_pos(front_red)}, front green buoys: {self.obs_to_pos(front_green)}"
         )
 
-        if not front_red or not front_green:
+        if ((not front_red) and (not front_green)) or ((prev_pair is None) and ((not front_red) or (not front_green))):
             prev_coords = self.ob_coords(prev_pair.left), self.ob_coords(
                 prev_pair.right
             )
@@ -473,14 +460,27 @@ class FollowBuoyPath(TaskServerBase):
             # If duplicate distance for both reject, if one is duplicate distance check angles
             left_duplicate, left_next = self.pick_buoy(front_red if self.red_left else front_green, prev_pair_midpoint, prev_pair.left)
             right_duplicate, right_next = self.pick_buoy(front_green if self.red_left else front_red, prev_pair_midpoint, prev_pair.right)
-            if left_duplicate and right_duplicate:
-                return None
-            elif (left_duplicate and (not self.check_better_one_side(prev_pair.left, right_next, prev_pair.right))) or (right_duplicate and (not self.check_better_one_side(prev_pair.right, left_next, prev_pair.left))):
-                return None
-            elif self.norm(self.ob_coords(left_next), self.ob_coords(right_next)) < self.inter_buoy_pair_dist:
-                return None
-            else:
-                return InternalBuoyPair(left_next, right_next)
+
+            ret = None
+
+            for left_buoy in ((True, prev_pair.left), (left_duplicate, left_next)):
+                for right_buoy in ((True, prev_pair.right), (right_duplicate, right_next)):
+                    if left_buoy[0] and right_buoy[0]:
+                        continue
+                    
+                    if left_buoy[0] and (not self.check_better_one_side(prev_pair.left, prev_pair.right, right_buoy[1])):
+                        continue
+                    
+                    if right_buoy[0] and (not self.check_better_one_side(prev_pair.right, prev_pair.left, left_buoy[1])):
+                        continue
+
+                    if self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) < self.inter_buoy_pair_dist:
+                        continue
+                    
+                    cur = InternalBuoyPair(left_buoy[1], right_buoy[1]) 
+                    if (ret is None) or self.better_buoy_pair_transition(ret, cur, prev_pair):
+                        ret = cur
+            return ret
         else:
             self.get_logger().debug("No previous pair!")
             # TODO: change those to: self.get_closest_to((0,0), red/green, local=True) to not have to use odometry position but just local obstacle positions (wrt the robot)?
@@ -596,15 +596,15 @@ class FollowBuoyPath(TaskServerBase):
         E----F
         CD is better than AB wrt EF (closer to right angles wrt to E, F)
         """
-        old_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(old_pair.left)))
-        old_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(old_pair.right)))
-        new_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(new_pair.left)))
-        new_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(new_pair.right)))
+        old_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(old_pair.left)) < self.duplicate_dist)
+        old_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(old_pair.right)) < self.duplicate_dist)
+        new_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(new_pair.left)) < self.duplicate_dist)
+        new_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(new_pair.right)) < self.duplicate_dist)
 
-        old_left = self.get_triangle_angle(ref_pair.left, old_pair.left, old_pair.right)
-        old_right = self.get_triangle_angle(ref_pair.right, old_pair.right, old_pair.left)
-        new_left = self.get_triangle_angle(ref_pair.left, new_pair.left, new_pair.right)
-        new_right = self.get_triangle_angle(ref_pair.right, new_pair.right, new_pair.left)
+        old_left = 0 if old_left_duplicate else self.get_triangle_angle(ref_pair.left, old_pair.left, old_pair.right)
+        old_right = 0 if old_right_duplicate else self.get_triangle_angle(ref_pair.right, old_pair.right, old_pair.left)
+        new_left = 0 if new_left_duplicate else self.get_triangle_angle(ref_pair.left, new_pair.left, new_pair.right)
+        new_right = 0 if new_right_duplicate else self.get_triangle_angle(ref_pair.right, new_pair.right, new_pair.left)
 
         # old and new can't be duplicate in both, because they would not be considered as potential next pairs
         if ((old_left_duplicate or old_right_duplicate) and (new_left_duplicate or new_right_duplicate)):
@@ -727,7 +727,7 @@ class FollowBuoyPath(TaskServerBase):
                     break
             # Find potential better next pair
             next_pair = self.next_pair(self.buoy_pairs[ind], red_buoys, green_buoys)
-            if next_pair is not None and ((ind == (len(self.buoy_pairs)-1) and self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair) > self.buoy_pair_dist_thres) or (ind < (len(self.buoy_pairs)-1) and self.better_buoy_pair_transition(self.buoy_pairs[ind+1],next_pair,self.buoy_pairs[ind]))):
+            if next_pair is not None and ((ind == (len(self.buoy_pairs)-1) and self.buoy_pairs_distance(self.buoy_pairs[ind], next_pair, "mid") > self.buoy_pair_dist_thres) or (ind < (len(self.buoy_pairs)-1) and self.better_buoy_pair_transition(self.buoy_pairs[ind+1],next_pair,self.buoy_pairs[ind]))):
                 self.buoy_pairs = self.buoy_pairs[:ind+1]
                 self.buoy_pairs.append(next_pair)
             ind += 1
@@ -737,13 +737,13 @@ class FollowBuoyPath(TaskServerBase):
         self.last_pair = self.pair_to
         left_coords = self.ob_coords(self.pair_to.left)
         right_coords = self.ob_coords(self.pair_to.right)
-        x, y = self.midpoint(left_coords, right_coords)
+        x, y = self.midpoint_pair(self.pair_to)
         rx, ry = self.robot_pos
         if self.ccw(
             left_coords,
             right_coords, 
             self.robot_pos,
-        ) or (x - rx) ** 2 + (y - ry) ** 2 <= self.thresh_dist:
+        ) or (x - rx) ** 2 + (y - ry) ** 2 <= self.thresh_dist ** 2:
             passed_previous = True
 
         if self.first_buoy_pair:
@@ -856,7 +856,7 @@ class FollowBuoyPath(TaskServerBase):
             return
         self.waypoint_sent_future = goal_handle.get_result_async()
 
-    def send_waypoint_to_server(self, waypoint):
+    def send_waypoint_to_server(self, waypoint, is_stationary=False):
         # self.get_logger().info('SENDING WAYPOINT TO SERVER')
         # sending waypoints to navigation server
         self.waypoint_sent_future = None # Reset this... Make sure chance of going backwards is 0
@@ -874,12 +874,11 @@ class FollowBuoyPath(TaskServerBase):
             goal_msg.goal_tol = self.get_parameter("goal_tol").value
             goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
             goal_msg.choose_every = self.get_parameter("choose_every").value
-            goal_msg.is_stationary = True
+            goal_msg.is_stationary = is_stationary
             self.follow_path_client.wait_for_server()
             self.send_goal_future = self.follow_path_client.send_goal_async(
                 goal_msg
             )
-            self.send_goal_future.add_done_callback(self._waypoint_sent_callback)
         else:
             goal_msg = Waypoint.Goal()
             goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
@@ -887,7 +886,7 @@ class FollowBuoyPath(TaskServerBase):
             goal_msg.x = waypoint[0]
             goal_msg.y = waypoint[1]
             goal_msg.ignore_theta = True
-            goal_msg.is_stationary = True
+            goal_msg.is_stationary = is_stationary
             self.result = False
             self.waypoint_client.wait_for_server()
             self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
@@ -921,7 +920,7 @@ class FollowBuoyPath(TaskServerBase):
                         max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {guide_point}.")
 
-        success = self.move_to_point(guide_point, busy_wait=True, abort_func=self.green_beacon_detected)
+        success = self.move_to_point(guide_point, busy_wait=True, abort_func=partial(self.green_beacon_detected, True))
 
         return Task.Result(success=success)
     
@@ -930,13 +929,10 @@ class FollowBuoyPath(TaskServerBase):
         Updates the position of the green beacon if too far away based on its global map position (and stored previous position) and the offset
         Returns a tuple (update_bool, new_pos) with whether we want to update the goal point and the new point respectively
         '''
-        for obstacle in self.obstacles:
-            if obstacle.label in self.green_beacon_labels:
-                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy (e.g. make it pick closest one or smth)
-                self.green_beacon_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                if self.norm(self.green_beacon_pos, self.prev_sent_beacon_pos) > self.circle_adapt_dist:
-                    self.prev_sent_beacon_pos = self.green_beacon_pos
-                    return (True, (self.green_beacon_pos[0]+offset_pos[0], self.green_beacon_pos[1]+offset_pos[1]))
+        self.green_beacon_detected()
+        if self.norm(self.green_beacon_pos, self.prev_sent_beacon_pos) > self.circle_adapt_dist:
+            self.prev_sent_beacon_pos = self.green_beacon_pos
+            return (True, (self.green_beacon_pos[0]+offset_pos[0], self.green_beacon_pos[1]+offset_pos[1]))
         return (False, None)
 
     def move_to_point(self, point, is_stationary=False, busy_wait=False, abort_func=None, goal_update_func=None):
@@ -998,6 +994,7 @@ class FollowBuoyPath(TaskServerBase):
                         goal_msg
                     )
                     self._get_result_future = None
+                    self.waypoint_reject = False
                     self.send_goal_future.add_done_callback(self.follow_path_response_cb)
                 time.sleep(self.timer_period)
         return False
@@ -1062,22 +1059,33 @@ class FollowBuoyPath(TaskServerBase):
         if result.is_finished:
             self.moved_to_point = True
 
-    def green_beacon_detected(self):
+    def green_beacon_detected(self, buoy_front=False):
         '''
         Check if the green beacon for turning is detected (returns boolean).
         Also sets the position of the green beacon if it is found.
-        '''
+        '''    
+        backup_buoy = None
+        updated_pos = False
         for obstacle in self.obstacles:
             if obstacle.label in self.green_beacon_labels:
-                # TODO: perhaps make this check better instead of just checking for a blue circle/buoy (e.g. make it pick closest one or smth)
-                self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
-                self.green_beacon_found = True
-                self.green_beacon_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                robot_x, robot_y = self.robot_pos
-                robot_buoy_vector = (self.green_beacon_pos[0]-robot_x, self.green_beacon_pos[1]-robot_y)
-                robot_buoy_dist = self.norm(robot_buoy_vector)
-                self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
-                break
+                buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
+                            obstacle.global_point.point.y-self.robot_pos[1])
+                dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
+                buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
+                if (backup_buoy is None) or (self.green_beacon_found and (self.norm(self.green_beacon_pos, buoy_pos) < self.norm(self.green_beacon_pos, backup_buoy))):
+                    backup_buoy = buoy_pos
+                if ((not buoy_front) or (dot_prod > 0)) and ((not self.green_beacon_found) or (self.norm(self.green_beacon_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
+                    if not self.green_beacon_found:
+                        self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
+                    self.green_beacon_found = True
+                    updated_pos = True
+                    self.green_beacon_pos = buoy_pos
+                    robot_buoy_dist = self.norm(buoy_dir)
+                    self.buoy_direction = (buoy_dir[0]/robot_buoy_dist, buoy_dir[1]/robot_buoy_dist)
+                    break
+        if (not updated_pos) and (backup_buoy is not None):
+            self.get_logger().info('SWITCHING TO BACKUP GREEN BEACON BUOY')
+            self.green_beacon_pos = backup_buoy
         return self.green_beacon_found
 
     def circle_green_beacon(self):
@@ -1161,21 +1169,23 @@ class FollowBuoyPath(TaskServerBase):
 
         # # LOOK LEFT 30 DEG
 
-        # self.get_logger().info(f"Turning left")
+        self.get_logger().info(f"Turning left")
 
-        # self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, abort_func=self.green_beacon_detected)
 
         # LOOK RIGHT 30 DEG
 
-        # self.get_logger().info(f"Turning right")
+        self.get_logger().info(f"Turning right")
 
         self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, abort_func=self.green_beacon_detected)
 
     def init_setup(self):
+        # TODO Add this code to should_accept_task instead, to return False if we don't have the conditions to start the task
         if self.obstacles is None:
             return
         success = self.setup_buoys()
         if success:
+            self.get_logger().info("Setup buoys succeeded!")
             self.state = FollowPathState.FOLLOWING_FIRST_PASS
             self.mark_successful()
         

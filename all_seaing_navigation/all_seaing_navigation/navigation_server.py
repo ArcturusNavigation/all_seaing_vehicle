@@ -36,6 +36,12 @@ class NavigationServer(ActionServerBase):
             OccupancyGrid, "/dynamic_map", self.map_callback, 10
         )
 
+        self.avoid_obs = (
+            self.declare_parameter("avoid_obs", True)
+            .get_parameter_value()
+            .bool_value
+        )
+
         self.map = None
 
         self.stop_plan_semaphore = Semaphore(1)
@@ -85,7 +91,7 @@ class NavigationServer(ActionServerBase):
         self.stopped_plan()  # Release the semaphore
         return path
 
-    def send_waypoint(self, goal_handle, pose, is_stationary):
+    def send_waypoint(self, goal_handle, pose, is_stationary, avoid_obs=False):
         goal_msg = Waypoint.Goal()
         goal_msg.xy_threshold = goal_handle.request.xy_threshold
         goal_msg.theta_threshold = goal_handle.request.theta_threshold
@@ -93,6 +99,7 @@ class NavigationServer(ActionServerBase):
         goal_msg.y = pose.position.y
         goal_msg.ignore_theta = True
         goal_msg.is_stationary = is_stationary
+        goal_msg.avoid_obs = avoid_obs
         self.result = False
         self.waypoint_client.wait_for_server()
         self.send_goal_future = self.waypoint_client.send_goal_async(goal_msg)
@@ -124,7 +131,7 @@ class NavigationServer(ActionServerBase):
     def follow_path_callback(self, goal_handle):
         self.get_logger().info("Path following started!")
 
-         # Immediately start and end process if no map is found
+        # Immediately start and end process if no map is found
         if self.map is None:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
@@ -153,7 +160,7 @@ class NavigationServer(ActionServerBase):
             # Last request should be "station keeping" if is_stationary is True
             is_stationary = (i == len(path.poses)-1 and goal_handle.request.is_stationary)
 
-            self.send_waypoint(goal_handle, pose, is_stationary)
+            self.send_waypoint(goal_handle, pose, is_stationary, self.avoid_obs)
 
             # Wait until the boat finished reaching the waypoint
             while not self.result:

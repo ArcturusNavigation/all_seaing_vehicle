@@ -18,6 +18,7 @@ from geometry_msgs.msg import Quaternion, Vector3
 from sensor_msgs.msg import CameraInfo, Imu
 from all_seaing_common.action_server_base import ActionServerBase
 from tf_transformations import euler_from_quaternion
+from all_seaing_common.task_server_base import TaskServerBase
 
 import os
 import yaml
@@ -27,17 +28,9 @@ from collections import deque
 
 TIMER_PERIOD = 1 / 60
 
-class SpeedChange(ActionServerBase):
+class SpeedChange(TaskServerBase):
     def __init__(self):
-        super().__init__("speed_challenge_server")
-
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "speed_challenge_pid",
-            execute_callback=self.execute_callback,
-            cancel_callback=self.default_cancel_callback,
-        )
+        super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge_pid", timer_period = 1 / 30.0)
 
         self.camera_info_sub = self.create_subscription(
             CameraInfo, "camera_info", self.camera_info_cb, 10
@@ -183,39 +176,18 @@ class SpeedChange(ActionServerBase):
     def bbox_callback(self, msg):
         self.bboxes = msg.boxes
 
-    def execute_callback(self, goal_handle):
-        self.start_process("Speed challenge task started!")
-
-        self.reset_challenge()
+    def init_setup(self):
         self.get_logger().info("Speed challenge setup completed.")
         self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
-
-       # Trace a long path and turn when blue buoy detected
-        # trace a somewhat long path and run FTB when gates are detected
-
-        while rclpy.ok():
-            # Check if the action client requested cancel
-            if goal_handle.is_cancel_requested:
-                self.get_logger().info("Cancel requested. Aborting task initialization.")
-                goal_handle.canceled()
-                return Task.Result(success=False)
-
-            self.run_loop()
-            if (self.current_loop_index == 5):
-                self.get_logger().info("Speed challenge task successfully ended.")
-                return Task.Result(success=True)
-                
-            time.sleep(TIMER_PERIOD)
-
-        # If we exit the `while rclpy.ok()` loop somehow
-        self.get_logger().info("ROS shutdown detected or loop ended unexpectedly.")
-        goal_handle.abort()
-        return Task.Result(success=False)
+        self.mark_successful()
     
-    def run_loop(self):
+    def control_loop(self):
         '''
         Control which PID loop is being ran.
         '''
+        if (self.current_loop_index == 5):
+            self.get_logger().info("Speed challenge task successfully ended.")
+            self.mark_successful()
         self.prev_loop_index = self.current_loop_index
         self.start_blue_x = 0.28 * self.image_size[0]
         if self.current_loop_index == 0: #follow buoy

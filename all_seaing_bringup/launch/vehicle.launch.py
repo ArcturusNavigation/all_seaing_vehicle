@@ -110,8 +110,10 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"datum": [lat, lon, 0.0]},
-            {"yaw_offset": np.pi/2.0},
-            {"odom_yaw_offset": np.pi/2.0},
+            # {"yaw_offset": np.pi/2.0},
+            # {"odom_yaw_offset": np.pi/2.0},
+            {"yaw_offset": 0.0},
+            {"odom_yaw_offset": 0.0},
             {"utm_zone": utm}, # 19 for Boston, 17 for Florida
         ],condition=IfCondition(
             PythonExpression([

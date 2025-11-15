@@ -9,7 +9,7 @@ from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption, ObstacleMap
 from all_seaing_common.action_server_base import ActionServerBase
-from task_server_base import TaskServerBase
+from all_seaing_common.task_server_base import TaskServerBase
 
 from sensor_msgs.msg import CameraInfo
 
@@ -97,7 +97,6 @@ class FollowBuoyPID(TaskServerBase):
         # self.pid.set_effort_min(-self.max_yaw_rate)
         # self.pid.set_effort_max(self.max_yaw_rate)
         # self.prev_update_time = self.get_clock().now()
-        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
@@ -206,6 +205,11 @@ class FollowBuoyPID(TaskServerBase):
     # New version with obstacles
     def bbox_callback_new(self, msg):
         self.obstacleboxes = msg.obstacles
+
+    def init_setup(self):
+        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
+        self.set_pid_setpoints(0,0,0)
+        self.mark_successful()
 
     def control_loop(self):
         # if self.width is None or len(self.obstacleboxes) == 0:

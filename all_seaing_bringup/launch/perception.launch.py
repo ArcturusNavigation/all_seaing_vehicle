@@ -49,6 +49,25 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
 
+    point_cloud_filter_obstacle_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/velodyne_points"),
+            ("point_cloud/filtered", "point_cloud/filtered_obs")
+        ],
+        parameters=[
+            {"robot_frame_id": "base_link"},
+            {"global_frame_id": "map"},
+            {"range_radius": [1.0, 5.0]},
+            {"local_range_z": [-100000.0, 0.0]},
+            {"leaf_size_xy": 1.0},
+            {"leaf_size_z": 1.0},
+            {"min_pts_per_voxel": 10},
+            {"convert_to_robot": True},
+        ],
+    )
+
     buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
@@ -235,6 +254,7 @@ def launch_setup(context, *args, **kwargs):
         executable="ransac_detector",
         output="screen",
         remappings=[
+            ("labeled_object_point_clouds", "labeled_object_point_clouds/merged"),
         ],
         parameters=[
             {"ransac_params_file": ransac_params},
@@ -359,6 +379,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
+        point_cloud_filter_obstacle_node,
         buoy_yolo_node,
         buoy_yolo_node_back_left,
         buoy_yolo_node_back_right,

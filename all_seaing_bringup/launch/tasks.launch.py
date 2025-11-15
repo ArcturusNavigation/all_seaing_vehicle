@@ -75,13 +75,64 @@ def launch_setup(context, *args, **kwargs):
             {"forward_dist": 1.5},
             {"inter_buoy_pair_dist": 0.5},
             {"buoy_pair_dist_thres": 0.2},
-            {"xy_threshold": 2.0},
+            {"xy_threshold": 1.0},
+            {"thresh_dist": 1.5},
             {"choose_every": 10},
             {"turn_offset": 1.5},
+            {"beacon_probe_dist": 1.5},
+            {"midpoint_pair_forward_dist": 0.5},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
+        ],
+    )
+
+    speed_challenge = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="speed_challenge.py",
+        parameters=[
+            {"is_sim": False},
+            {"color_label_mappings_file": buoy_label_mappings},
+            {"robot_frame_id": "base_link"},
+            {"turn_offset": 2.0},
+            {"choose_every": 100},
+            {"probe_distance": 10},
+            {"xy_threshold": 1.0},
+            {"duplicate_dist": 0.3},
+            {"init_gate_dist": 0.5},
+            {"gate_dist_back": 0.5},
+        ],
+        remappings=[
+            ("obstacle_map/labeled", "obstacle_map/global"),
+            ("odometry/filtered", "odometry/tracked"),
+        ]
+    )
+
+    docking = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="docking.py",
+        parameters=[
+            {"is_sim": False},
+            {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": shape_label_mappings},
+            {"robot_frame_id": "base_link"},
+            # {"dock_width": 2.0},
+            # {"dock_length": 7.0},
+            # {"wpt_banner_dist": 10.0},
+            # {"navigation_dist_thres": 12.0},
+            {"duplicate_dist": 0.3},
+            {"xy_threshold": 2.0},
+            {"choose_every": 10},
+            {"Kpid_x": [0.75, 0.0, 0.0]},
+            {"Kpid_y": [0.75, 0.0, 0.0]},
+            {"Kpid_theta": [0.75, 0.0, 0.0]},
+            {"max_vel": [1.0, 1.0, 0.3]},
+            {"avoid_max_dist": 1.5},
+            {"avoid_vel_coeff": 2.0},
+        ],
+        remappings=[
+            
         ],
     )
 
@@ -102,22 +153,6 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
             ("obstacle_map/labeled", "obstacle_map/local"),
         ],
-    )
-
-    speed_challenge = launch_ros.actions.Node(
-        package="all_seaing_autonomy",
-        executable="speed_challenge.py",
-        parameters=[
-            {"is_sim": False},
-            {"color_label_mappings_file": buoy_label_mappings},
-            {"robot_frame_id": "base_link"},
-            {"turn_offset": 1.5},
-            {"choose_every": 100},
-        ],
-        remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
-            ("odometry/filtered", "odometry/tracked"),
-        ]
     )
 
     speed_challenge_pid = launch_ros.actions.Node(
@@ -167,10 +202,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
-            {"Kpid_x": [1.0, 0.0, 0.0]},
-            {"Kpid_y": [0.3, 0.0, 0.0]},
+            {"Kpid_x": [0.5, 0.0, 0.0]},
+            {"Kpid_y": [0.5, 0.0, 0.0]},
             {"Kpid_theta": [0.3, 0.0, 0.0]},
-            {"max_vel": [2.5, 0.6, 0.1]},
+            {"max_vel": [1.0, 1.0, 0.3]},
+            {"avoid_max_dist": 1.5},
+            {"avoid_vel_coeff": 2.0},
         ],
         output="screen",
     )
@@ -181,6 +218,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
+            {"avoid_obs": True},
         ],
         output="screen",
     )
@@ -224,11 +262,12 @@ def launch_setup(context, *args, **kwargs):
         run_tasks,
         task_init_server, 
         follow_buoy_path,
-        # follow_buoy_pid,
         speed_challenge,
+        docking,
+        # follow_buoy_pid,
         # speed_challenge_pid
-        # delivery_server
         # docking_fallback
+        # delivery_server
     ]
 
 

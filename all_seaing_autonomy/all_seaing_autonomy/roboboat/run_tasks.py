@@ -25,11 +25,12 @@ class RunTasks(Node):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
-            [ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)]
-            # ActionClient(self, Task, "follow_buoy_pid"),
-            # ActionClient(self, Task, "speed_challenge_pid"),
-            # ActionClient(self, Task, "speed_challenge")
-            # ActionClient(self, Task, "docking_fallback"),
+            [ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
         ]
         self.term_tasks = [
             
@@ -38,7 +39,8 @@ class RunTasks(Node):
         self.next_task_index = -1
         self.next_init_index = ReferenceInt(0)
         self.next_term_index = ReferenceInt(0)
-        self.max_attempt_count = 1000
+        self.declare_parameter("max_attempt_count", 1)
+        self.max_attempt_count = self.get_parameter("max_attempt_count").get_parameter_value().integer_value
 
         self.pause_publisher = self.create_publisher(Bool, "pause", 10)
         self.find_task() # um idk if this is right
@@ -90,6 +92,8 @@ class RunTasks(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().info("Goal rejected, looking for new task")
+            if not (self.incr_on_fail is None): # consider failure to start task (goal rejected when setup conditions not met) as failure to do the task?
+                self.incr_on_fail.val += 1
             self.find_task()
             return
         self.get_logger().info("Goal accepted")

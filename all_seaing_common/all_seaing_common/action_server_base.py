@@ -7,6 +7,7 @@ from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
+from math import cos, sin
 from tf_transformations import euler_from_quaternion
 from threading import Semaphore, Event
 from visualization_msgs.msg import Marker
@@ -92,6 +93,23 @@ class ActionServerBase(ABC, Node):
         marker_msg.ns = self.marker_ns
         marker_msg.action = Marker.DELETEALL
         self.marker_pub.publish(marker_msg)
+
+        
+    @property
+    def robot_pos(self):
+        '''
+        Gets the robot position as a tuple (x,y)
+        '''
+        position = self.get_robot_pose()[0:2]
+        return (float(position[0]), float(position[1]))
+
+    @property
+    def robot_dir(self):
+        '''
+        Gets the robot direction as a tuple, containing the unit vector in the same direction as heading
+        '''
+        heading = self.get_robot_pose()[2]
+        return (cos(heading), sin(heading))
 
     def get_robot_pose(self):
         """

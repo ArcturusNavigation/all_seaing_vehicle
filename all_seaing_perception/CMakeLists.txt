@@ -24,6 +24,7 @@ ament_auto_add_executable(
 ament_auto_add_executable(
     point_cloud_filter
     ${PROJECT_NAME}/point_cloud_filter.cpp
+    ${PROJECT_NAME}/perception_utilities.cpp
 )
 
 ament_auto_add_executable(

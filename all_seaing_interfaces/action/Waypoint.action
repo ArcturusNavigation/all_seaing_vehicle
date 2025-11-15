@@ -6,6 +6,7 @@ float64 xy_threshold
 float64 theta_threshold
 bool ignore_theta
 bool is_stationary
+bool avoid_obs false
 ---
 # Result
 bool is_finished
