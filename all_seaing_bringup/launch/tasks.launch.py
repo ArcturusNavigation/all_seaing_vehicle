@@ -78,7 +78,7 @@ def launch_setup(context, *args, **kwargs):
             {"xy_threshold": 1.0},
             {"thresh_dist": 1.5},
             {"choose_every": 10},
-            {"turn_offset": 1.5},
+            {"turn_offset": 2.0},
             {"beacon_probe_dist": 1.5},
             {"midpoint_pair_forward_dist": 0.5},
         ],
@@ -202,12 +202,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
-            {"Kpid_x": [0.5, 0.0, 0.0]},
-            {"Kpid_y": [0.5, 0.0, 0.0]},
-            {"Kpid_theta": [0.3, 0.0, 0.0]},
+            {"Kpid_x": [0.5, 0.0, 0.1]},
+            {"Kpid_y": [0.5, 0.0, 0.1]},
+            {"Kpid_theta": [0.3, 0.0, 0.1]},
             {"max_vel": [1.0, 1.0, 0.3]},
             {"avoid_max_dist": 1.5},
-            {"avoid_vel_coeff": 2.0},
+            {"avoid_vel_coeff": 0.5},
         ],
         output="screen",
     )
@@ -218,7 +218,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
-            {"avoid_obs": True},
+            {"avoid_obs": False},
         ],
         output="screen",
     )
