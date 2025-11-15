@@ -43,7 +43,7 @@ class DockingState(Enum):
 
 class Docking(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "docking_server", action_name = "docking", timer_period = 1.0 / 30.0)
+        super().__init__(server_name = "docking_server", action_name = "docking")
 
         self.control_pub = self.create_publisher(
             ControlOption, 
@@ -90,9 +90,6 @@ class Docking(TaskServerBase):
 
         self.declare_parameter("boat_angle_coeff", 0.8)
         self.boat_angle_coeff = self.get_parameter("boat_angle_coeff").get_parameter_value().double_value
-
-        self.declare_parameter("timer_period", 1/30.0)
-        self.timer_period = self.get_parameter("timer_period").get_parameter_value().double_value
 
         self.declare_parameter("dock_merged_id", 100)
         self.dock_merged_id = self.get_parameter("dock_merged_id").get_parameter_value().integer_value

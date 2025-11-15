@@ -30,7 +30,7 @@ TIMER_PERIOD = 1 / 60
 
 class SpeedChange(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge_pid", timer_period = 1 / 30.0)
+        super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge_pid")
 
         self.camera_info_sub = self.create_subscription(
             CameraInfo, "camera_info", self.camera_info_cb, 10

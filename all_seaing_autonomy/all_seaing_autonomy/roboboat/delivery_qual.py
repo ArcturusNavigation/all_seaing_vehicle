@@ -9,23 +9,16 @@ from all_seaing_controller.pid_controller import PIDController
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption
 from all_seaing_common.action_server_base import ActionServerBase
+from all_seaing_common.task_server_base import TaskServerBase
 from sensor_msgs.msg import CameraInfo
 
 import os
 import yaml
 import time
 
-class DeliveryQual(ActionServerBase):
+class DeliveryQual(TaskServerBase):
     def __init__(self):
-        super().__init__("delivery_qual_server")
-
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "delivery_qual",
-            execute_callback=self.execute_callback,
-            cancel_callback=self.default_cancel_callback,
-        )
+        super().__init__(server_name = "delivery_qual_server", action_name = "delivery_qual")
 
         self.bbox_sub = self.create_subscription(
             LabeledBoundingBox2DArray, 
@@ -56,8 +49,6 @@ class DeliveryQual(ActionServerBase):
         self.height = None
         self.width = None
         self.bboxes = []
-
-        self.timer_period = 1 / 30.0
 
         self.declare_parameter(
             "shape_label_mappings_file", 
@@ -136,6 +127,10 @@ class DeliveryQual(ActionServerBase):
 
     def bbox_callback(self, msg):
         self.bboxes = msg.boxes
+
+    def init_setup(self):
+        self.prev_update_time = self.get_clock().now()
+        self.mark_successful()
 
     def control_loop(self):
 
@@ -231,30 +226,6 @@ class DeliveryQual(ActionServerBase):
         # control_msg.twist.linear.y = 0.0
         # control_msg.twist.angular.z = float(yaw_rate)
         # self.control_pub.publish(control_msg)
-
-    def execute_callback(self, goal_handle):
-        self.start_process("starting delivery qual")
-
-        self.prev_update_time = self.get_clock().now()
-
-        while not self.result:
-
-            if self.should_abort():
-                self.end_process("aborting delivery qual")
-                goal_handle.abort()
-                return Task.Result()
-
-            if goal_handle.is_cancel_requested:
-                self.end_process("cancelling dleivery qual")
-                goal_handle.canceled()
-                return Task.Result()
-
-            self.control_loop()
-            time.sleep(self.timer_period)
-
-        self.end_process("delivery qual complete!")
-        goal_handle.succeed()
-        return Task.Result(success=True)
 
 
 def main(args=None):

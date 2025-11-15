@@ -44,7 +44,7 @@ class InternalBuoyPair:
 
 class SpeedChallenge(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge", timer_period = 1.0 / 30.0)
+        super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge")
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
@@ -78,9 +78,6 @@ class SpeedChallenge(TaskServerBase):
 
         self.declare_parameter("gate_dist_back", 1.0)
         self.forward_dist_back = self.get_parameter("gate_dist_back").get_parameter_value().double_value
-
-        self.declare_parameter("timer_period", 1/60.0)
-        self.timer_period = self.get_parameter("timer_period").get_parameter_value().double_value
 
         self.declare_parameter("is_sim", False)
         self.declare_parameter("turn_offset", 5.0)

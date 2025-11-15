@@ -236,7 +236,10 @@ def launch_setup(context, *args, **kwargs):
     task_init_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="task_init.py",
-        parameters=[{"is_sim": False}],
+        parameters=[
+            {"is_sim": True},
+            {"timer_period": 1.0},
+        ],
     )
 
     delivery_server = launch_ros.actions.Node(

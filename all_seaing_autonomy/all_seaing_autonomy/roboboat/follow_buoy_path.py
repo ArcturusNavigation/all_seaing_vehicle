@@ -44,7 +44,7 @@ class FollowPathState(Enum):
 
 class FollowBuoyPath(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path", timer_period = 1.0 / 30.0)
+        super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path")
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
@@ -104,9 +104,6 @@ class FollowBuoyPath(TaskServerBase):
 
         self.declare_parameter("better_angle_thres", 0.2)
         self.better_angle_thres = self.get_parameter("better_angle_thres").get_parameter_value().double_value
-
-        self.declare_parameter("timer_period", 1/30.0)
-        self.timer_period = self.get_parameter("timer_period").get_parameter_value().double_value
 
         self.declare_parameter("circle_beacon", True)
         self.circle_beacon = self.get_parameter("circle_beacon").get_parameter_value().bool_value

@@ -12,7 +12,7 @@ import time
 import math
 
 class TaskServerBase(ActionServerBase):
-    def __init__(self, server_name, action_name, timer_period = 1.0 / 30.0):
+    def __init__(self, server_name, action_name):
         super().__init__(server_name)
         self.server_name = server_name
 
@@ -25,7 +25,11 @@ class TaskServerBase(ActionServerBase):
             goal_callback=self.goal_callback
         )
 
-        self.timer_period = timer_period
+        self.timer_period = (
+            self.declare_parameter("timer_period", 1.0 / 30.0)
+            .get_parameter_value()
+            .double_value
+        )
 
     # Mark result of task as successful, exit control loop
     # IN THEORY, supports directly marking .result as true, and will mark _succeed as true by default
