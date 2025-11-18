@@ -868,23 +868,23 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     if(m_track_robot && m_first_state) return;
     
-    RCLCPP_INFO(this->get_logger(), "DIFFERENCE BETWEEN DETECTION & LAST ODOM TIME: %lf - %lf = %lf", rclcpp::Time(msg->local_header.stamp).nanoseconds()/((float)1e9), m_last_odom_time.nanoseconds()/((float)1e9), std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()));
+    // RCLCPP_INFO(this->get_logger(), "DIFFERENCE BETWEEN DETECTION & LAST ODOM TIME: %lf - %lf = %lf", rclcpp::Time(msg->local_header.stamp).nanoseconds()/((float)1e9), m_last_odom_time.nanoseconds()/((float)1e9), std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()));
 
     if (m_track_robot && (std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()) > m_odom_detection_timeout)) return;
 
     // std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-    // measuring time
-    using std::chrono::high_resolution_clock;
-    using std::chrono::duration_cast;
-    using std::chrono::duration;
-    using std::chrono::milliseconds;
+    // // measuring time
+    // using std::chrono::high_resolution_clock;
+    // using std::chrono::duration_cast;
+    // using std::chrono::duration;
+    // using std::chrono::milliseconds;
 
-    auto t1 = high_resolution_clock::now();
-    auto t2 = high_resolution_clock::now();
-    duration<double, std::milli> ms_double = t2 - t1;
+    // auto t1 = high_resolution_clock::now();
+    // auto t2 = high_resolution_clock::now();
+    // duration<double, std::milli> ms_double = t2 - t1;
 
-    t1 = high_resolution_clock::now();
+    // t1 = high_resolution_clock::now();
 
     std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>> detected_obstacles;
     for (all_seaing_interfaces::msg::Obstacle obs : msg->obstacles) {
@@ -893,15 +893,15 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         detected_obstacles.push_back(obj_cloud);
     }
 
-    t2 = high_resolution_clock::now();
+    // t2 = high_resolution_clock::now();
 
-    ms_double = t2 - t1;
+    // ms_double = t2 - t1;
     
-    RCLCPP_INFO(this->get_logger(), "STORING DETECTIONS: %lfms", ms_double.count());
+    // RCLCPP_INFO(this->get_logger(), "STORING DETECTIONS: %lfms", ms_double.count());
 
     // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
 
-    t1 = high_resolution_clock::now();
+    // t1 = high_resolution_clock::now();
 
     Eigen::Matrix<float, 2, 2> Q{
         {m_range_std*m_range_std, 0},
@@ -971,13 +971,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
     }
 
-    t2 = high_resolution_clock::now();
+    // t2 = high_resolution_clock::now();
 
-    ms_double = t2 - t1;
+    // ms_double = t2 - t1;
     
-    RCLCPP_INFO(this->get_logger(), "UNKNOWN ASSOCIATIONS: %lfms", ms_double.count()); // TODO OPTIMIZE, IT'S TAKING MUCH LONGER THAN THE OTHER STUFF
+    // RCLCPP_INFO(this->get_logger(), "UNKNOWN ASSOCIATIONS: %lfms", ms_double.count()); // TODO OPTIMIZE, IT'S TAKING MUCH LONGER THAN THE OTHER STUFF
 
-    t1 = high_resolution_clock::now();
+    // t1 = high_resolution_clock::now();
 
     std::vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
@@ -998,13 +998,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
     }
 
-    t2 = high_resolution_clock::now();
+    // t2 = high_resolution_clock::now();
 
-    ms_double = t2 - t1;
+    // ms_double = t2 - t1;
     
-    RCLCPP_INFO(this->get_logger(), "ASSOCIATIONS: %lfms", ms_double.count());
+    // RCLCPP_INFO(this->get_logger(), "ASSOCIATIONS: %lfms", ms_double.count());
 
-    t1 = high_resolution_clock::now();
+    // t1 = high_resolution_clock::now();
 
     // Update vectors, now with known correspondence
     for (size_t i = 0; i < detected_obstacles.size(); i++) {
@@ -1097,21 +1097,21 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         m_tracked_obstacles[tracked_id] = detected_obstacles[i];
     }
 
-    t2 = high_resolution_clock::now();
+    // t2 = high_resolution_clock::now();
 
-    ms_double = t2 - t1;
+    // ms_double = t2 - t1;
     
-    RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN ASSOCIATIONS: %lfms", ms_double.count()); // TODO OPTIMIZE, IT'S TAKING MUCH LONGER THAN THE OTHER STUFF
+    // RCLCPP_INFO(this->get_logger(), "UPDATE WITH KNOWN ASSOCIATIONS: %lfms", ms_double.count()); // TODO OPTIMIZE, IT'S TAKING MUCH LONGER THAN THE OTHER STUFF
 
-    t1 = high_resolution_clock::now();
+    // t1 = high_resolution_clock::now();
     
     this->update_maps();
 
-    t2 = high_resolution_clock::now();
+    // t2 = high_resolution_clock::now();
 
-    ms_double = t2 - t1;
+    // ms_double = t2 - t1;
     
-    RCLCPP_INFO(this->get_logger(), "UPDATE MAPS: %lfms", ms_double.count());
+    // RCLCPP_INFO(this->get_logger(), "UPDATE MAPS: %lfms", ms_double.count());
 
     pcl::PointXYZ p0(0, 0, 0);
     float avg_dist = 0;
@@ -1119,7 +1119,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         avg_dist += pcl::euclideanDistance(p0, m_tracked_obstacles[i]->obstacle.get_local_point()) / ((float)m_tracked_obstacles.size());
     }
 
-    t1 = high_resolution_clock::now();
+    // t1 = high_resolution_clock::now();
 
     // Filter old obstacles
     std::unordered_set<int> to_keep_set;
@@ -1153,13 +1153,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         to_keep_set.insert(tracked_id);
     }
 
-    t2 = high_resolution_clock::now();
+    // t2 = high_resolution_clock::now();
 
-    ms_double = t2 - t1;
+    // ms_double = t2 - t1;
     
-    RCLCPP_INFO(this->get_logger(), "FILTERING OLD OBSTACLES: %lfms", ms_double.count());
+    // RCLCPP_INFO(this->get_logger(), "FILTERING OLD OBSTACLES: %lfms", ms_double.count());
 
-    t1 = high_resolution_clock::now();
+    // t1 = high_resolution_clock::now();
 
     // Clear out duplicates
     // TODO: optimize to N^2 (now is N^3) by making a priority queue of pairs of indices based on minimum distance and popping if index already removed and removing if distance < threshold
@@ -1187,11 +1187,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         }
     }
 
-    t2 = high_resolution_clock::now();
+    // t2 = high_resolution_clock::now();
 
-    ms_double = t2 - t1;
+    // ms_double = t2 - t1;
     
-    RCLCPP_INFO(this->get_logger(), "CLEARING OUT DUPLICATES: %lfms", ms_double.count());
+    // RCLCPP_INFO(this->get_logger(), "CLEARING OUT DUPLICATES: %lfms", ms_double.count());
+
+    // t1 = high_resolution_clock::now();
 
     std::vector<int> to_remove;
     std::vector<int> to_keep;
@@ -1244,7 +1246,13 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         m_num_obj = to_keep.size();
     }
 
-    m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
+    // t2 = high_resolution_clock::now();
+
+    // ms_double = t2 - t1;
+    
+    // RCLCPP_INFO(this->get_logger(), "REMOVING FILTERED OBSTACLES FROM MATRICES: %lfms", ms_double.count());
+
+    // m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
 
     if (m_track_robot) {
         // make the trace only keep a # of points specified by a param
