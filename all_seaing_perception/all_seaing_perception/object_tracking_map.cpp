@@ -177,6 +177,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_got_local_frame = false;
     m_got_nav = false;
     m_got_odom = false;
+    m_num_obj = 0;
+    m_num_banners = 0;
 }
 
 template <typename T_matrix> std::string matrix_to_string(T_matrix matrix) {
