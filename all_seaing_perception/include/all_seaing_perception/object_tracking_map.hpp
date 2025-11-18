@@ -10,6 +10,7 @@
 #include <chrono>
 #include <math.h>
 #include <deque>
+#include <thread>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -107,9 +108,13 @@ private:
     bool m_include_unlabeled, m_drop_ignore_unlabeled;
     double m_unlabeled_assoc_threshold;
     bool m_track_banners, m_banners_slam;
+    bool m_diff_position_odom;
+    int m_odom_queue_size;
+    int m_detection_queue_size;
 
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
+    double m_odom_x, m_odom_y, m_odom_heading, m_last_odom_x, m_last_odom_y, m_last_odom_heading;
     
     std::deque<std::tuple<float, float, float>> m_trace; // (x,y,time)
 

@@ -36,4 +36,7 @@ object_tracking_map:
     data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0
     include_unlabeled: True
-    unlabeled_association_threshold: 0.005
+    unlabeled_association_threshold: 0.01
+    diff_position_odom: True
+    odom_queue_size: 10 # can even increase to 30 or 50 since those are processed quickly and it's important to keep a lot of them so that we at least have the latest odometry (and it hasn't been dropped from the queue) before applying the sensor data
+    detection_queue_size: 1 # decrease it if all odom messages before next detection are getting dropped from queue before we finish processing the current detection

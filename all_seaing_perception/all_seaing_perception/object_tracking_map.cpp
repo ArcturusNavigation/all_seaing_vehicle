@@ -106,6 +106,15 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("banners_slam", false);
     m_banners_slam = this->get_parameter("banners_slam").as_bool();
 
+    this->declare_parameter<bool>("diff_position_odom", true);
+    m_diff_position_odom = this->get_parameter("diff_position_odom").as_bool();
+
+    this->declare_parameter<int>("odom_queue_size", 10);
+    m_odom_queue_size = this->get_parameter("odom_queue_size").as_int();
+
+    this->declare_parameter<int>("detection_queue_size", 10);
+    m_detection_queue_size = this->get_parameter("detection_queue_size").as_int();
+
     RCLCPP_INFO(this->get_logger(), m_banners_slam ? "BANNERS SLAM: ON" : "BANNERS SLAM: OFF");
 
     // Initialize navigation & odometry variables to 0
@@ -127,12 +136,12 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
         "obstacle_map/map_cov_viz", 10);
     m_object_sub =
         this->create_subscription<all_seaing_interfaces::msg::ObstacleMap>(
-            "detections", 10,
+            "detections", m_detection_queue_size,
             std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
     if (m_include_unlabeled){
         m_unlabeled_sub =
             this->create_subscription<all_seaing_interfaces::msg::ObstacleMap>(
-                "obstacle_map/unlabeled", 10,
+                "obstacle_map/unlabeled", m_detection_queue_size,
                 std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
     }
 
@@ -151,8 +160,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
         m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
         // update odometry based on IMU data by subscribing to the odometry message
         m_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
-            "odometry/filtered", 10,
-            std::bind(&ObjectTrackingMap::odom_msg_callback, this, std::placeholders::_1));
+        "odometry/filtered", m_odom_queue_size,
+        std::bind(&ObjectTrackingMap::odom_msg_callback, this, std::placeholders::_1));
     }
 
     if (m_track_banners){
@@ -245,12 +254,30 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     }
     m_nav_vz = msg.twist.twist.linear.z;
     m_nav_omega = msg.twist.twist.angular.z;
+
+    m_odom_x = msg.pose.pose.position.x;
+    m_odom_y = msg.pose.pose.position.y;
+    tf2::Quaternion quat;
+    tf2::fromMsg(msg.pose.pose.orientation, quat);
+    tf2::Matrix3x3 m(quat);
+    double r, p;
+    m.getRPY(r, p, m_odom_heading);
+    if(r > M_PI/2 || p > M_PI/2){ // to discard weird RPY solutions
+        m.getRPY(r, p, m_odom_heading, 2);
+    }
+
     m_last_odom_msg = msg;
 
     rclcpp::Time curr_odom_time = rclcpp::Time(msg.header.stamp);
 
+    if (m_nav_x < 0.001 || m_nav_y < 0.001 || m_nav_heading < 0.001) return; // TF not initialized yet
+    if (m_odom_x < 0.001 || m_odom_y < 0.001 || m_odom_heading < 0.001) return; // probably fake odom/doesn't have correct position (mostly in sim)
+
     if(!m_got_odom){
         m_last_odom_time = curr_odom_time;
+        m_last_odom_x = m_odom_x;
+        m_last_odom_y = m_odom_y;
+        m_last_odom_heading = m_odom_heading;
         m_got_odom = true;
         return;
     }
@@ -262,15 +289,7 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
 
     if (m_first_state) {
         // initialize mean and cov robot pose
-        tf2::Quaternion quat;
-        tf2::fromMsg(msg.pose.pose.orientation, quat);
-        tf2::Matrix3x3 m(quat);
-        double r, p, y;
-        m.getRPY(r, p, y);
-        if(r > M_PI/2 || p > M_PI/2){ // to discard weird RPY solutions
-            m.getRPY(r, p, y, 2);
-        }
-        m_state = Eigen::Vector3f(msg.pose.pose.position.x, msg.pose.pose.position.y, y);
+        m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
         Eigen::Matrix3f init_pose_noise{
             {m_init_xy_noise*m_init_xy_noise, 0, 0},
             {0, m_init_xy_noise*m_init_xy_noise, 0},
@@ -281,6 +300,8 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         // m_last_odom_time = rclcpp::Time(msg.header.stamp);
         return;
     }
+
+    m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
 
     Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, m_mat_size);
     F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
@@ -293,23 +314,66 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
 
     Eigen::Vector3f mot_const;
     Eigen::Matrix3f mot_grad;
-    if (m_nav_omega < 0.001){
-        mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
-        // gradient - identity
-        mot_grad = Eigen::Matrix3f({
-            {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
-            {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
-            {0, 0, 0},
-        });
+    // if (m_nav_omega < 0.001){
+    //     mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
+    //     // gradient - identity
+    //     mot_grad = Eigen::Matrix3f({
+    //         {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
+    //         {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
+    //         {0, 0, 0},
+    //     });
+    // }else{
+    //     mot_const = Eigen::Vector3f(((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy, ((-cos(m_state(2)+m_nav_omega*dt)+cos(m_state(2)))/m_nav_omega)*m_nav_vx+((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vy, m_nav_omega*dt);
+    //     // gradient - identity
+    //     mot_grad = Eigen::Matrix3f({
+    //         {0, 0, ((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vx+((-sin(m_state(2)+m_nav_omega*dt)+sin(m_state(2)))/m_nav_omega)*m_nav_vy},
+    //         {0, 0, ((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy},
+    //         {0, 0, 0},
+    //     });
+    // }
+
+    double dx, dy, dtheta; // in the robot's frame
+
+    if (m_diff_position_odom){
+        std::tie(dx, dy, dtheta) = all_seaing_perception::compute_transform_from_to(m_last_odom_x, m_last_odom_y, m_last_odom_heading, m_odom_x, m_odom_y, m_odom_heading);
     }else{
-        mot_const = Eigen::Vector3f(((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy, ((-cos(m_state(2)+m_nav_omega*dt)+cos(m_state(2)))/m_nav_omega)*m_nav_vx+((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vy, m_nav_omega*dt);
-        // gradient - identity
-        mot_grad = Eigen::Matrix3f({
-            {0, 0, ((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vx+((-sin(m_state(2)+m_nav_omega*dt)+sin(m_state(2)))/m_nav_omega)*m_nav_vy},
-            {0, 0, ((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy},
-            {0, 0, 0},
-        });
+        if (m_nav_omega < 0.001){
+            // mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
+            // // gradient - identity
+            // mot_grad = Eigen::Matrix3f({
+            //     {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
+            //     {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
+            //     {0, 0, 0},
+            // });
+            dx = m_nav_vx*dt;
+            dy = m_nav_vy*dt;
+            dtheta = m_nav_omega*dt;
+        }else{
+            // mot_const = Eigen::Vector3f(((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy, ((-cos(m_state(2)+m_nav_omega*dt)+cos(m_state(2)))/m_nav_omega)*m_nav_vx+((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vy, m_nav_omega*dt);
+            // // gradient - identity
+            // mot_grad = Eigen::Matrix3f({
+            //     {0, 0, ((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vx+((-sin(m_state(2)+m_nav_omega*dt)+sin(m_state(2)))/m_nav_omega)*m_nav_vy},
+            //     {0, 0, ((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy},
+            //     {0, 0, 0},
+            // });
+            dx = (sin(m_nav_omega*dt)/m_nav_omega)*m_nav_vx+((cos(m_nav_omega*dt)-1)/m_nav_omega)*m_nav_vy;
+            dy = ((1-cos(m_nav_omega*dt))/m_nav_omega)*m_nav_vx+(sin(m_nav_omega*dt)/m_nav_omega)*m_nav_vy;
+            dtheta = m_nav_omega*dt;
+        }
     }
+
+    m_last_odom_x = m_odom_x;
+    m_last_odom_y = m_odom_y;
+    m_last_odom_heading = m_odom_heading;
+
+    // independent of the motion model in between
+    mot_const = Eigen::Vector3f(cos(m_state(2))*dx-sin(m_state(2))*dy, sin(m_state(2))*dx+cos(m_state(2))*dy, dtheta);
+    // gradient - identity
+    mot_grad = Eigen::Matrix3f({
+        {0, 0, -sin(m_state(2))*dx-cos(m_state(2))*dy},
+        {0, 0, cos(m_state(2))*dx-sin(m_state(2))*dy},
+        {0, 0, 0},
+    });
 
     m_state += F.transpose() * mot_const;
 
@@ -784,6 +848,7 @@ void ObjectTrackingMap::visualize_predictions() {
 }
 
 void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr &msg){
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     // Set up headers and transforms
     m_local_header = msg->local_header;
     m_global_header.frame_id = m_track_robot? m_slam_frame_id : m_global_frame_id;
