@@ -111,6 +111,7 @@ private:
     bool m_diff_position_odom;
     int m_odom_queue_size;
     int m_detection_queue_size;
+    double m_odom_detection_timeout;
 
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
     rclcpp::Time m_last_odom_time;
