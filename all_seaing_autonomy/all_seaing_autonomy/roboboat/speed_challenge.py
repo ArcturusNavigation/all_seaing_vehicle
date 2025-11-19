@@ -363,6 +363,13 @@ class SpeedChallenge(TaskServerBase):
         self.get_logger().info("Returning to start")
         self.red_left = not self.red_left
         self.gate_pair.left, self.gate_pair.right = self.gate_pair.right, self.gate_pair.left
+        # make the robot face the previous gate
+        _, intended_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        theta_intended = math.atan2(intended_dir[1], intended_dir[0])
+        nav_x, nav_y = self.robot_pos
+        self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
+        # recompute gate
+        self.setup_buoys()
         self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.forward_dist_back)
 
         self.get_logger().info('going back to the gate')
