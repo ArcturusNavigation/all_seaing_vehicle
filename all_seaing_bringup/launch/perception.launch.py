@@ -352,7 +352,8 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("detections", "obstacle_map/local"),
-            ("odometry/filtered", "odometry/gps"),
+            # ("odometry/filtered", "odometry/gps"),
+            ("odometry/filtered", "odometry/integrated"),
         ],
         parameters=[configured_params]
     )
