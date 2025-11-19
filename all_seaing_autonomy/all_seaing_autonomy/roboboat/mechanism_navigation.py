@@ -10,7 +10,7 @@ from rclpy.executors import MultiThreadedExecutor
 from all_seaing_interfaces.action import Task
 from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
-from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption, ObstacleMap
+from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption, ObstacleMap, LabeledObjectPlaneArray
 from all_seaing_common.action_server_base import ActionServerBase
 from sensor_msgs.msg import CameraInfo
 
@@ -45,6 +45,14 @@ class MechanismNavigation(ActionServerBase):
             ObstacleMap,
             "obstacle_map/labeled",
             self.bbox_callback_new,
+            10
+        )
+
+        # New, new subscription??
+        self.plane_box = self.create_subscription(
+            LabeledObjectPlaneArray,
+            "object_planes",
+            self.plane_box,
             10
         )
 
@@ -119,6 +127,7 @@ class MechanismNavigation(ActionServerBase):
         self.width = None
         self.bboxes = [] # To be commented out
         self.obstacleboxes = []
+        self.planeboxes = []
 
         self.timer_period = 1 / 30.0
 
@@ -213,6 +222,10 @@ class MechanismNavigation(ActionServerBase):
     def bbox_callback_new(self, msg):
         self.obstacleboxes = msg.obstacles
 
+    # New new version with plane objects?
+    def plane_box_callback(self, msg):
+        self.planeboxes = msg.object_planes
+
     def control_loop(self):
         # if self.width is None or len(self.obstacleboxes) == 0:
         #     self.get_logger().info(f"no obstalces or zero width {self.width}, {len(self.obstacleboxes)}")
@@ -231,18 +244,20 @@ class MechanismNavigation(ActionServerBase):
         # a bit of a y shift too?
 
         # Logic to find the largest cross and triangle just in case get noise?
+        # Choose the last triangle/cross in the list
+        # Could use size (type vector 3) to choose closest in theory
         forward = False
-        for box in self.obstacleboxes:
-            area = (box.bbox_max.x - box.bbox_min.x) * (box.bbox_max.y - box.bbox_min.y)
-            location = box.global_point
-            if box.label in self.triangle_labels and area > triangle_area:
+        for box in self.planeboxes:
+            # area = (box.bbox_max.x - box.bbox_min.x) * (box.bbox_max.y - box.bbox_min.y)
+            location = box.normal_ctr # Type Pose (point, Quaternian)
+            if box.label in self.triangle_labels: # and area > triangle_area:
                 self.get_logger().info('TRIANGLE THERE')
-                triangle_area = area
-                triangle_location = location
-            elif box.label in self.cross_labels and area > cross_area:
+                # triangle_area = area
+                triangle_location = location.point
+            elif box.label in self.cross_labels: # and area > cross_area:
                 self.get_logger().info('CROSS THERE')
-                cross_area = area
-                cross_location = location
+                # cross_area = area
+                cross_location = location.point
 
         # Initializes values
         self.waypoint_x = None
