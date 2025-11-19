@@ -194,6 +194,21 @@ class FollowBuoyPath(TaskServerBase):
         midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
 
         return midpoint
+    
+    def midpoint_pair_dir(self, pair, forward_dist):
+        left_coords = self.ob_coords(pair.left)
+        right_coords = self.ob_coords(pair.right)
+        midpoint = self.midpoint(left_coords, right_coords)
+        
+        scale = forward_dist
+        dy = right_coords[1] - left_coords[1]
+        dx = right_coords[0] - left_coords[0]
+        norm = math.sqrt(dx**2 + dy**2)
+        dx /= norm
+        dy /= norm
+        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
+
+        return midpoint, (-dy, dx)
 
     def split_buoys(self, obstacles):
         """
@@ -999,6 +1014,13 @@ class FollowBuoyPath(TaskServerBase):
                     self.green_labels.remove("green_pole_buoy")
                 if "red_pole_buoy" in self.red_labels:
                     self.red_labels.remove("red_pole_buoy")
+                # make the robot face the previous gate
+                _, intended_dir = self.midpoint_pair_dir(self.pair_to, 0.0)
+                theta_intended = math.atan2(intended_dir[1], intended_dir[0])
+                nav_x, nav_y = self.robot_pos
+                self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
+                # recompute gate
+                self.setup_buoys()
             self.generate_waypoints()
         elif self.state == FollowPathState.WAITING_GREEN_BEACON:
             self.get_logger().info(f"Searching green beacon")
