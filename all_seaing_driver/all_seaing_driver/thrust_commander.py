@@ -10,7 +10,7 @@ from all_seaing_interfaces.msg import Heartbeat
 import time
 
 # DO NOT CHANGE. COMMANDS GET LOST IF FASTER THAN 1/8
-TIMER_PERIOD = 1 / 8.0
+TIMER_PERIOD = 1 / 7.0
 
 class ThrustCommander(Node):
 
