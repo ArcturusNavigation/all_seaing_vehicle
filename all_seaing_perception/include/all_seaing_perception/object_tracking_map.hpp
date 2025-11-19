@@ -71,6 +71,7 @@ private:
     void odom_callback();
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
     void banners_cb(const all_seaing_interfaces::msg::LabeledObjectPlaneArray::ConstSharedPtr &msg);
+    void gps_based_pred();
 
     template <typename T>
     T convert_to_global(T point, bool untracked = false);
@@ -112,10 +113,14 @@ private:
     int m_odom_queue_size;
     int m_detection_queue_size;
     double m_odom_detection_timeout;
+    bool m_gps_based_predictions;
 
     double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
-    rclcpp::Time m_last_odom_time;
+    rclcpp::Time m_last_odom_time, m_last_nav_time;
     double m_odom_x, m_odom_y, m_odom_heading, m_last_odom_x, m_last_odom_y, m_last_odom_heading;
+    bool m_gps_based_predicted;
+    double m_gps_based_dx, m_gps_based_dy, m_gps_based_dtheta;
+    double m_last_nav_x, m_last_nav_y, m_last_nav_heading;
     
     std::deque<std::tuple<float, float, float>> m_trace; // (x,y,time)
 
@@ -145,6 +150,7 @@ private:
     Eigen::VectorXf m_state;//obstacle map
     Eigen::MatrixXf m_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
+    bool m_shouldnt_gps_pred;
     nav_msgs::msg::Odometry m_last_odom_msg;
 public:
     ObjectTrackingMap();

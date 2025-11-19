@@ -118,6 +118,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<double>("odom_detection_timeout", 0.1);
     m_odom_detection_timeout = this->get_parameter("odom_detection_timeout").as_double();
 
+    this->declare_parameter<bool>("gps_based_predictions", true);
+    m_gps_based_predictions = this->get_parameter("gps_based_predictions").as_bool();
+
     RCLCPP_INFO(this->get_logger(), m_banners_slam ? "BANNERS SLAM: ON" : "BANNERS SLAM: OFF");
 
     // Initialize navigation & odometry variables to 0
@@ -131,22 +134,6 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_nav_heading = 0;
     
     m_mat_size = 3;
-
-    // Initialize publishers and subscribers
-    m_tracked_map_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(
-        "obstacle_map/global", 10);
-    m_map_cov_viz_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-        "obstacle_map/map_cov_viz", 10);
-    m_object_sub =
-        this->create_subscription<all_seaing_interfaces::msg::ObstacleMap>(
-            "detections", m_detection_queue_size,
-            std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
-    if (m_include_unlabeled){
-        m_unlabeled_sub =
-            this->create_subscription<all_seaing_interfaces::msg::ObstacleMap>(
-                "obstacle_map/unlabeled", m_detection_queue_size,
-                std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
-    }
 
     // Initialize tf_listener pointer
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -167,6 +154,22 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
         std::bind(&ObjectTrackingMap::odom_msg_callback, this, std::placeholders::_1));
     }
 
+    // Initialize publishers and subscribers
+    m_tracked_map_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(
+        "obstacle_map/global", 10);
+    m_map_cov_viz_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+        "obstacle_map/map_cov_viz", 10);
+    m_object_sub =
+        this->create_subscription<all_seaing_interfaces::msg::ObstacleMap>(
+            "detections", m_detection_queue_size,
+            std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
+    if (m_include_unlabeled){
+        m_unlabeled_sub =
+            this->create_subscription<all_seaing_interfaces::msg::ObstacleMap>(
+                "obstacle_map/unlabeled", m_detection_queue_size,
+                std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
+    }
+
     if (m_track_banners){
         m_banners_sub = 
             this->create_subscription<all_seaing_interfaces::msg::LabeledObjectPlaneArray>(
@@ -182,6 +185,12 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_got_odom = false;
     m_num_obj = 0;
     m_num_banners = 0;
+
+    m_shouldnt_gps_pred = true;
+    m_gps_based_predicted = false;
+    m_gps_based_dx = 0;
+    m_gps_based_dy = 0;
+    m_gps_based_dtheta = 0;
 }
 
 template <typename T_matrix> std::string matrix_to_string(T_matrix matrix) {
@@ -202,7 +211,7 @@ template <typename T_vector> std::string vector_to_string(T_vector v) {
 
 void ObjectTrackingMap::publish_slam(){
     geometry_msgs::msg::TransformStamped t;
-    t.header.stamp = m_last_odom_msg.header.stamp;
+    t.header.stamp = m_last_nav_time;
     if(m_direct_tf){
         // publish the transform from the local frame (base_link) to slam_map
         // (slam_map is a child of base_link to not interfere with the ekf localization node map)
@@ -271,9 +280,11 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         m.getRPY(r, p, m_odom_heading, 2);
     }
 
-    m_last_odom_msg = msg;
-
     rclcpp::Time curr_odom_time = rclcpp::Time(msg.header.stamp);
+
+    if (!m_got_nav || std::abs((curr_odom_time-m_last_nav_time).seconds()) > m_odom_detection_timeout) return; // make odometry catch up to GPS/current time
+
+    m_last_odom_msg = msg;
 
     if(!m_got_odom){
         m_last_odom_time = curr_odom_time;
@@ -285,10 +296,19 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         return;
     }
 
+    if (!m_got_nav || !m_track_robot || !m_imu_predict){
+        m_last_odom_time = curr_odom_time;
+        return;
+    }
+
+    // if previous odometry was too old wrt current nav time we've already updated based on gps
+    if(m_gps_based_predictions && (std::abs((m_last_odom_time-m_last_nav_time).seconds()) > m_odom_detection_timeout)){
+        m_last_odom_time = curr_odom_time;
+        return;
+    }
+
     float dt = (curr_odom_time - m_last_odom_time).seconds();
     m_last_odom_time = curr_odom_time;
-
-    if (!m_got_nav || !m_track_robot || !m_imu_predict) return;
 
     if (m_first_state) {
         if (std::abs(m_nav_x) < 0.001 || std::abs(m_nav_y) < 0.001 || std::abs(m_nav_heading) < 0.001) return; // TF not initialized yet
@@ -316,8 +336,8 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     mot_grad: rows -> components of final state (actually difference with old state), columns -> components of old state wrt to which the gradient is taken
     */
 
-    Eigen::Vector3f mot_const;
-    Eigen::Matrix3f mot_grad;
+    // Eigen::Vector3f mot_const;
+    // Eigen::Matrix3f mot_grad;
     // if (m_nav_omega < 0.001){
     //     mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
     //     // gradient - identity
@@ -340,7 +360,20 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
 
     if (m_diff_position_odom){
         std::tie(dx, dy, dtheta) = all_seaing_perception::compute_transform_from_to(m_last_odom_x, m_last_odom_y, m_last_odom_heading, m_odom_x, m_odom_y, m_odom_heading);
+        if (m_gps_based_predicted){
+            if (curr_odom_time > m_last_nav_time){
+                std::tie(dx, dy, dtheta) = all_seaing_perception::compose_transforms(all_seaing_perception::compute_transform_from_to(m_gps_based_dx, m_gps_based_dy, m_gps_based_dtheta, 0, 0, 0), std::make_tuple(dx, dy, dtheta));
+            }else{
+                // odometry is older, no need to use it
+                dx = 0;
+                dy = 0;
+                dtheta = 0;
+            }
+        }
     }else{
+        if (m_gps_based_predicted){
+            dt = std::max((curr_odom_time - m_last_nav_time).seconds(), (double)0);
+        }
         if (m_nav_omega < 0.001){
             // mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
             // // gradient - identity
@@ -366,14 +399,21 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         }
     }
 
+    if(m_gps_based_predicted){
+        m_gps_based_predicted = false;
+        m_gps_based_dx = 0;
+        m_gps_based_dy = 0;
+        m_gps_based_dtheta = 0;
+    }
+
     m_last_odom_x = m_odom_x;
     m_last_odom_y = m_odom_y;
     m_last_odom_heading = m_odom_heading;
 
     // independent of the motion model in between
-    mot_const = Eigen::Vector3f(cos(m_state(2))*dx-sin(m_state(2))*dy, sin(m_state(2))*dx+cos(m_state(2))*dy, dtheta);
+    Eigen::Vector3f mot_const = Eigen::Vector3f(cos(m_state(2))*dx-sin(m_state(2))*dy, sin(m_state(2))*dx+cos(m_state(2))*dy, dtheta);
     // gradient - identity
-    mot_grad = Eigen::Matrix3f({
+    Eigen::Matrix3f mot_grad = Eigen::Matrix3f({
         {0, 0, -sin(m_state(2))*dx-cos(m_state(2))*dy},
         {0, 0, cos(m_state(2))*dx-sin(m_state(2))*dy},
         {0, 0, 0},
@@ -394,23 +434,74 @@ void ObjectTrackingMap::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         {0, m_imu_xy_noise, 0},
         {0, 0, m_imu_theta_noise},
     };
+    m_cov = G * m_cov * G.transpose() + F.transpose() * ((dt*m_odom_refresh_rate)*motion_noise) * F; // variance is approximately proporational to the number of steps skipped, helps to correct w/ GPS when skipping too many points thus odometry more noisy
+    // m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
+
+    // if (m_track_robot) {
+    //     m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(msg.header.stamp).seconds()));
+    // }
+    
+    // // to see the robot position prediction mean & uncertainty
+    // if(m_got_nav){
+    //     this->visualize_predictions();
+    // }
+    // // publish robot pose predictions (here and after measurement update) as transforms from map to lidar/camera frame, possibly also as a message
+    // // it should ultimately be a source of odometry that can be used by other nodes along with the global map
+    // if(m_track_robot && m_got_nav && m_got_odom){
+    //     publish_slam();
+    // }
+
+    // this->update_maps();
+
+    // this->publish_maps();
+
+    // always call the GPS position measurement update after an odometry prediction, to reduce the effect of noisy odometry to the predicted position & mitigate position jumps due to that
+    m_shouldnt_gps_pred = true;
+    if (m_gps_update){
+        this->odom_callback();
+    }
+}
+
+void ObjectTrackingMap::gps_based_pred(){
+    double dx, dy, dtheta;
+
+    std::tie(dx, dy, dtheta) = all_seaing_perception::compute_transform_from_to(m_last_nav_x, m_last_nav_y, m_last_nav_heading, m_nav_x, m_nav_y, m_nav_heading);
+
+    std::tie(m_gps_based_dx, m_gps_based_dy, m_gps_based_dtheta) = all_seaing_perception::compose_transforms(std::make_tuple(m_gps_based_dx, m_gps_based_dy, m_gps_based_dtheta), std::make_tuple(dx, dy, dtheta));
+
+    // independent of the motion model in between
+    Eigen::Vector3f mot_const = Eigen::Vector3f(cos(m_state(2))*dx-sin(m_state(2))*dy, sin(m_state(2))*dx+cos(m_state(2))*dy, dtheta);
+    // gradient - identity
+    Eigen::Matrix3f mot_grad = Eigen::Matrix3f({
+        {0, 0, -sin(m_state(2))*dx-cos(m_state(2))*dy},
+        {0, 0, cos(m_state(2))*dx-sin(m_state(2))*dy},
+        {0, 0, 0},
+    });
+
+    m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
+    Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, m_mat_size);
+    F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
+    
+    m_state += F.transpose() * mot_const;
+
+    Eigen::MatrixXf G = Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) +
+                        F.transpose() * mot_grad * F;
+    // add a consistent amount of noise based on how much the robot moved since the last time
+    // Eigen::Matrix3f motion_noise{
+    //     {m_xy_noise * abs(mot_const[0]), 0, 0},
+    //     {0, m_xy_noise * abs(mot_const[1]), 0},
+    //     {0, 0, m_theta_noise * abs(mot_const[2])},
+    // };
+    Eigen::Matrix3f motion_noise{
+        {m_imu_xy_noise, 0, 0},
+        {0, m_imu_xy_noise, 0},
+        {0, 0, m_imu_theta_noise},
+    };
+    // m_cov = G * m_cov * G.transpose() + F.transpose() * ((dt*m_odom_refresh_rate)*motion_noise) * F; // variance is approximately proporational to the number of steps skipped, helps to correct w/ GPS when skipping too many points thus odometry more noisy
     m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
 
-    if (m_track_robot) {
-        m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(msg.header.stamp).seconds()));
-    }
 
-    this->publish_maps();
-    
-    // to see the robot position prediction mean & uncertainty
-    if(m_got_nav){
-        this->visualize_predictions();
-    }
-    // publish robot pose predictions (here and after measurement update) as transforms from map to lidar/camera frame, possibly also as a message
-    // it should ultimately be a source of odometry that can be used by other nodes along with the global map
-    if(m_track_robot && m_got_nav && m_got_odom){
-        publish_slam();
-    }
+    m_gps_based_predicted = true;
 }
 
 void ObjectTrackingMap::odom_callback() {
@@ -434,16 +525,26 @@ void ObjectTrackingMap::odom_callback() {
     m_got_nav = true;
 
     // to ignore gps TFs that are the same thing 5000 times a second and cause SLAM to lock into the GPS
-    if((!m_first_state) && (((m_nav_x == m_map_base_link_tf.transform.translation.x) && (m_nav_y == m_map_base_link_tf.transform.translation.y)) ||  (m_nav_heading == y))) return;
+    // if((!m_first_state) && (((m_nav_x == m_map_base_link_tf.transform.translation.x) && (m_nav_y == m_map_base_link_tf.transform.translation.y)) ||  (m_nav_heading == y))) return;
 
     m_nav_x = m_map_base_link_tf.transform.translation.x;
     m_nav_y = m_map_base_link_tf.transform.translation.y;
     m_nav_heading = y;
 
+    m_last_nav_time = rclcpp::Time(m_map_base_link_tf.header.stamp);
+
+    // RCLCPP_INFO(this->get_logger(), "GOT GPS AT TIME: %lf -> (%lf, %lf, %lf)", m_last_nav_time.seconds(), m_nav_x, m_nav_y, m_nav_heading);
+
     if(!m_track_robot || m_first_state) return;
 
-    if (m_track_robot && (std::abs((rclcpp::Time(m_map_base_link_tf.header.stamp)-m_last_odom_time).seconds()) > m_odom_detection_timeout)) return;
+    // if (m_track_robot && (std::abs((rclcpp::Time(m_map_base_link_tf.header.stamp)-m_last_odom_time).seconds()) > m_odom_detection_timeout)) return;
 
+    if (m_shouldnt_gps_pred){
+        m_shouldnt_gps_pred = false;
+    }else if (m_gps_based_predictions){
+        this->gps_based_pred();
+    }
+    
     m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
 
     if (!m_imu_predict) {
@@ -537,6 +638,10 @@ void ObjectTrackingMap::odom_callback() {
 
     this->update_maps();
     this->publish_maps();
+    
+    m_last_nav_x = m_nav_x;
+    m_last_nav_y = m_nav_y;
+    m_last_nav_heading = m_nav_heading;
 }
 
 template <typename T>
@@ -863,14 +968,18 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     m_local_frame_id = m_local_header.frame_id;
     m_got_local_frame = true;
 
-    m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
-    m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
+    // m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
+    // m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     if(m_track_robot && m_first_state) return;
     
     // RCLCPP_INFO(this->get_logger(), "DIFFERENCE BETWEEN DETECTION & LAST ODOM TIME: %lf - %lf = %lf", rclcpp::Time(msg->local_header.stamp).nanoseconds()/((float)1e9), m_last_odom_time.nanoseconds()/((float)1e9), std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()));
 
-    if (m_track_robot && (std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()) > m_odom_detection_timeout)) return;
+    // if (m_track_robot && (std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()) > m_odom_detection_timeout)) return;
+
+    if ((!m_track_robot || m_gps_update) && std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_nav_time).seconds()) > m_odom_detection_timeout) return; // make detections catch up to GPS/current time
+
+    this->odom_callback(); //catch up to current position before applying sensor data
 
     // std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
