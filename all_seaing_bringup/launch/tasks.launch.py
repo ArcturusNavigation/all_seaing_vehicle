@@ -98,7 +98,7 @@ def launch_setup(context, *args, **kwargs):
             {"turn_offset": 2.0},
             {"choose_every": 100},
             {"probe_distance": 10},
-            {"xy_threshold": 1.0},
+            {"xy_threshold": 0.8},
             {"duplicate_dist": 0.3},
             {"init_gate_dist": 0.5},
             {"gate_dist_back": 0.5},
@@ -114,8 +114,8 @@ def launch_setup(context, *args, **kwargs):
         executable="docking.py",
         parameters=[
             {"is_sim": False},
-            {"shape_label_mappings_file": buoy_label_mappings},
-            # {"shape_label_mappings_file": shape_label_mappings},
+            # {"shape_label_mappings_file": buoy_label_mappings},
+            {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "base_link"},
             # {"dock_width": 2.0},
             # {"dock_length": 7.0},
@@ -205,9 +205,9 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_x": [0.5, 0.0, 0.1]},
             {"Kpid_y": [0.5, 0.0, 0.1]},
             {"Kpid_theta": [0.3, 0.0, 0.1]},
-            {"max_vel": [1.0, 1.0, 0.3]},
-            {"avoid_max_dist": 1.5},
-            {"avoid_vel_coeff": 0.5},
+            {"max_vel": [0.8, 0.8, 0.2]},
+            {"avoid_max_dist": 1.7},
+            {"avoid_vel_coeff": 1.2},
         ],
         output="screen",
     )
@@ -218,7 +218,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
-            {"avoid_obs": False},
+            {"avoid_obs": True},
         ],
         output="screen",
     )
@@ -237,7 +237,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_autonomy",
         executable="task_init.py",
         parameters=[
-            {"is_sim": True},
+            {"is_sim": False},
             {"timer_period": 1.0},
         ],
     )
