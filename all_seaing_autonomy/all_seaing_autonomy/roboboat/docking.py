@@ -201,8 +201,9 @@ class Docking(TaskServerBase):
             self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
         else:
             # TODO replace w/ numbers for the dock banner labels, as in the roboboat course
-            self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
-            self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
+            # self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
+            self.dock_labels = [self.label_mappings[name] for name in ["black_triangle"]]
+            # self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
         
         self.inv_label_mappings = {}
         for key, value in self.label_mappings.items():

@@ -3,7 +3,7 @@ object_tracking_map:
     global_frame_id: "odom"
     slam_frame_id: "map"
     duplicate_thresh: 1.0
-    obstacle_drop_thresh: 15.0
+    obstacle_drop_thresh: 30.0
     range_drop_thresh: 15.0
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False

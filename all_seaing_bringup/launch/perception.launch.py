@@ -73,7 +73,9 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "best"},
+            # {"model": "roboboat_shape_2025"},
             {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -89,7 +91,9 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "best"},
+            # {"model": "roboboat_shape_2025"},
             {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -106,7 +110,9 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "best"},
+            # {"model": "roboboat_shape_2025"},
             {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -258,8 +264,8 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"ransac_params_file": ransac_params},
-            {"label_mappings_file": buoy_label_mappings},
-            # {"label_mappings_file": shape_label_mappings},
+            # {"label_mappings_file": buoy_label_mappings},
+            {"label_mappings_file": shape_label_mappings},
         ]
     )
 
