@@ -77,7 +77,19 @@ class OdometryPublisher(Node):
         self.odom_timer = self.create_timer(1.0/self.odom_hz, self.filter_cb)
         
         self.odom_pub = self.create_publisher(Odometry, "odometry/gps", 10)
+        self.odom_integrated_pub = self.create_publisher(Odometry, "odometry/integrated", 10)
         self.tf_broadcaster = TransformBroadcaster(self)
+
+        self.odom_x = 0.0
+        self.odom_y = 0.0
+        self.odom_theta = 0.0
+        self.vx = 0.0
+        self.vy = 0.0
+        self.omega = 0.0
+        self.last_vx = 0.0
+        self.last_vy = 0.0
+        self.last_omega = 0.0
+        self.last_odom_time = 0.0
 
     def nav_sat_callback(self, gps_msg):
         self.got_gps = True
@@ -90,16 +102,73 @@ class OdometryPublisher(Node):
     def yaw_odom_callback(self, yaw_odom_msg):
         self.got_yaw_odom = True
         self.yaw_odom_msg = yaw_odom_msg
+
+    def compute_transform_from_to(self, from_pos, to_pos):
+        from_x, from_y, from_theta = from_pos
+        to_x, to_y, to_theta = to_pos
+        dx = np.cos(from_theta)*(to_x-from_x)+np.sin(from_theta)*(to_y-from_y)
+        dy = -np.sin(from_theta)*(to_x-from_x)+np.cos(from_theta)*(to_y-from_y)
+        dtheta = to_theta - from_theta
+        return (dx, dy, dtheta)
+
+    def compose_transforms(self, t1, t2):
+        t1_dx, t1_dy, t1_dtheta = t1
+        t2_dx, t2_dy, t2_dtheta = t2
+        t_dx = t1_dx+np.cos(t1_dtheta)*t2_dx-np.sin(t1_dtheta)*t2_dy
+        t_dy = t1_dy+np.sin(t1_dtheta)*t2_dx+np.cos(t1_dtheta)*t2_dy
+        t_dtheta = t1_dtheta+t2_dtheta
+        return (t_dx, t_dy, t_dtheta)
     
     def odom_callback(self, odom_msg):
-        self.got_odom = True
         self.odom_msg = odom_msg
+        imu_twist = self.odom_msg.twist.twist
+
+        self.vx = imu_twist.linear.x*np.cos(self.odom_yaw_offset) + imu_twist.linear.y*np.sin(self.odom_yaw_offset)
+        self.vy = -imu_twist.linear.x*np.sin(self.odom_yaw_offset) + imu_twist.linear.y*np.cos(self.odom_yaw_offset)
+        self.omega = imu_twist.angular.z
+
+        if self.got_odom:
+            # trapezoidal rule
+            vx = 0.5*(self.vx+self.last_vx)
+            vy = 0.5*(self.vy+self.last_vy)
+            omega = 0.5*(self.omega+self.last_omega)
+            dt = self.odom_msg.header.stamp.sec + self.odom_msg.header.stamp.nanosec*10**-9 - self.last_odom_time
+
+            if omega < 0.001:
+                dx = vx*dt
+                dy = vy*dt
+                dtheta = omega*dt
+            else:
+                dx = (np.sin(omega*dt)/omega)*vx+((np.cos(omega*dt)-1)/omega)*vy
+                dy = ((1-np.cos(omega*dt))/omega)*vx+(np.sin(omega*dt)/omega)*vy
+                dtheta = omega*dt
+
+            self.odom_x, self.odom_y, self.odom_theta = self.compose_transforms((self.odom_x, self.odom_y, self.odom_theta), (dx, dy, dtheta))
+
+        integrated_odom_msg = Odometry()
+        integrated_odom_msg.header.stamp = self.odom_msg.header.stamp
+        integrated_odom_msg.header.frame_id = self.global_frame_id
+        integrated_odom_msg.child_frame_id = self.base_link_frame
+        integrated_odom_msg.twist.twist.linear.x = self.vx
+        integrated_odom_msg.twist.twist.linear.y = self.vy
+        integrated_odom_msg.twist.twist.angular.z = self.omega
+        integrated_odom_msg.pose.pose.position.x = self.odom_x
+        integrated_odom_msg.pose.pose.position.y = self.odom_y
+        integrated_odom_msg.pose.pose.orientation.x, integrated_odom_msg.pose.pose.orientation.y, integrated_odom_msg.pose.pose.orientation.z, integrated_odom_msg.pose.pose.orientation.w = quaternion_from_euler(0,0,self.odom_theta)
+        self.odom_integrated_pub.publish(integrated_odom_msg)
+
+        self.got_odom = True
+        self.last_vx = self.vx
+        self.last_vy = self.vy
+        self.last_omega = self.omega
+        self.last_odom_time = self.odom_msg.header.stamp.sec + self.odom_msg.header.stamp.nanosec*10**-9
+
     def filter_cb(self):
         if (not self.got_odom) or (not self.use_odom_pos and not self.got_gps) or (self.use_odom_pos and not self.got_pos_odom) or (self.use_odom_yaw and not self.got_pos_odom):
             return
         # get filtered values -> in imu_link -> rotated 90 degrees left wrt base_link
-        stamp = self.odom_msg.header.stamp
-        frame_id = self.odom_msg.header.frame_id
+        # stamp = self.odom_msg.header.stamp
+        # frame_id = self.odom_msg.header.frame_id
         if not self.use_odom_pos:
             lat, lon = self.gps_msg.latitude, self.gps_msg.longitude
         if not self.use_odom_yaw:
@@ -145,7 +214,7 @@ class OdometryPublisher(Node):
         if self.publish_tf:
             # publish tf
             tf_msg = TransformStamped()
-            tf_msg.header.stamp = stamp
+            tf_msg.header.stamp = self.get_clock().now().to_msg()
             tf_msg.header.frame_id = self.global_frame_id
             tf_msg.child_frame_id = self.base_link_frame
             tf_msg.transform.translation.x = dx

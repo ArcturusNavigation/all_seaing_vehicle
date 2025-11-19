@@ -74,6 +74,7 @@ def launch_setup(context, *args, **kwargs):
         locations = yaml.safe_load(f)
     lat = locations["sydney"]["lat"]
     lon = locations["sydney"]["lon"]
+    utm = locations["sydney"]["utm"]
     navsat_node = launch_ros.actions.Node(
         package="robot_localization",
         executable="navsat_transform_node",
@@ -295,6 +296,28 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    odometry_publisher_node = launch_ros.actions.Node(
+        package = "all_seaing_driver",
+        executable = "odometry_publisher.py",
+        output = "screen",
+        remappings=[
+            ("gps_topic", "/wamv/sensors/gps/gps/fix"),
+            ("odom_topic", "odometry/filtered"),
+            ("odometry/gps", "odometry/gps_sim"),
+        ],
+        parameters=[
+            {"datum": [lat, lon, 0.0]},
+            # {"yaw_offset": np.pi/2.0},
+            # {"odom_yaw_offset": np.pi/2.0},
+            {"yaw_offset": 0.0},
+            {"odom_yaw_offset": 0.0},
+            {"utm_zone": utm}, # 19 for Boston, 17 for Florida
+            {"publish_tf": False},
+            {"base_link_frame": "wamv/wamv/base_link"},
+            {"use_sim_time": True},
+        ]
+    )
+
     object_tracking_map_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="object_tracking_map",
@@ -302,6 +325,8 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("detections", "obstacle_map/local"),
+            # ("odometry/filtered", "odometry/gps_sim"),
+            ("odometry/filtered", "odometry/integrated"),
         ],
         parameters=[slam_real_params],
     )
@@ -564,6 +589,7 @@ def launch_setup(context, *args, **kwargs):
         point_cloud_filter_obstacle_node,
         bbox_project_pcloud_node,
         ransac_node,
+        odometry_publisher_node,
         object_tracking_map_node,
         rviz_node,
         control_mux,
