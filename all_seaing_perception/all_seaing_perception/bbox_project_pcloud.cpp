@@ -30,6 +30,8 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     this->declare_parameter<bool>("is_sim", false);
     m_is_sim = this->get_parameter("is_sim").as_bool();
 
+    RCLCPP_INFO(this->get_logger(), m_is_sim?"IS SIM: TRUE":"IS SIM: FALSE");
+
     this->declare_parameter<bool>("label_list", true);
     m_label_list = this->get_parameter("label_list").as_bool();
 
@@ -191,7 +193,7 @@ void BBoxProjectPCloud::bb_pcl_project(
     // using std::chrono::duration;
     // using std::chrono::milliseconds;
 
-    // auto t1 = high_resolution_clock::now();
+    // auto t1_tf = high_resolution_clock::now();
     
     pcl::PointCloud<pcl::PointXYZI>::Ptr in_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>), in_cloud_tf_ptr(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::fromROSMsg(*in_cloud_msg, *in_cloud_ptr);

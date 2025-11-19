@@ -234,7 +234,8 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("detections", "obstacle_map/local"),
-            ("odometry/filtered", "odometry/gps"),
+            # ("odometry/filtered", "odometry/gps"),
+            ("odometry/filtered", "odometry/integrated"),
         ],
         parameters=[slam_params]
     )
@@ -248,8 +249,8 @@ def launch_setup(context, *args, **kwargs):
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
             # {"child_frames_to_remove": ["imu_link_accel"]},
-            {"parent_frames_to_remove": ["map"]},
-            # {"parent_frames_to_remove": ["map", "odom"]},
+            # {"parent_frames_to_remove": ["map"]},
+            {"parent_frames_to_remove": ["map", "odom"]},
         ]
     )
 
@@ -272,8 +273,10 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"datum": [42.358541, -71.087389, 0.0]},
-            {"yaw_offset": -np.pi/2.0},
-            {"odom_yaw_offset": -np.pi/2.0},
+            # {"yaw_offset": -np.pi/2.0},
+            # {"odom_yaw_offset": -np.pi/2.0},
+            {"yaw_offset": np.pi/2.0},
+            {"odom_yaw_offset": np.pi/2.0},
             {"utm_zone": 19}, # 19 for Boston, 17 for Florida
             # {"use_odom_pos": True},
         ]
@@ -310,10 +313,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [0.5, 60.0]},
-            {"leaf_size_xy": 0.2},
-            {"leaf_size_z": 0.2},
+            {"leaf_size_xy": 0.3},
+            {"leaf_size_z": 0.3},
             {"local_range_z": [-100000.0, 0.0]},
-            {"min_pts_per_voxel": 2},
+            {"min_pts_per_voxel": 10},
         ],
     )
 
@@ -342,8 +345,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 0.4},
-            {"obstacle_size_min": 3},
+            {"clustering_distance": 1.0},
+            {"obstacle_size_min": 2},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},
@@ -469,17 +472,16 @@ def launch_setup(context, *args, **kwargs):
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
         # multicam_detection_merge_node,
-        # odometry_publisher_node,
+        odometry_publisher_node,
         object_tracking_map_node,
         tf_filtering,
-        # odometry_publisher_node,
         # robot_state_publisher,
         # static_transforms_ld,
         # point_cloud_filter_node,
         point_cloud_filter_downsampled_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
-        grid_map_generator,
+        # grid_map_generator,
         # rotate_imu_accel,
         # imu_reframe_node,
         # imu_filter_node,

@@ -49,12 +49,33 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
 
+    point_cloud_filter_obstacle_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="point_cloud_filter",
+        remappings=[
+            ("point_cloud", "/velodyne_points"),
+            ("point_cloud/filtered", "point_cloud/filtered_obs")
+        ],
+        parameters=[
+            {"robot_frame_id": "base_link"},
+            {"global_frame_id": "map"},
+            {"range_radius": [1.0, 5.0]},
+            {"local_range_z": [-100000.0, 0.0]},
+            {"leaf_size_xy": 1.0},
+            {"leaf_size_z": 1.0},
+            {"min_pts_per_voxel": 10},
+            {"convert_to_robot": True},
+        ],
+    )
+
     buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
             {"model": "best"},
+            # {"model": "roboboat_shape_2025"},
             {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -70,7 +91,9 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "best"},
+            # {"model": "roboboat_shape_2025"},
             {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -87,7 +110,9 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov8_node.py",
         parameters=[
             {"model": "best"},
+            # {"model": "roboboat_shape_2025"},
             {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -235,11 +260,12 @@ def launch_setup(context, *args, **kwargs):
         executable="ransac_detector",
         output="screen",
         remappings=[
+            ("labeled_object_point_clouds", "labeled_object_point_clouds/merged"),
         ],
         parameters=[
             {"ransac_params_file": ransac_params},
-            {"label_mappings_file": buoy_label_mappings},
-            # {"label_mappings_file": shape_label_mappings},
+            # {"label_mappings_file": buoy_label_mappings},
+            {"label_mappings_file": shape_label_mappings},
         ]
     )
 
@@ -253,10 +279,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [1.0, 60.0]},
-            {"leaf_size_xy": 0.2},
-            {"leaf_size_z": 0.2},
+            {"leaf_size_xy": 0.3},
+            {"leaf_size_z": 0.3},
             {"local_range_z": [-100000.0, 0.0]},
-            {"min_pts_per_voxel": 2},
+            {"min_pts_per_voxel": 10},
         ],
     )
 
@@ -285,12 +311,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"base_link_frame": "base_link"},
             {"global_frame_id": "map"},
-            {"clustering_distance": 0.4},
-            {"obstacle_size_min": 3},
+            {"clustering_distance": 1.0},
+            {"obstacle_size_min": 2},
             # {"obstacle_size_max": 300},
             # {"obstacle_filter_pts_max": 100},
             # {"obstacle_filter_area_max": 0.2},
-            {"obstacle_filter_length_max": 0.5},
+            {"obstacle_filter_length_max": 0.3},
             # {"range_max": 50.0},
         ],
     )
@@ -332,7 +358,8 @@ def launch_setup(context, *args, **kwargs):
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
             ("detections", "obstacle_map/local"),
-            ("odometry/filtered", "odometry/gps"),
+            # ("odometry/filtered", "odometry/gps"),
+            ("odometry/filtered", "odometry/integrated"),
         ],
         parameters=[configured_params]
     )
@@ -359,6 +386,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
+        point_cloud_filter_obstacle_node,
         buoy_yolo_node,
         buoy_yolo_node_back_left,
         buoy_yolo_node_back_right,

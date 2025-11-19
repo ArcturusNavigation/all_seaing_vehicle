@@ -3,8 +3,8 @@ object_tracking_map:
     global_frame_id: "odom"
     slam_frame_id: "map"
     duplicate_thresh: 1.0
-    obstacle_drop_thresh: 15.0
-    range_drop_thresh: 30.0
+    obstacle_drop_thresh: 30.0
+    range_drop_thresh: 15.0
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False
     range_uncertainty: 15.0
@@ -15,7 +15,7 @@ object_tracking_map:
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 1.0 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 30.0 # beware, was 10 before but changed it to 30 bc that's mavros publish rate, change it back if issues
-    update_gps_xy_uncertainty: 15.0 # for only labeled
+    update_gps_xy_uncertainty: 45.0 # for only labeled
     include_odom_theta: True
     include_odom_only_theta: False
     rotate_odom: False
@@ -37,3 +37,10 @@ object_tracking_map:
     trace_time: 10.0
     include_unlabeled: True
     unlabeled_association_threshold: 0.01
+    diff_position_odom: True
+    odom_queue_size: 1 # can even increase to 30 or 50 since those are processed quickly and it's important to keep a lot of them so that we at least have the latest odometry (and it hasn't been dropped from the queue) before applying the sensor data
+    # actually better to decrease (put it to 1) to increase speed of processing if detections slow the whole thing down, then we guarantee we are processing the last message & not holding onto previous ones
+    detection_queue_size: 5 # decrease it if all odom messages before next detection are getting dropped from queue before we finish processing the current detection, or if the messages in the beginning of the queue are too old
+    odom_detection_timeout: 0.5
+    gps_based_predictions: True
+    # the way it's currently done, it's best to either have gps_based_predictions or diff_position_odom to be True, not both of them (diff_position_odom is basically useless if the gps callback is faster than the odometry one and gps_based_predictions is True)

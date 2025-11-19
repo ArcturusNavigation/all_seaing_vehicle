@@ -110,8 +110,10 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"datum": [lat, lon, 0.0]},
-            {"yaw_offset": np.pi/2.0},
-            {"odom_yaw_offset": np.pi/2.0},
+            # {"yaw_offset": -np.pi/2.0},
+            # {"odom_yaw_offset": -np.pi/2.0},
+            {"yaw_offset": 0.0},
+            {"odom_yaw_offset": 0.0},
             {"utm_zone": utm}, # 19 for Boston, 17 for Florida
         ],condition=IfCondition(
             PythonExpression([
@@ -217,7 +219,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM2"}],
+        parameters=[{"port": "/dev/ttyACM0"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -237,7 +239,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM0"
+            "port": "/dev/ttyACM1"
         }.items(),
     )
 
