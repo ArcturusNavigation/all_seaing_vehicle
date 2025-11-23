@@ -91,12 +91,16 @@ class NavigationServer(ActionServerBase):
         self.stopped_plan()  # Release the semaphore
         return path
 
-    def send_waypoint(self, goal_handle, pose, is_stationary, avoid_obs=False):
+    def send_waypoint(self, goal_handle, pose, is_stationary, lookahead_pose = None, avoid_obs=False):
+        if lookahead_pose == None:
+            lookahead_pose = pose
         goal_msg = Waypoint.Goal()
         goal_msg.xy_threshold = goal_handle.request.xy_threshold
         goal_msg.theta_threshold = goal_handle.request.theta_threshold
         goal_msg.x = pose.position.x
         goal_msg.y = pose.position.y
+        goal_msg.lookahead_x = lookahead_pose.position.x
+        goal_msg.lookahead_y = lookahead_pose.position.y
         goal_msg.ignore_theta = True
         goal_msg.is_stationary = is_stationary
         goal_msg.avoid_obs = avoid_obs
@@ -160,7 +164,7 @@ class NavigationServer(ActionServerBase):
             # Last request should be "station keeping" if is_stationary is True
             is_stationary = (i == len(path.poses)-1 and goal_handle.request.is_stationary)
 
-            self.send_waypoint(goal_handle, pose, is_stationary, self.avoid_obs)
+            self.send_waypoint(goal_handle, pose, is_stationary, self.avoid_obs, lookahead_pose = (None if is_stationary else path.poses[i + 1]))
 
             # Wait until the boat finished reaching the waypoint
             while not self.result:

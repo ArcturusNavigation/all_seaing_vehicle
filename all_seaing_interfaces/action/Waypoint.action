@@ -4,6 +4,8 @@ float64 y
 float64 theta
 float64 xy_threshold
 float64 theta_threshold
+float64 lookahead_x
+float64 lookahead_y
 bool ignore_theta
 bool is_stationary
 bool avoid_obs false

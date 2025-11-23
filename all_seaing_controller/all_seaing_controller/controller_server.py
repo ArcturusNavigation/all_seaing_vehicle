@@ -67,6 +67,9 @@ class ControllerServer(ActionServerBase):
             .get_parameter_value()
             .double_value
         )
+        
+        self.min_goal_weight = 0.3
+        self.lookahead_scale = 0.05
 
         # --------------- SUBSCRIBERS, PUBLISHERS, AND SERVERS ---------------#
 
@@ -95,6 +98,10 @@ class ControllerServer(ActionServerBase):
         self.x_pid = PIDController(*Kpid_x)
         self.y_pid = PIDController(*Kpid_y)
         self.theta_pid = CircularPID(*Kpid_theta)
+
+        self.lookahead_x_pid = PIDController(*Kpid_x)
+        self.lookahead_y_pid = PIDController(*Kpid_y)
+
         self.theta_pid.set_effort_min(-self.max_vel[2])
         self.theta_pid.set_effort_max(self.max_vel[2])
         self.prev_update_time = self.get_clock().now()
@@ -124,16 +131,22 @@ class ControllerServer(ActionServerBase):
         self.x_pid.reset()
         self.y_pid.reset()
         self.theta_pid.reset()
+        self.lookahead_x_pid.reset()
+        self.lookahead_y_pid.reset()
 
-    def set_pid_setpoints(self, x, y, theta):
+    def set_pid_setpoints(self, x, y, theta, lookahead_x, lookahead_y):
         self.x_pid.set_setpoint(x)
         self.y_pid.set_setpoint(y)
         self.theta_pid.set_setpoint(theta)
+        self.lookahead_x_pid.setpoint(lookahead_x)
+        self.lookahead_y_pid.setpoint(lookahead_y)
 
     def update_pid(self, x, y, heading):
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.x_pid.update(x, dt)
         self.y_pid.update(y, dt)
+        self.lookahead_x_pid.update(x, dt)
+        self.lookahead_y_pid.update(y, dt)
         self.theta_pid.update(heading, dt)
         self.prev_update_time = self.get_clock().now()
 
@@ -166,8 +179,11 @@ class ControllerServer(ActionServerBase):
 
     def control_loop(self, nav_x, nav_y, heading):
         self.update_pid(nav_x, nav_y, heading)
-        x_output = self.x_pid.get_effort()
-        y_output = self.y_pid.get_effort()
+        dist_to_goal = (nav_x - self.goal_x) * (nav_x - self.goal_x) + (nav_y - self.goal_y) * (nav_y - self.goal_y)
+        dist_to_lookahead = (nav_x - self.lookahead_x) * (nav_x - self.lookahead_x) + (nav_y - self.lookahead_y) * (nav_y - self.lookahead_y)
+        goal_weight = max(self.min_goal_weight, dist_to_goal / (dist_to_lookahead * self.lookahead_scale + dist_to_goal))
+        x_output = self.x_pid.get_effort() * goal_weight + self.lookahead_x_pid.get_effort() * (1 - goal_weight)
+        y_output = self.y_pid.get_effort() * goal_weight + self.lookahead_y_pid.get_effort() * (1 - goal_weight)
         theta_output = self.theta_pid.get_effort()
         x_vel = x_output * math.cos(heading) + y_output * math.sin(heading)
         y_vel = y_output * math.cos(heading) - x_output * math.sin(heading)
@@ -205,8 +221,15 @@ class ControllerServer(ActionServerBase):
         theta_threshold = goal_handle.request.theta_threshold
         goal_x = goal_handle.request.x
         goal_y = goal_handle.request.y
+        goal_lookahead_x = goal_handle.request.lookahead_x
+        goal_lookahead_y = goal_handle.request.lookahead_y
         is_stationary = goal_handle.request.is_stationary
         self.avoid_obs = goal_handle.request.avoid_obs
+
+        self.goal_x = goal_x
+        self.goal_y = goal_y
+        self.goal_lookahead_x = goal_lookahead_x
+        self.goal_lookahead_y = goal_lookahead_y
 
         nav_x, nav_y, heading = self.get_robot_pose()
         if goal_handle.request.ignore_theta:
@@ -217,7 +240,7 @@ class ControllerServer(ActionServerBase):
         self.visualize_waypoint(goal_x, goal_y)
 
         self.reset_pid()
-        self.set_pid_setpoints(goal_x, goal_y, goal_theta)
+        self.set_pid_setpoints(goal_x, goal_y, goal_theta, goal_lookahead_x, goal_lookahead_y)
         while (
             not self.x_pid.is_done(nav_x, xy_threshold)
             or not self.y_pid.is_done(nav_y, xy_threshold)
