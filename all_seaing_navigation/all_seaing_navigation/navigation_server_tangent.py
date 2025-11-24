@@ -213,6 +213,10 @@ class NavigationTangentServer(ActionServerBase):
 
     def dot_3(self, a, b, c):
         return (b[0] - a[0]) * (c[0] - a[0]) + (b[1] - a[1]) * (c[1] - a[1])
+    
+    def point_segment_scale(self, a, b, c):
+        dot_prod = self.dot_3(a, b, c)
+        return dot_prod / ((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]))
 
     def point_to_segment(self, a, b, c): # point c to segment a-b
         dot_prod = self.dot_3(a, b, c)
@@ -278,6 +282,13 @@ class NavigationTangentServer(ActionServerBase):
             target_pos = b
         else:
             cor_off = self.proj_vector(a, b, (nav_x, nav_y)) # the perpendicular vector from robot pos to the line
+
+            ds_scale = self.point_segment_scale(a, b, (nav_x, nav_y))
+
+            if ds_scale < 0: # before a
+                cor_off = (a[0]-nav_x, a[1]-nav_y)
+            elif ds_scale > 1: # after b, shouldn't really happen bc we are considering the closest segment
+                cor_off = (b[0]-nav_x, b[1]-nav_y)
 
             for_sca = self.forward_dist / self.norm((b[0] - a[0], b[1] - a[1]))
             for_off = ((b[0] - a[0]) * for_sca, (b[1] - a[1]) * for_sca) # the tangent vector of the line

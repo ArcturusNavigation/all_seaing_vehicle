@@ -392,6 +392,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"forward_dist": 15.0},
             {"avoid_obs": True},
         ],
         output="screen",
