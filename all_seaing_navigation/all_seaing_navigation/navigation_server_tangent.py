@@ -10,11 +10,15 @@ from all_seaing_navigation.planner_executor import PlannerExecutor
 from all_seaing_interfaces.msg import ControlOption
 from all_seaing_interfaces.msg import ControlOption
 from sensor_msgs.msg import PointCloud2
+from rclpy.qos import qos_profile_sensor_data
+from all_seaing_controller.potential_field import PotentialField
 
 from std_msgs.msg import ColorRGBA
 from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import MarkerArray, Marker
-from geometry_msgs.msg import Point, PoseArray
+from geometry_msgs.msg import Point, PoseArray, Pose, Point, Vector3, Quaternion
+from tf_transformations import quaternion_from_euler
+from std_msgs.msg import Header, ColorRGBA
 
 from threading import Semaphore, Event
 import math
@@ -46,10 +50,10 @@ class NavigationTangentServer(ActionServerBase):
             .bool_value
         )
 
-        self.forward_vel = (
-            self.declare_parameter("forward_vel", 1)
+        self.forward_dist = (
+            self.declare_parameter("forward_dist", 5.0)
             .get_parameter_value()
-            .bool_value
+            .double_value
         )
 
         Kpid_x = (
@@ -159,6 +163,7 @@ class NavigationTangentServer(ActionServerBase):
         marker_msg.points = [
             Point(x=pose.position.x, y=pose.position.y) for pose in path.poses
         ]
+        marker_msg.id = 0
         self.marker_pub.publish(marker_msg)
 
     def generate_path(self, goal_handle, nav_x, nav_y):
@@ -223,42 +228,64 @@ class NavigationTangentServer(ActionServerBase):
         foot = (a[0] + sca * (b[0] - a[0]), a[1] + sca * (b[1] - a[1]))
         return (foot[0] - c[0], foot[1] - c[1])
 
-    def global_to_robot(target, robot):
+    def global_to_robot(self, target, robot):
         rel_pos = (target[0] - robot[0], target[1] - robot[1])
-        conv_pos = (rel_pos[0] * math.cos(robot_pose[2]) + rel_pos[1] * math.sin(robot_pose[2]), -rel.pos[0] * math.sin(robot_pose[2]) + rel.pos[1] * math.cos(robot_pose[2]))
-        return (conv_pos[0], conv_pos[1], math.atan2(conv_pos[1], conv_pos[0]))
+        conv_pos = (rel_pos[0] * math.cos(robot[2]) + rel_pos[1] * math.sin(robot[2]), -rel_pos[0] * math.sin(robot[2]) + rel_pos[1] * math.cos(robot[2]))
+        return (conv_pos[0], conv_pos[1], target[2]-robot[2])
+
+    def norm(self, x):
+        return math.sqrt(x[0]**2+x[1]**2)
+    
+    def visualize_waypoint(self, x, y):
+        marker_msg = Marker()
+        marker_msg.header.frame_id = self.global_frame_id
+        marker_msg.header.stamp = self.get_clock().now().to_msg()
+        marker_msg.ns = "pid_setpoint"
+        marker_msg.type = Marker.CYLINDER
+        marker_msg.action = Marker.ADD
+        marker_msg.scale.x = 0.4
+        marker_msg.scale.y = 0.4
+        marker_msg.scale.z = 8.0
+        marker_msg.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
+
+        marker_msg.pose.position.x = x
+        marker_msg.pose.position.y = y
+        marker_msg.pose.position.z = 2.0
+        marker_msg.id = 0
+        self.marker_pub.publish(marker_msg)
 
     def control_loop(self):
         nav_x, nav_y, nav_theta = self.get_robot_pose()
         assert self.cur_seg != None
 
-        if self.cur_seg + 1 >= len(self.path):
+        if self.cur_seg + 1 >= len(self.path.poses):
             return
 
         target_pos = (0, 0)
 
         a = (self.path.poses[self.cur_seg].position.x, self.path.poses[self.cur_seg].position.y)
         b = (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y)
-        while self.cur_seg + 2 < len(self.path):
+        while self.cur_seg + 2 < len(self.path.poses):
             c = (self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y)
-            if self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > self.point_to_segment(b, c, (nav_x, nav_y))
+            if self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > self.point_to_segment(b, c, (nav_x, nav_y)):
                 self.cur_seg += 1
                 a = b
                 b = c
             else:
                 break
 
-        if self.cur_seg + 2 == len(self.path):
+        if self.cur_seg + 2 == len(self.path.poses):
             target_pos = b
         else:
             cor_off = self.proj_vector(a, b, (nav_x, nav_y)) # the perpendicular vector from robot pos to the line
 
-            for_sca = self.forward_vel / self.magnitude((b[0] - a[0], b[1] - a[1]))
+            for_sca = self.forward_dist / self.norm((b[0] - a[0], b[1] - a[1]))
             for_off = ((b[0] - a[0]) * for_sca, (b[1] - a[1]) * for_sca) # the tangent vector of the line
 
             target_pos = (nav_x + cor_off[0] + for_off[0], nav_y + cor_off[1] + for_off[1])
 
-        target_robot_frame = self.global_to_robot(target_pos, (nav_x, nav_y, nav_theta))
+        self.visualize_waypoint(target_pos[0], target_pos[1])
+        target_robot_frame = self.global_to_robot((target_pos[0], target_pos[1], math.atan2(b[1]-a[1], b[0]-a[0])), (nav_x, nav_y, nav_theta))
         self.set_pid_setpoints(*target_robot_frame)
         self.update_pid(0, 0, 0)
 
@@ -314,15 +341,15 @@ class NavigationTangentServer(ActionServerBase):
         nav_x, nav_y, _ = self.get_robot_pose()
 
         # Generate path using requested planner
-        path = self.generate_path(goal_handle, nav_x, nav_y)
-        if not path.poses:
+        self.path = self.generate_path(goal_handle, nav_x, nav_y)
+        if not self.path.poses:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()
             return FollowPath.Result()
 
         self.start_process()
 
-        self.visualize_path(path)
+        self.visualize_path(self.path)
 
         self.cur_seg = self.get_closest_seg(nav_x, nav_y)
 
