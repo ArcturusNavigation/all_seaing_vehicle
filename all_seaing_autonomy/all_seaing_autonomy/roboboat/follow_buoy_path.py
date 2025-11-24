@@ -956,15 +956,15 @@ class FollowBuoyPath(TaskServerBase):
 
         # LOOK LEFT 30 DEG
 
-        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, cancel_on_exit=True)
 
         # LOOK RIGHT 30 DEG
 
-        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, cancel_on_exit=True)
 
         # BACK TO FORWARD
 
-        self.move_to_waypoint([nav_x, nav_y, heading], is_stationary=True, busy_wait=False)
+        self.move_to_waypoint([nav_x, nav_y, heading], is_stationary=True, busy_wait=False, cancel_on_exit=True)
 
     def search_buoys(self):
         nav_x, nav_y, heading = self.get_robot_pose()
@@ -973,13 +973,13 @@ class FollowBuoyPath(TaskServerBase):
 
         self.get_logger().info(f"Turning left")
 
-        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, cancel_on_exit=True)
 
         # LOOK RIGHT 30 DEG
 
         self.get_logger().info(f"Turning right")
 
-        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True)
+        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, cancel_on_exit=True)
 
     def search_beacon(self):
         nav_x, nav_y, heading = self.get_robot_pose()
@@ -988,13 +988,13 @@ class FollowBuoyPath(TaskServerBase):
 
         self.get_logger().info(f"Turning left")
 
-        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, exit_func=self.green_beacon_detected)
+        self.move_to_waypoint([nav_x, nav_y, heading + (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, exit_func=self.green_beacon_detected, cancel_on_exit=True)
 
         # LOOK RIGHT 30 DEG
 
         self.get_logger().info(f"Turning right")
 
-        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, exit_func=self.green_beacon_detected)
+        self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, exit_func=self.green_beacon_detected, cancel_on_exit=True)
 
     def init_setup(self):
         # TODO Add this code to should_accept_task instead, to return False if we don't have the conditions to start the task
@@ -1015,17 +1015,19 @@ class FollowBuoyPath(TaskServerBase):
                 if "red_pole_buoy" in self.red_labels:
                     self.red_labels.remove("red_pole_buoy")
                 # make the robot face the previous gate
+                self.get_logger().info('facing gate')
                 _, intended_dir = self.midpoint_pair_dir(self.pair_to, 0.0)
                 theta_intended = math.atan2(intended_dir[1], intended_dir[0])
                 nav_x, nav_y = self.robot_pos
-                self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
+                self.move_to_point([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
                 # recompute gate
                 self.setup_buoys()
+                self.get_logger().info('recomputing gate')
             self.generate_waypoints()
         elif self.state == FollowPathState.WAITING_GREEN_BEACON:
             self.get_logger().info(f"Searching green beacon")
 
-            self.search_beacon()
+            # self.search_beacon()
 
             self.get_logger().info(f'Detecting green beacon')
             self.home_pos = self.robot_pos # keep track of home position
