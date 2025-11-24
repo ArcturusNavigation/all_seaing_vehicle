@@ -12,14 +12,13 @@ from all_seaing_interfaces.action import Waypoint
 from all_seaing_interfaces.msg import ControlOption
 from sensor_msgs.msg import PointCloud2
 from rclpy.qos import qos_profile_sensor_data
-from visualization_msgs.msg import MarkerArray
+from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import Pose, Point, Vector3, Quaternion
 from std_msgs.msg import Header, ColorRGBA
 from tf_transformations import quaternion_from_euler
 
 
 from std_msgs.msg import ColorRGBA
-from visualization_msgs.msg import Marker
 
 TIMER_PERIOD = 1 / 60
 
