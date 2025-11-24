@@ -225,6 +225,24 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    navigation_server_tangent = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server_tangent.py",
+        parameters=[
+            {"global_frame_id": "map"},
+            {"robot_frame_id": "base_link"},
+            {"Kpid_x": [0.5, 0.0, 0.1]},
+            {"Kpid_y": [0.5, 0.0, 0.1]},
+            {"Kpid_theta": [0.6, 0.0, 0.0]},
+            {"max_vel": [1.5, 1.0, 0.3]},
+            {"avoid_max_dist": 1.7},
+            {"avoid_vel_coeff": 1.2},
+            {"forward_dist": 5.0},
+            {"avoid_obs": True},
+        ],
+        output="screen",
+    )
+    
     navigation_server_nomap = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server_nomap.py",
@@ -261,7 +279,8 @@ def launch_setup(context, *args, **kwargs):
 
     return [
         controller_server,
-        navigation_server,
+        # navigation_server,
+        navigation_server_tangent,
         # navigation_server_nomap,
         rviz_waypoint_sender,
         run_tasks,
