@@ -80,12 +80,12 @@ class SpeedChallenge(TaskServerBase):
         self.exit_turn_eps = self.get_parameter("exit_turn_eps").get_parameter_value().double_value
 
         self.max_turn_vel = (
-            self.declare_parameter("max_turn_vel", [4.0, 0.0, 2.5])
+            self.declare_parameter("max_turn_vel", [5.0, 0.0, 1.0])
             .get_parameter_value()
             .double_array_value
         )
         Turn_pid = (
-            self.declare_parameter("turn_pid", [0.03, 0.0, 0.0])
+            self.declare_parameter("turn_pid", [1.5, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
@@ -130,7 +130,7 @@ class SpeedChallenge(TaskServerBase):
             self.red_labels.add(label_mappings["red"])
             self.green_labels.add(label_mappings["green"])
             # self.blue_labels.add(label_mappings["green"])
-            self.blue_labels.add(label_mappings["black"])
+            self.blue_labels.add(label_mappings["yellow"])
         else:
             self.declare_parameter(
                 "buoy_label_mappings_file",
@@ -396,13 +396,13 @@ class SpeedChallenge(TaskServerBase):
         def update_first_base():
             self.blue_buoy_detected()
             return add_tuple(self.blue_buoy_pos, first_dir)
-        self.moved_to_point(self.first_base, busy_wait=True,
+        self.move_to_point(self.first_base, busy_wait=True,
                             goal_update_func=partial(self.update_point, "first_base", update_first_base) )
         self.get_logger().info(f"moved to first base = {self.moved_to_point}")
 
         in_circling = False # boolean flag for whether boat is circling, set to True when boat has turned at least 90 degrees
         def exit_angle_met():
-            cur_robot_dir = self.robot_dir()
+            cur_robot_dir = self.robot_dir
             buoy_gate_vector =  (self.gate_wpt[0]-self.blue_buoy_pos[0],self.gate_wpt[1] -self.blue_buoy_pos[1])
             buoy_gate_dir = (buoy_gate_vector[0]/self.norm(buoy_gate_vector), buoy_gate_vector[1]/self.norm(buoy_gate_vector))
             angle = math.atan2(cur_robot_dir[1], cur_robot_dir[0]) - math.atan2(buoy_gate_dir[1], buoy_gate_dir[0])
@@ -413,17 +413,25 @@ class SpeedChallenge(TaskServerBase):
         self.turn_pid.reset()
         self.turn_pid.set_setpoint(t_o)
         self.turn_pid.set_effort_max(self.max_turn_vel[2])
-        while (not in_circling) and (not exit_angle_met()):
+        self.turn_pid.set_effort_min(-self.max_turn_vel[2])
+        self.prev_update_time = self.get_clock().now()
+        self.get_logger().info(f"Circling buoy via PID")
+        while (not in_circling) or (not exit_angle_met()):
             pid_output = self.turn_pid.get_effort()
             # send velocity commands
-            self.send_vel_cmd(self.max_turn_vel[0], 0, pid_output)
+            self.send_vel_cmd(self.max_turn_vel[0], 0.0, -1.0*pid_output)
             # get feedback
-            cur_robot_pos= self.robot_pos()
             self.blue_buoy_detected()
-            dist_to_buoy = self.norm(self.blue_buoy_pos, self.robot_pos())
+            dist_to_buoy = self.norm(self.blue_buoy_pos, self.robot_pos)
             dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+
+            self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
             self.turn_pid.update(dist_to_buoy,dt)
+
+            # TODO: update in_Circling correctly (check 90 degrees)
+            in_circling = True
             time.sleep(TIMER_PERIOD)
+        self.get_logger().info(f"Finished circling buoy")
         return Task.Result(success=True)
     
     def send_vel_cmd(self, x=0, y=0, theta=0):
