@@ -15,6 +15,7 @@
 
     <depend>all_seaing_common</depend>
     <depend>all_seaing_interfaces</depend>
+    <depend>all_seaing_controller</depend>
 
     <depend>geometry_msgs</depend>
     <depend>sensor_msgs</depend>
