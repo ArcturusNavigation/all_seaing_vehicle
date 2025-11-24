@@ -15,7 +15,7 @@ object_tracking_map:
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 1.0 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 30.0 # beware, was 10 before but changed it to 30 bc that's mavros publish rate, change it back if issues
-    update_gps_xy_uncertainty: 70.0 # for only labeled
+    update_gps_xy_uncertainty: 100.0 # for only labeled
     include_odom_theta: True
     include_odom_only_theta: False
     rotate_odom: False
@@ -36,7 +36,7 @@ object_tracking_map:
     data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0
     include_unlabeled: True
-    unlabeled_association_threshold: 0.03
+    unlabeled_association_threshold: 0.01
     diff_position_odom: True
     odom_queue_size: 1 # can even increase to 30 or 50 since those are processed quickly and it's important to keep a lot of them so that we at least have the latest odometry (and it hasn't been dropped from the queue) before applying the sensor data
     # actually better to decrease (put it to 1) to increase speed of processing if detections slow the whole thing down, then we guarantee we are processing the last message & not holding onto previous ones

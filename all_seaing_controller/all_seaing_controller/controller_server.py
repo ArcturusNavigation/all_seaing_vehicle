@@ -176,7 +176,7 @@ class ControllerServer(ActionServerBase):
         # x_vel = x_output * math.cos(heading) + y_output * math.sin(heading)
         # y_vel = y_output * math.cos(heading) - x_output * math.sin(heading)
 
-        target_robot_frame = self.global_to_robot((self.goal_x, self.goal_y, self.goal_theta), (nav_x, nav_y, nav_theta))
+        target_robot_frame = self.global_to_robot((self.goal_x, self.goal_y, self.goal_theta), (nav_x, nav_y, heading))
         self.set_pid_setpoints(*target_robot_frame)
         self.update_pid(0, 0, 0)
         x_vel = self.x_pid.get_effort()
@@ -231,7 +231,7 @@ class ControllerServer(ActionServerBase):
         self.goal_x = goal_x
         self.goal_y = goal_y
         self.goal_theta = goal_theta
-        target_robot_frame = self.global_to_robot((self.goal_x, self.goal_y, self.goal_theta), (nav_x, nav_y, nav_theta))
+        target_robot_frame = self.global_to_robot((self.goal_x, self.goal_y, self.goal_theta), (nav_x, nav_y, heading))
         self.set_pid_setpoints(*target_robot_frame)
         # self.set_pid_setpoints(goal_x, goal_y, goal_theta)
         while (

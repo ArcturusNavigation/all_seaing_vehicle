@@ -176,7 +176,12 @@ class NavigationTangentServer(ActionServerBase):
 
         self.planner = PlannerExecutor(goal_handle.request.planner)
         path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
-        path.poses = path.poses[(len(path.poses) - 1) % goal_handle.request.choose_every :: goal_handle.request.choose_every]
+        if len(path.poses) >= 3:
+            self.get_logger().info('downsampling')
+            path.poses[1:-1] = path.poses[1+(len(path.poses) - 2) % goal_handle.request.choose_every :-1: goal_handle.request.choose_every]
+        if len(path.poses) <=1:
+            path.poses = [Pose(position=start), Pose(position=goal)]
+        assert(len(path.poses) >=2)
 
         self.stopped_plan()  # Release the semaphore
         return path
@@ -358,6 +363,8 @@ class NavigationTangentServer(ActionServerBase):
             goal_handle.abort()
             return FollowPath.Result()
 
+        self.get_logger().info("PATH FOUND")
+
         self.start_process()
 
         self.visualize_path(self.path)
@@ -368,7 +375,7 @@ class NavigationTangentServer(ActionServerBase):
 
         while True:
             nav_x, nav_y, _ = self.get_robot_pose()
-            if (nav_x - goal_handle.request.x) * (nav_x - goal_handle.request.x) + (nav_y - goal_handle.request.y) * (nav_y - goal_handle.request.y) < goal_handle.request.xy_threshold and not goal_handle.request.is_stationary:
+            if math.sqrt((nav_x - goal_handle.request.x) * (nav_x - goal_handle.request.x) + (nav_y - goal_handle.request.y) * (nav_y - goal_handle.request.y) < goal_handle.request.xy_threshold) and not goal_handle.request.is_stationary:
                 break
 
             if self.should_abort():

@@ -79,6 +79,9 @@ class SpeedChallenge(TaskServerBase):
         self.declare_parameter("exit_turn_eps", 0.4) #roughly a bit less than pi/6 both ways
         self.exit_turn_eps = self.get_parameter("exit_turn_eps").get_parameter_value().double_value
 
+        self.declare_parameter("t_o_eps", 0.5)
+        self.t_o_eps = self.get_parameter("t_o_eps").get_parameter_value().double_value
+
         self.max_turn_vel = (
             self.declare_parameter("max_turn_vel", [5.0, 0.0, 1.0])
             .get_parameter_value()
@@ -382,7 +385,7 @@ class SpeedChallenge(TaskServerBase):
         robot_buoy_vector = (self.blue_buoy_pos[0]-robot_x, self.blue_buoy_pos[1]-robot_y)
         robot_buoy_dist = self.norm(robot_buoy_vector)
         self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
-        first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
+        first_dir = (self.buoy_direction[1]*(t_o+self.t_o_eps), -self.buoy_direction[0]*(t_o+self.t_o_eps))
         if not self.left_first:
             first_dir = (-first_dir[0], -first_dir[1])
 
@@ -419,7 +422,7 @@ class SpeedChallenge(TaskServerBase):
         while (not in_circling) or (not exit_angle_met()):
             pid_output = self.turn_pid.get_effort()
             # send velocity commands
-            self.send_vel_cmd(self.max_turn_vel[0], 0.0, -1.0*pid_output)
+            self.send_vel_cmd(self.max_turn_vel[0], 0.0, (-1.0 if self.left_first else 1.0)*pid_output)
             # get feedback
             self.blue_buoy_detected()
             dist_to_buoy = self.norm(self.blue_buoy_pos, self.robot_pos)
@@ -456,7 +459,7 @@ class SpeedChallenge(TaskServerBase):
         _, intended_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
         theta_intended = math.atan2(intended_dir[1], intended_dir[0])
         nav_x, nav_y = self.robot_pos
-        self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
+        self.move_to_point([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
         # recompute gate
         self.setup_buoys()
         self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.forward_dist_back)
