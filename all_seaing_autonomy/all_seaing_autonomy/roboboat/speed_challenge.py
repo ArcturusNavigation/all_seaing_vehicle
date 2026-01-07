@@ -424,12 +424,13 @@ class SpeedChallenge(TaskServerBase):
         self.red_left = not self.red_left
         self.gate_pair.left, self.gate_pair.right = self.gate_pair.right, self.gate_pair.left
         # make the robot face the previous gate
-        _, intended_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
-        theta_intended = math.atan2(intended_dir[1], intended_dir[0])
-        nav_x, nav_y = self.robot_pos
-        self.move_to_point([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
+        # _, intended_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        # theta_intended = math.atan2(intended_dir[1], intended_dir[0])
+        # nav_x, nav_y = self.robot_pos
+        # self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
         # recompute gate
-        self.setup_buoys()
+        gate_mid, _ = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        self.setup_buoys(self.difference(self.robot_pos, gate_mid))
         self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.forward_dist_back)
 
         self.get_logger().info('going back to the gate')
@@ -444,6 +445,17 @@ class SpeedChallenge(TaskServerBase):
 
     def norm(self, vec, ref=(0, 0)):
         return math.sqrt(self.norm_squared(vec, ref))
+    
+    def dot(self, vec1, vec2):
+        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
+    
+    def difference(self, pt1, pt2):
+        """
+        pt2 - pt1
+        """
+        x1, y1 = pt1
+        x2, y2 = pt2
+        return (x2-x1, y2-y1)
 
     def blue_buoy_detected(self, buoy_front=False):
         '''
@@ -567,7 +579,7 @@ class SpeedChallenge(TaskServerBase):
         return marker_array
 
     
-    def setup_buoys(self):
+    def setup_buoys(self, pointing_direction=None):
         """
         Runs when the first obstacle map is received, filters the buoys that are in front of
         the robot (x>0 in local coordinates) and finds (and stores) the closest green one and
@@ -583,9 +595,10 @@ class SpeedChallenge(TaskServerBase):
         green_init, red_init = self.split_buoys(self.obstacles)
 
         # lambda function that filters the buoys that are in front of the robot
+        # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if ob.local_point.point.x > 0
+            if (pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
