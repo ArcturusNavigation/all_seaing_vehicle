@@ -55,12 +55,6 @@ class SpeedChange(TaskServerBase):
             Imu, "/mavros/imu/data", self.imu_cb, qos
         )
 
-        self.control_pub = self.create_publisher(
-            ControlOption, 
-            "control_options", 
-            10
-        )
-
 
         pid_vals = (
             self.declare_parameter("pid_vals", [0.0018, 0.0, 0.00005])

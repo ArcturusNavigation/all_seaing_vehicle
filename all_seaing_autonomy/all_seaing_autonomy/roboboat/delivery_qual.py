@@ -34,12 +34,6 @@ class DeliveryQual(TaskServerBase):
             10
         )
 
-        self.control_pub = self.create_publisher(
-            ControlOption, 
-            "control_options", 
-            10
-        )
-
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
 
