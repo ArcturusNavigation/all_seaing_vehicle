@@ -46,12 +46,6 @@ class FollowBuoyPID(TaskServerBase):
             10
         )
 
-        self.control_pub = self.create_publisher(
-            ControlOption,
-            "control_options",
-            10
-        )
-
         Kpid_x = (
             self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
             .get_parameter_value()

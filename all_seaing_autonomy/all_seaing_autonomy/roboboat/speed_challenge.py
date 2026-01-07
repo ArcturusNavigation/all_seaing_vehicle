@@ -54,8 +54,6 @@ class SpeedChallenge(TaskServerBase):
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
         )
 
-        self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
-
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
         )
@@ -266,12 +264,12 @@ class SpeedChallenge(TaskServerBase):
             self.get_logger().info('going behind the gate')
 
             self.move_to_point(self.gate_wpt, busy_wait=True,
-                goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
+                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
             
             self.get_logger().info('going in front of the gate')
             
             self.move_to_point(self.gate_wpt, busy_wait=True,
-                goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, self.init_gate_dist)))
+                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.init_gate_dist)))
             
             self.state = SpeedChallengeState.PROBING_BUOY
         
@@ -285,25 +283,6 @@ class SpeedChallenge(TaskServerBase):
         Gets the labeled map from all_seaing_perception.
         '''
         self.obstacles = msg.obstacles
-
-    def update_point(self, point_name, update_func):
-        '''
-        update_func: returns the new point value (x,y)
-        point_name: the attribute name of the point
-        Provides a wrapper for point updaters to be passed into move_to_point
-        '''
-        new_point = update_func()
-        if not hasattr(self, point_name):
-            setattr(self, point_name, new_point)
-            return False, None
-        else:
-            # already exists attribute
-            old_point = getattr(self, point_name)
-            dist_squared = (old_point[0] - new_point[0])**2 + (old_point[1] - new_point[1])**2
-            if (math.sqrt(dist_squared) > self.adaptive_distance):
-                setattr(self, point_name, new_point)
-                return True, new_point
-            return False, None
 
     def probe_blue_buoy(self):
         '''
@@ -366,7 +345,7 @@ class SpeedChallenge(TaskServerBase):
                 return add_tuple(self.blue_buoy_pos, dir)
             self.base_point = base
             self.move_to_point(self.base_point, busy_wait=True,
-                               goal_update_func=partial(self.update_point, "base_point", update_current_point) )
+                               goal_update_func=partial(self.update_point, "base_point", self.adaptive_distance, update_current_point) )
             self.get_logger().info(f"moved to point = {self.moved_to_point}")
 
         return Task.Result(success=True)
@@ -400,7 +379,7 @@ class SpeedChallenge(TaskServerBase):
             self.blue_buoy_detected()
             return add_tuple(self.blue_buoy_pos, first_dir)
         self.move_to_point(self.first_base, busy_wait=True,
-                            goal_update_func=partial(self.update_point, "first_base", update_first_base) )
+                            goal_update_func=partial(self.update_point, "first_base", self.adaptive_distance, update_first_base) )
         self.get_logger().info(f"moved to first base = {self.moved_to_point}")
 
         in_circling = False # boolean flag for whether boat is circling, set to True when boat has turned at least 90 degrees
@@ -437,17 +416,6 @@ class SpeedChallenge(TaskServerBase):
         self.get_logger().info(f"Finished circling buoy")
         return Task.Result(success=True)
     
-    def send_vel_cmd(self, x=0, y=0, theta=0):
-        '''
-        Send velocity commands to be executed by the controller.
-        '''
-        control_msg = ControlOption()
-        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
-        control_msg.twist.linear.x = x
-        control_msg.twist.linear.y = y
-        control_msg.twist.angular.z = theta
-        self.control_pub.publish(control_msg)
-    
     def return_to_start(self):
         '''
         After circling the buoy, return to the starting position.
@@ -466,9 +434,9 @@ class SpeedChallenge(TaskServerBase):
 
         self.get_logger().info('going back to the gate')
         self.move_to_point(self.gate_wpt, busy_wait=True,
-            goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, -self.forward_dist_back)))
+            goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.forward_dist_back)))
         self.move_to_point(self.gate_wpt, busy_wait=True,
-            goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, self.forward_dist_back)))
+            goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.forward_dist_back)))
         return Task.Result(success=True)
 
     def norm_squared(self, vec, ref=(0, 0)):

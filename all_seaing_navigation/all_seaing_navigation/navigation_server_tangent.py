@@ -276,12 +276,17 @@ class NavigationTangentServer(ActionServerBase):
         b = (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y)
         while self.cur_seg + 2 < len(self.path.poses):
             c = (self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y)
-            if self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > self.point_to_segment(b, c, (nav_x, nav_y)):
+            if b == c:
+                continue
+            if a == b or self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > self.point_to_segment(b, c, (nav_x, nav_y)):
                 self.cur_seg += 1
                 a = b
                 b = c
             else:
                 break
+
+        if a == b:
+            return
 
         if self.cur_seg + 2 == len(self.path.poses):
             target_pos = b

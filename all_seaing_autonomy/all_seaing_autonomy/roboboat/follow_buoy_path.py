@@ -14,6 +14,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_common.task_server_base import TaskServerBase
 from action_msgs.msg import GoalStatus
+from all_seaing_controller.pid_controller import PIDController
 
 import math
 import os
@@ -158,6 +159,26 @@ class FollowBuoyPath(TaskServerBase):
         self.last_pair = None
 
         self.green_beacon_found = False
+
+        self.declare_parameter("exit_turn_eps", 0.4) #roughly a bit less than pi/6 both ways
+        self.exit_turn_eps = self.get_parameter("exit_turn_eps").get_parameter_value().double_value
+
+        self.declare_parameter("t_o_eps", 0.5)
+        self.t_o_eps = self.get_parameter("t_o_eps").get_parameter_value().double_value
+
+        self.max_turn_vel = (
+            self.declare_parameter("max_turn_vel", [5.0, 0.0, 1.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        Turn_pid = (
+            self.declare_parameter("turn_pid", [1.5, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        self.turn_pid = PIDController(*Turn_pid)
+
+        self.first_back = True
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -940,6 +961,72 @@ class FollowBuoyPath(TaskServerBase):
 
         return Task.Result(success=True)
     
+    # copied from speed
+    def smooth_circle_green_beacon(self):
+        '''
+        Function to circle the green beacon in a smooth fashion.
+        '''
+        self.get_logger().info("Circling green beacon")
+        if not self.green_beacon_detected():
+            self.get_logger().info("speed challenge probing exited without finding green beacon")
+            return Task.Result(success=False)
+
+        t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
+        robot_x, robot_y = self.robot_pos
+        robot_buoy_vector = (self.green_beacon_pos[0]-robot_x, self.green_beacon_pos[1]-robot_y)
+        robot_buoy_dist = self.norm(robot_buoy_vector)
+        self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
+        first_dir = (self.buoy_direction[1]*(t_o+self.t_o_eps), -self.buoy_direction[0]*(t_o+self.t_o_eps))
+
+        add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
+        self.first_base = add_tuple(self.green_beacon_pos, first_dir)
+
+        self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
+        self.get_logger().info(f"green beacon buoy pose: {self.green_beacon_pos}")
+        self.get_logger().info(f"first base: {self.first_base}")
+
+        def update_first_base():
+            self.green_beacon_detected()
+            return add_tuple(self.green_beacon_pos, first_dir)
+        self.move_to_point(self.first_base, busy_wait=True,
+                            goal_update_func=partial(self.update_point, "first_base", self.adapt_dist, update_first_base) )
+        self.get_logger().info(f"moved to first base = {self.moved_to_point}")
+
+        in_circling = False # boolean flag for whether boat is circling, set to True when boat has turned at least 90 degrees
+        self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.pair_to, 0.0)
+        def exit_angle_met():
+            cur_robot_dir = self.robot_dir
+            buoy_gate_vector =  (self.gate_wpt[0]-self.green_beacon_pos[0],self.gate_wpt[1] -self.green_beacon_pos[1])
+            buoy_gate_dir = (buoy_gate_vector[0]/self.norm(buoy_gate_vector), buoy_gate_vector[1]/self.norm(buoy_gate_vector))
+            angle = math.atan2(cur_robot_dir[1], cur_robot_dir[0]) - math.atan2(buoy_gate_dir[1], buoy_gate_dir[0])
+            if (angle < 0):
+                angle += 2*math.pi
+            return (angle < self.exit_turn_eps) or (angle > 2*math.pi-self.exit_turn_eps)
+        
+        self.turn_pid.reset()
+        self.turn_pid.set_setpoint(t_o)
+        self.turn_pid.set_effort_max(self.max_turn_vel[2])
+        self.turn_pid.set_effort_min(-self.max_turn_vel[2])
+        self.prev_update_time = self.get_clock().now()
+        self.get_logger().info(f"Circling buoy via PID")
+        while (not in_circling) or (not exit_angle_met()):
+            pid_output = self.turn_pid.get_effort()
+            # send velocity commands
+            self.send_vel_cmd(self.max_turn_vel[0], 0.0, -pid_output)
+            # get feedback
+            self.green_beacon_detected()
+            dist_to_buoy = self.norm(self.green_beacon_pos, self.robot_pos)
+            dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+
+            self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
+            self.turn_pid.update(dist_to_buoy,dt)
+
+            # TODO: update in_Circling correctly (check 90 degrees)
+            in_circling = True
+            time.sleep(self.timer_period)
+        self.get_logger().info(f"Finished circling buoy")
+        return Task.Result(success=True)
+    
     def return_to_start(self):
         '''
         After circling the buoy, return to the starting position.
@@ -1009,7 +1096,7 @@ class FollowBuoyPath(TaskServerBase):
     def control_loop(self):
         # self.station_hold()
         if self.state in [FollowPathState.FOLLOWING_FIRST_PASS, FollowPathState.FOLLOWING_BACK]:
-            if self.state == FollowPathState.FOLLOWING_BACK:
+            if self.state == FollowPathState.FOLLOWING_BACK and self.first_back:
                 if "green_pole_buoy" in self.green_labels:
                     self.green_labels.remove("green_pole_buoy")
                 if "red_pole_buoy" in self.red_labels:
@@ -1023,6 +1110,7 @@ class FollowBuoyPath(TaskServerBase):
                 # recompute gate
                 self.setup_buoys()
                 self.get_logger().info('recomputing gate')
+                self.first_back = False
             self.generate_waypoints()
         elif self.state == FollowPathState.WAITING_GREEN_BEACON:
             self.get_logger().info(f"Searching green beacon")
@@ -1040,7 +1128,7 @@ class FollowBuoyPath(TaskServerBase):
                 self.state = FollowPathState.CIRCLING_GREEN_BEACON
         elif self.state == FollowPathState.CIRCLING_GREEN_BEACON:
             self.get_logger().info(f'Circling green beacon')
-            action_result = self.circle_green_beacon()
+            action_result = self.smooth_circle_green_beacon()
             # action_result = self.return_to_start()
             self.state = FollowPathState.FOLLOWING_BACK
 

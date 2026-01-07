@@ -4,6 +4,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 
 from all_seaing_interfaces.action import FollowPath, Task, Waypoint
+from all_seaing_interfaces.msg import ControlOption
 from all_seaing_common.action_server_base import ActionServerBase
 from action_msgs.msg import GoalStatus
 
@@ -28,6 +29,11 @@ class TaskServerBase(ActionServerBase):
 
         self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
+        self.control_pub = self.create_publisher(
+            ControlOption, 
+            "control_options", 
+            10
+        )
 
         self.timer_period = (
             self.declare_parameter("timer_period", 1.0 / 30.0)
@@ -299,3 +305,33 @@ class TaskServerBase(ActionServerBase):
             self.move_to_point(waypoint, is_stationary=is_stationary)
         else:
             self.move_to_waypoint(waypoint, is_stationary=is_stationary)
+    
+    def send_vel_cmd(self, x=0, y=0, theta=0):
+        '''
+        Send velocity commands to be executed by the controller.
+        '''
+        control_msg = ControlOption()
+        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+        control_msg.twist.linear.x = x
+        control_msg.twist.linear.y = y
+        control_msg.twist.angular.z = theta
+        self.control_pub.publish(control_msg)
+
+    def update_point(self, point_name, adaptive_distance, update_func):
+        '''
+        update_func: returns the new point value (x,y)
+        point_name: the attribute name of the point
+        Provides a wrapper for point updaters to be passed into move_to_point
+        '''
+        new_point = update_func()
+        if not hasattr(self, point_name):
+            setattr(self, point_name, new_point)
+            return False, None
+        else:
+            # already exists attribute
+            old_point = getattr(self, point_name)
+            dist_squared = (old_point[0] - new_point[0])**2 + (old_point[1] - new_point[1])**2
+            if (math.sqrt(dist_squared) > adaptive_distance):
+                setattr(self, point_name, new_point)
+                return True, new_point
+            return False, None

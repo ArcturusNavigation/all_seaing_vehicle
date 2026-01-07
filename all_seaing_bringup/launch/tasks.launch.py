@@ -82,6 +82,8 @@ def launch_setup(context, *args, **kwargs):
             {"beacon_probe_dist": 1.5},
             {"midpoint_pair_forward_dist": 0.5},
             {"adaptive_distance": 0.2},
+            {"max_turn_vel": [1.5, 0.0, 0.2]},
+            {"turn_pid": [0.4,0.0,0.0]},
         ],
         remappings=[
             ("obstacle_map/labeled", "obstacle_map/global"),
