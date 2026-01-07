@@ -235,9 +235,9 @@ class ControllerServer(ActionServerBase):
         self.set_pid_setpoints(*target_robot_frame)
         # self.set_pid_setpoints(goal_x, goal_y, goal_theta)
         while (
-            not self.x_pid.is_done(nav_x, xy_threshold)
-            or not self.y_pid.is_done(nav_y, xy_threshold)
-            or not (is_stationary or self.theta_pid.is_done(heading, math.radians(theta_threshold)))
+            not self.x_pid.is_done(xy_threshold)
+            or not self.y_pid.is_done(xy_threshold)
+            or not (goal_handle.request.ignore_theta or self.theta_pid.is_done(math.radians(theta_threshold)))
             or is_stationary
         ):
 

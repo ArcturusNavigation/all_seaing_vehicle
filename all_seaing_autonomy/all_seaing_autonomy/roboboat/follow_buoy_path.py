@@ -1113,11 +1113,11 @@ class FollowBuoyPath(TaskServerBase):
                 if "red_pole_buoy" in self.red_labels:
                     self.red_labels.remove("red_pole_buoy")
                 # make the robot face the previous gate
-                self.get_logger().info('facing gate')
+                # self.get_logger().info('facing gate')
                 # _, intended_dir = self.midpoint_pair_dir(self.pair_to, 0.0)
                 # theta_intended = math.atan2(intended_dir[1], intended_dir[0])
                 # nav_x, nav_y = self.robot_pos
-                # self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
+                # self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True, cancel_on_exit=True)
                 # recompute gate
                 # self.setup_buoys()
                 gate_mid, _ = self.midpoint_pair_dir(self.pair_to, 0.0)
