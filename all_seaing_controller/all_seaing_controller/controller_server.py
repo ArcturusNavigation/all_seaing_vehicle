@@ -12,14 +12,13 @@ from all_seaing_interfaces.action import Waypoint
 from all_seaing_interfaces.msg import ControlOption
 from sensor_msgs.msg import PointCloud2
 from rclpy.qos import qos_profile_sensor_data
-from visualization_msgs.msg import MarkerArray
+from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import Pose, Point, Vector3, Quaternion
 from std_msgs.msg import Header, ColorRGBA
 from tf_transformations import quaternion_from_euler
 
 
 from std_msgs.msg import ColorRGBA
-from visualization_msgs.msg import Marker
 
 TIMER_PERIOD = 1 / 60
 
@@ -164,13 +163,25 @@ class ControllerServer(ActionServerBase):
         control_msg.twist.angular.z = 0.0
         self.control_pub.publish(control_msg)
 
+    def global_to_robot(self, target, robot):
+        rel_pos = (target[0] - robot[0], target[1] - robot[1])
+        conv_pos = (rel_pos[0] * math.cos(robot[2]) + rel_pos[1] * math.sin(robot[2]), -rel_pos[0] * math.sin(robot[2]) + rel_pos[1] * math.cos(robot[2]))
+        return (conv_pos[0], conv_pos[1], target[2]-robot[2])
+
     def control_loop(self, nav_x, nav_y, heading):
-        self.update_pid(nav_x, nav_y, heading)
-        x_output = self.x_pid.get_effort()
-        y_output = self.y_pid.get_effort()
+        # self.update_pid(nav_x, nav_y, heading)
+        # x_output = self.x_pid.get_effort()
+        # y_output = self.y_pid.get_effort()
+        # theta_output = self.theta_pid.get_effort()
+        # x_vel = x_output * math.cos(heading) + y_output * math.sin(heading)
+        # y_vel = y_output * math.cos(heading) - x_output * math.sin(heading)
+
+        target_robot_frame = self.global_to_robot((self.goal_x, self.goal_y, self.goal_theta), (nav_x, nav_y, heading))
+        self.set_pid_setpoints(*target_robot_frame)
+        self.update_pid(0, 0, 0)
+        x_vel = self.x_pid.get_effort()
+        y_vel = self.y_pid.get_effort()
         theta_output = self.theta_pid.get_effort()
-        x_vel = x_output * math.cos(heading) + y_output * math.sin(heading)
-        y_vel = y_output * math.cos(heading) - x_output * math.sin(heading)
 
         marker_array = MarkerArray()
         marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))
@@ -217,11 +228,16 @@ class ControllerServer(ActionServerBase):
         self.visualize_waypoint(goal_x, goal_y)
 
         self.reset_pid()
-        self.set_pid_setpoints(goal_x, goal_y, goal_theta)
+        self.goal_x = goal_x
+        self.goal_y = goal_y
+        self.goal_theta = goal_theta
+        target_robot_frame = self.global_to_robot((self.goal_x, self.goal_y, self.goal_theta), (nav_x, nav_y, heading))
+        self.set_pid_setpoints(*target_robot_frame)
+        # self.set_pid_setpoints(goal_x, goal_y, goal_theta)
         while (
-            not self.x_pid.is_done(nav_x, xy_threshold)
-            or not self.y_pid.is_done(nav_y, xy_threshold)
-            or not (is_stationary or self.theta_pid.is_done(heading, math.radians(theta_threshold)))
+            not self.x_pid.is_done(xy_threshold)
+            or not self.y_pid.is_done(xy_threshold)
+            or not (goal_handle.request.ignore_theta or self.theta_pid.is_done(math.radians(theta_threshold)))
             or is_stationary
         ):
 

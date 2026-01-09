@@ -45,12 +45,6 @@ class Docking(TaskServerBase):
     def __init__(self):
         super().__init__(server_name = "docking_server", action_name = "docking")
 
-        self.control_pub = self.create_publisher(
-            ControlOption, 
-            "control_options", 
-            10
-        )
-
         self.obj_plane_sub = self.create_subscription(
             LabeledObjectPlaneArray, "object_planes/global", self.plane_cb, qos_profile_sensor_data
         )
@@ -202,6 +196,7 @@ class Docking(TaskServerBase):
         else:
             # TODO replace w/ numbers for the dock banner labels, as in the roboboat course
             # self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
+            self.boat_labels = []
             self.dock_labels = [self.label_mappings[name] for name in ["black_triangle"]]
             # self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
         

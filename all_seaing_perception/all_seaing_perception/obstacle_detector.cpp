@@ -7,6 +7,7 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/filter.h>
 #include <pcl/common/distances.h>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
@@ -69,7 +70,8 @@ private:
 
         // Flatten input point cloud to 2D
         pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZI>);
-        pcl::copyPointCloud(*in_cloud_ptr, *cloud_2d);
+        pcl::Indices filtered_indices;
+        pcl::removeNaNFromPointCloud(*in_cloud_ptr, *cloud_2d, filtered_indices);
         if (m_flatten){
             for (size_t i = 0; i < cloud_2d->points.size(); i++){
                 cloud_2d->points[i].z = 0;

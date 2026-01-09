@@ -249,7 +249,7 @@ def launch_setup(context, *args, **kwargs):
             {"enable_front": True},
             {"enable_back_left": True},
             {"enable_back_right": True},
-            {"individual": False},
+            {"individual": True},
             {"approximate": False},
             {"delay": 0.1},
         ]

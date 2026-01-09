@@ -5,8 +5,8 @@ from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
-
-from all_seaing_interfaces.msg import ObstacleMap, Obstacle, LabeledBoundingBox2DArray, LabeledBoundingBox2D
+from all_seaing_controller.pid_controller import PIDController
+from all_seaing_interfaces.msg import ObstacleMap, Obstacle, ControlOption
 from all_seaing_interfaces.action import FollowPath, Task
 from ament_index_python.packages import get_package_share_directory
 from sensor_msgs.msg import CameraInfo
@@ -25,10 +25,14 @@ from collections import deque
 from functools import partial
 from enum import Enum
 
+TIMER_PERIOD = 1 / 60
+
 class SpeedChallengeState(Enum):
     SETTING_UP = 1
     GATES = 2
-    CIRCLING_AND_BACK = 3
+    PROBING_BUOY = 3
+    CIRCLING = 4
+    RETURNING = 5
 
 class InternalBuoyPair:
     def __init__(self, left_buoy=None, right_buoy=None):
@@ -50,7 +54,6 @@ class SpeedChallenge(TaskServerBase):
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
         )
 
-
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
         )
@@ -71,12 +74,28 @@ class SpeedChallenge(TaskServerBase):
         self.declare_parameter("gate_dist_back", 1.0)
         self.forward_dist_back = self.get_parameter("gate_dist_back").get_parameter_value().double_value
 
+        self.declare_parameter("exit_turn_eps", 0.4) #roughly a bit less than pi/6 both ways
+        self.exit_turn_eps = self.get_parameter("exit_turn_eps").get_parameter_value().double_value
+
+        self.declare_parameter("t_o_eps", 0.5)
+        self.t_o_eps = self.get_parameter("t_o_eps").get_parameter_value().double_value
+
+        self.max_turn_vel = (
+            self.declare_parameter("max_turn_vel", [5.0, 0.0, 1.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        Turn_pid = (
+            self.declare_parameter("turn_pid", [1.5, 0.0, 0.0])
+            .get_parameter_value()
+            .double_array_value
+        )
+        self.turn_pid = PIDController(*Turn_pid)
+
         self.declare_parameter("is_sim", False)
         self.declare_parameter("turn_offset", 5.0)
 
-        self.home_pos = (0, 0)
         self.blue_buoy_pos = (0, 0)
-        self.runnerActivated = False
         
         self.buoy_direction = (0,0)
         self.buoy_found = False
@@ -112,7 +131,7 @@ class SpeedChallenge(TaskServerBase):
             self.red_labels.add(label_mappings["red"])
             self.green_labels.add(label_mappings["green"])
             # self.blue_labels.add(label_mappings["green"])
-            self.blue_labels.add(label_mappings["black"])
+            self.blue_labels.add(label_mappings["yellow"])
         else:
             self.declare_parameter(
                 "buoy_label_mappings_file",
@@ -147,7 +166,6 @@ class SpeedChallenge(TaskServerBase):
         Readies the server for the upcoming speed challenge.
         '''
         self.buoy_found = False
-        self.runnerActivated = False
         self.following_guide = True
         self.moved_to_point = False
     
@@ -227,68 +245,44 @@ class SpeedChallenge(TaskServerBase):
             self.mark_successful()
 
     def control_loop(self):
-        if self.state == SpeedChallengeState.GATES:
+        action_result = Task.Result(success=True)
+        if self.state == SpeedChallengeState.RETURNING:
+            action_result = self.return_to_start()
+            if action_result.success:
+                self.mark_successful()
+            else:
+                self.mark_unsuccessful()
+        elif self.state == SpeedChallengeState.CIRCLING:
+            action_result = self.smooth_circle_blue_buoy()
+            self.state = SpeedChallengeState.RETURNING
+        elif self.state == SpeedChallengeState.PROBING_BUOY:
+            action_result = self.probe_blue_buoy()
+            self.state = SpeedChallengeState.CIRCLING
+        elif self.state == SpeedChallengeState.GATES:
             self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.init_gate_dist)
 
             self.get_logger().info('going behind the gate')
 
             self.move_to_point(self.gate_wpt, busy_wait=True,
-                goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
+                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
             
             self.get_logger().info('going in front of the gate')
             
             self.move_to_point(self.gate_wpt, busy_wait=True,
-                goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, self.init_gate_dist)))
+                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.init_gate_dist)))
             
-            self.state = SpeedChallengeState.CIRCLING_AND_BACK
-        elif self.state == SpeedChallengeState.CIRCLING_AND_BACK:
-            self.runnerActivated = True
-
-            self.home_pos = self.robot_pos # keep track of home position
-            # self.buoy_direction = self.robot_dir
-
-            self.get_logger().info(f"Facing direction: {self.buoy_direction}")
-            task_result = self.run_actions()
-            if task_result:
-                self.mark_successful()
-            else:
-                self.mark_unsuccessful()
+            self.state = SpeedChallengeState.PROBING_BUOY
+        
+        # cancel control loop if a single action fails
+        if not action_result.success:
+            self.mark_unsuccessful()
+        
 
     def map_cb(self, msg):
         '''
         Gets the labeled map from all_seaing_perception.
         '''
         self.obstacles = msg.obstacles
-
-    def run_actions(self):
-        '''
-        Run all the actions, interrupted if an action fails
-        '''
-        actions = [self.probe_blue_buoy, self.circle_blue_buoy, self.return_to_start]
-        for action in actions:
-            action_result = action()
-            if action_result.success == False:
-                return action_result
-        return Task.Result(success=True)
-    
-    def update_point(self, point_name, update_func):
-        '''
-        update_func: returns the new point value (x,y)
-        point_name: the attribute name of the point
-        Provides a wrapper for point updaters to be passed into move_to_point
-        '''
-        new_point = update_func()
-        if not hasattr(self, point_name):
-            setattr(self, point_name, new_point)
-            return False, None
-        else:
-            # already exists attribute
-            old_point = getattr(self, point_name)
-            dist_squared = (old_point[0] - new_point[0])**2 + (old_point[1] - new_point[1])**2
-            if (math.sqrt(dist_squared) > self.adaptive_distance):
-                setattr(self, point_name, new_point)
-                return True, new_point
-            return False, None
 
     def probe_blue_buoy(self):
         '''
@@ -351,9 +345,75 @@ class SpeedChallenge(TaskServerBase):
                 return add_tuple(self.blue_buoy_pos, dir)
             self.base_point = base
             self.move_to_point(self.base_point, busy_wait=True,
-                               goal_update_func=partial(self.update_point, "base_point", update_current_point) )
+                               goal_update_func=partial(self.update_point, "base_point", self.adaptive_distance, update_current_point) )
             self.get_logger().info(f"moved to point = {self.moved_to_point}")
 
+        return Task.Result(success=True)
+
+    def smooth_circle_blue_buoy(self):
+        '''
+        Function to circle the blue buoy in a smooth fashion.
+        '''
+        self.get_logger().info("Circling blue buoy")
+        if not self.blue_buoy_detected():
+            self.get_logger().info("speed challenge probing exited without finding blue buoy")
+            return Task.Result(success=False)
+
+        t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
+        robot_x, robot_y = self.robot_pos
+        robot_buoy_vector = (self.blue_buoy_pos[0]-robot_x, self.blue_buoy_pos[1]-robot_y)
+        robot_buoy_dist = self.norm(robot_buoy_vector)
+        self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
+        first_dir = (self.buoy_direction[1]*(t_o+self.t_o_eps), -self.buoy_direction[0]*(t_o+self.t_o_eps))
+        if not self.left_first:
+            first_dir = (-first_dir[0], -first_dir[1])
+
+        add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
+        self.first_base = add_tuple(self.blue_buoy_pos, first_dir)
+
+        self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
+        self.get_logger().info(f"blue buoy pose: {self.blue_buoy_pos}")
+        self.get_logger().info(f"first base: {self.first_base}")
+
+        def update_first_base():
+            self.blue_buoy_detected()
+            return add_tuple(self.blue_buoy_pos, first_dir)
+        self.move_to_point(self.first_base, busy_wait=True,
+                            goal_update_func=partial(self.update_point, "first_base", self.adaptive_distance, update_first_base) )
+        self.get_logger().info(f"moved to first base = {self.moved_to_point}")
+
+        in_circling = False # boolean flag for whether boat is circling, set to True when boat has turned at least 90 degrees
+        def exit_angle_met():
+            cur_robot_dir = self.robot_dir
+            buoy_gate_vector =  (self.gate_wpt[0]-self.blue_buoy_pos[0],self.gate_wpt[1] -self.blue_buoy_pos[1])
+            buoy_gate_dir = (buoy_gate_vector[0]/self.norm(buoy_gate_vector), buoy_gate_vector[1]/self.norm(buoy_gate_vector))
+            angle = math.atan2(cur_robot_dir[1], cur_robot_dir[0]) - math.atan2(buoy_gate_dir[1], buoy_gate_dir[0])
+            if (angle < 0):
+                angle += 2*math.pi
+            return (angle < self.exit_turn_eps) or (angle > 2*math.pi-self.exit_turn_eps)
+        
+        self.turn_pid.reset()
+        self.turn_pid.set_setpoint(t_o)
+        self.turn_pid.set_effort_max(self.max_turn_vel[2])
+        self.turn_pid.set_effort_min(-self.max_turn_vel[2])
+        self.prev_update_time = self.get_clock().now()
+        self.get_logger().info(f"Circling buoy via PID")
+        while (not in_circling) or (not exit_angle_met()):
+            pid_output = self.turn_pid.get_effort()
+            # send velocity commands
+            self.send_vel_cmd(self.max_turn_vel[0], 0.0, (-1.0 if self.left_first else 1.0)*pid_output)
+            # get feedback
+            self.blue_buoy_detected()
+            dist_to_buoy = self.norm(self.blue_buoy_pos, self.robot_pos)
+            dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+
+            self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
+            self.turn_pid.update(dist_to_buoy,dt)
+
+            # TODO: update in_Circling correctly (check 90 degrees)
+            in_circling = True
+            time.sleep(TIMER_PERIOD)
+        self.get_logger().info(f"Finished circling buoy")
         return Task.Result(success=True)
     
     def return_to_start(self):
@@ -364,18 +424,21 @@ class SpeedChallenge(TaskServerBase):
         self.red_left = not self.red_left
         self.gate_pair.left, self.gate_pair.right = self.gate_pair.right, self.gate_pair.left
         # make the robot face the previous gate
-        _, intended_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
-        theta_intended = math.atan2(intended_dir[1], intended_dir[0])
-        nav_x, nav_y = self.robot_pos
-        self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True)
+        # _, intended_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        # theta_intended = math.atan2(intended_dir[1], intended_dir[0])
+        # nav_x, nav_y = self.robot_pos
+        # self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True, cancel_on_exit=True)
         # recompute gate
-        self.setup_buoys()
+        # self.setup_buoys()
+        gate_mid, _ = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        self.setup_buoys(self.difference(self.robot_pos, gate_mid))
         self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.forward_dist_back)
 
         self.get_logger().info('going back to the gate')
         self.move_to_point(self.gate_wpt, busy_wait=True,
-            goal_update_func=partial(self.update_point, "gate_wpt", partial(self.update_gate_wpt_pos, self.forward_dist_back)))
-        # self.move_to_point(self.home_pos, busy_wait=True)
+            goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.forward_dist_back)))
+        self.move_to_point(self.gate_wpt, busy_wait=True,
+            goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.forward_dist_back)))
         return Task.Result(success=True)
 
     def norm_squared(self, vec, ref=(0, 0)):
@@ -383,6 +446,17 @@ class SpeedChallenge(TaskServerBase):
 
     def norm(self, vec, ref=(0, 0)):
         return math.sqrt(self.norm_squared(vec, ref))
+    
+    def dot(self, vec1, vec2):
+        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
+    
+    def difference(self, pt1, pt2):
+        """
+        pt2 - pt1
+        """
+        x1, y1 = pt1
+        x2, y2 = pt2
+        return (x2-x1, y2-y1)
 
     def blue_buoy_detected(self, buoy_front=False):
         '''
@@ -506,7 +580,7 @@ class SpeedChallenge(TaskServerBase):
         return marker_array
 
     
-    def setup_buoys(self):
+    def setup_buoys(self, pointing_direction=None):
         """
         Runs when the first obstacle map is received, filters the buoys that are in front of
         the robot (x>0 in local coordinates) and finds (and stores) the closest green one and
@@ -522,9 +596,10 @@ class SpeedChallenge(TaskServerBase):
         green_init, red_init = self.split_buoys(self.obstacles)
 
         # lambda function that filters the buoys that are in front of the robot
+        # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if ob.local_point.point.x > 0
+            if (pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -577,6 +652,7 @@ class SpeedChallenge(TaskServerBase):
                 self.gate_pair = InternalBuoyPair(red_to, green_to)
             else:
                 self.gate_pair = InternalBuoyPair(green_to, red_to)
+            self.get_logger().info(f'FOUND GATE')
             return True
 
     def ccw(self, a, b, c):

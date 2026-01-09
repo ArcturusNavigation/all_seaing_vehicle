@@ -29,12 +29,6 @@ class DockingFallback(TaskServerBase):
     def __init__(self):
         super().__init__(server_name = "docking_server_fallback", action_name = "docking_fallback")
 
-        self.control_pub = self.create_publisher(
-            ControlOption, 
-            "control_options", 
-            10
-        )
-
         self.obj_plane_sub = self.create_subscription(
             LabeledObjectPlaneArray, "object_planes", self.plane_cb, qos_profile_sensor_data
         )
