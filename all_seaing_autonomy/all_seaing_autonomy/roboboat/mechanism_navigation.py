@@ -1,73 +1,82 @@
 #!/usr/bin/env python3
 
-# NOTE: Copied from follow_buoy_pid.py so need to make a lot of changes
-
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.qos import qos_profile_sensor_data
 
 
 from all_seaing_interfaces.action import Task
 from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
-from all_seaing_interfaces.msg import LabeledBoundingBox2DArray, ControlOption, ObstacleMap, LabeledObjectPlaneArray
-from all_seaing_common.action_server_base import ActionServerBase
+from all_seaing_interfaces.msg import ControlOption, LabeledObjectPlane, LabeledObjectPlaneArray
+from all_seaing_common.action_server_base import TaskServerBase
 from sensor_msgs.msg import CameraInfo
+from enum import Enum
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Pose, Point, Vector3, Quaternion
+from std_msgs.msg import Header, ColorRGBA
+
+from tf_transformations import quaternion_from_euler, euler_from_quaternion
+
+from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
+
+from dataclasses import dataclass
 
 import os
 import yaml
 import time
 import math
+import numpy as np
 
-class MechanismNavigation(ActionServerBase):
+class DeliveryState(Enum):
+    WAITING_TARGET = 1
+    NAVIGATING_TARGET = 2
+    STATIONKEEPING = 3
+    CANCELLING_NAVIGATION = 4
+    NEW_NAVIGATION = 5
+
+class TargetType(Enum):
+    def __str__(self):
+        return str(self.name)
+    WATER_TARGET = 1
+    BALL_TARGET = 2
+
+class MechanismNavigation(TaskServerBase):
     def __init__(self):
-        super().__init__("mechanism_navigation")
+        super().__init__(server_name = "mechanism_navigation", action_name = "mechanism_navigation")
 
-        self._action_server = ActionServer(
-            self,
-            Task,
-            "mechanism_navigation",
-            execute_callback=self.execute_callback,
-            cancel_callback=self.default_cancel_callback,
+        self.obj_plane_sub = self.create_subscription(
+            LabeledObjectPlaneArray, "object_planes/global", self.plane_cb, qos_profile_sensor_data
         )
 
-        # Replaced by obstacle map
-        self.bbox_sub = self.create_subscription(
-            LabeledBoundingBox2DArray,
-            "bounding_boxes",
-            self.bbox_callback,
-            10
-        )
+        self.docking_marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
 
-        # New obstacle map node
-        # Will use type label and global point
-        self.bbox_sub_new = self.create_subscription(
-            ObstacleMap,
-            "obstacle_map/labeled",
-            self.bbox_callback_new,
-            10
-        )
+        self.declare_parameter("forward_speed", 2.0)
+        self.declare_parameter("max_yaw", 0.7)
+        self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
+        self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
 
-        # New, new subscription??
-        self.plane_box = self.create_subscription(
-            LabeledObjectPlaneArray,
-            "object_planes",
-            self.plane_box,
-            10
-        )
+        self.declare_parameter("slow_dist", 0.1) # larger->smoother decline, starts slowing down further away
+        self.slow_dist = self.get_parameter("slow_dist").get_parameter_value().double_value
 
-        self.intrinsics_sub = self.create_subscription(
-            CameraInfo,
-            "camera_info",
-            self.intrinsics_callback,
-            10
-        )
+        self.declare_parameter("navigation_dist_thres", 7.0)
+        self.navigation_dist_thres = self.get_parameter("navigation_dist_thres").get_parameter_value().double_value
 
-        self.control_pub = self.create_publisher(
-            ControlOption,
-            "control_options",
-            10
-        )
+        self.declare_parameter("update_target_dist_thres", 3.0)
+        self.update_target_dist_thres = self.get_parameter("update_target_dist_thres").get_parameter_value().double_value
+
+        self.declare_parameter("adapt_dist", 0.7)
+        self.adapt_dist = self.get_parameter("adapt_dist").get_parameter_value().double_value
+
+        self.declare_parameter("wpt_banner_dist", 4.0)
+        self.wpt_banner_dist = self.get_parameter("wpt_banner_dist").get_parameter_value().double_value
+
+        self.declare_parameter("shooting_xy_thres", 0.2)
+        self.shooting_xy_thres = self.get_parameter("shooting_xy_thres").get_parameter_value().double_value
+
+        self.declare_parameter("duplicate_dist", 0.5)
+        self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
 
         Kpid_x = (
             self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
@@ -85,7 +94,7 @@ class MechanismNavigation(ActionServerBase):
             .double_array_value
         )
         self.max_vel = (
-            self.declare_parameter("max_vel", [2.0, 2.0, 0.4])
+            self.declare_parameter("max_vel", [2.0, 1.0, 0.4])
             .get_parameter_value()
             .double_array_value
         )
@@ -97,85 +106,198 @@ class MechanismNavigation(ActionServerBase):
         self.theta_pid.set_effort_max(self.max_vel[2])
         self.prev_update_time = self.get_clock().now()
 
-
-        # pid_vals = (
-        #     self.declare_parameter("pid_vals", [0.003, 0.0, 0.0])
-        #     .get_parameter_value()
-        #     .double_array_value
-        # )
-
-
-        self.declare_parameter("forward_speed", 5.0)
-        self.declare_parameter("max_yaw", 1.0)
-        self.forward_speed = self.get_parameter("forward_speed").get_parameter_value().double_value
-        self.max_yaw_rate = self.get_parameter("max_yaw").get_parameter_value().double_value
-
-        # self.pid = PIDController(*pid_vals)
-        # self.pid.set_effort_min(-self.max_yaw_rate)
-        # self.pid.set_effort_max(self.max_yaw_rate)
-        # self.prev_update_time = self.get_clock().now()
-        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
-
+        self.time_last_had_target = time.time()
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
-
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
-        # update from subs
-        self.height = None
-        self.width = None
-        self.bboxes = [] # To be commented out
-        self.obstacleboxes = []
-        self.planeboxes = []
-
-        self.timer_period = 1 / 30.0
-
-        # Parameter that set what boat we got to first
-        self.declare_parameter("cross_first", True)
-        self.cross_first = self.get_parameter("cross_first").get_parameter_value().bool_value
-        # Parameters for when is acceptable to have "reached" boat
-        self.declare_parameter("x_threshold", 5)
-        self.declare_parameter("y_threshold", 5)
-        self.x_threshold = self.get_parameter("x_threshold").get_parameter_value().double_value
-        self.y_threshold = self.get_parameter("y_threshold").get_parameter_value().double_value
-
         self.declare_parameter(
-            "color_label_mappings_file",
+            "shape_label_mappings_file",
             os.path.join(
-                bringup_prefix, "config", "perception", "color_label_mappings.yaml"
+                bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
             ),
         )
-        self.waypoint_x = None
-        self.waypoint_y = None
 
-        # Only want this to happen on init, check that this is the case
-        self.triangle_storage_x = None
-        self.triangle_storage_y = None
-        self.cross_storage_x = None
-        self.cross_storage_y = None
-
-        # Declares if have completed first step, should only happen on init
-        self.cross_done = False
-
-        # Adds objects with cross or triangle in name to set but is not correct
-        # Ask/Look into how this should be done
-        color_label_mappings_file = self.get_parameter(
-            "color_label_mappings_file"
+        shape_label_mappings_file = self.get_parameter(
+            "shape_label_mappings_file"
         ).value
-        with open(color_label_mappings_file, "r") as f:
-            label_mappings = yaml.safe_load(f)
-        # hardcoded from reading YAML
+        with open(shape_label_mappings_file, "r") as f:
+            self.label_mappings = yaml.safe_load(f)
 
-        # Don't know if strings are correct here
         if self.is_sim:
-            self.triangle_labels.add(label_mappings["triangle"])
-            self.cross_labels.add(label_mappings["cross"])
+            self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
+            self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
         else:
-            self.triangle_labels.add(label_mappings["triangle"])
-            self.cross_labels.add(label_mappings["cross"])
+            self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
+            self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
 
+        self.state = DeliveryState.WAITING_TARGET
 
+        # update from subs
+        self.water_banners = []
+        self.ball_banners = []
+        self.selected_target = None
+        self.shot_targets = []
+
+        self.got_target = False
+        self.picked_target = False
+        self.started_task = False
+
+        self.state = None
+
+        self.shot_water = False
+        self.shot_ball = False
+
+    def ctr_normal(self, plane: LabeledObjectPlane):
+        center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
+        _,_,theta = euler_from_quaternion([plane.normal_ctr.orientation.x, plane.normal_ctr.orientation.y, plane.normal_ctr.orientation.z, plane.normal_ctr.orientation.w])
+        return (center_pt, (np.cos(theta), np.sin(theta)))
+
+    def plane_cb(self, msg: LabeledObjectPlaneArray):
+        if not self.started_task:
+            return
+        # self.get_logger().info('GOT OBJECTS')
+        self.got_target = False
+        self.picked_target = False
+        self.started_task = False
+        self.updated_target_pos = False
+        new_water_banners = []
+        new_ball_banners = []
+        obj_plane: LabeledObjectPlane
+        for obj_plane in msg.objects:
+            if(obj_plane.label in self.water_labels):
+                self.got_target = True
+                ctr, normal = self.ctr_normal(obj_plane)
+                new_water_banners.append((TargetType.WATER_TARGET, (ctr, normal)))
+            if (obj_plane.label in self.ball_labels):
+                self.got_target = True
+                ctr, normal = self.ctr_normal(obj_plane)
+                new_ball_banners.append((TargetType.BALL_TARGET, (ctr, normal)))
+        
+        # update global variables
+        self.water_banners = new_water_banners
+        self.ball_labels = new_ball_banners
+
+        # ensure that we first shoot two targets of different type
+        if self.shot_water and not self.shot_ball:
+            target_banners = self.ball_banners
+        elif self.shot_ball and not self.shot_water:
+            target_banners = self.water_banners
+        else:
+            target_banners = self.water_banners + self.ball_banners
+
+        if self.got_target:
+            # check for taken docks and stuff
+            for target_type, (target_ctr, target_normal) in target_banners:
+                # check if we already shot it
+                shot = False
+                for shot_target_type, (shot_target_ctr, shot_target_normal) in self.shot_targets:
+                    if self.norm(shot_target_ctr, target_ctr) < self.duplicate_dist:
+                        shot = True
+                if shot:
+                    continue
+                # found new docking target
+                self.picked_target = True
+                if self.selected_target is None:
+                    self.updated_target_pos = True
+                if (self.selected_target is not None) and (self.norm(self.selected_target[1][0], target_ctr) < self.duplicate_dist):
+                    # same target, update position & normal
+                    self.selected_target = (target_type, (target_ctr, target_normal))
+                    self.updated_target_pos = True
+                    return
+                if (self.selected_target is None) or (self.norm(self.selected_target[1][0], self.robot_pos) > self.norm(target_ctr, self.robot_pos) + self.update_target_dist_thres):
+                    self.state = DeliveryState.NEW_NAVIGATION
+                    # found a new one closer
+                    self.selected_target = (target_type, (target_ctr, target_normal))
+                    self.updated_target_pos = True
+                    # self.pid.reset()
+                    self.x_pid.reset()
+                    self.y_pid.reset()
+                    self.theta_pid.reset()
+                    self.get_logger().info(f'WILL SHOOT {self.selected_target[0]}')
+
+        if (not self.picked_target) or (not self.updated_target_pos):
+        # if (not self.picked_target):
+            self.selected_target = None
+            self.picked_target = False
+            # self.pid.reset()
+            self.x_pid.reset()
+            self.y_pid.reset()
+            self.theta_pid.reset()
+            if self.state == DeliveryState.NAVIGATING_TARGET:
+                # was going to a fake target (misdetection)
+                self.state = DeliveryState.CANCELLING_NAVIGATION
+                self.get_logger().info(f'WAS GOING TO A FAKE TARGET, ABORT')
+            else:
+                self.state = DeliveryState.WAITING_TARGET
+        
+        # if not self.updated_target_pos:
+        #     self.selected_target = None
+        #     self.picked_target = False
+        #     self.get_logger().info("COULDN'T TRACK TARGET POSITION")
+        #     self.x_pid.reset()
+        #     self.y_pid.reset()
+        #     self.theta_pid.reset()
+    
+    def distance(self, point, wall_params):
+        x, y = point
+        (a, b, c), _ = wall_params
+        return (a*x+b+y)/math.sqrt(a**2+b**2)
+    
+    def dot(self, vec1, vec2):
+        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
+
+    def midpoint(self, pt1, pt2):
+        x1, y1 = pt1
+        x2, y2 = pt2
+        return ((x1+x2)/2.0, (y1+y2)/2.0)
+
+    def difference(self, pt1, pt2):
+        """
+        pt2 - pt1
+        """
+        x1, y1 = pt1
+        x2, y2 = pt2
+        return (x2-x1, y2-y1)
+    
+    def norm_squared(self, vec, ref=(0, 0)):
+        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
+
+    def norm(self, vec, ref=(0, 0)):
+        return math.sqrt(self.norm_squared(vec, ref))
+    
+    def perp_vec(self, vec):
+        return (-vec[1], vec[0])
+    
+    # def angle_vec(self, vec1, vec2):
+    #     return math.acos(self.dot(vec1, vec2)/(self.norm(vec1)*self.norm(vec2))) 
+    
+    def negative(self, vec):
+        return (-vec[0], -vec[1])
+    
+    def sum(self, vec1, vec2):
+        return (vec1[0]+vec2[0], vec1[1]+vec2[1])
+    
+    def scalar_prod(self, vec, scalar):
+        return (scalar*vec[0], scalar*vec[1])
+    
+    def cross(self, vec1, vec2):
+        return vec1[0]*vec2[1]-vec1[1]*vec2[0]
+
+    def angle_vec(self, vec1, vec2):
+        return math.atan2(self.cross(vec1, vec2)/(self.norm(vec1)*self.norm(vec2)), self.dot(vec1, vec2)/(self.norm(vec1)*self.norm(vec2))) 
+
+    def angle_segments(self, p1, p2):
+        p1left, p1right = p1
+        p2left, p2right = p2
+        return self.angle_vec(self.difference(p1left, p1right), self.difference(p2left, p2right))
+    
+    def fit_pair(self, point_pair):
+        (x1,y1), (x2,y2) = point_pair
+        # (y-y1)(x2-x1) = (y2-y1)*(x-x1) -> y(x2-x1)+x(y1-y2)+x1(y2-y1)+y1(x1-x2) = 0 -> y(x2-x1)+x(y1-y2)+x1y2-x2y1
+        return (y1-y2, x2-x1, x1*y2-x2*y1), abs(x1*y2-x2*y1)/math.sqrt((y1-y2)**2+(x2-x1)**2)
+    
     def set_pid_setpoints(self, x, y, theta):
         self.x_pid.set_setpoint(x)
         self.y_pid.set_setpoint(y)
@@ -194,211 +316,110 @@ class MechanismNavigation(ActionServerBase):
 
         scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
         return scale * x_vel, scale * y_vel
+    
+    def init_setup(self):
+        self.started_task = True
+        self.set_pid_setpoints(0, 0, 0)
+        self.mark_successful()
 
-    def intrinsics_callback(self, msg):
-        self.height = msg.height
-        self.width = msg.width
-
-    def dist_squared(self, vect):
-        return vect[0] * vect[0] + vect[1] * vect[1]
-
-    def ccw(self, right, yellow, left):
-        """Return True if the points a, b, c are counterclockwise, respectively"""
-        area = (
-            right[0] * yellow[1]
-            + yellow[0] * left[1]
-            + left[0] * right[1]
-            - right[1] * yellow[0]
-            - yellow[1] * left[0]
-            - left[1] * right[0]
+    def vel_to_marker(self, vel, scale=1.0, rgb=(1.0, 0.0, 0.0), id=0):
+        orientation = Quaternion()
+        orientation.x, orientation.y, orientation.z, orientation.w = quaternion_from_euler(0, 0, math.atan2(vel[1], vel[0]))
+        return Marker(
+            type=Marker.ARROW,
+            header=Header(frame_id=self.robot_frame_id),
+            pose=Pose(orientation=orientation),
+            scale=Vector3(x=scale*math.sqrt(vel[0]**2+vel[1]**2), y=0.15, z=0.15),
+            color=ColorRGBA(a=1.0, r=rgb[0], g=rgb[1], b=rgb[2]),
+            id=id,
         )
-        return area > 0
-
-    # Replaced by obstacle map
-    def bbox_callback(self, msg):
-        self.bboxes = msg.boxes
-
-    # New version with obstacles
-    def bbox_callback_new(self, msg):
-        self.obstacleboxes = msg.obstacles
-
-    # New new version with plane objects?
-    def plane_box_callback(self, msg):
-        self.planeboxes = msg.object_planes
-
+    
     def control_loop(self):
-        # if self.width is None or len(self.obstacleboxes) == 0:
-        #     self.get_logger().info(f"no obstalces or zero width {self.width}, {len(self.obstacleboxes)}")
-        #     return
+        if self.state == DeliveryState.WAITING_TARGET:
+            # IF DON'T HAVE A TARGET FOR TOO LONG, FINISH TASK
+            if time.time() - self.time_last_had_target > 5:
+                self.mark_successful()
+            return # TODO stationkeep/search for target by steering right and left
+        self.time_last_had_target = time.time()
+        if self.state == DeliveryState.CANCELLING_NAVIGATION:
+            self.cancel_navigation()
+            self.state = DeliveryState.WAITING_TARGET
+            return
+        marker_arr = MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)])
+        mark_id = 1
+        # self.get_logger().info(f'CONTROL LOOP')
+        # PID to go to the detected target (consider its middle and the angle of the whole dock line)
+        target_back_mid = self.selected_target[1][0]
+        target_dir = self.selected_target[1][1]
+        
+        marker_arr.markers.append(VisualizationTools.visualize_line(target_back_mid, self.perp_vec(target_dir), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
+        mark_id = mark_id + 1
 
-        # Access point through name.point.x, etc.?
-        triangle_location = None
-        triangle_area = 0
+        if self.state == DeliveryState.STATIONKEEPING or self.norm(target_back_mid, self.robot_pos) < self.navigation_dist_thres:
+            if self.state == DeliveryState.NAVIGATING_TARGET:
+                self.get_logger().info('CANCELLING NAVIGATION')
+                self.cancel_navigation()
+            self.get_logger().info('STATIONKEEPING PID')
+            self.state = DeliveryState.STATIONKEEPING
+            # go to that line and forward (negative error if boat left of line, positive if right)
+            offset = -self.dot(self.difference(target_back_mid, self.robot_pos), self.perp_vec(target_dir))
+            approach_angle = self.angle_vec(self.negative(target_dir), self.robot_dir) # TODO Check sign
 
-        cross_location = None
-        cross_area = 0
+            # forward speed decreasing exponentially as we get closer
+            dist_diff = self.dot(self.difference(target_back_mid, self.robot_pos), target_dir) - self.wpt_banner_dist
+            # forward_speed = self.forward_speed*(1-np.exp(-dist_diff/self.slow_dist))
 
-        # handle balancing box sizes later ?
-        # ex. same size but offset should be y shift
-        # but diff size should be a rotation and probably
-        # a bit of a y shift too?
+            self.get_logger().info(f'side offset: {offset}')
+            self.get_logger().info(f'forward distance: {dist_diff}')
+            self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
+            if abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres:
+                # TODO SHOOT BALL/WATER
+                self.get_logger().info(f'SHOOTING {self.selected_target[0]}')
+                # move on
+                self.shot_targets.append(self.selected_target)
+                self.state = DeliveryState.WAITING_TARGET
+                self.selected_target = None
+                self.picked_target = False
+                # self.pid.reset()
+                self.x_pid.reset()
+                self.y_pid.reset()
+                self.theta_pid.reset()
+                return
+            x_output = self.x_pid.get_effort()
+            y_output = self.y_pid.get_effort()
+            theta_output = self.theta_pid.get_effort()
+            x_vel = x_output
+            # x_vel = forward_speed
+            y_vel = y_output
 
-        # Logic to find the largest cross and triangle just in case get noise?
-        # Choose the last triangle/cross in the list
-        # Could use size (type vector 3) to choose closest in theory
-        forward = False
-        for box in self.planeboxes:
-            # area = (box.bbox_max.x - box.bbox_min.x) * (box.bbox_max.y - box.bbox_min.y)
-            location = box.normal_ctr # Type Pose (point, Quaternian)
-            if box.label in self.triangle_labels: # and area > triangle_area:
-                self.get_logger().info('TRIANGLE THERE')
-                # triangle_area = area
-                triangle_location = location.point
-            elif box.label in self.cross_labels: # and area > cross_area:
-                self.get_logger().info('CROSS THERE')
-                # cross_area = area
-                cross_location = location.point
+            marker_array = MarkerArray()
+            marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))
 
-        # Initializes values
-        self.waypoint_x = None
-        self.waypoint_y = None
-        self.waypoint_cross_x = None
-        self.waypoint_cross_y = None
-        self.waypoint_triangle_x = None
-        self.waypoint_triangle_y = None
-        cross_x = None
-        cross_y = None
-        triangle_x = None
-        triangle_y = None
+            marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 0.0, 1.0), id=2))
 
-        # Handles cases where only have one and maybe build into logic of storing location somehow
-        if cross_location is not None or triangle_location is not None:
-            # Set imaginary location for any buoys we do not see
-            if cross_location is None:
-                self.get_logger().info("cross was None")
-                triangle_y = triangle_location.point.y
-                triangle_x = triangle_location.point.x
-                cross_y = self.cross_storage_y
-                cross_x = self.cross_storage_x
-            elif triangle_location is None:
-                self.get_logger().info("triangle was None")
-                cross_y = cross_location.point.y
-                cross_x = cross_location.point.x
-                triangle_y = self.triangle_storage_y
-                triangle_x = self.triangle_storage_x
-            else:
-                triangle_y = triangle_location.point.y
-                triangle_x = triangle_location.point.x
-                cross_y = cross_location.point.y
-                cross_x = cross_location.point.x
-
-        # Reset global variables for storage
-        self.triangle_storage_x = triangle_x
-        self.triangle_storage_y = triangle_y
-        self.cross_storage_x = cross_x
-        self.cross_storage_y = cross_y
-
-        # Main logic of the mechanism navigation
-        # From here assumes no positions are NONE
-        # Needs to know when to stop and then switch to other
-        # Captures robot position only
-        # Doesn't do heading so might need to do something with that later
-        position = self.get_robot_pose()[0:1]
-        robot_x = position[1]
-        robot_y = position[0]
-        if abs(triangle_x - robot_x) <= self.x_threshold:
-            self.waypoint_triangle_x = robot_x
-
-        if abs(cross_x - robot_x) <= self.x_threshold:
-            self.waypoint_cross_x = robot_x
-
-        if abs(triangle_y - robot_y) <= self.y_threshold:
-            self.waypoint_triangle_y = robot_y
-
-        if abs(cross_y - robot_y) <= self.y_threshold:
-            self.waypoint_cross_y = robot_y
-
-        if self.cross_first and not self.cross_done:
-            if self.waypoint_cross_x == robot_x and self.waypoint_cross_y == robot_y:
-                self.cross_done = True
-                # Add in wait here?
-            else:
-                self.waypoint_y = self.waypoint_cross_y
-                self.waypoint_x = self.waypoint_cross_x
-        elif self.cross_done:
-            if self.waypoint_triangle_x == robot_x and self.waypoint_triangle_y == robot_y:
-                # Place holder so no error REMOVE
-                self.waypoint_triangle_x = 0
-                # Can terminate
-                # Can add in wait
-            else:
-                self.waypoint_x = self.waypoint_triangle_x
-                self.waypoint_y = self.waypoint_triangle_y
-
-        yaw0 = False
-        # if self.waypoint_x is None or (math.sqrt(self.waypoint_x**2)+ math.sqrt(self.waypoint_y**2)) < self.front_limit:
-        # In theory shouldn't happen, but maybe uncomment and have just in case
-        # if cross_x is None and triangle_x is None:
-        #     yaw0 = True
-        #     if (self.get_clock().now().nanoseconds / 1e9) - self.time_last_seen_buoys > 100.0:
-        #         self.get_logger().info("not detecting cross or triangle")
-        #         # wait 1 second, then send a stopping control msg (in case we haven't fully passed the buoys)
-        #         time.sleep(1)
-
-        #         self.result = True
-        #     self.get_logger().info('KILLING THRUSTERS')
-        #     control_msg = ControlOption()
-        #     control_msg.priority = 1
-        #     self.get_logger().info(f'SENDING COMMAND: {control_msg}')
-        #     self.control_pub.publish(control_msg)
-        #     return
-        # else:
-        #     self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
-
-        # POINTS TO GIVE PID: self.waypoint_y and self.waypoint_x
-        self.get_logger().info(f"triangle x: {triangle_x}, triangle y: {triangle_y}")
-        self.get_logger().info(f"cross x: {cross_x}, cross y: {cross_y}")
-        self.get_logger().info(f"waypoint x: {self.waypoint_x}, waypoint y: {self.waypoint_y}")
-
-        self.update_pid(-self.waypoint_x, -self.waypoint_y, math.atan2(-self.waypoint_y, -self.waypoint_x))
-        x_output = self.x_pid.get_effort()
-        y_output = self.y_pid.get_effort()
-        theta_output = self.theta_pid.get_effort()
-        x_vel = x_output
-        y_vel = y_output
-
-        x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
-        control_msg = ControlOption()
-        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
-        control_msg.twist.linear.x = x_vel
-        control_msg.twist.linear.y = y_vel
-        control_msg.twist.angular.z = theta_output
-        self.control_pub.publish(control_msg)
-
-
-    def execute_callback(self, goal_handle):
-        self.start_process("mechanism navigation pid starting")
-        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
-        self.set_pid_setpoints(0, 0, 0) #want angle to point to be 0 radians
-
-        while not self.result:
-
-            if self.should_abort():
-                self.end_process("aborting mechanism navigation")
-                goal_handle.abort()
-                return Task.Result()
-
-            if goal_handle.is_cancel_requested:
-                self.end_process("cancelling mechanism navigation")
-                goal_handle.canceled()
-                return Task.Result()
-
-            self.control_loop()
-            time.sleep(self.timer_period)
-
-        self.end_process("mechanism navigation pid completed!")
-        goal_handle.succeed()
-        return Task.Result(success=True)
+            x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
+            control_msg = ControlOption()
+            control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+            control_msg.twist.linear.x = x_vel
+            control_msg.twist.linear.y = y_vel
+            control_msg.twist.angular.z = theta_output
+            self.control_pub.publish(control_msg)
+            self.controller_marker_pub.publish(marker_array)
+        else:
+            waypoint = self.sum(target_back_mid, self.scalar_prod(target_dir, self.wpt_banner_dist))
+            if self.state == DeliveryState.NEW_NAVIGATION or ((self.sent_waypoint is not None) and (self.norm(waypoint, self.sent_waypoint) > self.adapt_dist)):
+                self.get_logger().info('SENDING WAYPOINT')
+                # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
+                self.send_waypoint_to_server(waypoint)
+                self.state = DeliveryState.NAVIGATING_TARGET
+            elif self.send_goal_future != None and self.sent_waypoint != None:
+                goal_result = self.send_goal_future.result()
+                if self.waypoint_rejected or self.waypoint_aborted:
+                    # follow path failed, retry sending
+                    self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
+                    self.send_waypoint_to_server(self.sent_waypoint)
+            
+        self.docking_marker_pub.publish(marker_arr)
 
 
 def main(args=None):
