@@ -20,6 +20,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/roboboat/docking_fallback.py
     ${PROJECT_NAME}/roboboat/speed_challenge.py
     ${PROJECT_NAME}/roboboat/speed_challenge_pid.py
+    ${PROJECT_NAME}/roboboat/mechanism_navigation.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -56,6 +56,7 @@ class TaskServerBase(ActionServerBase):
         self.moved_to_point = False
         self.waypoint_rejected = False
         self.waypoint_aborted = False
+        self.sent_waypoint = None
         self.active_future_request = 0 # active future requests
         self.active_waypoint_request = 0 # keeps track of the number of active waypoint requests
 

@@ -10,7 +10,6 @@ from rclpy.qos import qos_profile_sensor_data
 from visualization_msgs.msg import MarkerArray
 from geometry_msgs.msg import Pose, Point, Vector3, Quaternion
 from std_msgs.msg import Header, ColorRGBA
-from tf_transformations import quaternion_from_euler
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -145,7 +144,6 @@ class Docking(TaskServerBase):
         self.theta_pid.set_effort_min(-self.max_vel[2])
         self.theta_pid.set_effort_max(self.max_vel[2])
         self.prev_update_time = self.get_clock().now()
-        self.time_last_seen_buoys = self.get_clock().now().nanoseconds / 1e9
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
@@ -172,9 +170,6 @@ class Docking(TaskServerBase):
         self.picked_slot = False
         self.started_task = False
 
-        self.state = None
-        self.result = False
-
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         self.declare_parameter(
@@ -192,13 +187,13 @@ class Docking(TaskServerBase):
         
         if self.is_sim:
             self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
-            self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
+            self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
         else:
             # TODO replace w/ numbers for the dock banner labels, as in the roboboat course
             # self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
             self.boat_labels = []
             self.dock_labels = [self.label_mappings[name] for name in ["black_triangle"]]
-            # self.boat_labels = [self.label_mappings[name] for name in ["black_circle", "black_cross", "black_triangle"]]
+            # self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
         
         self.inv_label_mappings = {}
         for key, value in self.label_mappings.items():
@@ -407,6 +402,8 @@ class Docking(TaskServerBase):
         self.mark_successful()
     
     def control_loop(self):
+        if not self.started_task:
+            return
         if self.state == DockingState.WAITING_DOCK:
             return # TODO stationkeep/search for dock by steering right and left
         if self.state == DockingState.CANCELLING_NAVIGATION:
@@ -423,7 +420,7 @@ class Docking(TaskServerBase):
         marker_arr.markers.append(VisualizationTools.visualize_line(slot_back_mid, self.perp_vec(slot_dir), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
 
-        if self.norm(slot_back_mid, self.robot_pos) < self.navigation_dist_thres:
+        if self.state == DockingState.DOCKING or self.norm(slot_back_mid, self.robot_pos) < self.navigation_dist_thres:
             if self.state == DockingState.NAVIGATING_DOCK:
                 self.get_logger().info('CANCELLING NAVIGATION')
                 self.cancel_navigation()

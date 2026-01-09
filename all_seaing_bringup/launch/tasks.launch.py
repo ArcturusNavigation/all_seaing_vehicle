@@ -127,6 +127,8 @@ def launch_setup(context, *args, **kwargs):
             # {"dock_length": 7.0},
             # {"wpt_banner_dist": 10.0},
             # {"navigation_dist_thres": 12.0},
+            # {"update_slot_dist_thres": 3.0},
+            # {"docked_xy_thres": 0.2},
             {"duplicate_dist": 0.3},
             {"xy_threshold": 2.0},
             {"choose_every": 10},
@@ -136,6 +138,31 @@ def launch_setup(context, *args, **kwargs):
             {"max_vel": [1.0, 1.0, 0.3]},
             {"avoid_max_dist": 1.5},
             {"avoid_vel_coeff": 2.0},
+        ],
+        remappings=[
+            
+        ],
+    )
+
+    mechanism_navigation = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="mechanism_navigation.py",
+        parameters=[
+            {"is_sim": False},
+            # {"shape_label_mappings_file": buoy_label_mappings},
+            {"shape_label_mappings_file": shape_label_mappings},
+            {"robot_frame_id": "base_link"},
+            # {"wpt_banner_dist": 2.0},
+            # {"navigation_dist_thres": 5.0},
+            # {"update_target_dist_thres": 3.0},
+            # {"shooting_xy_thres": 0.2},
+            {"duplicate_dist": 0.3},
+            {"xy_threshold": 2.0},
+            {"choose_every": 10},
+            {"Kpid_x": [0.75, 0.0, 0.0]},
+            {"Kpid_y": [0.75, 0.0, 0.0]},
+            {"Kpid_theta": [0.75, 0.0, 0.0]},
+            {"max_vel": [1.0, 1.0, 0.3]},
         ],
         remappings=[
             
@@ -292,6 +319,7 @@ def launch_setup(context, *args, **kwargs):
         follow_buoy_path,
         speed_challenge,
         docking,
+        mechanism_navigation,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback
