@@ -10,7 +10,7 @@ from all_seaing_interfaces.action import Task
 from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_interfaces.msg import ControlOption, LabeledObjectPlane, LabeledObjectPlaneArray
-from all_seaing_common.action_server_base import TaskServerBase
+from all_seaing_common.task_server_base import TaskServerBase
 from sensor_msgs.msg import CameraInfo
 from enum import Enum
 from visualization_msgs.msg import Marker, MarkerArray
@@ -50,7 +50,11 @@ class MechanismNavigation(TaskServerBase):
             LabeledObjectPlaneArray, "object_planes/global", self.plane_cb, qos_profile_sensor_data
         )
 
-        self.docking_marker_pub = self.create_publisher(MarkerArray, 'docking_marker_pub', 10)
+        self.delivery_marker_pub = self.create_publisher(MarkerArray, 'delivery_marker_pub', 10)
+
+        self.controller_marker_pub = self.create_publisher(
+            MarkerArray, "controller_markers", 10
+        )
 
         self.declare_parameter("forward_speed", 2.0)
         self.declare_parameter("max_yaw", 0.7)
@@ -99,6 +103,12 @@ class MechanismNavigation(TaskServerBase):
             .double_array_value
         )
 
+        self.vel_marker_scale = (
+            self.declare_parameter("vel_marker_scale", 1.0)
+            .get_parameter_value()
+            .double_value
+        )
+
         self.x_pid = PIDController(*Kpid_x)
         self.y_pid = PIDController(*Kpid_y)
         self.theta_pid = CircularPID(*Kpid_theta)
@@ -126,8 +136,8 @@ class MechanismNavigation(TaskServerBase):
             self.label_mappings = yaml.safe_load(f)
 
         if self.is_sim:
-            self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
-            self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+            self.water_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle"]]
+            self.ball_labels = [self.label_mappings[name] for name in ["red_circle", "red_cross", "red_triangle", "red_square"]]
         else:
             self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
             self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
@@ -144,7 +154,7 @@ class MechanismNavigation(TaskServerBase):
         self.picked_target = False
         self.started_task = False
 
-        self.state = None
+        self.state = DeliveryState.WAITING_TARGET
 
         self.shot_water = False
         self.shot_ball = False
@@ -160,7 +170,6 @@ class MechanismNavigation(TaskServerBase):
         # self.get_logger().info('GOT OBJECTS')
         self.got_target = False
         self.picked_target = False
-        self.started_task = False
         self.updated_target_pos = False
         new_water_banners = []
         new_ball_banners = []
@@ -319,6 +328,7 @@ class MechanismNavigation(TaskServerBase):
     
     def init_setup(self):
         self.started_task = True
+        self.time_last_had_target = time.time()
         self.set_pid_setpoints(0, 0, 0)
         self.mark_successful()
 
@@ -335,6 +345,8 @@ class MechanismNavigation(TaskServerBase):
         )
     
     def control_loop(self):
+        if not self.started_task:
+            return
         if self.state == DeliveryState.WAITING_TARGET:
             # IF DON'T HAVE A TARGET FOR TOO LONG, FINISH TASK
             if time.time() - self.time_last_had_target > 5:
@@ -419,7 +431,7 @@ class MechanismNavigation(TaskServerBase):
                     self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
                     self.send_waypoint_to_server(self.sent_waypoint)
             
-        self.docking_marker_pub.publish(marker_arr)
+        self.delivery_marker_pub.publish(marker_arr)
 
 
 def main(args=None):

@@ -170,8 +170,6 @@ class Docking(TaskServerBase):
         self.picked_slot = False
         self.started_task = False
 
-        self.state = None
-
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         self.declare_parameter(
@@ -404,6 +402,8 @@ class Docking(TaskServerBase):
         self.mark_successful()
     
     def control_loop(self):
+        if not self.started_task:
+            return
         if self.state == DockingState.WAITING_DOCK:
             return # TODO stationkeep/search for dock by steering right and left
         if self.state == DockingState.CANCELLING_NAVIGATION:
