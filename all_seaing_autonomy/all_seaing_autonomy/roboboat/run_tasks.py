@@ -25,10 +25,10 @@ class RunTasks(Node):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
-            # [ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
-            [ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
