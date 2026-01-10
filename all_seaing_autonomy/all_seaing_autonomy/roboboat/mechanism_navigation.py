@@ -149,6 +149,7 @@ class MechanismNavigation(TaskServerBase):
         self.ball_banners = []
         self.selected_target = None
         self.shot_targets = []
+        self.plane_msg = None
 
         self.got_target = False
         self.picked_target = False
@@ -165,8 +166,14 @@ class MechanismNavigation(TaskServerBase):
         return (center_pt, (np.cos(theta), np.sin(theta)))
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
+        self.plane_msg = msg
         if not self.started_task:
             return
+        self.find_target()
+        
+    def find_target(self):
+        if self.plane_msg is None:
+            return False
         # self.get_logger().info('GOT OBJECTS')
         self.got_target = False
         self.picked_target = False
@@ -174,7 +181,7 @@ class MechanismNavigation(TaskServerBase):
         new_water_banners = []
         new_ball_banners = []
         obj_plane: LabeledObjectPlane
-        for obj_plane in msg.objects:
+        for obj_plane in self.plane_msg.objects:
             if(obj_plane.label in self.water_labels):
                 self.got_target = True
                 ctr, normal = self.ctr_normal(obj_plane)
@@ -214,7 +221,6 @@ class MechanismNavigation(TaskServerBase):
                     # same target, update position & normal
                     self.selected_target = (target_type, (target_ctr, target_normal))
                     self.updated_target_pos = True
-                    return
                 if (self.selected_target is None) or (self.norm(self.selected_target[1][0], self.robot_pos) > self.norm(target_ctr, self.robot_pos) + self.update_target_dist_thres):
                     self.state = DeliveryState.NEW_NAVIGATION
                     # found a new one closer
@@ -240,6 +246,9 @@ class MechanismNavigation(TaskServerBase):
                 self.get_logger().info(f'WAS GOING TO A FAKE TARGET, ABORT')
             else:
                 self.state = DeliveryState.WAITING_TARGET
+            return False
+        else:
+            return True
         
         # if not self.updated_target_pos:
         #     self.selected_target = None
@@ -326,6 +335,12 @@ class MechanismNavigation(TaskServerBase):
         scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
         return scale * x_vel, scale * y_vel
     
+    def should_accept_task(self, goal_request):
+        self.selected_slot = None
+        self.picked_slot = False
+        self.state = DeliveryState.WAITING_TARGET
+        return self.find_target()
+    
     def init_setup(self):
         self.started_task = True
         self.time_last_had_target = time.time()
@@ -345,8 +360,6 @@ class MechanismNavigation(TaskServerBase):
         )
     
     def control_loop(self):
-        if not self.started_task:
-            return
         if self.state == DeliveryState.WAITING_TARGET:
             # IF DON'T HAVE A TARGET FOR TOO LONG, FINISH TASK
             if time.time() - self.time_last_had_target > 5:

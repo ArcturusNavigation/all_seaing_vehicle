@@ -165,6 +165,7 @@ class Docking(TaskServerBase):
         self.boat_banners = []
         self.selected_slot = None
         self.taken = []
+        self.plane_msg = None
 
         self.got_dock = False
         self.picked_slot = False
@@ -222,8 +223,14 @@ class Docking(TaskServerBase):
         return (center_pt, (np.cos(theta), np.sin(theta)))
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
+        self.plane_msg = msg
         if not self.started_task:
             return
+        self.find_docking_slot()
+        
+    def find_docking_slot(self):
+        if self.plane_msg is None:
+            return False
         # self.get_logger().info('GOT OBJECTS')
         self.got_dock = False
         self.picked_slot = False
@@ -231,7 +238,7 @@ class Docking(TaskServerBase):
         new_dock_banners = []
         new_boat_banners = []
         obj_plane: LabeledObjectPlane
-        for obj_plane in msg.objects:
+        for obj_plane in self.plane_msg.objects:
             if(obj_plane.label in self.boat_labels):
                 ctr, normal = self.ctr_normal(obj_plane)
                 new_boat_banners.append((obj_plane.label, (ctr, normal)))
@@ -284,7 +291,6 @@ class Docking(TaskServerBase):
                     # same slot, update position & normal
                     self.selected_slot = (dock_label, (dock_ctr, dock_normal))
                     self.updated_slot_pos = True
-                    return
                 if (self.selected_slot is None) or (self.norm(self.selected_slot[1][0], self.robot_pos) > self.norm(dock_ctr, self.robot_pos) + self.update_slot_dist_thres):
                     self.state = DockingState.NEW_NAVIGATION
                     # found an empty one closer
@@ -310,6 +316,9 @@ class Docking(TaskServerBase):
                 self.get_logger().info(f'WAS GOING TO A FAKE DOCK, ABORT')
             else:
                 self.state = DockingState.WAITING_DOCK
+            return False
+        else:
+            return True
         
         # if not self.updated_slot_pos:
         #     self.selected_slot = None
@@ -396,14 +405,18 @@ class Docking(TaskServerBase):
         scale = min(self.max_vel[0] / abs(x_vel), self.max_vel[1] / abs(y_vel))
         return scale * x_vel, scale * y_vel
     
+    def should_accept_task(self, goal_request):
+        self.selected_slot = None
+        self.picked_slot = False
+        self.state = DockingState.WAITING_DOCK
+        return self.find_docking_slot()
+
     def init_setup(self):
         self.started_task = True
         self.set_pid_setpoints(0, 0, 0)
         self.mark_successful()
     
     def control_loop(self):
-        if not self.started_task:
-            return
         if self.state == DockingState.WAITING_DOCK:
             return # TODO stationkeep/search for dock by steering right and left
         if self.state == DockingState.CANCELLING_NAVIGATION:

@@ -234,15 +234,25 @@ class SpeedChallenge(TaskServerBase):
         ), 0.0)]))
         return gate_wpt
     
-    def init_setup(self):
-        # TODO Add this code to should_accept_task instead, to return False if we don't have the conditions to start the task
+    def should_accept_task(self, goal_request):
         if self.obstacles is None:
-            return
-        success = self.setup_buoys()
-        if success:
-            self.get_logger().info("Setup buoys succeeded!")
-            self.state = SpeedChallengeState.GATES
-            self.mark_successful()
+            return False
+        self.first_setup = True
+        return self.setup_buoys()
+    
+    # def init_setup(self):
+    #     if self.obstacles is None:
+    #         return
+    #     success = self.setup_buoys()
+    #     if success:
+    #         self.get_logger().info("Setup buoys succeeded!")
+    #         self.state = SpeedChallengeState.GATES
+    #         self.mark_successful()
+
+    def init_setup(self):
+        self.get_logger().info("Setup buoys succeeded!")
+        self.state = SpeedChallengeState.GATES
+        self.mark_successful()
 
     def control_loop(self):
         action_result = Task.Result(success=True)

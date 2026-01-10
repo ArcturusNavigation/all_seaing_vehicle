@@ -1094,15 +1094,25 @@ class FollowBuoyPath(TaskServerBase):
 
         self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, exit_func=self.green_beacon_detected, cancel_on_exit=True)
 
-    def init_setup(self):
-        # TODO Add this code to should_accept_task instead, to return False if we don't have the conditions to start the task
+    def should_accept_task(self, goal_request):
         if self.obstacles is None:
-            return
-        success = self.setup_buoys()
-        if success:
-            self.get_logger().info("Setup buoys succeeded!")
-            self.state = FollowPathState.FOLLOWING_FIRST_PASS
-            self.mark_successful()
+            return False
+        self.first_setup = True
+        return self.setup_buoys()
+    
+    # def init_setup(self):
+    #     if self.obstacles is None:
+    #         return
+    #     success = self.setup_buoys()
+    #     if success:
+    #         self.get_logger().info("Setup buoys succeeded!")
+    #         self.state = FollowPathState.FOLLOWING_FIRST_PASS
+    #         self.mark_successful()
+
+    def init_setup(self):
+        self.get_logger().info("Setup buoys succeeded!")
+        self.state = FollowPathState.FOLLOWING_FIRST_PASS
+        self.mark_successful()
         
     def control_loop(self):
         # self.station_hold()
