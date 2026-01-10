@@ -61,6 +61,9 @@ class SpeedChallenge(TaskServerBase):
         self.declare_parameter("gate_dist_thres", 40.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
 
+        self.declare_parameter("circling_buoy_dist_thres", 40.0)
+        self.circling_buoy_dist_thres = self.get_parameter("circling_buoy_dist_thres").get_parameter_value().double_value
+
         self.declare_parameter("max_inter_gate_dist", 25.0)
         self.max_inter_gate_dist = self.get_parameter("max_inter_gate_dist").get_parameter_value().double_value
 
@@ -482,6 +485,8 @@ class SpeedChallenge(TaskServerBase):
         updated_pos = False
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
+                if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.circling_buoy_dist_thres:
+                    continue
                 buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
                             obstacle.global_point.point.y-self.robot_pos[1])
                 dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
