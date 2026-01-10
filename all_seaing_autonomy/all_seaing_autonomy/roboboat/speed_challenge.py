@@ -58,6 +58,9 @@ class SpeedChallenge(TaskServerBase):
             MarkerArray, "waypoint_markers", 10
         )
 
+        self.declare_parameter("gate_dist_thres", 40.0)
+        self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
+
         self.declare_parameter("probe_distance", 10)
         self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
@@ -609,7 +612,7 @@ class SpeedChallenge(TaskServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if (pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)
+            if ((pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
