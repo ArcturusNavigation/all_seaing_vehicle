@@ -60,6 +60,12 @@ class FollowBuoyPath(TaskServerBase):
         self.declare_parameter("gate_dist_thres", 25.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
 
+        self.declare_parameter("max_inter_gate_dist", 25.0)
+        self.max_inter_gate_dist = self.get_parameter("max_inter_gate_dist").get_parameter_value().double_value
+
+        self.declare_parameter("max_gate_pair_dist", 25.0)
+        self.max_gate_pair_dist = self.get_parameter("max_gate_pair_dist").get_parameter_value().double_value
+
         self.declare_parameter("buoy_pair_dist_thres", 1.0)
         self.buoy_pair_dist_thres = self.get_parameter("buoy_pair_dist_thres").get_parameter_value().double_value
 
@@ -377,8 +383,8 @@ class FollowBuoyPath(TaskServerBase):
             red_to = None
             for red_b in red_buoys:
                 for green_b in green_buoys:
-                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
-                        self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))} < {self.inter_buoy_pair_dist}')
+                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+                        self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))}')
                         continue
                     elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
                         self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} BETTER, DIST FROM ROBOT: {self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True)))}')
@@ -401,7 +407,7 @@ class FollowBuoyPath(TaskServerBase):
             red_to = None
             for red_b in red_buoys:
                 for green_b in green_buoys:
-                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
+                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
                         continue
                     elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
                         green_to = green_b
@@ -498,10 +504,14 @@ class FollowBuoyPath(TaskServerBase):
                     if right_buoy[0] and (not self.check_better_one_side(prev_pair.right, prev_pair.left, left_buoy[1])):
                         continue
 
-                    if self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) < self.inter_buoy_pair_dist:
+                    if self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) > self.max_inter_gate_dist:
+                        continue
+
+                    cur = InternalBuoyPair(left_buoy[1], right_buoy[1]) 
+
+                    if self.buoy_pairs_distance(prev_pair, cur, "mid") > self.max_gate_pair_dist:
                         continue
                     
-                    cur = InternalBuoyPair(left_buoy[1], right_buoy[1]) 
                     if (ret is None) or self.better_buoy_pair_transition(ret, cur, prev_pair):
                         ret = cur
             return ret

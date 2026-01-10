@@ -61,6 +61,9 @@ class SpeedChallenge(TaskServerBase):
         self.declare_parameter("gate_dist_thres", 40.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
 
+        self.declare_parameter("max_inter_gate_dist", 25.0)
+        self.max_inter_gate_dist = self.get_parameter("max_inter_gate_dist").get_parameter_value().double_value
+
         self.declare_parameter("probe_distance", 10)
         self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
@@ -632,7 +635,7 @@ class SpeedChallenge(TaskServerBase):
         #     red_to = None
         #     for red_b in red_buoys:
         #         for green_b in green_buoys:
-        #             if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
+        #             if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
         #                 continue
         #             elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
         #                 green_to = green_b
@@ -654,7 +657,7 @@ class SpeedChallenge(TaskServerBase):
         red_to = None
         for red_b in red_buoys:
             for green_b in green_buoys:
-                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
+                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
                     continue
                 # elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
                 elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))):
