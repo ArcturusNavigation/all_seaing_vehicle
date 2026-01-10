@@ -142,8 +142,6 @@ class MechanismNavigation(TaskServerBase):
             self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
             self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
 
-        self.state = DeliveryState.WAITING_TARGET
-
         # update from subs
         self.water_banners = []
         self.ball_banners = []
@@ -336,10 +334,10 @@ class MechanismNavigation(TaskServerBase):
         return scale * x_vel, scale * y_vel
     
     def should_accept_task(self, goal_request):
-        self.selected_slot = None
-        self.picked_slot = False
-        self.state = DeliveryState.WAITING_TARGET
-        return self.find_target()
+        if self.state == DeliveryState.WAITING_TARGET:
+            return self.find_target()
+        else:
+            return True
     
     def init_setup(self):
         self.started_task = True

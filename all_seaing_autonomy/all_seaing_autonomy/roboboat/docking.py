@@ -406,10 +406,10 @@ class Docking(TaskServerBase):
         return scale * x_vel, scale * y_vel
     
     def should_accept_task(self, goal_request):
-        self.selected_slot = None
-        self.picked_slot = False
-        self.state = DockingState.WAITING_DOCK
-        return self.find_docking_slot()
+        if self.state == DockingState.WAITING_DOCK:
+            return self.find_docking_slot()
+        else:
+            return True
 
     def init_setup(self):
         self.started_task = True

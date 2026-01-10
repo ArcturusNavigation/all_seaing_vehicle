@@ -380,7 +380,7 @@ class NavigationTangentServer(ActionServerBase):
 
         while True:
             nav_x, nav_y, _ = self.get_robot_pose()
-            if math.sqrt((nav_x - goal_handle.request.x) * (nav_x - goal_handle.request.x) + (nav_y - goal_handle.request.y) * (nav_y - goal_handle.request.y) < goal_handle.request.xy_threshold) and not goal_handle.request.is_stationary:
+            if math.sqrt((nav_x - goal_handle.request.x) * (nav_x - goal_handle.request.x) + (nav_y - goal_handle.request.y) * (nav_y - goal_handle.request.y)) < goal_handle.request.xy_threshold and not goal_handle.request.is_stationary:
                 break
 
             if self.should_abort():
