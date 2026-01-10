@@ -56,6 +56,18 @@ class FollowBuoyPath(TaskServerBase):
 
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+        
+        self.declare_parameter("gate_dist_thres", 25.0)
+        self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
+
+        self.declare_parameter("circling_buoy_dist_thres", 25.0)
+        self.circling_buoy_dist_thres = self.get_parameter("circling_buoy_dist_thres").get_parameter_value().double_value
+
+        self.declare_parameter("max_inter_gate_dist", 25.0)
+        self.max_inter_gate_dist = self.get_parameter("max_inter_gate_dist").get_parameter_value().double_value
+
+        self.declare_parameter("max_gate_pair_dist", 25.0)
+        self.max_gate_pair_dist = self.get_parameter("max_gate_pair_dist").get_parameter_value().double_value
 
         self.declare_parameter("buoy_pair_dist_thres", 1.0)
         self.buoy_pair_dist_thres = self.get_parameter("buoy_pair_dist_thres").get_parameter_value().double_value
@@ -343,7 +355,7 @@ class FollowBuoyPath(TaskServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if (pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)
+            if ((pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -374,8 +386,8 @@ class FollowBuoyPath(TaskServerBase):
             red_to = None
             for red_b in red_buoys:
                 for green_b in green_buoys:
-                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
-                        self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))} < {self.inter_buoy_pair_dist}')
+                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+                        self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))}')
                         continue
                     elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
                         self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} BETTER, DIST FROM ROBOT: {self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True)))}')
@@ -398,7 +410,7 @@ class FollowBuoyPath(TaskServerBase):
             red_to = None
             for red_b in red_buoys:
                 for green_b in green_buoys:
-                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
+                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
                         continue
                     elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
                         green_to = green_b
@@ -495,10 +507,14 @@ class FollowBuoyPath(TaskServerBase):
                     if right_buoy[0] and (not self.check_better_one_side(prev_pair.right, prev_pair.left, left_buoy[1])):
                         continue
 
-                    if self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) < self.inter_buoy_pair_dist:
+                    if self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) > self.max_inter_gate_dist:
+                        continue
+
+                    cur = InternalBuoyPair(left_buoy[1], right_buoy[1]) 
+
+                    if self.buoy_pairs_distance(prev_pair, cur, "mid") > self.max_gate_pair_dist:
                         continue
                     
-                    cur = InternalBuoyPair(left_buoy[1], right_buoy[1]) 
                     if (ret is None) or self.better_buoy_pair_transition(ret, cur, prev_pair):
                         ret = cur
             return ret
@@ -917,6 +933,8 @@ class FollowBuoyPath(TaskServerBase):
         updated_pos = False
         for obstacle in self.obstacles:
             if obstacle.label in self.green_beacon_labels:
+                if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.circling_buoy_dist_thres:
+                    continue
                 buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
                             obstacle.global_point.point.y-self.robot_pos[1])
                 dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
@@ -1094,15 +1112,25 @@ class FollowBuoyPath(TaskServerBase):
 
         self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, exit_func=self.green_beacon_detected, cancel_on_exit=True)
 
-    def init_setup(self):
-        # TODO Add this code to should_accept_task instead, to return False if we don't have the conditions to start the task
+    def should_accept_task(self, goal_request):
         if self.obstacles is None:
-            return
-        success = self.setup_buoys()
-        if success:
-            self.get_logger().info("Setup buoys succeeded!")
-            self.state = FollowPathState.FOLLOWING_FIRST_PASS
-            self.mark_successful()
+            return False
+        self.first_setup = True
+        return self.setup_buoys()
+    
+    # def init_setup(self):
+    #     if self.obstacles is None:
+    #         return
+    #     success = self.setup_buoys()
+    #     if success:
+    #         self.get_logger().info("Setup buoys succeeded!")
+    #         self.state = FollowPathState.FOLLOWING_FIRST_PASS
+    #         self.mark_successful()
+
+    def init_setup(self):
+        self.get_logger().info("Setup buoys succeeded!")
+        self.state = FollowPathState.FOLLOWING_FIRST_PASS
+        self.mark_successful()
         
     def control_loop(self):
         # self.station_hold()

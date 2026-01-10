@@ -58,6 +58,15 @@ class SpeedChallenge(TaskServerBase):
             MarkerArray, "waypoint_markers", 10
         )
 
+        self.declare_parameter("gate_dist_thres", 40.0)
+        self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
+
+        self.declare_parameter("circling_buoy_dist_thres", 40.0)
+        self.circling_buoy_dist_thres = self.get_parameter("circling_buoy_dist_thres").get_parameter_value().double_value
+
+        self.declare_parameter("max_inter_gate_dist", 25.0)
+        self.max_inter_gate_dist = self.get_parameter("max_inter_gate_dist").get_parameter_value().double_value
+
         self.declare_parameter("probe_distance", 10)
         self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
@@ -159,7 +168,7 @@ class SpeedChallenge(TaskServerBase):
 
         self.red_left = True
         self.gate_pair = None
-        self.first_setup = True
+        # self.first_setup = True
 
     def reset_challenge(self):
         '''
@@ -234,15 +243,24 @@ class SpeedChallenge(TaskServerBase):
         ), 0.0)]))
         return gate_wpt
     
-    def init_setup(self):
-        # TODO Add this code to should_accept_task instead, to return False if we don't have the conditions to start the task
+    def should_accept_task(self, goal_request):
         if self.obstacles is None:
-            return
-        success = self.setup_buoys()
-        if success:
-            self.get_logger().info("Setup buoys succeeded!")
-            self.state = SpeedChallengeState.GATES
-            self.mark_successful()
+            return False
+        return self.setup_buoys()
+    
+    # def init_setup(self):
+    #     if self.obstacles is None:
+    #         return
+    #     success = self.setup_buoys()
+    #     if success:
+    #         self.get_logger().info("Setup buoys succeeded!")
+    #         self.state = SpeedChallengeState.GATES
+    #         self.mark_successful()
+
+    def init_setup(self):
+        self.get_logger().info("Setup buoys succeeded!")
+        self.state = SpeedChallengeState.GATES
+        self.mark_successful()
 
     def control_loop(self):
         action_result = Task.Result(success=True)
@@ -467,6 +485,8 @@ class SpeedChallenge(TaskServerBase):
         updated_pos = False
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
+                if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.circling_buoy_dist_thres:
+                    continue
                 buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
                             obstacle.global_point.point.y-self.robot_pos[1])
                 dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
@@ -599,7 +619,8 @@ class SpeedChallenge(TaskServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if (pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)
+            # if ((pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
+            if self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -614,46 +635,47 @@ class SpeedChallenge(TaskServerBase):
         # And do the same for the green buoys.
         # This pair is the front pair of the starting box of the robot.
         # want to pick the pair that's far apart but has the closest midpoint
-        if self.first_setup:
-            green_to = None
-            red_to = None
-            for red_b in red_buoys:
-                for green_b in green_buoys:
-                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
-                        continue
-                    elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
-                        green_to = green_b
-                        red_to = red_b
-            if green_to is None:
-                return False
-            if self.ccw((0, 0), self.ob_coords(green_to, local=True), self.ob_coords(red_to, local=True)):
-                self.red_left = True
-                self.gate_pair = InternalBuoyPair(red_to, green_to)
-                self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
-            else:
-                self.red_left = False
-                self.gate_pair = InternalBuoyPair(green_to, red_to)
-                self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
-            self.first_setup = False
-            return True
+        # if self.first_setup:
+        #     green_to = None
+        #     red_to = None
+        #     for red_b in red_buoys:
+        #         for green_b in green_buoys:
+        #             if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+        #                 continue
+        #             elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
+        #                 green_to = green_b
+        #                 red_to = red_b
+        #     if green_to is None:
+        #         return False
+        #     if self.ccw((0, 0), self.ob_coords(green_to, local=True), self.ob_coords(red_to, local=True)):
+        #         self.red_left = True
+        #         self.gate_pair = InternalBuoyPair(red_to, green_to)
+        #         self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
+        #     else:
+        #         self.red_left = False
+        #         self.gate_pair = InternalBuoyPair(green_to, red_to)
+        #         self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
+        #     self.first_setup = False
+        #     return True
+        # else:
+        green_to = None
+        red_to = None
+        for red_b in red_buoys:
+            for green_b in green_buoys:
+                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+                    continue
+                # elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
+                elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))):
+                    green_to = green_b
+                    red_to = red_b
+        if green_to is None:
+            return False
+        if self.red_left:
+            self.gate_pair = InternalBuoyPair(red_to, green_to)
         else:
-            green_to = None
-            red_to = None
-            for red_b in red_buoys:
-                for green_b in green_buoys:
-                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist:
-                        continue
-                    elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
-                        green_to = green_b
-                        red_to = red_b
-            if green_to is None:
-                return False
-            if self.red_left:
-                self.gate_pair = InternalBuoyPair(red_to, green_to)
-            else:
-                self.gate_pair = InternalBuoyPair(green_to, red_to)
-            self.get_logger().info(f'FOUND GATE')
-            return True
+            self.gate_pair = InternalBuoyPair(green_to, red_to)
+        self.get_logger().info(f'FOUND GATE')
+        return True
 
     def ccw(self, a, b, c):
         """Return True if the points a, b, c are counterclockwise, respectively"""
