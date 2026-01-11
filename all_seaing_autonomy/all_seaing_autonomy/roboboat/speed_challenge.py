@@ -210,13 +210,6 @@ class SpeedChallenge(TaskServerBase):
         q[3] = sy * cp * cr - cy * sp * sr
 
         return q
-        
-    def pair_angle_to_pose(self, pair, angle):
-        quat = self.quaternion_from_euler(0, 0, angle)
-        return Pose(
-            position=Point(x=pair[0], y=pair[1]),
-            orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
-        )
 
     def update_gate_wpt_pos(self, forward_dist = 0.0, tryhard=False):
         # split the buoys into red and green
@@ -233,14 +226,7 @@ class SpeedChallenge(TaskServerBase):
                     return self.gate_wpt
         self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
         gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, forward_dist)
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_angle_to_pose(
-            pair=gate_wpt,
-            # angle=(
-            #     math.atan(self.ob_coords(pair.right)[1] - self.ob_coords(pair.left)[1]) /
-            #     (self.ob_coords(pair.right)[0] - self.ob_coords(pair.left)[0])
-            # ) + (math.pi / 2),
-            angle=0,
-        ), 0.0)]))
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(gate_wpt), 0.0)]))
         return gate_wpt
     
     def should_accept_task(self, goal_request):

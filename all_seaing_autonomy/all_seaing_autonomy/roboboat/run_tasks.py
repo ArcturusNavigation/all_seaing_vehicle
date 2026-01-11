@@ -8,6 +8,9 @@ from std_msgs.msg import Bool
 from all_seaing_interfaces.action import Task
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_common.action_server_base import ActionServerBase
+from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import Header, ColorRGBA
+from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
@@ -133,6 +136,10 @@ class RunTasks(ActionServerBase):
         
         self.red_left = True
         self.gate_pair = None
+
+        self.waypoint_marker_pub = self.create_publisher(
+            MarkerArray, "waypoint_markers", 10
+        )
     
     def split_buoys(self, obstacles):
         """
@@ -169,6 +176,27 @@ class RunTasks(ActionServerBase):
             return (buoy.local_point.point.x, buoy.local_point.point.y)
         else:
             return (buoy.global_point.point.x, buoy.global_point.point.y)
+        
+    def midpoint(self, vec1, vec2):
+        return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
+    
+    def obs_to_pos_label(self, obs):
+        return [self.ob_coords(ob, local=False) + (ob.label,) for ob in obs]
+    
+    def midpoint_pair_dir(self, pair, forward_dist):
+        left_coords = self.ob_coords(pair.left)
+        right_coords = self.ob_coords(pair.right)
+        midpoint = self.midpoint(left_coords, right_coords)
+        
+        scale = forward_dist
+        dy = right_coords[1] - left_coords[1]
+        dx = right_coords[0] - left_coords[0]
+        norm = math.sqrt(dx**2 + dy**2)
+        dx /= norm
+        dy /= norm
+        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
+
+        return midpoint, (-dy, dx)
 
     def setup_buoys(self, pointing_direction=None):
         """
@@ -221,7 +249,60 @@ class RunTasks(ActionServerBase):
         else:
             self.gate_pair = InternalBuoyPair(green_to, red_to)
         self.get_logger().info(f'FOUND STARTING GATE')
+        self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
+        gate_wpt, _ = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(gate_wpt), 0.0)]))
         return True
+    
+    def pair_to_pose(self, pair):
+        return Pose(position=Point(x=pair[0], y=pair[1]))
+
+    def buoy_pairs_to_markers(self, buoy_pairs):
+        """
+        Create the markers from an array of buoy pairs to visualize them (and the respective waypoints) in RViz
+        """
+        marker_array = MarkerArray()
+        i = 0
+        for p_left, p_right, point, radius in buoy_pairs:
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.ARROW,
+                    pose=point,
+                    header=Header(frame_id=self.global_frame_id),
+                    scale=Vector3(x=2.0, y=0.15, z=0.15),
+                    color=ColorRGBA(a=1.0, b=1.0),
+                    id=(4 * i),
+                )
+            )
+            if self.red_left:
+                left_color = ColorRGBA(r=1.0, a=1.0)
+                right_color = ColorRGBA(g=1.0, a=1.0)
+            else:
+                left_color = ColorRGBA(g=1.0, a=1.0)
+                right_color = ColorRGBA(r=1.0, a=1.0)
+
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.SPHERE,
+                    pose=self.pair_to_pose(self.ob_coords(p_left)),
+                    header=Header(frame_id=self.global_frame_id),
+                    scale=Vector3(x=1.0, y=1.0, z=1.0),
+                    color=left_color,
+                    id=(4 * i) + 1,
+                )
+            )
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.SPHERE,
+                    pose=self.pair_to_pose(self.ob_coords(p_right)),
+                    header=Header(frame_id=self.global_frame_id),
+                    scale=Vector3(x=1.0, y=1.0, z=1.0),
+                    color=right_color,
+                    id=(4 * i) + 2,
+                )
+            )
+            i += 1
+        return marker_array
     
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
