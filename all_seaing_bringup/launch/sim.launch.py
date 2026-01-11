@@ -24,6 +24,9 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
+    task_locations = os.path.join(
+        bringup_prefix, "config", "course", "task_locations_sim.yaml"
+    )
     slam_real_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
@@ -561,6 +564,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
+            {"task_locations_file": task_locations},
             {"robot_frame_id": "wamv/wamv/base_link"},
         ]
     )

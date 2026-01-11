@@ -5,7 +5,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from std_msgs.msg import Bool
 
-from all_seaing_interfaces.action import Task
+from all_seaing_interfaces.action import Task, Search
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_common.action_server_base import ActionServerBase
 from visualization_msgs.msg import Marker, MarkerArray
@@ -53,10 +53,10 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
-            [ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0), ActionClient(self, Search, "search_followpath"), "follow_path"],
+            # [ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0), ActionClient(self, Search, "search_speed"), "speed_challenge"],
+            # [ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), ActionClient(self, Search, "search_docking"), "docking"],
+            # [ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), ActionClient(self, Search, "search_delivery"), "delivery"],
             # [ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
@@ -133,6 +133,19 @@ class RunTasks(ActionServerBase):
             self.red_labels.add(label_mappings["red_pole_buoy"])
             # self.red_labels.add(label_mappings["yellow_buoy"])
             # self.red_labels.add(label_mappings["yellow_racquet_ball"])
+        task_location_mappings_file
+        self.declare_parameter(
+            "task_locations_file", 
+            os.path.join(
+                bringup_prefix, "config", "course", "task_locations.yaml"
+            ),
+        )
+
+        task_location_mappings_file = self.get_parameter(
+            "task_locations_file"
+        ).value
+        with open(task_location_mappings_file, "r") as f:
+            task_location_mappings = yaml.safe_load(f)
         
         self.red_left = True
         self.gate_pair = None
@@ -310,7 +323,7 @@ class RunTasks(ActionServerBase):
         if self.gate_pair is None:
             self.setup_buoys()
 
-    def attempt_task(self, current_task, incr_on_success, incr_on_fail = None):
+    def attempt_task(self, current_task, incr_on_success, incr_on_fail = None, search_client = None, location_name = None):
         self.current_task = current_task
         self.incr_on_success = incr_on_success
         self.incr_on_fail = incr_on_fail

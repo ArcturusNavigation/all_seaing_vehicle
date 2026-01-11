@@ -26,7 +26,9 @@ def launch_setup(context, *args, **kwargs):
     robot_urdf_file = os.path.join(
         description_prefix, "urdf", "fish_and_chips", "robot.urdf.xacro"
     )
-    
+    task_locations = os.path.join(
+        bringup_prefix, "config", "course", "task_locations_real.yaml"
+    )
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
@@ -66,6 +68,7 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
+            {"task_locations_file": task_locations},
             {"gate_dist_thres": 25.0},
             {"circling_buoy_dist_thres": 25.0},
             {"max_inter_gate_dist": 25.0},

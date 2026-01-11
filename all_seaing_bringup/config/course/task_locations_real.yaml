@@ -1,0 +1,29 @@
+follow_path:
+  search: false
+  x: 0.0
+  y: 0.0
+
+speed_challenge:
+  search: true
+  x: 0.0
+  y: 0.0
+
+docking:
+  search: true
+  x: 0.0
+  y: 0.0
+
+delivery:
+  search: true
+  x: 0.0
+  y: 0.0
+
+harbor_marina:
+  search: true
+  x: 0.0
+  y: 0.0
+
+harbor_sprint:
+  search: true
+  x: 0.0
+  y: 0.0
