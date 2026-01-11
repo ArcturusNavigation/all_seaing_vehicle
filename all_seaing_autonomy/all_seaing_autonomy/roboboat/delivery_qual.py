@@ -18,7 +18,7 @@ import time
 
 class DeliveryQual(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "delivery_qual_server", action_name = "delivery_qual")
+        super().__init__(server_name = "delivery_qual_server", action_name = "delivery_qual", search_action_name = "search_delivery_qual")
 
         self.bbox_sub = self.create_subscription(
             LabeledBoundingBox2DArray, 

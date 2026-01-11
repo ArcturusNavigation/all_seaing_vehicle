@@ -48,7 +48,7 @@ class InternalBuoyPair:
 
 class SpeedChallenge(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge")
+        super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge", search_action_name = "search_speed")
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10

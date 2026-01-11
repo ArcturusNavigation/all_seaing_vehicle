@@ -44,7 +44,7 @@ class TargetType(Enum):
 
 class MechanismNavigation(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "mechanism_navigation", action_name = "mechanism_navigation")
+        super().__init__(server_name = "mechanism_navigation", action_name = "mechanism_navigation", search_action_name = "search_delivery")
 
         self.obj_plane_sub = self.create_subscription(
             LabeledObjectPlaneArray, "object_planes/global", self.plane_cb, qos_profile_sensor_data

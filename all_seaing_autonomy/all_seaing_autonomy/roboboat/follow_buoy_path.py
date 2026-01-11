@@ -45,7 +45,7 @@ class FollowPathState(Enum):
 
 class FollowBuoyPath(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path")
+        super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path", search_action_name = "search_followpath")
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
