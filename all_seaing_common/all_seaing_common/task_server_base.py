@@ -61,6 +61,9 @@ class TaskServerBase(ActionServerBase):
         self.declare_parameter("bypass_planner", False)
 
         self.bypass_planner = self.get_parameter("bypass_planner").get_parameter_value().bool_value
+
+        self.declare_parameter("search_task_radius", 50.0)
+        self.search_task_radius = self.get_parameter("search_task_radius").get_parameter_value().double_value
         
         self.moved_to_point = False
         self.waypoint_rejected = False
@@ -392,7 +395,7 @@ class TaskServerBase(ActionServerBase):
                 goal_handle.canceled()
                 return Search.Result()
 
-            if self.should_accept_task():
+            if math.sqrt((self.robot_pos[0]-goal_handle.x)**2 + (self.robot_pos[1]-goal_handle.y)**2) < self.search_task_radius and self.should_accept_task():
                 self.found_task = True
                 self.cancel_navigation()
             elif self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality

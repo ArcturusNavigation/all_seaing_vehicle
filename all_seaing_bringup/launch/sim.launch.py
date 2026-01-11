@@ -436,7 +436,6 @@ def launch_setup(context, *args, **kwargs):
             # {"midpoint_pair_forward_dist": 5.0},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ]
     )
@@ -453,7 +452,6 @@ def launch_setup(context, *args, **kwargs):
             # {"gate_dist_back": 5.0},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ]
     )
@@ -519,7 +517,6 @@ def launch_setup(context, *args, **kwargs):
                 "camera_info",
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
             ),
-            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
@@ -539,7 +536,6 @@ def launch_setup(context, *args, **kwargs):
                 "imu",
                 "/wamv/sensors/imu/imu/data"
             ),
-            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
@@ -562,6 +558,11 @@ def launch_setup(context, *args, **kwargs):
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ]
     )
 
     task_init_server = launch_ros.actions.Node(

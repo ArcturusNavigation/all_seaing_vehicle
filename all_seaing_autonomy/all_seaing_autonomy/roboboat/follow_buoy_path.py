@@ -48,7 +48,7 @@ class FollowBuoyPath(TaskServerBase):
         super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path", search_action_name = "search_followpath")
 
         self.map_sub = self.create_subscription(
-            ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
+            ObstacleMap, "obstacle_map/global", self.map_cb, 10
         )
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10

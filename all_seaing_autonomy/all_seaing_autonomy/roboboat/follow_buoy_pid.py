@@ -34,7 +34,7 @@ class FollowBuoyPID(TaskServerBase):
         # Will use type label and local point
         self.bbox_sub_new = self.create_subscription(
             ObstacleMap,
-            "obstacle_map/labeled",
+            "obstacle_map/local",
             self.bbox_callback_new,
             10
         )

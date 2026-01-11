@@ -80,7 +80,6 @@ def launch_setup(context, *args, **kwargs):
             {"buoy_pair_dist_thres": 0.2},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ],
     )
@@ -100,7 +99,6 @@ def launch_setup(context, *args, **kwargs):
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
-            ("obstacle_map/labeled", "obstacle_map/local"),
         ],
     )
 
@@ -121,7 +119,6 @@ def launch_setup(context, *args, **kwargs):
                 "imu",
                 "/mavros/imu/data"
             ),
-            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 

@@ -51,7 +51,7 @@ class SpeedChallenge(TaskServerBase):
         super().__init__(server_name = "speed_challenge_server", action_name = "speed_challenge", search_action_name = "search_speed")
 
         self.map_sub = self.create_subscription(
-            ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
+            ObstacleMap, "obstacle_map/global", self.map_cb, 10
         )
 
         self.waypoint_marker_pub = self.create_publisher(
@@ -615,7 +615,6 @@ class SpeedChallenge(TaskServerBase):
         # Split all the buoys into red and green
         green_init, red_init = self.split_buoys(self.obstacles)
 
-        # lambda function that filters the buoys that are in front of the robot
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs

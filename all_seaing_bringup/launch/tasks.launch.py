@@ -62,6 +62,18 @@ def launch_setup(context, *args, **kwargs):
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
+        parameters=[
+            {"is_sim": False},
+            {"global_frame_id": "map"},
+            {"color_label_mappings_file": buoy_label_mappings},
+            {"gate_dist_thres": 25.0},
+            {"circling_buoy_dist_thres": 25.0},
+            {"max_inter_gate_dist": 25.0},
+            {"max_gate_pair_dist": 25.0},
+            {"duplicate_dist": 0.3},
+            {"inter_buoy_pair_dist": 0.5},
+            {"buoy_pair_dist_thres": 0.2},
+        ]
     )
 
     follow_buoy_path = launch_ros.actions.Node(
@@ -71,6 +83,7 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
+            {"search_task_radius": 50.0},
             {"gate_dist_thres": 25.0},
             {"circling_buoy_dist_thres": 25.0},
             {"max_inter_gate_dist": 25.0},
@@ -90,7 +103,6 @@ def launch_setup(context, *args, **kwargs):
             {"turn_pid": [0.4,0.0,0.0]},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ],
     )
@@ -102,6 +114,7 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"color_label_mappings_file": buoy_label_mappings},
             {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
             {"gate_dist_thres": 40.0},
             {"circling_buoy_dist_thres": 40.0},
             {"max_inter_gate_dist": 25.0},
@@ -117,7 +130,6 @@ def launch_setup(context, *args, **kwargs):
             {"turn_pid": [0.4,0.0,0.0]},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ]
     )
@@ -130,6 +142,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
             # {"dock_width": 2.0},
             # {"dock_length": 7.0},
             # {"wpt_banner_dist": 10.0},
@@ -159,6 +172,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
             # {"wpt_banner_dist": 2.0},
             # {"navigation_dist_thres": 5.0},
             # {"update_target_dist_thres": 3.0},
@@ -191,7 +205,6 @@ def launch_setup(context, *args, **kwargs):
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
-            ("obstacle_map/labeled", "obstacle_map/local"),
         ],
     )
 
@@ -212,7 +225,6 @@ def launch_setup(context, *args, **kwargs):
                 "imu",
                 "/mavros/imu/data/filtered"
             ),
-            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
