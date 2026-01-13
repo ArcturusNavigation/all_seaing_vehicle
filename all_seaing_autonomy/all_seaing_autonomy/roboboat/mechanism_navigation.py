@@ -79,6 +79,9 @@ class MechanismNavigation(TaskServerBase):
         self.declare_parameter("shooting_xy_thres", 0.2)
         self.shooting_xy_thres = self.get_parameter("shooting_xy_thres").get_parameter_value().double_value
 
+        self.declare_parameter("shooting_theta_thres", 10.0)
+        self.shooting_theta_thres = self.get_parameter("shooting_theta_thres").get_parameter_value().double_value
+
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
 
@@ -191,7 +194,7 @@ class MechanismNavigation(TaskServerBase):
         
         # update global variables
         self.water_banners = new_water_banners
-        self.ball_labels = new_ball_banners
+        self.ball_banners = new_ball_banners
 
         # ensure that we first shoot two targets of different type
         if self.shot_water and not self.shot_ball:
@@ -395,11 +398,17 @@ class MechanismNavigation(TaskServerBase):
             self.get_logger().info(f'side offset: {offset}')
             self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
-            if abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres:
+            if abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres and abs(approach_angle) < self.shooting_theta_thres/180.0*np.pi:
                 # TODO SHOOT BALL/WATER
                 self.get_logger().info(f'SHOOTING {self.selected_target[0]}')
                 # move on
                 self.shot_targets.append(self.selected_target)
+
+                if self.selected_target[0] == TargetType.WATER_TARGET:
+                    self.shot_water = True
+                if self.selected_target[0] == TargetType.BALL_TARGET:
+                    self.shot_ball = True
+
                 self.state = DeliveryState.WAITING_TARGET
                 self.selected_target = None
                 self.picked_target = False

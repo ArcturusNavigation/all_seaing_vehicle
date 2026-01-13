@@ -10,6 +10,7 @@
       - local_position
       - global_position
       - imu
+      - imu_pub
       - setpoint_velocity
       - sys_status
 /**/imu:

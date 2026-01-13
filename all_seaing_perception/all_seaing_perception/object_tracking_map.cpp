@@ -1393,6 +1393,8 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
 
     if(m_track_robot && m_first_state) return;
 
+    if (m_track_robot && m_gps_update && std::abs((rclcpp::Time(msg->header.stamp)-m_last_nav_time).seconds()) > m_odom_detection_timeout) return; // make detections catch up to GPS/current time
+
     std::vector<std::shared_ptr<all_seaing_perception::Banner>> detected_banners;
     for (all_seaing_interfaces::msg::LabeledObjectPlane banner_msg : msg->coplanar_indiv) {
         std::shared_ptr<all_seaing_perception::Banner> banner(new all_seaing_perception::Banner(rclcpp::Time(m_local_header.stamp), banner_msg.label, banner_msg));

@@ -339,8 +339,8 @@ def launch_setup(context, *args, **kwargs):
 
     param_substitutions = {
         'track_robot': str(context.perform_substitution(LaunchConfiguration('use_slam')).lower() == "true"),
-        'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false") or 
-                                       (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")),
+        'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false")
+        or (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")),
         'track_banners': str(context.perform_substitution(LaunchConfiguration('track_banners')).lower() == "true"),
         'banners_slam': str(context.perform_substitution(LaunchConfiguration('banners_slam')).lower() == "true"),
     }
@@ -396,7 +396,7 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,
         multicam_detection_merge_node,
-        # ransac_node,
+        ransac_node,
         point_cloud_filter_downsampled_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
@@ -410,7 +410,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             # DeclareLaunchArgument('use_sim_time', default_value='true'),
-            DeclareLaunchArgument("location", default_value="pavillion"),
+            DeclareLaunchArgument("location", default_value="pavillion"), # TODO USE IT TO USE LIO WHEN INDOORS, SAME AS IN VEHICLE LAUNCH FILE
             DeclareLaunchArgument("use_slam", default_value='true'),
             DeclareLaunchArgument("use_gps", default_value='true'),
             DeclareLaunchArgument("track_banners", default_value='false'),

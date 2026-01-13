@@ -115,9 +115,34 @@ def launch_setup(context, *args, **kwargs):
             {"yaw_offset": 0.0},
             {"odom_yaw_offset": 0.0},
             {"utm_zone": utm}, # 19 for Boston, 17 for Florida
-        ],condition=IfCondition(
+        ],
+        condition=IfCondition(
             PythonExpression([
                 "'", is_indoors, "' == 'false' and '", use_lio, "' == 'false'"
+            ]),
+        ),
+    )
+
+    odometry_publisher_rf2o_node = launch_ros.actions.Node(
+        package = "all_seaing_driver",
+        executable = "odometry_publisher.py",
+        output = "screen",
+        remappings=[
+            ("odom_topic", "/odom_rf2o"),
+            ("pos_odom_topic", "/odom_rf2o"),
+        ],
+        parameters=[
+            {"datum": [lat, lon, 0.0]},
+            # {"yaw_offset": -np.pi/2.0},
+            # {"odom_yaw_offset": -np.pi/2.0},
+            {"yaw_offset": 0.0},
+            {"odom_yaw_offset": 0.0},
+            {"utm_zone": utm}, # 19 for Boston, 17 for Florida
+            {"use_odom_pos": True},
+        ],
+        condition=IfCondition(
+            PythonExpression([
+                "'", is_indoors, "' == 'true' or '", use_lio, "' == 'true'"
             ]),
         ),
     )
@@ -354,7 +379,7 @@ def launch_setup(context, *args, **kwargs):
         executable="ekf_node",
         parameters=[robot_localization_rf2o_params],
         remappings=[
-            ("odometry/filtered", "odometry/gps"),
+            # ("odometry/filtered", "odometry/gps"),
         ],
         condition=IfCondition(
             PythonExpression([
@@ -398,6 +423,7 @@ def launch_setup(context, *args, **kwargs):
         # ekf_node,
         # navsat_node,
         odometry_publisher_node,
+        odometry_publisher_rf2o_node,
         point_cloud_filter_node,
         rover_custom_controller,
         rover_lora_controller,
