@@ -13,16 +13,16 @@ ekf_filter_node:
     # base_link_frame: actual_base_link
     world_frame: odom
     # map_frame: odom
-    publish_tf: true
+    publish_tf: false
     reset_on_time_jump: true
 
     imu0: /mavros/imu/data/reframed
     imu0_config:
       [
         false, false, false, # X, Y, Z
-        true,  true,  true,  # roll, pitch, yaw
+        false,  false,  false,  # roll, pitch, yaw
         false, false, false, # X', Y', Z'
-        false,  false,  false,  # roll', pitch', yaw'
+        true,  true,  true,  # roll', pitch', yaw'
         true, true, true, # X'', Y'', Z''
       ]
     imu0_differential: false
@@ -34,7 +34,7 @@ ekf_filter_node:
     odom0_config:
       [
         false, false, false,  # X, Y, Z
-        false, false, false, # roll, pitch, yaw
+        true, true, true, # roll, pitch, yaw
         true, true, true, # X', Y', Z'
         false, false, false, # roll', pitch', yaw'
         false, false, false, # X'', Y'', Z''

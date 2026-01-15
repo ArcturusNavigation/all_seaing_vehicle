@@ -79,6 +79,9 @@ class MechanismNavigation(TaskServerBase):
         self.declare_parameter("shooting_xy_thres", 0.2)
         self.shooting_xy_thres = self.get_parameter("shooting_xy_thres").get_parameter_value().double_value
 
+        self.declare_parameter("shooting_theta_thres", 10.0)
+        self.shooting_theta_thres = self.get_parameter("shooting_theta_thres").get_parameter_value().double_value
+
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
 
@@ -117,6 +120,7 @@ class MechanismNavigation(TaskServerBase):
         self.prev_update_time = self.get_clock().now()
 
         self.time_last_had_target = time.time()
+        self.time_started_shooting = -1
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
@@ -191,12 +195,12 @@ class MechanismNavigation(TaskServerBase):
         
         # update global variables
         self.water_banners = new_water_banners
-        self.ball_labels = new_ball_banners
+        self.ball_banners = new_ball_banners
 
         # ensure that we first shoot two targets of different type
-        if self.shot_water and not self.shot_ball:
+        if self.shot_water and not self.shot_ball and len(self.ball_banners) > 0:
             target_banners = self.ball_banners
-        elif self.shot_ball and not self.shot_water:
+        elif self.shot_ball and not self.shot_water and len(self.water_banners) > 0:
             target_banners = self.water_banners
         else:
             target_banners = self.water_banners + self.ball_banners
@@ -387,6 +391,7 @@ class MechanismNavigation(TaskServerBase):
             # go to that line and forward (negative error if boat left of line, positive if right)
             offset = -self.dot(self.difference(target_back_mid, self.robot_pos), self.perp_vec(target_dir))
             approach_angle = self.angle_vec(self.negative(target_dir), self.robot_dir) # TODO Check sign
+            angle_error = self.angle_vec(self.difference(self.robot_pos, target_back_mid), self.robot_dir)
 
             # forward speed decreasing exponentially as we get closer
             dist_diff = self.dot(self.difference(target_back_mid, self.robot_pos), target_dir) - self.wpt_banner_dist
@@ -394,26 +399,41 @@ class MechanismNavigation(TaskServerBase):
 
             self.get_logger().info(f'side offset: {offset}')
             self.get_logger().info(f'forward distance: {dist_diff}')
-            self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
-            if abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres:
+            self.update_pid(-dist_diff, offset, angle_error) # could also use PID for the x coordinate, instead of the exponential thing we did above
+            if abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres and abs(angle_error) < self.shooting_theta_thres/180.0*np.pi:
                 # TODO SHOOT BALL/WATER
-                self.get_logger().info(f'SHOOTING {self.selected_target[0]}')
-                # move on
-                self.shot_targets.append(self.selected_target)
-                self.state = DeliveryState.WAITING_TARGET
-                self.selected_target = None
-                self.picked_target = False
-                # self.pid.reset()
-                self.x_pid.reset()
-                self.y_pid.reset()
-                self.theta_pid.reset()
-                return
+                # self.get_logger().info(f'SHOOTING {self.selected_target[0]}')
+
+                if self.time_started_shooting == -1:
+                    self.get_logger().info(f'STARTED SHOOTING {self.selected_target[0]}, TIME: {time.time()}')
+                    self.time_started_shooting = time.time()
+                    return
+                elif time.time() - self.time_started_shooting > 5:
+                    self.get_logger().info(f'SHOT {self.selected_target[0]}, TIME: {time.time()}')
+                    # move on
+                    self.shot_targets.append(self.selected_target)
+
+                    if self.selected_target[0] == TargetType.WATER_TARGET:
+                        self.shot_water = True
+                    if self.selected_target[0] == TargetType.BALL_TARGET:
+                        self.shot_ball = True
+
+                    self.state = DeliveryState.WAITING_TARGET
+                    self.selected_target = None
+                    self.picked_target = False
+                    # self.pid.reset()
+                    self.x_pid.reset()
+                    self.y_pid.reset()
+                    self.theta_pid.reset()
+                    self.time_started_shooting = -1
+                    self.send_vel_cmd(0.0,0.0,0.0)
+                    return
             x_output = self.x_pid.get_effort()
             y_output = self.y_pid.get_effort()
             theta_output = self.theta_pid.get_effort()
-            x_vel = x_output
+            x_vel = x_output*np.cos(approach_angle) + y_output*np.sin(approach_angle)
             # x_vel = forward_speed
-            y_vel = y_output
+            y_vel = y_output*np.cos(approach_angle) - x_output*np.sin(approach_angle)
 
             marker_array = MarkerArray()
             marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))
@@ -421,12 +441,7 @@ class MechanismNavigation(TaskServerBase):
             marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 0.0, 1.0), id=2))
 
             x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
-            control_msg = ControlOption()
-            control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
-            control_msg.twist.linear.x = x_vel
-            control_msg.twist.linear.y = y_vel
-            control_msg.twist.angular.z = theta_output
-            self.control_pub.publish(control_msg)
+            self.send_vel_cmd(x_vel, y_vel, theta_output)
             self.controller_marker_pub.publish(marker_array)
         else:
             waypoint = self.sum(target_back_mid, self.scalar_prod(target_dir, self.wpt_banner_dist))

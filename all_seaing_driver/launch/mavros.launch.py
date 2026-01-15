@@ -84,7 +84,7 @@ def generate_launch_description():
                     {"flip_gyro": True},
                 ],
                 remappings=[
-                    ("imu_topic", "/mavros/imu/data/filtered"),
+                    ("imu_topic", "/mavros/imu/data"),
                     ("new_imu_topic", "/mavros/imu/data/reframed")
                 ]
             ),
