@@ -472,9 +472,9 @@ class Docking(TaskServerBase):
             x_output = self.x_pid.get_effort()
             y_output = self.y_pid.get_effort()
             theta_output = self.theta_pid.get_effort()
-            x_vel = x_output
+            x_vel = x_output*np.cos(approach_angle) + y_output*np.sin(approach_angle)
             # x_vel = forward_speed
-            y_vel = y_output
+            y_vel = y_output*np.cos(approach_angle) - x_output*np.sin(approach_angle)
 
             marker_array = MarkerArray()
             marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))

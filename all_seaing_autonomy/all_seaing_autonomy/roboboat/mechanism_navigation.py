@@ -390,6 +390,7 @@ class MechanismNavigation(TaskServerBase):
             # go to that line and forward (negative error if boat left of line, positive if right)
             offset = -self.dot(self.difference(target_back_mid, self.robot_pos), self.perp_vec(target_dir))
             approach_angle = self.angle_vec(self.negative(target_dir), self.robot_dir) # TODO Check sign
+            angle_error = self.angle_vec(self.difference(self.robot_pos, target_back_mid), self.robot_dir)
 
             # forward speed decreasing exponentially as we get closer
             dist_diff = self.dot(self.difference(target_back_mid, self.robot_pos), target_dir) - self.wpt_banner_dist
@@ -397,8 +398,8 @@ class MechanismNavigation(TaskServerBase):
 
             self.get_logger().info(f'side offset: {offset}')
             self.get_logger().info(f'forward distance: {dist_diff}')
-            self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
-            if abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres and abs(approach_angle) < self.shooting_theta_thres/180.0*np.pi:
+            self.update_pid(-dist_diff, offset, angle_error) # could also use PID for the x coordinate, instead of the exponential thing we did above
+            if abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres and abs(angle_error) < self.shooting_theta_thres/180.0*np.pi:
                 # TODO SHOOT BALL/WATER
                 self.get_logger().info(f'SHOOTING {self.selected_target[0]}')
                 # move on
@@ -420,9 +421,9 @@ class MechanismNavigation(TaskServerBase):
             x_output = self.x_pid.get_effort()
             y_output = self.y_pid.get_effort()
             theta_output = self.theta_pid.get_effort()
-            x_vel = x_output
+            x_vel = x_output*np.cos(approach_angle) + y_output*np.sin(approach_angle)
             # x_vel = forward_speed
-            y_vel = y_output
+            y_vel = y_output*np.cos(approach_angle) - x_output*np.sin(approach_angle)
 
             marker_array = MarkerArray()
             marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))
