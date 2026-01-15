@@ -1435,7 +1435,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 float d_y = m_state(3 + 2*m_num_obj + 3 * tracked_id + 1) - m_state(1);
                 float d_theta = m_state(3 + 2*m_num_obj + 3 * tracked_id + 2) - m_state(2);
                 float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::bidirectional_angle_to_pi_range(d_theta));
+                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::angle_to_pi_range(d_theta));
                 Eigen::MatrixXf F = Eigen::MatrixXf::Zero(6, m_mat_size);
                 F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
                 F.block(3, 3 + 2*m_num_obj + 3 * tracked_id, 3, 3) = Eigen::Matrix3f::Identity();
@@ -1455,7 +1455,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_nav_y;
                 float d_theta = m_tracked_banners[tracked_id]->mean_pred[2] - m_nav_heading;
                 float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::bidirectional_angle_to_pi_range(d_theta));
+                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::angle_to_pi_range(d_theta));
 
                 Eigen::Matrix<float, 3, 3> h{
                     {std::sqrt(q) * d_x, std::sqrt(q) * d_y, 0},
@@ -1471,7 +1471,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             Eigen::Vector3f z_actual(range, bearing, phi);
 
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
-            z_actual(2) = z_pred(2)+all_seaing_perception::bidirectional_angle_to_pi_range(z_actual(2)-z_pred(2));
+            z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
             p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
                                (z_actual - z_pred));
             v_meas.back().push_back(Psi.trace());
@@ -1531,7 +1531,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             float d_y = m_state(3 + 2*m_num_obj + 3 * tracked_id + 1) - m_state(1);
             float d_theta = m_state(3 + 2*m_num_obj + 3 * tracked_id + 2) - m_state(2);
             float q = d_x * d_x + d_y * d_y;
-            Eigen::Vector3f z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::bidirectional_angle_to_pi_range(d_theta));
+            Eigen::Vector3f z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::angle_to_pi_range(d_theta));
             Eigen::Matrix<float, 3, 6> h{
                 {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
                     std::sqrt(q) * d_y, 0},
@@ -1544,7 +1544,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             Eigen::MatrixXf H = h * F / q;
             Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
-            z_actual(2) = z_pred(2)+all_seaing_perception::bidirectional_angle_to_pi_range(z_actual(2)-z_pred(2));
+            z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
             m_state += K * (z_actual - z_pred);
             m_cov =
                 (Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) - K * H) * m_cov;
@@ -1553,7 +1553,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_nav_y;
             float d_theta = m_tracked_banners[tracked_id]->mean_pred[2] - m_nav_heading;
             float q = d_x * d_x + d_y * d_y;
-            Eigen::Vector3f z_pred(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::bidirectional_angle_to_pi_range(d_theta));
+            Eigen::Vector3f z_pred(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::angle_to_pi_range(d_theta));
             Eigen::Matrix<float, 3, 3> h{
                 {std::sqrt(q) * d_x, std::sqrt(q) * d_y, 0},
                 {-d_y, d_x, 0},
@@ -1564,7 +1564,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 m_tracked_banners[tracked_id]->cov * H.transpose() *
                 (H * m_tracked_banners[tracked_id]->cov * H.transpose() + Q).inverse();
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
-            z_actual(2) = z_pred(2)+all_seaing_perception::bidirectional_angle_to_pi_range(z_actual(2)-z_pred(2));
+            z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
             m_tracked_banners[tracked_id]->mean_pred += K * (z_actual - z_pred);
             m_tracked_banners[tracked_id]->cov =
                 (Eigen::Matrix3f::Identity() - K * H) * m_tracked_banners[tracked_id]->cov;

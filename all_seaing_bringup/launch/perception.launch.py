@@ -273,8 +273,8 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"ransac_params_file": ransac_params},
-            # {"label_mappings_file": buoy_label_mappings},
-            {"label_mappings_file": shape_label_mappings},
+            {"label_mappings_file": buoy_label_mappings},
+            # {"label_mappings_file": shape_label_mappings},
         ]
     )
 
@@ -351,6 +351,12 @@ def launch_setup(context, *args, **kwargs):
         'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false")
         or (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")
         or (is_indoors == "true")),
+        'gps_update': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "true")
+        and (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "false")
+        and (is_indoors == "false")),
+        # 'include_odom_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "true")
+        # and ((context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")
+        # or (is_indoors == "true"))),
         'track_banners': str(context.perform_substitution(LaunchConfiguration('track_banners')).lower() == "true"),
         'banners_slam': str(context.perform_substitution(LaunchConfiguration('banners_slam')).lower() == "true"),
     }

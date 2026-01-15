@@ -32,7 +32,7 @@ coplanar:
     "red_triangle"
     ]
 
-max_iters: 70
+max_iters: 20
 dist_thres: 0.1
 min_inliers: 25
 clust_dist: 0.5
