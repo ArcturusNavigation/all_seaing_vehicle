@@ -48,6 +48,15 @@ def launch_setup(context, *args, **kwargs):
     ransac_params = os.path.join(
         bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
+    locations_file = os.path.join(
+        bringup_prefix, "config", "localization", "locations.yaml"
+    )
+
+    with open(locations_file, "r") as f:
+        locations = yaml.safe_load(f)
+
+    location = context.perform_substitution(LaunchConfiguration("location"))
+    is_indoors = str(locations[location]["indoors"]).lower()
 
     point_cloud_filter_obstacle_node = launch_ros.actions.Node(
         package="all_seaing_perception",
@@ -340,7 +349,8 @@ def launch_setup(context, *args, **kwargs):
     param_substitutions = {
         'track_robot': str(context.perform_substitution(LaunchConfiguration('use_slam')).lower() == "true"),
         'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false")
-        or (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")),
+        or (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")
+        or (is_indoors == "true")),
         'track_banners': str(context.perform_substitution(LaunchConfiguration('track_banners')).lower() == "true"),
         'banners_slam': str(context.perform_substitution(LaunchConfiguration('banners_slam')).lower() == "true"),
     }
@@ -410,7 +420,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             # DeclareLaunchArgument('use_sim_time', default_value='true'),
-            DeclareLaunchArgument("location", default_value="pavillion"), # TODO USE IT TO USE LIO WHEN INDOORS, SAME AS IN VEHICLE LAUNCH FILE
+            DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
             DeclareLaunchArgument("use_gps", default_value='true'),
             DeclareLaunchArgument("track_banners", default_value='false'),
