@@ -193,7 +193,7 @@ class Docking(TaskServerBase):
             # TODO replace w/ numbers for the dock banner labels, as in the roboboat course
             # self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
             self.boat_labels = []
-            self.dock_labels = [self.label_mappings[name] for name in ["black_triangle"]]
+            self.dock_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
             # self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
         
         self.inv_label_mappings = {}
@@ -494,12 +494,7 @@ class Docking(TaskServerBase):
             marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 0.0, 1.0), id=2))
 
             x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
-            control_msg = ControlOption()
-            control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
-            control_msg.twist.linear.x = x_vel
-            control_msg.twist.linear.y = y_vel
-            control_msg.twist.angular.z = theta_output
-            self.control_pub.publish(control_msg)
+            self.send_vel_cmd(x_vel, y_vel, theta_output)
             self.controller_marker_pub.publish(marker_array)
         else:
             waypoint = self.sum(slot_back_mid, self.scalar_prod(slot_dir, self.wpt_banner_dist))

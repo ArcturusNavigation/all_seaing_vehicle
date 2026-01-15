@@ -21,7 +21,7 @@ object_tracking_map:
     rotate_odom: False
     update_odom_theta_uncertainty: 10.0
     new_object_slam_threshold: 0.05
-    new_banner_slam_threshold: 0.5 # all banners have different labels on them, and the ones that have the same (boats to shoot) are very far away, but there is the chance for YOLO misdetections
+    new_banner_slam_threshold: 0.1 # all banners have different labels on them, and the ones that have the same (boats to shoot) are very far away, but there is the chance for YOLO misdetections
     init_xy_noise: 0.7
     init_theta_noise: 0.25
     init_new_cov: 50.0
