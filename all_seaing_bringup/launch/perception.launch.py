@@ -48,6 +48,15 @@ def launch_setup(context, *args, **kwargs):
     ransac_params = os.path.join(
         bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
+    locations_file = os.path.join(
+        bringup_prefix, "config", "localization", "locations.yaml"
+    )
+
+    with open(locations_file, "r") as f:
+        locations = yaml.safe_load(f)
+
+    location = context.perform_substitution(LaunchConfiguration("location"))
+    is_indoors = str(locations[location]["indoors"]).lower()
 
     point_cloud_filter_obstacle_node = launch_ros.actions.Node(
         package="all_seaing_perception",
@@ -339,8 +348,9 @@ def launch_setup(context, *args, **kwargs):
 
     param_substitutions = {
         'track_robot': str(context.perform_substitution(LaunchConfiguration('use_slam')).lower() == "true"),
-        'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false") or 
-                                       (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")),
+        'include_odom_only_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "false")
+        or (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")
+        or (is_indoors == "true")),
         'track_banners': str(context.perform_substitution(LaunchConfiguration('track_banners')).lower() == "true"),
         'banners_slam': str(context.perform_substitution(LaunchConfiguration('banners_slam')).lower() == "true"),
     }
@@ -396,7 +406,7 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,
         multicam_detection_merge_node,
-        # ransac_node,
+        ransac_node,
         point_cloud_filter_downsampled_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
