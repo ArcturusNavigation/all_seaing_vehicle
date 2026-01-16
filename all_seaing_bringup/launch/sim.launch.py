@@ -139,6 +139,38 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    color_segmentation_node_far_left = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="color_segmentation.py",
+        remappings=[
+            ("image", "/wamv/sensors/cameras/far_left_camera_sensor/image_raw"),
+            ("bounding_boxes", "bounding_boxes/far_left"),
+            ("image/segmented", "image/segmented/far_left"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+                "color_ranges_file": color_ranges,
+            }
+        ],
+    )
+
+    color_segmentation_node_front_right = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="color_segmentation.py",
+        remappings=[
+            ("image", "/wamv/sensors/cameras/front_right_camera_sensor/image_raw"),
+            ("bounding_boxes", "bounding_boxes/front_right"),
+            ("image/segmented", "image/segmented/front_right"),
+        ],
+        parameters=[
+            {
+                "color_label_mappings_file": color_label_mappings,
+                "color_ranges_file": color_ranges,
+            }
+        ],
+    )
+
     buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
@@ -267,9 +299,10 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
             ("camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
             ("lidar_topic", "point_cloud/filtered"),
-            ("detections", "obstacle_map/local"),
+            ("detections/front", "obstacle_map/local"),
         ],
         parameters=[
+            {"camera_name": "front"},
             {"base_link_frame": "wamv/wamv/base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": color_buoy_label_mappings},
@@ -283,6 +316,82 @@ def launch_setup(context, *args, **kwargs):
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
             {"is_sim": True},
             {"label_list": True}
+        ]
+    )
+
+    bbox_project_pcloud_node_far_left = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/far_left_camera_sensor/camera_info"),
+            ("camera_topic", "/wamv/sensors/cameras/far_left_camera_sensor/image_raw"),
+            ("lidar_topic", "point_cloud/filtered"),
+            ("bounding_boxes", "bounding_boxes/far_left"),
+        ],
+        parameters=[
+            {"camera_name": "back_left"},
+            {"base_link_frame": "wamv/wamv/base_link"},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": color_buoy_label_mappings},
+            {"color_ranges_file": color_ranges},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 2000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
+            {"clustering_distance": 0.1},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": True},
+            {"label_list": True}
+        ]
+    )
+    
+    bbox_project_pcloud_node_front_right = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="bbox_project_pcloud",
+        output="screen",
+        remappings=[
+            ("camera_info_topic", "/wamv/sensors/cameras/front_right_camera_sensor/camera_info"),
+            ("camera_topic", "/wamv/sensors/cameras/front_right_camera_sensor/image_raw"),
+            ("lidar_topic", "point_cloud/filtered"),
+            ("bounding_boxes", "bounding_boxes/front_right"),
+        ],
+        parameters=[
+            {"camera_name": "back_right"},
+            {"base_link_frame": "wamv/wamv/base_link"},
+            {"bbox_object_margin": 0.0},
+            {"color_label_mappings_file": color_buoy_label_mappings},
+            {"color_ranges_file": color_ranges},
+            {"obstacle_size_min": 2},
+            {"obstacle_size_max": 2000},
+            {"contour_bbox_area_thres": 0.5},
+            {"cluster_bbox_area_thres": 0.0},
+            {"clustering_distance": 0.1},
+            {"matching_weights_file": matching_weights},
+            {"contour_matching_color_ranges_file": contour_matching_color_ranges},
+            {"is_sim": True},
+            {"label_list": True}
+        ]
+    )
+
+    multicam_detection_merge_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="multicam_detection_merge.py",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings = [
+            ("detections/merged", "obstacle_map/local"),
+        ],
+        parameters = [
+            {"enable_front": True},
+            {"enable_back_left": True},
+            {"enable_back_right": True},
+            {"individual": True},
+            {"approximate": False},
+            {"delay": 0.1},
+            {"duplicate_thres": 0.3},
+            {"angle_thres": 15.0},
         ]
     )
 
@@ -653,11 +762,16 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         color_segmentation_node,
+        # color_segmentation_node_far_left,
+        # color_segmentation_node_front_right,
         # ycrcb_color_segmentation_node,
         # buoy_yolo_node,
         point_cloud_filter_node,
         point_cloud_filter_obstacle_node,
         bbox_project_pcloud_node,
+        # bbox_project_pcloud_node_far_left,
+        # bbox_project_pcloud_node_front_right,
+        # multicam_detection_merge_node,
         ransac_node,
         odometry_publisher_node,
         object_tracking_map_node,
