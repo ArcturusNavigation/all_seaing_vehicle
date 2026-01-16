@@ -56,6 +56,9 @@ class FollowBuoyPath(TaskServerBase):
 
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+
+        self.declare_parameter("red_left", True)
+        self.red_left = self.get_parameter("red_left").get_parameter_value().bool_value
         
         self.declare_parameter("gate_dist_thres", 25.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
@@ -154,7 +157,6 @@ class FollowBuoyPath(TaskServerBase):
         
         self.sent_waypoints = set()
 
-        self.red_left = True
         self.first_setup = True
         self.time_last_seen_buoys = time.time()
 

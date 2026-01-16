@@ -66,6 +66,7 @@ def launch_setup(context, *args, **kwargs):
         executable="run_tasks.py",
         parameters=[
             {"is_sim": False},
+            {"red_left": True},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
             {"task_locations_file": task_locations},
@@ -84,6 +85,7 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
+            {"red_left": True},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
             {"search_task_radius": 50.0},
@@ -115,6 +117,7 @@ def launch_setup(context, *args, **kwargs):
         executable="speed_challenge.py",
         parameters=[
             {"is_sim": False},
+            {"red_left": True},
             {"color_label_mappings_file": buoy_label_mappings},
             {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
@@ -197,6 +200,7 @@ def launch_setup(context, *args, **kwargs):
         executable="return_home.py",
         parameters=[
             {"is_sim": False},
+            {"red_left": False},
             {"color_label_mappings_file": buoy_label_mappings},
             {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},

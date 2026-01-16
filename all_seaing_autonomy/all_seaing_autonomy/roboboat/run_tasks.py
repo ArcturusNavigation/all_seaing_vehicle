@@ -83,6 +83,9 @@ class RunTasks(ActionServerBase):
 
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+
+        self.declare_parameter("red_left", True)
+        self.red_left = self.get_parameter("red_left").get_parameter_value().bool_value
         
         self.declare_parameter("gate_dist_thres", 50.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
@@ -156,7 +159,6 @@ class RunTasks(ActionServerBase):
         with open(task_location_mappings_file, "r") as f:
             self.task_location_mappings = yaml.safe_load(f)
         
-        self.red_left = True
         self.gate_pair = None
 
         self.waypoint_marker_pub = self.create_publisher(

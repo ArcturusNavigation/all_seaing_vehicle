@@ -58,6 +58,9 @@ class ReturnHome(TaskServerBase):
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
+        self.declare_parameter("red_left", False)
+        self.red_left = self.get_parameter("red_left").get_parameter_value().bool_value
+
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
 
@@ -134,7 +137,6 @@ class ReturnHome(TaskServerBase):
             ),
         )
 
-        self.red_left = False
         self.gate_pair = None
 
     def reset_challenge(self):

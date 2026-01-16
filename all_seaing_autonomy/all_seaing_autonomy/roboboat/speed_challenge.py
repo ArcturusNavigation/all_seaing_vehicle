@@ -58,6 +58,9 @@ class SpeedChallenge(TaskServerBase):
             MarkerArray, "waypoint_markers", 10
         )
 
+        self.declare_parameter("red_left", True)
+        self.red_left = self.get_parameter("red_left").get_parameter_value().bool_value
+
         self.declare_parameter("gate_dist_thres", 40.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
 
@@ -164,7 +167,6 @@ class SpeedChallenge(TaskServerBase):
             for buoy_label in ["yellow_buoy", "yellow_racquet_ball"]:
                 self.blue_labels.add(label_mappings[buoy_label])
 
-        self.red_left = True
         self.gate_pair = None
         # self.first_setup = True
 
