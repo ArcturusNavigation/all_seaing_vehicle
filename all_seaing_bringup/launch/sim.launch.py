@@ -516,6 +516,22 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    return_home = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="return_home.py",
+        parameters=[
+            {"is_sim": True},
+            {"color_label_mappings_file": color_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 50.0},
+            # {"gate_dist_back": 5.0},
+            {"gate_probe_dist": 10.0},
+            {"gate_dist_thres": 50.0},
+        ],
+        remappings=[
+        ]
+    )
+
     follow_buoy_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_pid.py",
@@ -654,6 +670,7 @@ def launch_setup(context, *args, **kwargs):
         speed_challenge,
         docking,
         mechanism_navigation,
+        return_home,
         # follow_buoy_pid,
         # speed_challenge_pid,
         # docking_fallback,

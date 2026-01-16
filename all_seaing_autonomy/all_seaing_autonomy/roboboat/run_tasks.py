@@ -58,7 +58,7 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
-            [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
             [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.SEARCH, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
             # [ActionType.TASK, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
@@ -71,7 +71,8 @@ class RunTasks(ActionServerBase):
             # [ActionType.TASK, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
         ]
         self.term_tasks = [
-            
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_return"), "return"],
+            # [ActionType.TASK, ActionClient(self, Task, "return_home")],
         ]
         self.current_task = None
         self.next_task_index = -1
@@ -219,7 +220,7 @@ class RunTasks(ActionServerBase):
 
         return midpoint, (-dy, dx)
 
-    def setup_buoys(self, pointing_direction=None):
+    def setup_buoys(self):
         """
         Runs when the first obstacle map is received, filters the buoys that are in front of
         the robot (x>0 in local coordinates) and finds (and stores) the closest green one and
@@ -237,8 +238,7 @@ class RunTasks(ActionServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            # if ((pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
-            if self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
+            if ob.local_point.point.x > 0 and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -372,7 +372,7 @@ class RunTasks(ActionServerBase):
                 return
         
         if self.next_term_index.val < len(self.term_tasks):
-            self.attempt_task(self.term_tasks[self.next_term_index.val], self.next_term_index, None)
+            self.attempt_task(self.term_tasks[self.next_term_index.val][0], self.term_tasks[self.next_term_index.val][1], self.next_term_index, None, self.term_tasks[self.next_term_index.val][2] if self.term_tasks[self.next_term_index.val][0] == ActionType.SEARCH else None)
             return
         
         self.get_logger().info("All tasks completed. Shutting down node.")

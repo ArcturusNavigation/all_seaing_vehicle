@@ -164,8 +164,6 @@ class SpeedChallenge(TaskServerBase):
             for buoy_label in ["yellow_buoy", "yellow_racquet_ball"]:
                 self.blue_labels.add(label_mappings[buoy_label])
 
-        self.obstacles = []
-
         self.red_left = True
         self.gate_pair = None
         # self.first_setup = True
@@ -434,13 +432,17 @@ class SpeedChallenge(TaskServerBase):
         # self.move_to_waypoint([nav_x, nav_y, theta_intended], is_stationary=False, busy_wait=True, cancel_on_exit=True)
         # recompute gate
         # self.setup_buoys()
-        gate_mid, _ = self.midpoint_pair_dir(self.gate_pair, 0.0)
-        self.setup_buoys(self.difference(self.robot_pos, gate_mid))
-        self.gate_wpt, self.buoy_direction = self.midpoint_pair_dir(self.gate_pair, self.forward_dist_back)
+        # gate_mid, _ = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        # self.setup_buoys(self.difference(self.robot_pos, gate_mid))
+        self.get_logger().info('probing & recomputing gate')
+        probing_wpt, _ = self.midpoint_pair_dir(self.gate_pair, -self.forward_dist_back)
+        self.move_to_point(probing_wpt, busy_wait=True, exit_func=self.setup_buoys)
 
         self.get_logger().info('going back to the gate')
+        self.gate_wpt, _ = self.midpoint_pair_dir(self.gate_pair, -self.forward_dist_back) # gate detected after probing or the one computed at the start
         self.move_to_point(self.gate_wpt, busy_wait=True,
             goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.forward_dist_back)))
+        self.gate_wpt, _ = self.midpoint_pair_dir(self.gate_pair, self.forward_dist_back)
         self.move_to_point(self.gate_wpt, busy_wait=True,
             goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.forward_dist_back)))
         return Task.Result(success=True)
@@ -605,7 +607,7 @@ class SpeedChallenge(TaskServerBase):
         obstacles_in_front = lambda obs: [
             ob for ob in obs
             # if ((pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
-            if self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
+            if (self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres and (pointing_direction is None or self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0))
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -660,6 +662,9 @@ class SpeedChallenge(TaskServerBase):
         else:
             self.gate_pair = InternalBuoyPair(green_to, red_to)
         self.get_logger().info(f'FOUND GATE')
+        self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
+        self.gate_mid, self.gate_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(self.gate_mid), 0.0)]))
         return True
 
     def ccw(self, a, b, c):
