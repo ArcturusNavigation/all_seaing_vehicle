@@ -98,7 +98,7 @@ class TaskServerBase(ActionServerBase):
 # Functions below are not meant to be reimplemented
 
     def goal_callback(self, goal_request):
-        self.get_logger().info('Task Server [{self.server_name}] received task')
+        self.get_logger().info(f'Task Server [{self.server_name}] received task')
         if self.should_accept_task(goal_request):
             return GoalResponse.ACCEPT
         else:
@@ -358,15 +358,15 @@ class TaskServerBase(ActionServerBase):
 
         firstLoop = True
 
-        self.get_logger().info(f"Moving to point {(goal_handle.x, goal_handle.y)}")
+        self.get_logger().info(f"Moving to point {(goal_handle.request.x, goal_handle.request.y)}")
         self.moved_to_point = False
         self.waypoint_rejected = False
         self.waypoint_aborted = False
         self.follow_path_client.wait_for_server()
         goal_msg = FollowPath.Goal()
         goal_msg.planner = self.get_parameter("planner").value
-        goal_msg.x = goal_handle.x
-        goal_msg.y = goal_handle.y
+        goal_msg.x = goal_handle.request.x
+        goal_msg.y = goal_handle.request.y
         goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
         goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
         goal_msg.goal_tol = self.get_parameter("goal_tol").value
@@ -377,10 +377,6 @@ class TaskServerBase(ActionServerBase):
         self._send_goal(goal_msg)
 
         self.found_task = False
-
-        while not self.moved_to_point:
-            
-            time.sleep(self.timer_period)
 
         while (not self.found_task) and (not self.moved_to_point) and rclpy.ok():
             if self.should_abort():
@@ -395,7 +391,7 @@ class TaskServerBase(ActionServerBase):
                 goal_handle.canceled()
                 return Search.Result()
 
-            if math.sqrt((self.robot_pos[0]-goal_handle.x)**2 + (self.robot_pos[1]-goal_handle.y)**2) < self.search_task_radius and self.should_accept_task():
+            if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task(None):
                 self.found_task = True
                 self.cancel_navigation()
             elif self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality
@@ -404,11 +400,6 @@ class TaskServerBase(ActionServerBase):
                 self.waypoint_rejected = False
                 self.waypoint_aborted = False
             time.sleep(self.timer_period)
-        
-        if not self.found_task:
-            self.get_logger().info("ROS shutdown detected or loop ended unexpectedly in control.")
-            goal_handle.abort()
-            return Search.Result(success=False)
 
         self.end_process(f"Searching Server for [{self.server_name}] task completed with result {self.found_task}")
         goal_handle.succeed()

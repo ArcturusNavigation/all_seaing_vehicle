@@ -435,8 +435,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
+            {"search_task_radius": 50.0},
             {"robot_frame_id": "wamv/wamv/base_link"},
             # {"midpoint_pair_forward_dist": 5.0},
+            {"gate_dist_thres": 50.0},
         ],
         remappings=[
             ("odometry/filtered", "odometry/tracked"),
@@ -450,9 +452,11 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 50.0},
             {"probe_distance": 30},
             # {"init_gate_dist": 5.0},
             # {"gate_dist_back": 5.0},
+            {"gate_dist_thres": 50.0},
         ],
         remappings=[
             ("odometry/filtered", "odometry/tracked"),
@@ -467,6 +471,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 100.0},
             {"dock_width": 2.0},
             {"dock_length": 11.0},
             {"wpt_banner_dist": 12.0},
@@ -493,6 +498,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 100.0},
             {"wpt_banner_dist": 10.0},
             {"navigation_dist_thres": 25.0},
             # {"update_target_dist_thres": 3.0},

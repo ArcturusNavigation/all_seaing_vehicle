@@ -15,6 +15,7 @@ from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
 import math
+from enum import Enum
 
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
@@ -46,6 +47,10 @@ class InternalBuoyPair:
         else:
             self.right = right_buoy
 
+class ActionType(Enum):
+    TASK = 1
+    SEARCH = 2
+
 class RunTasks(ActionServerBase):
     def __init__(self):
         super().__init__("run_tasks")
@@ -53,13 +58,17 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
-            [ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0), ActionClient(self, Search, "search_followpath"), "follow_path"],
-            # [ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0), ActionClient(self, Search, "search_speed"), "speed_challenge"],
-            # [ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), ActionClient(self, Search, "search_docking"), "docking"],
-            # [ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), ActionClient(self, Search, "search_delivery"), "delivery"],
-            # [ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
+            # [ActionType.TASK, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
+            # [ActionType.TASK, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
+            # [ActionType.TASK, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
         ]
         self.term_tasks = [
             
@@ -74,7 +83,7 @@ class RunTasks(ActionServerBase):
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
         
-        self.declare_parameter("gate_dist_thres", 25.0)
+        self.declare_parameter("gate_dist_thres", 50.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
 
         self.declare_parameter("circling_buoy_dist_thres", 25.0)
@@ -133,7 +142,6 @@ class RunTasks(ActionServerBase):
             self.red_labels.add(label_mappings["red_pole_buoy"])
             # self.red_labels.add(label_mappings["yellow_buoy"])
             # self.red_labels.add(label_mappings["yellow_racquet_ball"])
-        task_location_mappings_file
         self.declare_parameter(
             "task_locations_file", 
             os.path.join(
@@ -145,7 +153,7 @@ class RunTasks(ActionServerBase):
             "task_locations_file"
         ).value
         with open(task_location_mappings_file, "r") as f:
-            task_location_mappings = yaml.safe_load(f)
+            self.task_location_mappings = yaml.safe_load(f)
         
         self.red_left = True
         self.gate_pair = None
@@ -263,8 +271,8 @@ class RunTasks(ActionServerBase):
             self.gate_pair = InternalBuoyPair(green_to, red_to)
         self.get_logger().info(f'FOUND STARTING GATE')
         self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
-        gate_wpt, _ = self.midpoint_pair_dir(self.gate_pair, 0.0)
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(gate_wpt), 0.0)]))
+        self.gate_mid, self.gate_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(self.gate_mid), 0.0)]))
         return True
     
     def pair_to_pose(self, pair):
@@ -323,14 +331,24 @@ class RunTasks(ActionServerBase):
         if self.gate_pair is None:
             self.setup_buoys()
 
-    def attempt_task(self, current_task, incr_on_success, incr_on_fail = None, search_client = None, location_name = None):
+    def attempt_task(self, action_type, current_task, incr_on_success, incr_on_fail = None, location_name = None):
         self.current_task = current_task
         self.incr_on_success = incr_on_success
         self.incr_on_fail = incr_on_fail
         self.get_logger().info("Starting Task Manager States...")
         self.current_task.wait_for_server()
         self.get_logger().info(f"Starting task: {self.current_task}")
-        task_goal_msg = Task.Goal()
+        if action_type == ActionType.TASK:
+            task_goal_msg = Task.Goal()
+        else:
+            assert location_name is not None, f"Didn't provide location to search for task {self.current_task}"
+            local_x, local_y = self.task_location_mappings[location_name]["x"], self.task_location_mappings[location_name]["y"]
+            if self.gate_pair is None:
+                self.get_logger().info(f"Didn't identify the starting gate yet, but called to search task")
+                return
+            task_x = self.gate_mid[0] + self.gate_dir[1]*local_x + self.gate_dir[0]*local_y
+            task_y = self.gate_mid[1] + self.gate_dir[1]*local_y - self.gate_dir[0]*local_x
+            task_goal_msg = Search.Goal(x = task_x, y = task_y)
         self.get_logger().info(f"Sending goal: {task_goal_msg}")
         send_goal_future = self.current_task.send_goal_async(
             task_goal_msg,
@@ -340,7 +358,7 @@ class RunTasks(ActionServerBase):
 
     def find_task(self):
         if self.next_init_index.val < len(self.init_tasks):
-            self.attempt_task(self.init_tasks[self.next_init_index.val], self.next_init_index, None)
+            self.attempt_task(ActionType.TASK, self.init_tasks[self.next_init_index.val], self.next_init_index, None)
             return
 
         # print(self.task_list)
@@ -349,7 +367,7 @@ class RunTasks(ActionServerBase):
             self.next_task_index += 1
             if self.next_task_index >= len(self.task_list):
                 self.next_task_index -= len(self.task_list)
-            if self.task_list[self.next_task_index][1].val == 0 and self.task_list[self.next_task_index][2].val < self.max_attempt_count:
+            if self.task_list[self.next_task_index][2].val == 0 and self.task_list[self.next_task_index][3].val < self.max_attempt_count:
                 self.attempt_task(*self.task_list[self.next_task_index])
                 return
         
