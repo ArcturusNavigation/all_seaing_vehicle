@@ -24,6 +24,9 @@ def launch_setup(context, *args, **kwargs):
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_sim.yaml"
     )
+    task_locations = os.path.join(
+        bringup_prefix, "config", "course", "task_locations_sim.yaml"
+    )
     slam_real_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
@@ -431,12 +434,14 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": True},
+            {"red_left": True},
             {"color_label_mappings_file": color_label_mappings},
+            {"search_task_radius": 50.0},
             {"robot_frame_id": "wamv/wamv/base_link"},
             # {"midpoint_pair_forward_dist": 5.0},
+            {"gate_dist_thres": 50.0},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ]
     )
@@ -446,14 +451,16 @@ def launch_setup(context, *args, **kwargs):
         executable="speed_challenge.py",
         parameters=[
             {"is_sim": True},
+            {"red_left": True},
             {"color_label_mappings_file": color_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 50.0},
             {"probe_distance": 30},
             # {"init_gate_dist": 5.0},
             # {"gate_dist_back": 5.0},
+            {"gate_dist_thres": 50.0},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ]
     )
@@ -466,6 +473,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 100.0},
             {"dock_width": 2.0},
             {"dock_length": 11.0},
             {"wpt_banner_dist": 12.0},
@@ -492,6 +500,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 100.0},
             {"wpt_banner_dist": 10.0},
             {"navigation_dist_thres": 25.0},
             # {"update_target_dist_thres": 3.0},
@@ -509,6 +518,23 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    return_home = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="return_home.py",
+        parameters=[
+            {"is_sim": True},
+            {"red_left": False},
+            {"color_label_mappings_file": color_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 50.0},
+            # {"gate_dist_back": 5.0},
+            {"gate_probe_dist": 10.0},
+            {"gate_dist_thres": 50.0},
+        ],
+        remappings=[
+        ]
+    )
+
     follow_buoy_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_pid.py",
@@ -521,7 +547,6 @@ def launch_setup(context, *args, **kwargs):
                 "camera_info",
                 "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"
             ),
-            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
@@ -541,7 +566,6 @@ def launch_setup(context, *args, **kwargs):
                 "imu",
                 "/wamv/sensors/imu/imu/data"
             ),
-            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
@@ -564,6 +588,13 @@ def launch_setup(context, *args, **kwargs):
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
+        parameters=[
+            {"is_sim": True},
+            {"red_left": True},
+            {"color_label_mappings_file": color_label_mappings},
+            {"task_locations_file": task_locations},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+        ]
     )
 
     task_init_server = launch_ros.actions.Node(
@@ -643,6 +674,7 @@ def launch_setup(context, *args, **kwargs):
         speed_challenge,
         docking,
         mechanism_navigation,
+        return_home,
         # follow_buoy_pid,
         # speed_challenge_pid,
         # docking_fallback,

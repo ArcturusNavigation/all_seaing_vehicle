@@ -20,7 +20,7 @@ import math
 
 class FollowBuoyPID(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "follow_path_pid_server", action_name = "follow_buoy_pid")
+        super().__init__(server_name = "follow_path_pid_server", action_name = "follow_buoy_pid", search_action_name = "search_followpath_pid")
 
         # Replaced by obstacle map
         self.bbox_sub = self.create_subscription(
@@ -34,7 +34,7 @@ class FollowBuoyPID(TaskServerBase):
         # Will use type label and local point
         self.bbox_sub_new = self.create_subscription(
             ObstacleMap,
-            "obstacle_map/labeled",
+            "obstacle_map/local",
             self.bbox_callback_new,
             10
         )

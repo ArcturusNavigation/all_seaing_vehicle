@@ -26,7 +26,9 @@ def launch_setup(context, *args, **kwargs):
     robot_urdf_file = os.path.join(
         description_prefix, "urdf", "fish_and_chips", "robot.urdf.xacro"
     )
-    
+    task_locations = os.path.join(
+        bringup_prefix, "config", "course", "task_locations_real.yaml"
+    )
     robot_localization_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_real.yaml"
     )
@@ -62,6 +64,20 @@ def launch_setup(context, *args, **kwargs):
     run_tasks = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="run_tasks.py",
+        parameters=[
+            {"is_sim": False},
+            {"red_left": True},
+            {"global_frame_id": "map"},
+            {"color_label_mappings_file": buoy_label_mappings},
+            {"task_locations_file": task_locations},
+            {"gate_dist_thres": 25.0},
+            {"circling_buoy_dist_thres": 25.0},
+            {"max_inter_gate_dist": 25.0},
+            {"max_gate_pair_dist": 25.0},
+            {"duplicate_dist": 0.3},
+            {"inter_buoy_pair_dist": 0.5},
+            {"buoy_pair_dist_thres": 0.2},
+        ]
     )
 
     follow_buoy_path = launch_ros.actions.Node(
@@ -69,8 +85,10 @@ def launch_setup(context, *args, **kwargs):
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
+            {"red_left": True},
             {"global_frame_id": "map"},
             {"color_label_mappings_file": buoy_label_mappings},
+            {"search_task_radius": 50.0},
             {"gate_dist_thres": 25.0},
             {"circling_buoy_dist_thres": 25.0},
             {"max_inter_gate_dist": 25.0},
@@ -90,7 +108,6 @@ def launch_setup(context, *args, **kwargs):
             {"turn_pid": [0.4,0.0,0.0]},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ],
     )
@@ -100,8 +117,10 @@ def launch_setup(context, *args, **kwargs):
         executable="speed_challenge.py",
         parameters=[
             {"is_sim": False},
+            {"red_left": True},
             {"color_label_mappings_file": buoy_label_mappings},
             {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
             {"gate_dist_thres": 40.0},
             {"circling_buoy_dist_thres": 40.0},
             {"max_inter_gate_dist": 25.0},
@@ -117,7 +136,6 @@ def launch_setup(context, *args, **kwargs):
             {"turn_pid": [0.4,0.0,0.0]},
         ],
         remappings=[
-            ("obstacle_map/labeled", "obstacle_map/global"),
             ("odometry/filtered", "odometry/tracked"),
         ]
     )
@@ -130,6 +148,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
             # {"dock_width": 2.0},
             # {"dock_length": 7.0},
             # {"wpt_banner_dist": 10.0},
@@ -158,6 +177,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
             {"wpt_banner_dist": 3.0},
             {"navigation_dist_thres": 5.0},
             # {"update_target_dist_thres": 3.0},
@@ -175,6 +195,23 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    return_home = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="return_home.py",
+        parameters=[
+            {"is_sim": False},
+            {"red_left": False},
+            {"color_label_mappings_file": buoy_label_mappings},
+            {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
+            {"gate_dist_back": 5.0},
+            {"gate_probe_dist": 10.0},
+            {"gate_dist_thres": 50.0},
+        ],
+        remappings=[
+        ]
+    )
+
     follow_buoy_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_pid.py",
@@ -190,7 +227,6 @@ def launch_setup(context, *args, **kwargs):
         ],
         remappings=[
             ("camera_info", "/zed/zed_node/rgb/camera_info"),
-            ("obstacle_map/labeled", "obstacle_map/local"),
         ],
     )
 
@@ -211,7 +247,6 @@ def launch_setup(context, *args, **kwargs):
                 "imu",
                 "/mavros/imu/data/filtered"
             ),
-            ("obstacle_map/labeled", "obstacle_map/local")
         ],
     )
 
@@ -326,6 +361,7 @@ def launch_setup(context, *args, **kwargs):
         speed_challenge,
         docking,
         mechanism_navigation,
+        return_home,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback

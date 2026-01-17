@@ -45,10 +45,10 @@ class FollowPathState(Enum):
 
 class FollowBuoyPath(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path")
+        super().__init__(server_name = "follow_path_server", action_name = "follow_buoy_path", search_action_name = "search_followpath")
 
         self.map_sub = self.create_subscription(
-            ObstacleMap, "obstacle_map/labeled", self.map_cb, 10
+            ObstacleMap, "obstacle_map/global", self.map_cb, 10
         )
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
@@ -56,6 +56,9 @@ class FollowBuoyPath(TaskServerBase):
 
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+
+        self.declare_parameter("red_left", True)
+        self.red_left = self.get_parameter("red_left").get_parameter_value().bool_value
         
         self.declare_parameter("gate_dist_thres", 25.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
@@ -154,7 +157,6 @@ class FollowBuoyPath(TaskServerBase):
         
         self.sent_waypoints = set()
 
-        self.red_left = True
         self.first_setup = True
         self.time_last_seen_buoys = time.time()
 
@@ -224,12 +226,12 @@ class FollowBuoyPath(TaskServerBase):
     def midpoint(self, vec1, vec2):
         return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
 
-    def midpoint_pair(self, pair):
+    def midpoint_pair(self, pair, forward_dist):
         left_coords = self.ob_coords(pair.left)
         right_coords = self.ob_coords(pair.right)
         midpoint = self.midpoint(left_coords, right_coords)
         
-        scale = self.midpoint_pair_forward_dist # number of meters to translate forward. TODO: parametrize.
+        scale = forward_dist
         dy = right_coords[1] - left_coords[1]
         dx = right_coords[0] - left_coords[0]
         norm = math.sqrt(dx**2 + dy**2)
@@ -486,7 +488,7 @@ class FollowBuoyPath(TaskServerBase):
             return None
 
         if prev_pair is not None:
-            prev_pair_midpoint = self.midpoint_pair(prev_pair)
+            prev_pair_midpoint = self.midpoint_pair(prev_pair, 0.0)
             self.get_logger().debug(f"prev pair midpoint: {prev_pair_midpoint}")
             # Add a threshold on the minimum distance to a buoy if the new angle on the not close buoys is worse (diagonal but not the one that improves the pair)
             # Instead of only checking the two closest, order by distance and pick either the first one not at duplicate distance or the furthest one
@@ -746,7 +748,7 @@ class FollowBuoyPath(TaskServerBase):
                     return
             else:
                 # Check if new target waypoint is further than adapt_dist away from the old one that's been sent (store it in a global variable and only change it when sending to server)
-                if (self.sent_waypoint is not None) and (self.norm(self.midpoint_pair(self.buoy_pairs[0]), self.sent_waypoint) > self.adapt_dist):
+                if (self.sent_waypoint is not None) and (self.norm(self.midpoint_pair(self.buoy_pairs[0], self.midpoint_pair_forward_dist), self.sent_waypoint) > self.adapt_dist):
                     adapt_waypoint = True
                 # changed_pair_to = self.find_better_pair_to(self.buoy_pairs[0], red_buoys if self.red_left else green_buoys, green_buoys if self.red_left else red_buoys)
                 self.pair_to = self.buoy_pairs[0]
@@ -774,7 +776,7 @@ class FollowBuoyPath(TaskServerBase):
         self.last_pair = self.pair_to
         left_coords = self.ob_coords(self.pair_to.left)
         right_coords = self.ob_coords(self.pair_to.right)
-        x, y = self.midpoint_pair(self.pair_to)
+        x, y = self.midpoint_pair(self.pair_to, self.midpoint_pair_forward_dist)
         rx, ry = self.robot_pos
         if self.ccw(
             left_coords,
@@ -798,13 +800,7 @@ class FollowBuoyPath(TaskServerBase):
                     buoy_pair = self.buoy_pairs[0]
                     left_coords = self.ob_coords(buoy_pair.left)
                     right_coords = self.ob_coords(buoy_pair.right)
-                    # get the perp forward direction
-                    forward_dir = (right_coords[1] - left_coords[1], left_coords[0] - right_coords[0])
-                    forward_dir_norm = math.sqrt(forward_dir[0]**2 + forward_dir[1]**2)
-                    forward_dir = (-forward_dir[0]/forward_dir_norm, -forward_dir[1]/forward_dir_norm)
-                    midpt = self.midpoint_pair(buoy_pair)
-                    scale = self.forward_dist
-                    wpt = (midpt[0] + scale * forward_dir[0], midpt[1] + scale * forward_dir[1])
+                    wpt = self.midpoint_pair(buoy_pair, self.forward_dist)
 
                     self.send_waypoint_to_server(wpt)
 
@@ -844,7 +840,7 @@ class FollowBuoyPath(TaskServerBase):
             self.sent_forward = False
             self.time_last_seen_buoys = time.time()
         
-        self.waypoints = [self.midpoint_pair(pair) for pair in self.buoy_pairs]
+        self.waypoints = [self.midpoint_pair(pair, self.midpoint_pair_forward_dist) for pair in self.buoy_pairs]
         
         self.get_logger().debug(f"Pairs: {[(self.ob_coords(pair.left), self.ob_coords(pair.right)) for pair in self.buoy_pairs]}")
         self.get_logger().debug(f"Waypoints: {self.waypoints}")

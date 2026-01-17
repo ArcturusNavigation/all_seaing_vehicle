@@ -12,6 +12,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "action/FollowPath.action"
     "action/Waypoint.action"
     "action/Task.action"
+    "action/Search.action"
     "msg/ObstacleMap.msg"
     "msg/Obstacle.msg"
     "msg/ControlOption.msg"

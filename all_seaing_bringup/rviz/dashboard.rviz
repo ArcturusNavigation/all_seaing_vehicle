@@ -28,7 +28,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -408,68 +408,66 @@ Visualization Manager:
       Show Names: false
       Tree:
         map:
-          {}
-        odom:
-          {}
-        wamv/wamv/base_link:
-          wamv/wamv/back_left_engine_link:
-            wamv/wamv/back_left_propeller_link:
-              {}
-          wamv/wamv/back_right_engine_link:
-            wamv/wamv/back_right_propeller_link:
-              {}
-          wamv/wamv/ball_shooter_base_link:
-            wamv/wamv/ball_shooter_launcher_link:
-              {}
-          wamv/wamv/base_link/contact_sensor:
-            {}
-          wamv/wamv/base_link/far_left_camera_sensor:
-            {}
-          wamv/wamv/base_link/front_left_camera_sensor:
-            {}
-          wamv/wamv/base_link/front_right_camera_sensor:
-            {}
-          wamv/wamv/base_link/lidar_wamv_sensor:
-            {}
-          wamv/wamv/cpu_cases_link:
-            {}
-          wamv/wamv/far_left_camera_post_link:
-            wamv/wamv/far_left_camera_post_arm_link:
-              wamv/wamv/far_left_camera_link:
-                wamv/wamv/far_left_camera_link_optical:
+          odom:
+            wamv/wamv/base_link:
+              wamv/wamv/back_left_engine_link:
+                wamv/wamv/back_left_propeller_link:
                   {}
-          wamv/wamv/front_left_camera_post_link:
-            wamv/wamv/front_left_camera_post_arm_link:
-              wamv/wamv/front_left_camera_link:
-                wamv/wamv/front_left_camera_link_optical:
+              wamv/wamv/back_right_engine_link:
+                wamv/wamv/back_right_propeller_link:
                   {}
-          wamv/wamv/front_left_engine_link:
-            wamv/wamv/front_left_propeller_link:
-              {}
-          wamv/wamv/front_right_camera_post_link:
-            wamv/wamv/front_right_camera_post_arm_link:
-              wamv/wamv/front_right_camera_link:
-                wamv/wamv/front_right_camera_link_optical:
+              wamv/wamv/ball_shooter_base_link:
+                wamv/wamv/ball_shooter_launcher_link:
                   {}
-          wamv/wamv/front_right_engine_link:
-            wamv/wamv/front_right_propeller_link:
-              {}
-          wamv/wamv/gps_wamv_link:
-            wamv/wamv/gps_wamv_link/navsat:
-              {}
-          wamv/wamv/imu_wamv_link:
-            wamv/wamv/imu_wamv_link/imu_wamv_sensor:
-              {}
-          wamv/wamv/left_battery_link:
-            {}
-          wamv/wamv/lidar_wamv_post_link:
-            wamv/wamv/lidar_wamv_post_arm_link:
-              wamv/wamv/lidar_wamv_link:
+              wamv/wamv/base_link/contact_sensor:
                 {}
-          wamv/wamv/receiver:
-            {}
-          wamv/wamv/right_battery_link:
-            {}
+              wamv/wamv/base_link/far_left_camera_sensor:
+                {}
+              wamv/wamv/base_link/front_left_camera_sensor:
+                {}
+              wamv/wamv/base_link/front_right_camera_sensor:
+                {}
+              wamv/wamv/base_link/lidar_wamv_sensor:
+                {}
+              wamv/wamv/cpu_cases_link:
+                {}
+              wamv/wamv/far_left_camera_post_link:
+                wamv/wamv/far_left_camera_post_arm_link:
+                  wamv/wamv/far_left_camera_link:
+                    wamv/wamv/far_left_camera_link_optical:
+                      {}
+              wamv/wamv/front_left_camera_post_link:
+                wamv/wamv/front_left_camera_post_arm_link:
+                  wamv/wamv/front_left_camera_link:
+                    wamv/wamv/front_left_camera_link_optical:
+                      {}
+              wamv/wamv/front_left_engine_link:
+                wamv/wamv/front_left_propeller_link:
+                  {}
+              wamv/wamv/front_right_camera_post_link:
+                wamv/wamv/front_right_camera_post_arm_link:
+                  wamv/wamv/front_right_camera_link:
+                    wamv/wamv/front_right_camera_link_optical:
+                      {}
+              wamv/wamv/front_right_engine_link:
+                wamv/wamv/front_right_propeller_link:
+                  {}
+              wamv/wamv/gps_wamv_link:
+                wamv/wamv/gps_wamv_link/navsat:
+                  {}
+              wamv/wamv/imu_wamv_link:
+                wamv/wamv/imu_wamv_link/imu_wamv_sensor:
+                  {}
+              wamv/wamv/left_battery_link:
+                {}
+              wamv/wamv/lidar_wamv_post_link:
+                wamv/wamv/lidar_wamv_post_arm_link:
+                  wamv/wamv/lidar_wamv_link:
+                    {}
+              wamv/wamv/receiver:
+                {}
+              wamv/wamv/right_battery_link:
+                {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -554,6 +552,18 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /waypoint_markers
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

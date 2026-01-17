@@ -3,7 +3,7 @@ from rclpy.action import ActionServer, CancelResponse, GoalResponse, ActionClien
 from rclpy.executors import MultiThreadedExecutor
 
 
-from all_seaing_interfaces.action import FollowPath, Task, Waypoint
+from all_seaing_interfaces.action import FollowPath, Task, Waypoint, Search
 from all_seaing_interfaces.msg import ControlOption
 from all_seaing_common.action_server_base import ActionServerBase
 from action_msgs.msg import GoalStatus
@@ -14,7 +14,7 @@ import time
 import math
 
 class TaskServerBase(ActionServerBase):
-    def __init__(self, server_name, action_name):
+    def __init__(self, server_name, action_name, search_action_name):
         super().__init__(server_name)
         self.server_name = server_name
 
@@ -25,6 +25,15 @@ class TaskServerBase(ActionServerBase):
             execute_callback=self.execute_callback,
             cancel_callback=self.default_cancel_callback,
             goal_callback=self.goal_callback
+        )
+
+        self._search_server = ActionServer(
+            self,
+            Search,
+            search_action_name,
+            execute_callback=self.search_execute_callback,
+            cancel_callback=self.default_cancel_callback,
+            goal_callback=self.search_goal_callback
         )
 
         self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
@@ -52,6 +61,9 @@ class TaskServerBase(ActionServerBase):
         self.declare_parameter("bypass_planner", False)
 
         self.bypass_planner = self.get_parameter("bypass_planner").get_parameter_value().bool_value
+
+        self.declare_parameter("search_task_radius", 50.0)
+        self.search_task_radius = self.get_parameter("search_task_radius").get_parameter_value().double_value
         
         self.moved_to_point = False
         self.waypoint_rejected = False
@@ -86,7 +98,7 @@ class TaskServerBase(ActionServerBase):
 # Functions below are not meant to be reimplemented
 
     def goal_callback(self, goal_request):
-        self.get_logger().info('Task Server [{self.server_name}] received task')
+        self.get_logger().info(f'Task Server [{self.server_name}] received task')
         if self.should_accept_task(goal_request):
             return GoalResponse.ACCEPT
         else:
@@ -336,3 +348,61 @@ class TaskServerBase(ActionServerBase):
                 setattr(self, point_name, new_point)
                 return True, new_point
             return False, None
+        
+    def search_goal_callback(self, goal_request):
+        self.get_logger().info('Searching Server for [{self.server_name}] called')
+        return GoalResponse.ACCEPT
+
+    def search_execute_callback(self, goal_handle):
+        self.start_process(f"Searching Server for [{self.server_name}] started with goal handle {goal_handle}")
+        
+        self.found_task = False
+        
+        if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task(None):
+            self.found_task = True
+
+        if not self.found_task:
+            self.get_logger().info(f"Moving to point {(goal_handle.request.x, goal_handle.request.y)}")
+            self.moved_to_point = False
+            self.waypoint_rejected = False
+            self.waypoint_aborted = False
+            self.follow_path_client.wait_for_server()
+            goal_msg = FollowPath.Goal()
+            goal_msg.planner = self.get_parameter("planner").value
+            goal_msg.x = goal_handle.request.x
+            goal_msg.y = goal_handle.request.y
+            goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+            goal_msg.theta_threshold = self.get_parameter("theta_threshold").value
+            goal_msg.goal_tol = self.get_parameter("goal_tol").value
+            goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
+            goal_msg.choose_every = self.get_parameter("choose_every").value
+            goal_msg.is_stationary = False
+
+            self._send_goal(goal_msg)
+
+        while (not self.found_task) and (not self.moved_to_point) and rclpy.ok():
+            if self.should_abort():
+                self.end_process(f"Searching Server for [{self.server_name}] aborted due to new request in control")
+                self.cancel_navigation()
+                goal_handle.abort()
+                return Search.Result()
+
+            if goal_handle.is_cancel_requested:
+                self.end_process(f"Searching Server for [{self.server_name}] cancelled due to request cancellation in control")
+                self.cancel_navigation()
+                goal_handle.canceled()
+                return Search.Result()
+
+            if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task(None):
+                self.found_task = True
+                self.cancel_navigation()
+            elif self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality
+                self.get_logger().info('RESENDING GOAL')
+                self._send_goal(goal_msg)
+                self.waypoint_rejected = False
+                self.waypoint_aborted = False
+            time.sleep(self.timer_period)
+
+        self.end_process(f"Searching Server for [{self.server_name}] task completed with result {self.found_task}")
+        goal_handle.succeed()
+        return Search.Result(success=self.found_task)
