@@ -141,7 +141,10 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
     m_global_bbox_max = global_max;
 
     // Skip chull calculation if less than 3 points
-    if (local_cloud_ptr->points.size() < 3) return;
+    if (local_cloud_ptr->points.size() < 3){
+        m_area = 0;
+        return;
+    }
 
     // Flatten cluster point cloud to 2D
     typename pcl::PointCloud<PointT>::Ptr cloud_2d(new typename pcl::PointCloud<PointT>);
@@ -213,6 +216,8 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header local_header, std_msgs::msg::He
         chull.setInputCloud(cloud_2d);
         chull.reconstruct(*local_hull_cloud);
         m_area = pcl::calculatePolygonArea(*local_hull_cloud);
+    }else{
+        m_area = 0;
     }
 
     if (global_pcloud->points.size() >= 3){
@@ -283,6 +288,9 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header header,
             typename pcl::ConvexHull<PointT> chull;
             chull.setInputCloud(cloud_2d);
             chull.reconstruct(*global_hull_cloud);
+            m_area = pcl::calculatePolygonArea(*global_hull_cloud);
+        }else{
+            m_area = 0;
         }
 
         for (size_t i = 0; i < global_hull_cloud->points.size(); i++) {
@@ -322,6 +330,9 @@ Obstacle<PointT>::Obstacle(std_msgs::msg::Header header,
             typename pcl::ConvexHull<PointT> chull;
             chull.setInputCloud(cloud_2d);
             chull.reconstruct(*local_hull_cloud);
+            m_area = pcl::calculatePolygonArea(*local_hull_cloud);
+        }else{
+            m_area = 0;
         }
 
         for (size_t i = 0; i < local_hull_cloud->points.size(); i++) {

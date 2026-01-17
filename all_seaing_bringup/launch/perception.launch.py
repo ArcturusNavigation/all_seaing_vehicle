@@ -261,6 +261,8 @@ def launch_setup(context, *args, **kwargs):
             {"individual": True},
             {"approximate": False},
             {"delay": 0.1},
+            {"duplicate_thres": 0.3},
+            {"angle_thres": 15.0},
         ]
     )
 
