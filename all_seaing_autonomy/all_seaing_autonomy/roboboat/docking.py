@@ -467,6 +467,7 @@ class Docking(TaskServerBase):
             self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
             if abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
+                self.send_vel_cmd(0.0,0.0,0.0)
                 self.mark_successful()
                 return
             x_output = self.x_pid.get_effort()
