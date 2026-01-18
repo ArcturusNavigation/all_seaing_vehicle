@@ -379,7 +379,7 @@ def launch_setup(context, *args, **kwargs):
         executable="ekf_node",
         parameters=[robot_localization_rf2o_params],
         remappings=[
-            # ("odometry/filtered", "odometry/gps"),
+            ("odometry/filtered", "odometry/gps"),
         ],
         condition=IfCondition(
             PythonExpression([
@@ -423,7 +423,7 @@ def launch_setup(context, *args, **kwargs):
         # ekf_node,
         # navsat_node,
         odometry_publisher_node,
-        odometry_publisher_rf2o_node,
+        # odometry_publisher_rf2o_node,
         point_cloud_filter_node,
         rover_custom_controller,
         rover_lora_controller,
