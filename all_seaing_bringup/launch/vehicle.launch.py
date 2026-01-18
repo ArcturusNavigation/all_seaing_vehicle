@@ -69,6 +69,7 @@ def launch_setup(context, *args, **kwargs):
     track_banners = context.perform_substitution(LaunchConfiguration("track_banners"))
     banners_slam = context.perform_substitution(LaunchConfiguration("banners_slam"))
     use_lio = LaunchConfiguration("use_lio")
+    use_amcl = LaunchConfiguration("use_amcl")
     comms = LaunchConfiguration("comms")
     is_indoors = str(locations[location]["indoors"]).lower()
 
@@ -119,30 +120,6 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(
             PythonExpression([
                 "'", is_indoors, "' == 'false' and '", use_lio, "' == 'false'"
-            ]),
-        ),
-    )
-
-    odometry_publisher_rf2o_node = launch_ros.actions.Node(
-        package = "all_seaing_driver",
-        executable = "odometry_publisher.py",
-        output = "screen",
-        remappings=[
-            ("odom_topic", "/odom_rf2o"),
-            ("pos_odom_topic", "/odom_rf2o"),
-        ],
-        parameters=[
-            {"datum": [lat, lon, 0.0]},
-            # {"yaw_offset": -np.pi/2.0},
-            # {"odom_yaw_offset": -np.pi/2.0},
-            {"yaw_offset": 0.0},
-            {"odom_yaw_offset": 0.0},
-            {"utm_zone": utm}, # 19 for Boston, 17 for Florida
-            {"use_odom_pos": True},
-        ],
-        condition=IfCondition(
-            PythonExpression([
-                "'", is_indoors, "' == 'true' or '", use_lio, "' == 'true'"
             ]),
         ),
     )
@@ -312,22 +289,22 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{'robot_description': robot_urdf}]
     )
 
-    # amcl_ld = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(
-    #         [
-    #             bringup_prefix,
-    #             "/launch/amcl.launch.py"
-    #         ]
-    #     ),
-    #     launch_arguments={
-    #         "location": location,
-    #     }.items(),
-    #     condition=IfCondition(
-    #         PythonExpression([
-    #             "'", is_indoors, "' == 'true'"
-    #         ]),
-    #     ),
-    # )
+    amcl_ld = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                bringup_prefix,
+                "/launch/amcl.launch.py"
+            ]
+        ),
+        launch_arguments={
+            "location": location,
+        }.items(),
+        condition=IfCondition(
+            PythonExpression([
+                "'", use_amcl, "' == 'true'"
+            ]),
+        ),
+    )
     
     pcl_to_scan_node = launch_ros.actions.Node(
         package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
@@ -362,9 +339,9 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{
             'laser_scan_topic' : '/pcl_scan',
             'odom_topic' : '/odom_rf2o',
-            'publish_tf' : True,
+            'publish_tf' : False,
             'base_frame_id' : 'base_link',
-            'odom_frame_id' : 'odom_rf2o',
+            'odom_frame_id' : 'odom_rf2o2',
             'init_pose_from_topic' : '',
             'freq' : 20.0}],
         condition=IfCondition(
@@ -379,7 +356,7 @@ def launch_setup(context, *args, **kwargs):
         executable="ekf_node",
         parameters=[robot_localization_rf2o_params],
         remappings=[
-            # ("odometry/filtered", "odometry/gps"),
+            ("odometry/filtered", "odom_rf2o/filtered"),
         ],
         condition=IfCondition(
             PythonExpression([
@@ -402,6 +379,7 @@ def launch_setup(context, *args, **kwargs):
             "track_banners": track_banners,
             "banners_slam": banners_slam,
             "use_lio": context.perform_substitution(use_lio),
+            "use_amcl": context.perform_substitution(use_amcl),
         }.items(),
     )
     
@@ -423,14 +401,13 @@ def launch_setup(context, *args, **kwargs):
         # ekf_node,
         # navsat_node,
         odometry_publisher_node,
-        odometry_publisher_rf2o_node,
         point_cloud_filter_node,
         rover_custom_controller,
         rover_lora_controller,
         rviz_waypoint_sender,
         thrust_commander_node,
         central_hub,
-        # amcl_ld,
+        amcl_ld,
         # static_transforms_ld,
         robot_state_publisher,
         # webcam_publisher,
@@ -458,6 +435,7 @@ def generate_launch_description():
             DeclareLaunchArgument("track_banners", default_value="false", choices=["true", "false"]),
             DeclareLaunchArgument("banners_slam", default_value="true", choices=["true", "false"]),
             DeclareLaunchArgument("use_lio", default_value="false", choices=["true", "false"]),
+            DeclareLaunchArgument("use_amcl", default_value="false", choices=["true", "false"]),
             OpaqueFunction(function=launch_setup),
         ]
     )

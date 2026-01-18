@@ -90,6 +90,9 @@ namespace all_seaing_perception{
         tf2::Matrix3x3 mat(q);
         double r, p, phi;
         mat.getRPY(r, p, phi);
+        if(r > M_PI/2 || p > M_PI/2){ // to discard weird RPY solutions
+            mat.getRPY(r, p, phi, 2);
+        }
         return std::make_tuple(range, bearing, phi, label);
     }
 

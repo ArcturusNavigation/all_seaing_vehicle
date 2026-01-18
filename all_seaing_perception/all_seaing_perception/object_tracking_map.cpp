@@ -1287,7 +1287,12 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
                     min_dist = pcl::euclideanDistance(m_tracked_obstacles[i]->obstacle.get_global_point(),
                                                         m_tracked_obstacles[j]->obstacle.get_global_point());
                     // remove
-                    ind_to_remove = (m_tracked_obstacles[i]->time_seen < m_tracked_obstacles[j]->time_seen)?i:j;
+                    // ind_to_remove = (m_tracked_obstacles[i]->time_seen < m_tracked_obstacles[j]->time_seen)?i:j;
+                    if (m_track_robot && m_banners_slam) {
+                        ind_to_remove = (m_cov.block(3 + 2 * i, 3 + 2 * i, 2, 2).trace() < m_cov.block(3 + 2 * i, 3 + 2 * i, 2, 2).trace())?j:i;
+                    }else{
+                        ind_to_remove = m_tracked_obstacles[i]->cov.trace() < m_tracked_obstacles[j]->cov.trace()?j:i;
+                    }
                 }
             }
         }
@@ -1435,7 +1440,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 float d_y = m_state(3 + 2*m_num_obj + 3 * tracked_id + 1) - m_state(1);
                 float d_theta = m_state(3 + 2*m_num_obj + 3 * tracked_id + 2) - m_state(2);
                 float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::angle_to_pi_range(d_theta));
+                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::mod_2pi(d_theta));
                 Eigen::MatrixXf F = Eigen::MatrixXf::Zero(6, m_mat_size);
                 F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
                 F.block(3, 3 + 2*m_num_obj + 3 * tracked_id, 3, 3) = Eigen::Matrix3f::Identity();
@@ -1455,7 +1460,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_nav_y;
                 float d_theta = m_tracked_banners[tracked_id]->mean_pred[2] - m_nav_heading;
                 float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::angle_to_pi_range(d_theta));
+                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::mod_2pi(d_theta));
 
                 Eigen::Matrix<float, 3, 3> h{
                     {std::sqrt(q) * d_x, std::sqrt(q) * d_y, 0},
@@ -1545,6 +1550,10 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
             z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
+            // RCLCPP_INFO(this->get_logger(), "ANGLE DIFF: %lf", z_actual(2)-z_pred(2));
+            if (abs(z_actual(2)-z_pred(2)) > ((float)M_PI/2)){
+                continue;
+            }
             m_state += K * (z_actual - z_pred);
             m_cov =
                 (Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) - K * H) * m_cov;
@@ -1565,6 +1574,9 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 (H * m_tracked_banners[tracked_id]->cov * H.transpose() + Q).inverse();
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
             z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
+            if (abs(z_actual(2)-z_pred(2)) > ((float)M_PI/2)){
+                continue;
+            }
             m_tracked_banners[tracked_id]->mean_pred += K * (z_actual - z_pred);
             m_tracked_banners[tracked_id]->cov =
                 (Eigen::Matrix3f::Identity() - K * H) * m_tracked_banners[tracked_id]->cov;
@@ -1637,7 +1649,12 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 if (dist < min_dist){
                     min_dist = dist;
                     // remove
-                    ind_to_remove = (m_tracked_banners[i]->time_seen < m_tracked_banners[j]->time_seen)?i:j;
+                    // ind_to_remove = (m_tracked_banners[i]->time_seen < m_tracked_banners[j]->time_seen)?i:j;
+                    if (m_track_robot && m_banners_slam) {
+                        ind_to_remove = (m_cov.block(3 + 2*m_num_obj + 3 * i, 3 + 2*m_num_obj + 3 * i, 3, 3).trace() < m_cov.block(3 + 2*m_num_obj + 3 * j, 3 + 2*m_num_obj + 3 * j, 3, 3).trace())?j:i;
+                    }else{
+                        ind_to_remove = m_tracked_banners[i]->cov.trace() < m_tracked_banners[j]->cov.trace()?j:i;
+                    }
                 }
             }
         }
