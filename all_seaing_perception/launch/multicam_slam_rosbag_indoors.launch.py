@@ -272,8 +272,8 @@ def launch_setup(context, *args, **kwargs):
             {"old_static_tf_topic": "/tf_static_fake"},
             {"new_static_tf_topic": "/tf_static"},
             # {"child_frames_to_remove": ["imu_link_accel"]},
-            # {"parent_frames_to_remove": ["map"]},
-            {"parent_frames_to_remove": ["map", "odom", "odom_rf2o"]},
+            {"parent_frames_to_remove": ["map"]},
+            # {"parent_frames_to_remove": ["map", "odom", "odom_rf2o"]},
         ]
     )
 
@@ -509,13 +509,13 @@ def launch_setup(context, *args, **kwargs):
     return [
         set_use_sim_time,
         # ekf_node,
-        buoy_yolo_node,
+        # buoy_yolo_node,
         # buoy_yolo_node_back_left,
         # buoy_yolo_node_back_right,
-        bbox_project_pcloud_node,
+        # bbox_project_pcloud_node,
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
-        ransac_node,
+        # ransac_node,
         # multicam_detection_merge_node,
         # odometry_publisher_node,
         object_tracking_map_node,
@@ -528,13 +528,13 @@ def launch_setup(context, *args, **kwargs):
         # obstacle_detector_unlabeled_node,
         # grid_map_generator,
         # rotate_imu_accel,
-        imu_reframe_node,
-        imu_filter_node,
-        pcl_to_scan_node,
-        rf2o_node,
-        ekf_node_rf2o,
+        # imu_reframe_node,
+        # imu_filter_node,
+        # pcl_to_scan_node,
+        # rf2o_node,
+        # ekf_node_rf2o,
         # ekf_node_amcl,
-        amcl_ld,
+        # amcl_ld,
     ]
 
 def generate_launch_description():
