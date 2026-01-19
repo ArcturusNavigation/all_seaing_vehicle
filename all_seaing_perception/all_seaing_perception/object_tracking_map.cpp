@@ -1139,13 +1139,17 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
             m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
             if (m_track_robot) {
                 m_state.conservativeResize(m_mat_size);
-                m_state.tail(3*m_num_banners) = m_state.segment(3 + 2 * m_num_obj-2, 3*m_num_banners);
+                Eigen::VectorXf copy_state(3*m_num_banners, 1);
+                copy_state = m_state.segment(3 + 2 * m_num_obj - 2, 3*m_num_banners);
+                m_state.tail(3*m_num_banners) = copy_state;
                 m_state.segment(3 + 2 * m_num_obj - 2, 2) = Eigen::Vector2f(m_state(0), m_state(1)) +
                                   range * Eigen::Vector2f(std::cos(bearing + m_state(2)),
                                                           std::sin(bearing + m_state(2)));
                 m_cov.conservativeResizeLike(
                     Eigen::MatrixXf::Zero(m_mat_size, m_mat_size));
-                m_cov.bottomRightCorner(3*m_num_banners, 3*m_num_banners) = m_cov.block(3 + 2 * m_num_obj - 2, 3 + 2 * m_num_obj - 2, 3*m_num_banners, 3*m_num_banners);
+                Eigen::MatrixXf copy_cov(3*m_num_banners, 3*m_num_banners);
+                copy_cov = m_cov.block(3 + 2 * m_num_obj - 2, 3 + 2 * m_num_obj - 2, 3*m_num_banners, 3*m_num_banners);
+                m_cov.bottomRightCorner(3*m_num_banners, 3*m_num_banners) = copy_cov;
                 m_cov.block(3 + 2 * m_num_obj - 2, 3 + 2 * m_num_obj - 2, 2, 2) = init_new_cov;
             } else {
                 m_tracked_obstacles.back()->mean_pred =
@@ -1403,6 +1407,8 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
 
     if (m_track_robot && m_gps_update && std::abs((rclcpp::Time(msg->header.stamp)-m_last_nav_time).seconds()) > m_odom_detection_timeout) return; // make detections catch up to GPS/current time
 
+    this->odom_callback(); //catch up to current position before applying sensor data
+
     std::vector<std::shared_ptr<all_seaing_perception::Banner>> detected_banners;
     for (all_seaing_interfaces::msg::LabeledObjectPlane banner_msg : msg->coplanar_indiv) {
         std::shared_ptr<all_seaing_perception::Banner> banner(new all_seaing_perception::Banner(rclcpp::Time(m_local_header.stamp), banner_msg.label, banner_msg));
@@ -1498,6 +1504,19 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         std::tie(range, bearing, phi, signature) =
             all_seaing_perception::local_banner_to_range_bearing_signature(detected_banners[i]->plane_msg.normal_ctr, detected_banners[i]->label);
         Eigen::Vector3f z_actual(range, bearing, phi);
+        // if (match[i] != -1){
+        //     float d_x = m_state(3 + 2*m_num_obj + 3 * match[i]) - m_state(0);
+        //     float d_y = m_state(3 + 2*m_num_obj + 3 * match[i] + 1) - m_state(1);
+        //     float d_theta = m_state(3 + 2*m_num_obj + 3 * match[i] + 2) - m_state(2);
+        //     float q = d_x * d_x + d_y * d_y;
+        //     Eigen::Vector3f z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::angle_to_pi_range(d_theta));
+        //     RCLCPP_INFO(this->get_logger(), "BANNER ORIENTATION: %lf, ROBOT ORIENTATION: %lf", m_state(3 + 2*m_num_obj + 3 * match[i] + 2), m_state(2));
+        //     RCLCPP_INFO(this->get_logger(), "THETA ACTUAL: %lf, THETA PRED: %lf", z_actual(2), z_pred(2));
+        //     if (abs(all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2))) > ((float)M_PI/2)){
+        //         RCLCPP_INFO(this->get_logger(), "REJECTED");
+        //         match[i] = -1;
+        //     }
+        // }
         if (match[i] == -1) {
             if (detected_banners[i]->label == -1){
                 // don't create new obstacles when they have no label
@@ -1540,6 +1559,12 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             float d_theta = m_state(3 + 2*m_num_obj + 3 * tracked_id + 2) - m_state(2);
             float q = d_x * d_x + d_y * d_y;
             Eigen::Vector3f z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::angle_to_pi_range(d_theta));
+            z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
+            // RCLCPP_INFO(this->get_logger(), "BANNER ORIENTATION: %lf, ROBOT ORIENTATION: %lf", m_state(3 + 2*m_num_obj + 3 * match[i] + 2), m_state(2));
+            // RCLCPP_INFO(this->get_logger(), "THETA ACTUAL BEFORE: %lf, THETA PRED: %lf", z_actual(2), z_pred(2));
+            z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
+            // RCLCPP_INFO(this->get_logger(), "THETA ACTUAL AFTER: %lf", z_actual(2));
+            // RCLCPP_INFO(this->get_logger(), "ANGLE DIFF: %lf", z_actual(2)-z_pred(2));
             Eigen::Matrix<float, 3, 6> h{
                 {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
                     std::sqrt(q) * d_y, 0},
@@ -1551,15 +1576,10 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             F.block(3, 3 + 2*m_num_obj + 3 * tracked_id, 3, 3) = Eigen::Matrix3f::Identity();
             Eigen::MatrixXf H = h * F / q;
             Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
-            z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
-            z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
-            // RCLCPP_INFO(this->get_logger(), "ANGLE DIFF: %lf", z_actual(2)-z_pred(2));
-            if (abs(z_actual(2)-z_pred(2)) > ((float)M_PI/2)){
-                continue;
-            }
             m_state += K * (z_actual - z_pred);
             m_cov =
                 (Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) - K * H) * m_cov;
+            // RCLCPP_INFO(this->get_logger(), "BANNER ORIENTATION: %lf, ROBOT ORIENTATION: %lf", m_state(3 + 2*m_num_obj + 3 * tracked_id + 2), m_state(2));
         } else {
             float d_x = m_tracked_banners[tracked_id]->mean_pred[0] - m_nav_x;
             float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_nav_y;
@@ -1697,7 +1717,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         }
 
         if (m_track_robot && m_banners_slam) {
-            Eigen::MatrixXf new_state(3 + 2*m_num_obj + 3 * to_keep.size(), 1);
+            Eigen::VectorXf new_state(3 + 2*m_num_obj + 3 * to_keep.size());
             Eigen::MatrixXf new_cov(3 + 2*m_num_obj + 3 * to_keep.size(), 3 + 2*m_num_obj + 3 * to_keep.size());
             int new_i = 0;
             for (int i : to_keep_flat) {

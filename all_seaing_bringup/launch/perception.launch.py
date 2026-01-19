@@ -359,6 +359,9 @@ def launch_setup(context, *args, **kwargs):
         # 'gps_update': str(context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "true"
         # and ((context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "false"
         # and is_indoors == "false") or context.perform_substitution(LaunchConfiguration('use_amcl')).lower() == "true")),
+        # 'gps_based_predictions': str(context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "true"
+        # and ((context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "false"
+        # and is_indoors == "false") or context.perform_substitution(LaunchConfiguration('use_amcl')).lower() == "true")),
         # 'include_odom_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "true")
         # and ((context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")
         # or (is_indoors == "true"))),
