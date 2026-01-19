@@ -438,7 +438,7 @@ def generate_launch_description():
             DeclareLaunchArgument("track_banners", default_value='true'),
             DeclareLaunchArgument("banners_slam", default_value='true'),
             DeclareLaunchArgument("use_lio", default_value='false'),
-            DeclareLaunchArgument("use_amcl", default_value='true'),
+            DeclareLaunchArgument("use_amcl", default_value='false'),
             OpaqueFunction(function=launch_setup),
         ]
     )
