@@ -1,20 +1,20 @@
 ekf_filter_node:
   ros__parameters:
     frequency: 30.0
-    sensor_timeout: 0.1
+    sensor_timeout: 0.5
     two_d_mode: true
     transform_time_offset: 0.0
     print_diagnostics: false
     debug: false
 
-    odom_frame: odom_rf2o
+    odom_frame: odom_rf2o2
     # odom_frame: odom
     base_link_frame: base_link
     # base_link_frame: actual_base_link
     world_frame: odom_rf2o
-    # map_frame: odom
+    map_frame: odom_rf2o
     publish_tf: true
-    reset_on_time_jump: true
+    reset_on_time_jump: false
 
     imu0: /mavros/imu/data/reframed
     imu0_config:
