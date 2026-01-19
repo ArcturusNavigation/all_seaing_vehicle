@@ -11,6 +11,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 import launch_ros
 from launch_ros.actions import SetRemap
+from nav2_common.launch import RewrittenYaml
 import os
 import yaml
 import xacro
@@ -33,6 +34,9 @@ def launch_setup(context, *args, **kwargs):
     )
     robot_localization_rf2o_params = os.path.join(
         bringup_prefix, "config", "localization", "localize_rf2o.yaml"
+    )
+    robot_localization_amcl_params = os.path.join(
+        bringup_prefix, "config", "localization", "localize_amcl.yaml"
     )
     inc_color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
@@ -335,15 +339,16 @@ def launch_setup(context, *args, **kwargs):
         package='rf2o_laser_odometry',
         executable='rf2o_laser_odometry_node',
         name='rf2o_laser_odometry',
-        output='screen',
+        output='log',
         parameters=[{
             'laser_scan_topic' : '/pcl_scan',
             'odom_topic' : '/odom_rf2o',
-            'publish_tf' : False,
+            'publish_tf' : True,
             'base_frame_id' : 'base_link',
             'odom_frame_id' : 'odom_rf2o2',
             'init_pose_from_topic' : '',
-            'freq' : 20.0}],
+            'freq' : 20.0,}],
+        arguments=['--ros-args', '--log-level', 'ERROR'],
         condition=IfCondition(
             PythonExpression([
                 "'", is_indoors, "' == 'true' or '", use_lio, "' == 'true'"
@@ -364,6 +369,31 @@ def launch_setup(context, *args, **kwargs):
             ]),
         ),
     )
+
+    # param_substitutions = {
+    #     'odom_frame': 'odom_amcl' if context.perform_substitution(LaunchConfiguration('use_amcl')).lower() == "true" else 'odom_rf2o',
+    # }
+
+    # configured_params = RewrittenYaml(
+    #         source_file=robot_localization_amcl_params,
+    #         root_key='',
+    #         param_rewrites=param_substitutions,
+    #         convert_types=True)
+
+    # ekf_node_amcl = launch_ros.actions.Node(
+    #     package="robot_localization",
+    #     executable="ekf_node",
+    #     parameters=[configured_params],
+    #     # parameters=[robot_localization_amcl_params],
+    #     remappings=[
+    #         ("odometry/filtered", "odometry/integrated"),
+    #     ],
+    #     condition=IfCondition(
+    #         PythonExpression([
+    #             "'", is_indoors, "' == 'true' or '", use_lio, "' == 'true'"
+    #         ]),
+    #     ),
+    # )
 
     perception_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -405,7 +435,7 @@ def launch_setup(context, *args, **kwargs):
         rover_custom_controller,
         rover_lora_controller,
         rviz_waypoint_sender,
-        thrust_commander_node,
+        # thrust_commander_node,
         central_hub,
         amcl_ld,
         # static_transforms_ld,
@@ -418,6 +448,7 @@ def launch_setup(context, *args, **kwargs):
         pcl_to_scan_node,
         rf2o_node,
         ekf_node_rf2o,
+        # ekf_node_amcl,
         # perception_ld,
         # tasks_ld,
     ]

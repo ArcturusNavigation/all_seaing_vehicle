@@ -337,6 +337,7 @@ def launch_setup(context, *args, **kwargs):
         executable="grid_map_generator.py",
         remappings=[
             ("odometry/filtered", "odom_rf2o/filtered" if context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true" or is_indoors == "true" else "odometry/gps"),
+            # ("odometry/filtered", "odometry/integrated" if context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true" or is_indoors == "true" else "odometry/gps")
         ],
         parameters=[
             {"global_frame_id": "map"},
@@ -355,9 +356,9 @@ def launch_setup(context, *args, **kwargs):
         or is_indoors == "true") and not context.perform_substitution(LaunchConfiguration('use_amcl')).lower() == "true")),
         'global_frame_id': 'odom_rf2o' if (context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true"
         or is_indoors == "true") and not context.perform_substitution(LaunchConfiguration('use_amcl')).lower() == "true" else 'odom',
-        'gps_update': str(context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "true"
-        and ((context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "false"
-        and is_indoors == "false") or context.perform_substitution(LaunchConfiguration('use_amcl')).lower() == "true")),
+        # 'gps_update': str(context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "true"
+        # and ((context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "false"
+        # and is_indoors == "false") or context.perform_substitution(LaunchConfiguration('use_amcl')).lower() == "true")),
         # 'include_odom_theta': str((context.perform_substitution(LaunchConfiguration('use_gps')).lower() == "true")
         # and ((context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true")
         # or (is_indoors == "true"))),
@@ -380,6 +381,7 @@ def launch_setup(context, *args, **kwargs):
             ("detections", "obstacle_map/local"),
             # ("odometry/filtered", "odometry/gps"),
             ("odometry/filtered", "odom_rf2o/filtered" if context.perform_substitution(LaunchConfiguration('use_lio')).lower() == "true" or is_indoors == "true" else "odometry/integrated"),
+            # ("odometry/filtered", "odometry/integrated"),
         ],
         parameters=[configured_params]
     )
@@ -436,7 +438,7 @@ def generate_launch_description():
             DeclareLaunchArgument("track_banners", default_value='true'),
             DeclareLaunchArgument("banners_slam", default_value='true'),
             DeclareLaunchArgument("use_lio", default_value='false'),
-            DeclareLaunchArgument("use_amcl", default_value='true'),
+            DeclareLaunchArgument("use_amcl", default_value='false'),
             OpaqueFunction(function=launch_setup),
         ]
     )

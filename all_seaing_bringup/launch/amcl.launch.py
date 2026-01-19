@@ -23,6 +23,7 @@ def launch_setup(context, *args, **kwargs):
         executable="map_server",
         parameters=[{
             "yaml_filename": map_file,
+            # "frame_id": "odom_amcl",
             "frame_id": "odom",
         }],
     )
@@ -43,6 +44,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{
             "min_particles": 1000,
             "max_particles": 2000,
+            # "global_frame_id": "odom_amcl",
             "global_frame_id": "odom",
             "base_frame_id": "base_link",
             "scan_topic": "pcl_scan",
