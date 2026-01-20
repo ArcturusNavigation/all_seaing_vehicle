@@ -32,8 +32,8 @@ coplanar:
     "red_triangle"
     ]
 
-max_iters: 30
-dist_thres: 0.05
-min_inliers: 40
+max_iters: 20
+dist_thres: 0.1
+min_inliers: 30
 clust_dist: 0.5
 plane_angle_thres: 30.0

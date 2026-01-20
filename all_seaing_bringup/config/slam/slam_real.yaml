@@ -3,7 +3,7 @@ object_tracking_map:
     global_frame_id: "odom"
     slam_frame_id: "map"
     duplicate_thresh: 1.0
-    obstacle_drop_thresh: 120.0
+    obstacle_drop_thresh: 1000.0
     range_drop_thresh: 10.0
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False
@@ -11,7 +11,7 @@ object_tracking_map:
     bearing_uncertainty: 5.0
     banner_range_uncertainty: 15.0
     banner_bearing_uncertainty: 5.0
-    banner_orientation_uncertainty: 5.0
+    banner_orientation_uncertainty: 15.0
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 1.0 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 30.0 # beware, was 10 before but changed it to 30 bc that's mavros publish rate, change it back if issues

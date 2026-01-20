@@ -7,7 +7,7 @@ ekf_filter_node:
     print_diagnostics: false
     debug: false
 
-    odom_frame: odom_rf2o2
+    odom_frame: odom_rf2o
     # odom_frame: odom
     base_link_frame: base_link
     # base_link_frame: actual_base_link

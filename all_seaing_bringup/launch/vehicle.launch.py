@@ -317,13 +317,13 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{
             'target_frame': 'base_link',
             'transform_tolerance': 0.01,
-            'min_height': 0.5,
+            'min_height': 1.0,
             'max_height': 5.0,
             'angle_min': -np.pi,
             'angle_max': np.pi,
             'angle_increment': np.pi/360.0,
             'scan_time': 1/30.0,
-            'range_min': 3.0,
+            'range_min': 1.0,
             'range_max': 60.0,
             'use_inf': True,
             'inf_epsilon': 1.0
@@ -343,7 +343,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{
             'laser_scan_topic' : '/pcl_scan',
             'odom_topic' : '/odom_rf2o',
-            'publish_tf' : True,
+            'publish_tf' : False,
             'base_frame_id' : 'base_link',
             'odom_frame_id' : 'odom_rf2o2',
             'init_pose_from_topic' : '',
@@ -435,7 +435,7 @@ def launch_setup(context, *args, **kwargs):
         rover_custom_controller,
         rover_lora_controller,
         rviz_waypoint_sender,
-        # thrust_commander_node,
+        thrust_commander_node,
         central_hub,
         amcl_ld,
         # static_transforms_ld,
