@@ -112,11 +112,13 @@ private:
     int m_obstacle_size_min;
     int m_obstacle_size_max;
     double m_clustering_distance;
+    double m_beacon_clustering_distance;
 
     // for color segmentation
     std::string color_label_mappings_file;
     YAML::Node label_config_yaml;
     std::map<int, std::string> label_color_map;
+    std::set<int> beacon_labels;
 
     // for cluster-contour matching/selection
     std::string matching_weights_file;
@@ -133,6 +135,7 @@ private:
     std::vector<double> m_cluster_contour_color_weights;
     std::vector<double> m_contour_detection_color_weights;
     double m_cluster_contour_size_weight;
+    double m_beacon_cluster_size_weight;
     double m_cluster_distance_weight;
     double m_cluster_area_ratio_weight;
     std::map<std::string, std::vector<int>> contour_matching_color_range_map;

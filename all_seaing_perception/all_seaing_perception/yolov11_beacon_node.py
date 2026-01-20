@@ -19,7 +19,7 @@ from sensor_msgs.msg import Image
 import os
 import torch
 import yaml
-
+import copy
 import itertools
 
 class Rectangle:
@@ -111,6 +111,9 @@ class Yolov11_Beacon_Node(Node):
         self.beacon_filter_ratio = self.declare_parameter(
             "beacon_filter_ratio", 0.2).get_parameter_value().double_value
         
+        self.indicator_to_beacon_bbox = self.declare_parameter(
+            "indicator_to_beacon_bbox", False).get_parameter_value().bool_value
+        
 
         if self.device == "default":
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -178,9 +181,9 @@ class Yolov11_Beacon_Node(Node):
         )
         results: Results = pred_results[0].cpu()
 
-        if self.filter_beacon_indicators:
-            pending_bounding_box_msgs: list[LabeledBoundingBox2D] = []
-            beacon_bboxes: list[LabeledBoundingBox2D] = []
+        # if self.filter_beacon_indicators:
+        pending_bounding_box_msgs: list[LabeledBoundingBox2D] = []
+        beacon_bboxes: list[LabeledBoundingBox2D] = []
         
         labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
         labeled_bounding_box_msgs.header = msg.header
@@ -199,16 +202,16 @@ class Yolov11_Beacon_Node(Node):
                 box_msg.max_y = int(center_y + height / 2)
                 label_name = self.model.names[int(box_data.cls)]
 
-                if not self.filter_beacon_indicators:
-                    labeled_bounding_box_msgs.boxes.append(box_msg)
+                # if not self.filter_beacon_indicators:
+                #     labeled_bounding_box_msgs.boxes.append(box_msg)
+                # else:
+                if box_data.cls in self.indicator_labels:
+                    pending_bounding_box_msgs.append(box_msg)
                 else:
-                    if box_data.cls in self.indicator_labels:
-                        pending_bounding_box_msgs.append(box_msg)
-                    else:
-                        labeled_bounding_box_msgs.boxes.append(box_msg)
-                    
-                    if box_data.cls == self.beacon_label:
-                        beacon_bboxes.append(box_msg)
+                    labeled_bounding_box_msgs.boxes.append(box_msg)
+                
+                if box_data.cls == self.beacon_label:
+                    beacon_bboxes.append(box_msg)
 
                 class_name = f"{label_name}_{str(int(box_data.cls))}"
                 class_name_list = class_name.split("_")
@@ -250,13 +253,23 @@ class Yolov11_Beacon_Node(Node):
                 else:
                     box_msg.label = int(box_data.cls)
 
-        if self.filter_beacon_indicators:
-            for indicator_box in pending_bounding_box_msgs:
-                for beacon_box in beacon_bboxes:
-                    if self.overlap_ratio(indicator_box, beacon_box) > self.beacon_filter_ratio:
+        # if self.filter_beacon_indicators:
+        for indicator_box in pending_bounding_box_msgs:
+            added = False
+            for beacon_box in beacon_bboxes:
+                if self.overlap_ratio(indicator_box, beacon_box) > self.beacon_filter_ratio:
+                    if self.indicator_to_beacon_bbox:
+                        new_indicator = copy.deepcopy(beacon_box)
+                        new_indicator.label = indicator_box.label
+                        # beacon_box.label = indicator_box.label
+                        labeled_bounding_box_msgs.boxes.append(new_indicator)
+                    else:
                         labeled_bounding_box_msgs.boxes.append(indicator_box)
-                        # self.get_logger().info(f"FOUND INDICATOR {indicator_box.label}")
-                        break
+                    # self.get_logger().info(f"FOUND INDICATOR {indicator_box.label}")
+                    added = True
+                    break
+            if not self.filter_beacon_indicators and not added:
+                labeled_bounding_box_msgs.boxes.append(indicator_box)
 
         # Publish detections
         self._pub.publish(labeled_bounding_box_msgs)

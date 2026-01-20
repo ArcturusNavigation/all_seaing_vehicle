@@ -6,3 +6,4 @@ contour_detection_color_weights: [500.0, 0.0, 0.0]
 cluster_contour_size_weight: 0.0
 cluster_distance_weight: 100000.0
 cluster_area_ratio_weight: 250000.0
+beacon_cluster_size_weight: 0.0
