@@ -152,6 +152,8 @@ def launch_setup(context, *args, **kwargs):
             {"label_config": "beacon_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
+            {"filter_beacon_indicators": False},
+            {"beacon_filter_ratio": 0.1},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
