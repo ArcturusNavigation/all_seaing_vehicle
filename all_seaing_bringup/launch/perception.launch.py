@@ -31,6 +31,10 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
     )
 
+    inc_color_beacon_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "inc_color_beacon_label_mappings.yaml"
+    )
+
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
@@ -83,8 +87,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "best"},
             # {"model": "roboboat_shape_2025"},
+            # {"model": "beacons_best"},
             {"label_config": "buoy_label_mappings"},
             # {"label_config": "shape_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -101,8 +107,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "best"},
             # {"model": "roboboat_shape_2025"},
+            # {"model": "beacons_best"},
             {"label_config": "buoy_label_mappings"},
             # {"label_config": "shape_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -120,8 +128,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "best"},
             # {"model": "roboboat_shape_2025"},
+            # {"model": "beacons_best"},
             {"label_config": "buoy_label_mappings"},
             # {"label_config": "shape_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
             {"conf": 0.6},
             {"use_color_names": False},
         ],
@@ -129,6 +139,23 @@ def launch_setup(context, *args, **kwargs):
             ("image", "/back_right_oak/rgb/image_rect"),
             ("annotated_image", "annotated_image/buoy/back_right"),
             ("bounding_boxes", "bounding_boxes/back_right"),
+        ],
+        output="screen",
+    )
+
+    beacon_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov11_beacon_node.py",
+        parameters=[
+            {"model": "beacons_best"},
+            # {"label_config": "buoy_label_mappings"},
+            {"label_config": "beacon_label_mappings"},
+            {"conf": 0.6},
+            {"use_color_names": False},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/buoy"),
         ],
         output="screen",
     )
@@ -179,7 +206,8 @@ def launch_setup(context, *args, **kwargs):
             {"camera_name": "front"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
-            {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            # {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
             {"contour_bbox_area_thres": 0.5},
@@ -206,7 +234,8 @@ def launch_setup(context, *args, **kwargs):
             {"camera_name": "back_left"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
-            {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            # {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
             {"contour_bbox_area_thres": 0.5},
@@ -233,7 +262,8 @@ def launch_setup(context, *args, **kwargs):
             {"camera_name": "back_right"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
-            {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            # {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"obstacle_size_min": 5},
             {"obstacle_size_max": 1000},
             {"contour_bbox_area_thres": 0.5},
@@ -415,6 +445,7 @@ def launch_setup(context, *args, **kwargs):
         buoy_yolo_node,
         buoy_yolo_node_back_left,
         buoy_yolo_node_back_right,
+        # beacon_yolo_node
         # shape_yolo_node,
         # static_shape_yolo_node,
         bbox_project_pcloud_node,

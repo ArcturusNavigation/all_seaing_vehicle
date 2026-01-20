@@ -69,6 +69,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/color_segmentation_ycrcb.py
     ${PROJECT_NAME}/dock_detector.py
     ${PROJECT_NAME}/yolov8_node.py
+    ${PROJECT_NAME}/yolov11_beacon_node.py
     ${PROJECT_NAME}/perception_eval.py
     ${PROJECT_NAME}/multicam_detection_merge.py
     DESTINATION lib/${PROJECT_NAME}

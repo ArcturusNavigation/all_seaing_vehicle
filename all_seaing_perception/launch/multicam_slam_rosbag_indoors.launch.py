@@ -36,6 +36,9 @@ def launch_setup(context, *args, **kwargs):
     inc_color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
     )
+    inc_color_beacon_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "inc_color_beacon_label_mappings.yaml"
+    )
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
@@ -87,11 +90,13 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_perception",
         executable="yolov8_node.py",
         parameters=[
-            # {"model": "best"},
-            {"model": "roboboat_shape_2025"},
-            # {"label_config": "buoy_label_mappings"},
-            {"label_config": "shape_label_mappings"},
-            {"conf": 0.1},
+            {"model": "best"},
+            # {"model": "roboboat_shape_2025"},
+            # {"model": "beacons_best"},
+            {"label_config": "buoy_label_mappings"},
+            # {"label_config": "shape_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
+            {"conf": 0.6},
             {"use_color_names": False},
         ],
         remappings=[
@@ -135,6 +140,23 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    beacon_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov11_beacon_node.py",
+        parameters=[
+            {"model": "beacons_best"},
+            # {"label_config": "buoy_label_mappings"},
+            {"label_config": "beacon_label_mappings"},
+            {"conf": 0.6},
+            {"use_color_names": False},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+
     bbox_project_pcloud_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="bbox_project_pcloud",
@@ -142,13 +164,15 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
             ("camera_info_topic", "/zed/zed_node/rgb/camera_info"),
             ("camera_topic", "/zed/zed_node/rgb/image_rect_color"),
-            ("lidar_topic", "/point_cloud/filtered")
+            ("lidar_topic", "/point_cloud/filtered"),
+            ("detections/front", "obstacle_map/local"),
         ],
         parameters=[
             {"camera_name": "front"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            # {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
             {"contour_bbox_area_thres": 0.5},
@@ -158,6 +182,7 @@ def launch_setup(context, *args, **kwargs):
             {"contour_matching_color_ranges_file": contour_matching_color_ranges},
             {"is_sim": False},
             {"label_list": True},
+            # {"label_list": False},
         ]
     )
 
@@ -509,10 +534,11 @@ def launch_setup(context, *args, **kwargs):
     return [
         set_use_sim_time,
         # ekf_node,
-        # buoy_yolo_node,
+        buoy_yolo_node,
         # buoy_yolo_node_back_left,
         # buoy_yolo_node_back_right,
-        # bbox_project_pcloud_node,
+        # beacon_yolo_node,
+        bbox_project_pcloud_node,
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
         # ransac_node,
