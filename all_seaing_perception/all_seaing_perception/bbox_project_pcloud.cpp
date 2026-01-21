@@ -26,6 +26,7 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     
     m_obstacle_size_min = this->get_parameter("obstacle_size_min").as_int();
     m_obstacle_size_max = this->get_parameter("obstacle_size_max").as_int();
+    m_clustering_distance = this->get_parameter("clustering_distance").as_double();
     m_beacon_clustering_distance = this->get_parameter("beacon_clustering_distance").as_double();
 
     this->declare_parameter<bool>("is_sim", false);
@@ -303,6 +304,7 @@ void BBoxProjectPCloud::bb_pcl_project(
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr pcloud_ptr = bbox_pcloud_pair.second;
         // if(!label_color_map.count(bbox.label)) continue; //ignore objects that are not registered buoy types
         if (label_color_map.count(bbox.label)){
+            // RCLCPP_INFO(this->get_logger(), "GOT %d", bbox.label);
 
             // image & bbox relation & adjustment (make sure in-bounds)
             if(bbox.min_x > bbox.max_x || bbox.min_y > bbox.max_y) continue;
@@ -523,6 +525,8 @@ void BBoxProjectPCloud::bb_pcl_project(
             all_seaing_interfaces::msg::Obstacle obstacle_msg;
             obstacle.to_ros_msg(obstacle_msg);
             obstacle_msg.label = bbox.label;
+
+            // RCLCPP_INFO(this->get_logger(), "PUBLISHING %d", bbox.label);
 
             refined_objects_msg.obstacles.push_back(obstacle_msg);
             
