@@ -35,6 +35,10 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "inc_color_beacon_label_mappings.yaml"
     )
 
+    inc_color_all_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "inc_color_all_label_mappings.yaml"
+    )
+
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
@@ -205,6 +209,74 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    all_yolo_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov11_all_node.py",
+        parameters=[
+            {"models": ["best", "beacons_best"]},
+            {"label_offsets": [0, 24]},
+            # {"label_config": "buoy_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
+            {"label_config": "all_label_mappings"},
+            {"confs": [0.6, 0.4]},
+            {"use_color_names": False},
+            {"filter_beacon_indicators": False},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+        ],
+        remappings=[
+            ("image", "/zed/zed_node/rgb/image_rect_color"),
+            ("annotated_image", "annotated_image/buoy"),
+        ],
+        output="screen",
+    )
+    
+    all_yolo_node_back_left = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov11_all_node.py",
+        parameters=[
+            {"models": ["best", "beacons_best"]},
+            {"label_offsets": [0, 24]},
+            # {"label_config": "buoy_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
+            {"label_config": "all_label_mappings"},
+            {"confs": [0.6, 0.4]},
+            {"use_color_names": False},
+            {"filter_beacon_indicators": False},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+        ],
+        remappings=[
+            ("image", "/back_left_oak/rgb/image_rect"),
+            ("annotated_image", "annotated_image/buoy/back_left"),
+            ("bounding_boxes", "bounding_boxes/back_left"),
+        ],
+        output="screen",
+    )
+
+    all_yolo_node_back_right = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="yolov11_all_node.py",
+        parameters=[
+            {"models": ["best", "beacons_best"]},
+            {"label_offsets": [0, 24]},
+            # {"label_config": "buoy_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
+            {"label_config": "all_label_mappings"},
+            {"confs": [0.6, 0.4]},
+            {"use_color_names": False},
+            {"filter_beacon_indicators": False},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+        ],
+        remappings=[
+            ("image", "/back_right_oak/rgb/image_rect"),
+            ("annotated_image", "annotated_image/buoy/back_right"),
+            ("bounding_boxes", "bounding_boxes/back_right"),
+        ],
+        output="screen",
+    )
+
     shape_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov8_node.py",
@@ -252,8 +324,9 @@ def launch_setup(context, *args, **kwargs):
             {"camera_name": "front"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
-            {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             # {"color_label_mappings_file": inc_color_beacon_label_mappings},
+            {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
             {"contour_bbox_area_thres": 0.5},
@@ -282,8 +355,9 @@ def launch_setup(context, *args, **kwargs):
             {"camera_name": "back_left"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
-            {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             # {"color_label_mappings_file": inc_color_beacon_label_mappings},
+            {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
             {"contour_bbox_area_thres": 0.5},
@@ -311,8 +385,9 @@ def launch_setup(context, *args, **kwargs):
             {"camera_name": "back_right"},
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
-            {"color_label_mappings_file": inc_color_buoy_label_mappings},
+            # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             # {"color_label_mappings_file": inc_color_beacon_label_mappings},
+            {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
             {"contour_bbox_area_thres": 0.5},
@@ -492,12 +567,15 @@ def launch_setup(context, *args, **kwargs):
 
     return [
         point_cloud_filter_obstacle_node,
-        buoy_yolo_node,
-        buoy_yolo_node_back_left,
-        buoy_yolo_node_back_right,
+        # buoy_yolo_node,
+        # buoy_yolo_node_back_left,
+        # buoy_yolo_node_back_right,
         # beacon_yolo_node,
         # beacon_yolo_node_back_left,
         # beacon_yolo_node_back_right,
+        all_yolo_node,
+        all_yolo_node_back_left,
+        all_yolo_node_back_right,
         # shape_yolo_node,
         # static_shape_yolo_node,
         bbox_project_pcloud_node,
