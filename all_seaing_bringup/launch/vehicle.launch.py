@@ -172,7 +172,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"range_radius": [1.0, 60.0]},
+            {"range_radius": [0.8, 60.0]},
         ],
     )
 
