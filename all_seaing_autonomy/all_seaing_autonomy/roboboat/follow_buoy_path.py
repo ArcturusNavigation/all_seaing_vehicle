@@ -152,8 +152,10 @@ class FollowBuoyPath(TaskServerBase):
             self.red_labels.add(label_mappings["red_pole_buoy"])
             # self.red_labels.add(label_mappings["yellow_buoy"])
             # self.red_labels.add(label_mappings["yellow_racquet_ball"])
-            self.green_beacon_labels.add(label_mappings["yellow_buoy"])
-            self.green_beacon_labels.add(label_mappings["yellow_racquet_ball"])
+            # self.green_beacon_labels.add(label_mappings["yellow_buoy"])
+            # self.green_beacon_labels.add(label_mappings["yellow_racquet_ball"])
+            self.green_beacon_labels.add(label_mappings["green_indicator"])
+            self.red_beacon_labels.add(label_mappings["red_indicator"])
         
         self.sent_waypoints = set()
 

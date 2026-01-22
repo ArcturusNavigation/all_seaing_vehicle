@@ -1,0 +1,6 @@
+black: [0]
+blue: [4, 5]
+green: [10, 11]
+red: [15, 16, 19]
+yellow: [22, 23]
+beacon: [25, 26]

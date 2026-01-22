@@ -85,21 +85,23 @@ def pairwise(iterable):
     return zip(a, b)
 
 
-class Yolov11_Beacon_Node(Node):
+class YOLOv11Node(Node):
 
     def __init__(self):
-        super().__init__("yolov11_beacon_node")
+        super().__init__("yolov11_all_node")
 
         perception_prefix = get_package_share_directory("all_seaing_perception")
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
         # Declare/get ROS parameters
-        model_name = self.declare_parameter(
-            "model", "beacons_best").get_parameter_value().string_value
+        model_names = self.declare_parameter(
+            "models", ["best"]).get_parameter_value().string_array_value
+        label_offsets = self.declare_parameter(
+            "label_offsets", [0]).get_parameter_value().integer_array_value
         self.device = self.declare_parameter(
             "device", "default").get_parameter_value().string_value
-        self.conf = self.declare_parameter(
-            "conf", 0.6).get_parameter_value().double_value
+        confs = self.declare_parameter(
+            "confs", [0.6]).get_parameter_value().double_array_value
         label_config = self.declare_parameter(
             "label_config", "color_label_mappings").get_parameter_value().string_value
         self.use_color_names = self.declare_parameter(
@@ -129,21 +131,27 @@ class Yolov11_Beacon_Node(Node):
         self.indicator_labels = [self.label_dict[name] for name in ["green_indicator", "red_indicator"]]
         self.beacon_label = self.label_dict["beacon"]
 
-        # Get the model's path
-        engine_path = os.path.join(perception_prefix, "models", model_name + ".engine")
-        pt_path = os.path.join(perception_prefix, "models", model_name + ".pt")
+        self.models:list[tuple[YOLO, int, float]] = []
+        
+        for model_name, offset, conf in zip(model_names, label_offsets, confs):
+            # Get the model's path
+            engine_path = os.path.join(perception_prefix, "models", model_name + ".engine")
+            pt_path = os.path.join(perception_prefix, "models", model_name + ".pt")
 
-        # Initialize YOLO model
-        # check if we are using the jetson and if the engine path exists.
-        self.cv_bridge = CvBridge()
-        if os.path.exists("/etc/nv_tegra_release") and os.path.isfile(engine_path):
-            self.get_logger().info(f"Loading model from tensorRT engine: {engine_path}")
-            self.model = YOLO(engine_path)
-        elif os.path.isfile(pt_path):
-            self.get_logger().info(f"Loading model from pt model: {pt_path}")
-            self.model = YOLO(pt_path)
-        else:
-            self.get_logger().error(f"Both model paths do not exist :( TensorRT: {engine_path} and pt: {pt_path}")
+            # Initialize YOLO model
+            # check if we are using the jetson and if the engine path exists.
+            self.cv_bridge = CvBridge()
+            if os.path.exists("/etc/nv_tegra_release") and os.path.isfile(engine_path):
+                self.get_logger().info(f"Loading model from tensorRT engine: {engine_path}")
+                model = YOLO(engine_path)
+            elif os.path.isfile(pt_path):
+                self.get_logger().info(f"Loading model from pt model: {pt_path}")
+                model = YOLO(pt_path)
+            else:
+                self.get_logger().error(f"Both model paths do not exist :( TensorRT: {engine_path} and pt: {pt_path}")
+                model = None
+            self.models.append((model, offset, conf))
+            
 
         # Setup QoS profile
         image_qos_profile = QoSProfile(
@@ -172,15 +180,6 @@ class Yolov11_Beacon_Node(Node):
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
         annotator = Annotator(cv_image, 2, 2, "Arial.ttf", False)
 
-        pred_results = self.model.predict(
-            source=cv_image,
-            verbose=False,
-            stream=False,
-            conf=self.conf,
-            device=self.device
-        )
-        results: Results = pred_results[0].cpu()
-
         # if self.filter_beacon_indicators:
         pending_bounding_box_msgs: list[LabeledBoundingBox2D] = []
         beacon_bboxes: list[LabeledBoundingBox2D] = []
@@ -188,70 +187,81 @@ class Yolov11_Beacon_Node(Node):
         labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
         labeled_bounding_box_msgs.header = msg.header
 
-        for box_data in results.boxes:
+        for model, offset, conf in self.models:
+            pred_results = model.predict(
+                source=cv_image,
+                verbose=False,
+                stream=False,
+                conf=conf,
+                device=self.device
+            )
 
-            box_msg = LabeledBoundingBox2D()
+            results: Results = pred_results[0].cpu()
 
-            if results.boxes:
+            for box_data in results.boxes:
 
-                box_msg.probability = float(box_data.conf)
-                center_x, center_y, width, height = box_data.xywh[0]
-                box_msg.min_x = int(center_x - width / 2)
-                box_msg.max_x = int(center_x + width / 2)
-                box_msg.min_y = int(center_y - height / 2)
-                box_msg.max_y = int(center_y + height / 2)
-                label_name = self.model.names[int(box_data.cls)]
+                box_msg = LabeledBoundingBox2D()
 
-                class_name = f"{label_name}_{str(int(box_data.cls))}"
-                class_name_list = class_name.split("_")
-                color_name = class_name_list[0] # assumes labels follow "color_object" format
-                color = ()
-                text_color = (0,0,0)
-                if color_name == "red":
-                    color = (0, 0, 255)
-                elif color_name == "green":
-                    color = (0,255,0)
-                elif color_name == "blue":
-                    color = (255, 0, 0)
-                elif color_name == "yellow":
-                    color = (0,230,230)
-                elif color_name == "black":
-                    color = (0,0,0)
-                elif color_name == "white":
-                    color = (255,255,255)
-                else: 
-                    color = (128,128,128)
+                if results.boxes:
 
-                color_label = -1
-                if color_name in self.label_dict:
-                    color_label = self.label_dict[color_name]
-                    # if color_name in ["black", "blue", "red", "green"]:
-                    #     object_name = class_name_list[1]
-                    #     if "buoy" not in object_name:
-                    #         color_label = -1
+                    box_msg.probability = float(box_data.conf)
+                    center_x, center_y, width, height = box_data.xywh[0]
+                    box_msg.min_x = int(center_x - width / 2)
+                    box_msg.max_x = int(center_x + width / 2)
+                    box_msg.min_y = int(center_y - height / 2)
+                    box_msg.max_y = int(center_y + height / 2)
+                    label_name = model.names[int(box_data.cls)]
 
-                    annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
-                    self.get_logger().debug(f"Detected: {class_name} Msg Label is {box_msg.label}")
-                else: 
-                    box_msg.label = -1 # for misc things
-                    annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
-                    self.get_logger().debug(f"Detected: {class_name} Item not in label_dict")
+                    class_name = f"{label_name}_{str(int(box_data.cls))}"
+                    class_name_list = class_name.split("_")
+                    color_name = class_name_list[0] # assumes labels follow "color_object" format
+                    color = ()
+                    text_color = (0,0,0)
+                    if color_name == "red":
+                        color = (0, 0, 255)
+                    elif color_name == "green":
+                        color = (0,255,0)
+                    elif color_name == "blue":
+                        color = (255, 0, 0)
+                    elif color_name == "yellow":
+                        color = (0,230,230)
+                    elif color_name == "black":
+                        color = (0,0,0)
+                    elif color_name == "white":
+                        color = (188,188,188)
+                    else: 
+                        color = (128,128,128)
 
-                if self.use_color_names:
-                    box_msg.label = color_label
-                else:
-                    box_msg.label = int(box_data.cls)
+                    color_label = -1
+                    if color_name in self.label_dict:
+                        color_label = self.label_dict[color_name]
+                        # if color_name in ["black", "blue", "red", "green"]:
+                        #     object_name = class_name_list[1]
+                        #     if "buoy" not in object_name:
+                        #         color_label = -1
 
-                # if not self.filter_beacon_indicators:
-                #     labeled_bounding_box_msgs.boxes.append(box_msg)
-                # else:
-                if box_msg.label in self.indicator_labels:
-                    pending_bounding_box_msgs.append(box_msg)
-                else:
-                    labeled_bounding_box_msgs.boxes.append(box_msg)
-                
-                if box_msg.label == self.beacon_label:
-                    beacon_bboxes.append(box_msg)
+                        annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
+                        self.get_logger().debug(f"Detected: {class_name} Msg Label is {box_msg.label}")
+                    else: 
+                        box_msg.label = -1 # for misc things
+                        annotator.box_label((box_msg.min_x, box_msg.min_y, box_msg.max_x, box_msg.max_y), class_name, color, text_color)
+                        self.get_logger().debug(f"Detected: {class_name} Item not in label_dict")
+
+                    if self.use_color_names:
+                        box_msg.label = color_label
+                    else:
+                        box_msg.label = int(box_data.cls) + offset
+
+                    # if not self.filter_beacon_indicators:
+                    #     labeled_bounding_box_msgs.boxes.append(box_msg)
+                    # else:
+                    if box_msg.label in self.indicator_labels:
+                        pending_bounding_box_msgs.append(box_msg)
+                    else:
+                        labeled_bounding_box_msgs.boxes.append(box_msg)
+                    
+                    if box_msg.label == self.beacon_label:
+                        beacon_bboxes.append(box_msg)
 
         # if self.filter_beacon_indicators:
         for indicator_box in pending_bounding_box_msgs:
@@ -282,7 +292,7 @@ class Yolov11_Beacon_Node(Node):
 
 def main():
     rclpy.init()
-    node = Yolov11_Beacon_Node()
+    node = YOLOv11Node()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
