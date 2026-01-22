@@ -64,6 +64,9 @@ class SpeedChallenge(TaskServerBase):
         self.declare_parameter("gate_dist_thres", 40.0)
         self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
 
+        self.declare_parameter("beacon_dist_thres", 15.0)
+        self.beacon_dist_thres = self.get_parameter("beacon_dist_thres").get_parameter_value().double_value
+
         self.declare_parameter("circling_buoy_dist_thres", 40.0)
         self.circling_buoy_dist_thres = self.get_parameter("circling_buoy_dist_thres").get_parameter_value().double_value
 
@@ -113,6 +116,7 @@ class SpeedChallenge(TaskServerBase):
         self.buoy_found = False
         self.following_guide = False
         self.left_first = True # goes left of buoy first
+        self.temp_left_first = self.left_first
 
         self.obstacles = None
 
@@ -123,6 +127,8 @@ class SpeedChallenge(TaskServerBase):
         self.blue_labels = set()
         self.red_labels = set()
         self.green_labels = set()
+        self.red_beacon_labels = set()
+        self.green_beacon_labels = set()
 
         self.declare_parameter(
             "color_label_mappings_file",
@@ -156,8 +162,8 @@ class SpeedChallenge(TaskServerBase):
             ).value
             with open(buoy_label_mappings_file, "r") as f:
                 label_mappings = yaml.safe_load(f)
-            for buoy_label in ["blue_buoy", "blue_circle", "blue_racquet_ball"]:
-                self.blue_labels.add(label_mappings[buoy_label])
+            # for buoy_label in ["blue_buoy", "blue_circle", "blue_racquet_ball"]:
+            #     self.blue_labels.add(label_mappings[buoy_label])
             for buoy_label in ["red_buoy", "red_circle", "red_racquet_ball"]:
                 self.red_labels.add(label_mappings[buoy_label])
                 # self.blue_labels.add(label_mappings[buoy_label])
@@ -166,6 +172,9 @@ class SpeedChallenge(TaskServerBase):
                 # self.blue_labels.add(label_mappings[buoy_label])
             for buoy_label in ["yellow_buoy", "yellow_racquet_ball"]:
                 self.blue_labels.add(label_mappings[buoy_label])
+            
+            self.green_beacon_labels.add(label_mappings["green_indicator"])
+            self.red_beacon_labels.add(label_mappings["red_indicator"])
 
         self.gate_pair = None
         # self.first_setup = True
@@ -288,6 +297,15 @@ class SpeedChallenge(TaskServerBase):
         '''
         self.obstacles = msg.obstacles
 
+        for obstacle in self.obstacles:
+            if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.beacon_dist_thres:
+                continue
+            # below might toggle some times but will hopefully settle before we start circling, it's fixed once we start circling
+            if obstacle.label in self.red_beacon_labels:
+                self.temp_left_first = False
+            elif obstacle.label in self.green_beacon_labels:
+                self.temp_left_first = True
+
     def probe_blue_buoy(self):
         '''
         Function to find the blue buoy by moving near it (general direction).
@@ -317,6 +335,8 @@ class SpeedChallenge(TaskServerBase):
         if not self.blue_buoy_detected():
             self.get_logger().info("speed challenge probing exited without finding blue buoy")
             return Task.Result(success=False)
+        
+        self.left_first = self.temp_left_first
         
         # circle the blue buoy like a baseball diamond
         # a better way to do this might be to have the astar run to original cell, 
@@ -362,6 +382,8 @@ class SpeedChallenge(TaskServerBase):
         if not self.blue_buoy_detected():
             self.get_logger().info("speed challenge probing exited without finding blue buoy")
             return Task.Result(success=False)
+        
+        self.left_first = self.temp_left_first
 
         t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
         robot_x, robot_y = self.robot_pos

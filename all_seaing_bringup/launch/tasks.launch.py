@@ -52,6 +52,9 @@ def launch_setup(context, *args, **kwargs):
     shape_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
     )
+    all_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "all_label_mappings.yaml"
+    )
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
@@ -68,7 +71,8 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"red_left": True},
             {"global_frame_id": "map"},
-            {"color_label_mappings_file": buoy_label_mappings},
+            # {"color_label_mappings_file": buoy_label_mappings},
+            {"color_label_mappings_file": all_label_mappings},
             {"task_locations_file": task_locations},
             {"gate_dist_thres": 25.0},
             {"circling_buoy_dist_thres": 25.0},
@@ -87,7 +91,8 @@ def launch_setup(context, *args, **kwargs):
             {"is_sim": False},
             {"red_left": True},
             {"global_frame_id": "map"},
-            {"color_label_mappings_file": buoy_label_mappings},
+            # {"color_label_mappings_file": buoy_label_mappings},
+            {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
             {"gate_dist_thres": 25.0},
             {"circling_buoy_dist_thres": 25.0},
@@ -118,10 +123,12 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             {"red_left": True},
-            {"color_label_mappings_file": buoy_label_mappings},
+            # {"color_label_mappings_file": buoy_label_mappings},
+            {"color_label_mappings_file": all_label_mappings},
             {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
             {"gate_dist_thres": 40.0},
+            {"beacon_dist_thres": 15.0},
             {"circling_buoy_dist_thres": 40.0},
             {"max_inter_gate_dist": 25.0},
             {"turn_offset": 1.5},
@@ -145,8 +152,9 @@ def launch_setup(context, *args, **kwargs):
         executable="docking.py",
         parameters=[
             {"is_sim": False},
-            {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": buoy_label_mappings},
             # {"shape_label_mappings_file": shape_label_mappings},
+            {"shape_label_mappings_file": all_label_mappings},
             {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
             {"dock_width": 2.0},
@@ -174,8 +182,9 @@ def launch_setup(context, *args, **kwargs):
         executable="mechanism_navigation.py",
         parameters=[
             {"is_sim": False},
-            {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": buoy_label_mappings},
             # {"shape_label_mappings_file": shape_label_mappings},
+            {"shape_label_mappings_file": all_label_mappings},
             {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
             {"wpt_banner_dist": 3.0},
@@ -201,7 +210,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             {"red_left": False},
-            {"color_label_mappings_file": buoy_label_mappings},
+            # {"color_label_mappings_file": buoy_label_mappings},
+            {"color_label_mappings_file": all_label_mappings},
             {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
             {"gate_dist_back": 5.0},
