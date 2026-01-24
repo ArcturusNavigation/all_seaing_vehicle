@@ -55,13 +55,38 @@ class PotentialField:
 
         for point in points:
             point_dist = self.dist(point,pos)
-            if point_dist >= self.q:
+            if point_dist >= self.q: # if too far ignore
                 break
             partialx+=2*(point_dist**-0.5 - 1/self.q)*(-0.5)*(point_dist**-1.5)*2*(pos[0]-point[0])
             partialy+=2*(point_dist**-0.5 - 1/self.q)*(-0.5)*(point_dist**-1.5)*2*(pos[1]-point[1])
         if self.goal:
             partialx += (pos[0]-self.goal[0])*((pos[0]-self.goal[0])**2 + (pos[1]-self.goal[1]))**-0.5
             partialy += (pos[1]-self.goal[1])*((pos[0]-self.goal[0])**2 + (pos[1]-self.goal[1]))**-0.5
+        
+        # normalize
+        mag = (partialx**2 + partialy**2)**0.5 if normalize else 1
+        return [-partialx/mag, -partialy/mag]
+    
+    def rotational_force(self, pos=(0,0), vel_dir=(1,0), normalize = False):
+        # analytically compute gradient
+        points = self.closest_obstacles(pos, self.k)
+
+        partialx = 0
+        partialy = 0
+
+        for point in points:
+            point_dist = self.dist(point,pos)
+            if point_dist >= self.q or point[0] < 0: # if obstacle is too far or to the back of the robot, don't add rotational force
+                break
+            if -vel_dir[1]*point[0]+vel_dir[0]*point[1] > 0: # dot product of vel (in robot's frame) and pos of obstacle
+                # obstacle is to the left of the robot velocity's direction, rotational force is CCW
+
+                partialx+=-2*(point_dist**-0.5 - 1/self.q)*(-0.5)*(point_dist**-1.5)*2*(pos[1]-point[1])
+                partialy+=2*(point_dist**-0.5 - 1/self.q)*(-0.5)*(point_dist**-1.5)*2*(pos[0]-point[0])
+            else:
+                # right, rotational force is CW
+                partialx+=2*(point_dist**-0.5 - 1/self.q)*(-0.5)*(point_dist**-1.5)*2*(pos[1]-point[1])
+                partialy+=-2*(point_dist**-0.5 - 1/self.q)*(-0.5)*(point_dist**-1.5)*2*(pos[0]-point[0])
         
         # normalize
         mag = (partialx**2 + partialy**2)**0.5 if normalize else 1
