@@ -228,8 +228,6 @@ def launch_setup(context, *args, **kwargs):
             {"timer_period": 1.0},
             {"grid_dim": [1000, 1000]},
             {"grid_resolution": 0.1},
-            {"obstacle_radius_sigma": 3.0},
-            {"search_radius_sigma": 10.0},
             {"dynamic_origin": True},
         ],
     )

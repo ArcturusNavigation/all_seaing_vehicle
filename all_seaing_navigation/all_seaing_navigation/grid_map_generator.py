@@ -6,6 +6,7 @@ import math
 from nav_msgs.msg import MapMetaData, OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 from all_seaing_interfaces.msg import ObstacleMap
+from geometry_msgs.msg import Polygon, Point32
 
 
 class GridMapGenerator(Node):
@@ -42,6 +43,18 @@ class GridMapGenerator(Node):
 
         self.grid_resolution = (
             self.declare_parameter("grid_resolution", 0.3)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.inflate_dist = (
+            self.declare_parameter("inflate_dist", 0.5)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.decay_rate = (
+            self.declare_parameter("inv_decay_rate", 1.8)
             .get_parameter_value()
             .double_value
         )
@@ -110,6 +123,81 @@ class GridMapGenerator(Node):
         x = gx * resolution + origin.x
         y = gy * resolution + origin.y
         return x, y
+    
+    def ccw(self, a, b, c):
+        """Return True if the points a, b, c are counterclockwise, respectively"""
+        area = (
+            a[0] * b[1]
+            + b[0] * c[1]
+            + c[0] * a[1]
+            - a[1] * b[0]
+            - b[1] * c[0]
+            - c[1] * a[0]
+        )
+        return area > 0
+
+    def point_diff(self, pt1: Point32, pt2: Point32) -> tuple[float, float]:
+        return (pt2.x-pt1.x, pt2.y-pt1.y)
+    
+    def norm(self, vec:tuple[float, float]) -> float:
+        return math.sqrt(vec[0]**2+vec[1]**2)
+    
+    def vec_normal(self, vec:tuple[float, float]) -> tuple[float, float]:
+        mag = self.norm(vec)
+        return (vec[0]/mag, vec[1]/mag)
+    
+    def vec_perp_right(self, vec:tuple[float, float]) -> tuple[float, float]:
+        return (vec[1], -vec[0])
+    
+    def vec_perp_left(self, vec:tuple[float, float]) -> tuple[float, float]:
+        return (-vec[1], vec[0])
+    
+    def sum(self, vec1, vec2):
+        return (vec1[0]+vec2[0], vec1[1]+vec2[1])
+    
+    def scalar_prod(self, vec, scalar):
+        return (scalar*vec[0], scalar*vec[1])
+    
+    def cross(self, vec1, vec2):
+        return vec1[0]*vec2[1]-vec1[1]*vec2[0]
+    
+    def dot(self, vec1, vec2):
+        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
+    
+    def angle_vec(self, vec1, vec2):
+        return math.atan2(self.cross(vec1, vec2)/(self.norm(vec1)*self.norm(vec2)), self.dot(vec1, vec2)/(self.norm(vec1)*self.norm(vec2))) 
+    
+    def inflate_polygon(self, polygon: Polygon, dist: float = 0.0) -> Polygon:
+        """
+        Inflates the given polygon by a set distance, assuming the points are ordered CW
+        """
+        new_poly = Polygon()
+        for i in range(len(polygon.points)):
+            pt_pre = polygon.points[-1-i]
+            pt_cur = polygon.points[-1-(i+1)%len(polygon.points)]
+            pt_post = polygon.points[-1-(i+2)%len(polygon.points)]
+            # assert self.ccw((pt_pre.x, pt_pre.y), (pt_cur.x, pt_cur.y), (pt_post.x, pt_post.y)), "polygon points are not ordered CW"
+            if not self.ccw((pt_pre.x, pt_pre.y), (pt_cur.x, pt_cur.y), (pt_post.x, pt_post.y)):
+                pt_pre, pt_cur, pt_post = pt_post, pt_cur, pt_pre
+            vec_pre_normal = self.vec_normal(self.point_diff(pt_pre, pt_cur))
+            pre_infl_vec_normal = self.vec_perp_right(vec_pre_normal)
+            vec_post_normal = self.vec_normal(self.point_diff(pt_cur, pt_post))
+            post_infl_vec_normal = self.vec_perp_right(vec_post_normal)
+            
+            # scaling_factor = 1.0/math.cos(self.angle_vec(pre_infl_vec_normal, post_infl_vec_normal)/2.0)
+            scaling_factor = 1.0
+            infl_vec = self.scalar_prod(self.vec_normal(self.sum(pre_infl_vec_normal, post_infl_vec_normal)), dist*scaling_factor)
+            
+            new_pt_pre = self.sum((pt_cur.x, pt_cur.y), self.scalar_prod(pre_infl_vec_normal, dist))
+            new_pt_cur = self.sum((pt_cur.x, pt_cur.y), infl_vec)
+            new_pt_post = self.sum((pt_cur.x, pt_cur.y), self.scalar_prod(post_infl_vec_normal, dist))
+
+            new_poly.points.append(Point32(x=new_pt_pre[0], y=new_pt_pre[1]))
+            new_poly.points.append(Point32(x=new_pt_cur[0], y=new_pt_cur[1]))
+            new_poly.points.append(Point32(x=new_pt_post[0], y=new_pt_post[1]))
+        
+        new_poly.points.reverse()
+        return new_poly
 
     def set_active(self, make_active):
         """
@@ -122,7 +210,8 @@ class GridMapGenerator(Node):
         edge_table = {} # ymin: (ymax, x, dx/dy)
         ymin, ymax = self.grid.info.height, 0
         for obstacle in self.obstacle_map.obstacles:
-            polygon = obstacle.global_chull.polygon
+            polygon:Polygon = obstacle.global_chull.polygon
+            polygon = self.inflate_polygon(polygon, self.inflate_dist)
             for i, low_point in enumerate(polygon.points):
                 j = (i + 1) % len(polygon.points)
                 high_point = polygon.points[j]
@@ -199,7 +288,7 @@ class GridMapGenerator(Node):
                     curVal *= 5
                     curVal = min(100, curVal)
                 else:
-                    curVal /= 1.8 # decrease probability by some small amount
+                    curVal /= self.decay_rate # decrease probability by some small amount
                     curVal = math.floor(curVal)
                 self.grid.data[x + y * self.grid.info.width] = curVal
 
