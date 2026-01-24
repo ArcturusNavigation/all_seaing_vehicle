@@ -524,8 +524,8 @@ def launch_setup(context, *args, **kwargs):
             {"timer_period": 1.0},
             {"grid_dim": [800, 800]},
             {"grid_resolution": 0.3},
-            {"obstacle_radius_sigma": 3.0},
-            {"search_radius_sigma": 15.0}
+            {"inflate_dist": 2.5},
+            {"inv_decay_rate": 1.2},
         ],
         remappings=[
             ("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan"),
