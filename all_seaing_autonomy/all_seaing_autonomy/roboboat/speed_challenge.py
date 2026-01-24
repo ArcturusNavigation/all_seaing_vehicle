@@ -115,7 +115,7 @@ class SpeedChallenge(TaskServerBase):
         self.buoy_direction = (0,0)
         self.buoy_found = False
         self.following_guide = False
-        self.left_first = True # goes left of buoy first
+        self.left_first = False # goes left of buoy first
         self.temp_left_first = self.left_first
 
         self.obstacles = None
@@ -151,17 +151,17 @@ class SpeedChallenge(TaskServerBase):
             # self.blue_labels.add(label_mappings["green"])
             self.blue_labels.add(label_mappings["yellow"])
         else:
-            self.declare_parameter(
-                "buoy_label_mappings_file",
-                os.path.join(
-                    bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
-                ),
-            )
-            buoy_label_mappings_file = self.get_parameter(
-                "buoy_label_mappings_file"
-            ).value
-            with open(buoy_label_mappings_file, "r") as f:
-                label_mappings = yaml.safe_load(f)
+            # self.declare_parameter(
+            #     "buoy_label_mappings_file",
+            #     os.path.join(
+            #         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
+            #     ),
+            # )
+            # buoy_label_mappings_file = self.get_parameter(
+            #     "buoy_label_mappings_file"
+            # ).value
+            # with open(buoy_label_mappings_file, "r") as f:
+            #     label_mappings = yaml.safe_load(f)
             # for buoy_label in ["blue_buoy", "blue_circle", "blue_racquet_ball"]:
             #     self.blue_labels.add(label_mappings[buoy_label])
             for buoy_label in ["red_buoy", "red_circle", "red_racquet_ball"]:
@@ -350,7 +350,7 @@ class SpeedChallenge(TaskServerBase):
         first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
         second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
         third_dir = (-first_dir[0], -first_dir[1])
-        if not self.left_first:
+        if self.left_first:
             first_dir, third_dir = third_dir, first_dir
 
         add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
@@ -384,6 +384,7 @@ class SpeedChallenge(TaskServerBase):
             return Task.Result(success=False)
         
         self.left_first = self.temp_left_first
+        self.get_logger().info('LEFT FIRST' if self.left_first else 'RIGHT FIRST')
 
         t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
         robot_x, robot_y = self.robot_pos
@@ -391,7 +392,7 @@ class SpeedChallenge(TaskServerBase):
         robot_buoy_dist = self.norm(robot_buoy_vector)
         self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
         first_dir = (self.buoy_direction[1]*(t_o+self.t_o_eps), -self.buoy_direction[0]*(t_o+self.t_o_eps))
-        if not self.left_first:
+        if self.left_first:
             first_dir = (-first_dir[0], -first_dir[1])
 
         add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
@@ -427,7 +428,7 @@ class SpeedChallenge(TaskServerBase):
         while (not in_circling) or (not exit_angle_met()):
             pid_output = self.turn_pid.get_effort()
             # send velocity commands
-            self.send_vel_cmd(self.max_turn_vel[0], 0.0, (-1.0 if self.left_first else 1.0)*pid_output)
+            self.send_vel_cmd(self.max_turn_vel[0], 0.0, (1.0 if self.left_first else -1.0)*pid_output)
             # get feedback
             self.blue_buoy_detected()
             dist_to_buoy = self.norm(self.blue_buoy_pos, self.robot_pos)
@@ -439,6 +440,7 @@ class SpeedChallenge(TaskServerBase):
             # TODO: update in_Circling correctly (check 90 degrees)
             in_circling = True
             time.sleep(TIMER_PERIOD)
+        self.send_vel_cmd(0.0, 0.0, 0.0)
         self.get_logger().info(f"Finished circling buoy")
         return Task.Result(success=True)
     

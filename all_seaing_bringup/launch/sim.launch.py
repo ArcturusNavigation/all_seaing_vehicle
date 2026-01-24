@@ -471,8 +471,10 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_y": [1.0, 0.0, 0.0]},
             {"Kpid_theta": [1.0, 0.0, 0.0]},
             {"max_vel": [5.0, 3.0, 1.5]},
-            {"avoid_max_dist": 5.0},
+            {"avoid_max_dist": 15.0},
             {"avoid_vel_coeff": 3.0},
+            {"rot_avoid_vel_coeff": 3.0},
+            {"avoid_rot_vel_mag": True},
         ],
         output="screen",
     )
@@ -506,6 +508,10 @@ def launch_setup(context, *args, **kwargs):
             {"robot_frame_id": "wamv/wamv/base_link"},
             {"forward_dist": 15.0},
             {"avoid_obs": True},
+            {"avoid_max_dist": 15.0},
+            {"avoid_vel_coeff": 3.0},
+            {"rot_avoid_vel_coeff": 3.0},
+            {"avoid_rot_vel_mag": True},
         ],
         output="screen",
     )
@@ -595,6 +601,8 @@ def launch_setup(context, *args, **kwargs):
             {"max_vel": [2.0, 1.0, 0.4]},
             {"avoid_max_dist": 5.0},
             {"avoid_vel_coeff": 3.0},
+            {"rot_avoid_vel_coeff": 3.0},
+            {"avoid_rot_vel_mag": True},
         ],
         remappings=[
             

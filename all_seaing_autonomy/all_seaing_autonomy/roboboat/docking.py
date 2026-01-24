@@ -126,6 +126,18 @@ class Docking(TaskServerBase):
             .double_value
         )
 
+        self.rot_avoid_vel_coeff = (
+            self.declare_parameter("rot_avoid_vel_coeff", 0.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.avoid_rot_vel_mag = (
+            self.declare_parameter("avoid_rot_vel_mag", True)
+            .get_parameter_value()
+            .bool_value
+        )
+
         self.vel_marker_scale = (
             self.declare_parameter("vel_marker_scale", 1.0)
             .get_parameter_value()
@@ -483,11 +495,21 @@ class Docking(TaskServerBase):
             # obstacle avoidance
             avoid_x_vel, avoid_y_vel = 0.0, 0.0
             if self.avoid_obs and (self.lidar_point_cloud is not None) and (self.lidar_point_cloud.width > 0):
-                # TODO possibly add the setpoint as a goal in the avoiding velocity & weighted average w/ sum of weights 1, but that will mess w/ the PID more & needs more tuning
                 avoid_x_vel, avoid_y_vel = PotentialField(self.lidar_point_cloud, self.avoid_max_dist).sketchy_gradient_descent_step()
                 # self.get_logger().info(f'{self.lidar_point_cloud.width} points, unscaled avoiding vel: {avoid_x_vel, avoid_y_vel}')
                 avoid_x_vel *= self.avoid_vel_coeff
                 avoid_y_vel *= self.avoid_vel_coeff
+                # rotational avoidance velocity
+                rot_avoid_x_vel, rot_avoid_y_vel = PotentialField(self.lidar_point_cloud, self.avoid_max_dist).rotational_force(vel_dir=(x_vel, y_vel))
+                # self.get_logger().info(f'{self.lidar_point_cloud.width} points, unscaled avoiding vel: {avoid_x_vel, avoid_y_vel}')
+                rot_avoid_x_vel *= self.rot_avoid_vel_coeff
+                rot_avoid_y_vel *= self.rot_avoid_vel_coeff
+                if self.avoid_rot_vel_mag:
+                    vel_mag = math.sqrt(x_vel**2+y_vel**2)
+                    rot_avoid_x_vel*=vel_mag
+                    rot_avoid_y_vel*=vel_mag
+                avoid_x_vel += rot_avoid_x_vel
+                avoid_y_vel += rot_avoid_y_vel
                 x_vel += avoid_x_vel
                 y_vel += avoid_y_vel
 
