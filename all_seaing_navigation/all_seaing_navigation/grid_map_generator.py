@@ -66,7 +66,7 @@ class GridMapGenerator(Node):
         )
 
         self.prob_occ_non_occ = (
-            self.declare_parameter("prob_occ_non_occ", 0.4)
+            self.declare_parameter("prob_occ_non_occ", 0.35)
             .get_parameter_value()
             .double_value
         )
@@ -320,7 +320,7 @@ class GridMapGenerator(Node):
                     # curVal = 100.0*self.from_log_odds(self.to_log_odds(curVal/100.0)-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_non_occ))
                     new_log_odds = prev_log_odds-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_non_occ)
                 # curVal = math.floor(curVal)
-                new_log_odds = min(max(new_log_odds, -5.0), 5.0) # to allow for rapid update in case of global map drift
+                new_log_odds = min(max(new_log_odds, -5.0), 20.0) # to allow for rapid update in case of global map drift
                 curVal = math.floor(self.from_log_odds(new_log_odds)*100.0)
                 self.log_odds[x + y * self.grid.info.width] = new_log_odds
                 self.grid.data[x + y * self.grid.info.width] = curVal
