@@ -502,6 +502,7 @@ def launch_setup(context, *args, **kwargs):
             {"grid_resolution": 0.1},
             {"inflate_dist": 1.0},
             {"inv_decay_rate": 1.2},
+            {"default_lidar_range": 40.0},
             {"dynamic_origin": True},
         ],
     )
