@@ -407,11 +407,23 @@ class NavigationTangentServer(ActionServerBase):
 
             if self.should_abort():
                 self.end_process("New request received. Aborting path following.")
+                control_msg = ControlOption()
+                control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+                control_msg.twist.linear.x = 0.0
+                control_msg.twist.linear.y = 0.0
+                control_msg.twist.angular.z = 0.0
+                self.control_pub.publish(control_msg)
                 goal_handle.abort()
                 return FollowPath.Result()
 
             if goal_handle.is_cancel_requested:
                 self.end_process("Path following canceled!")
+                control_msg = ControlOption()
+                control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+                control_msg.twist.linear.x = 0.0
+                control_msg.twist.linear.y = 0.0
+                control_msg.twist.angular.z = 0.0
+                self.control_pub.publish(control_msg)
                 goal_handle.canceled()
                 return FollowPath.Result()
 
@@ -420,6 +432,12 @@ class NavigationTangentServer(ActionServerBase):
             time.sleep(TIMER_PERIOD)
             
         self.end_process("Path following completed!")
+        control_msg = ControlOption()
+        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+        control_msg.twist.linear.x = 0.0
+        control_msg.twist.linear.y = 0.0
+        control_msg.twist.angular.z = 0.0
+        self.control_pub.publish(control_msg)
         goal_handle.succeed()
         return FollowPath.Result(is_finished=True)
 

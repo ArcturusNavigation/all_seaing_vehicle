@@ -76,7 +76,7 @@ class PotentialField:
 
         for point in points:
             point_dist = self.dist(point,pos)
-            if point_dist >= self.q or point[0] < 0: # if obstacle is too far or to the back of the robot, don't add rotational force
+            if point_dist >= self.q or vel_dir[0]*point[0]+vel_dir[1]*point[1] < 0: # if obstacle is too far or to the back of the robot, don't add rotational force
                 break
             if -vel_dir[1]*point[0]+vel_dir[0]*point[1] > 0: # dot product of vel (in robot's frame) and pos of obstacle
                 # obstacle is to the left of the robot velocity's direction, rotational force is CCW
