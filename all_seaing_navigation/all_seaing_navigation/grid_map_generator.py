@@ -144,6 +144,8 @@ class GridMapGenerator(Node):
     
     def vec_normal(self, vec:tuple[float, float]) -> tuple[float, float]:
         mag = self.norm(vec)
+        if mag == 0:
+            return (0.0,0.0)
         return (vec[0]/mag, vec[1]/mag)
     
     def vec_perp_right(self, vec:tuple[float, float]) -> tuple[float, float]:
