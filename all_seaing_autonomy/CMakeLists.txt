@@ -22,6 +22,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/roboboat/speed_challenge_pid.py
     ${PROJECT_NAME}/roboboat/mechanism_navigation.py
     ${PROJECT_NAME}/roboboat/return_home.py
+    ${PROJECT_NAME}/roboboat/harbor_alert.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

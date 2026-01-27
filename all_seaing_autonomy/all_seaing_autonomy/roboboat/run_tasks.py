@@ -58,17 +58,32 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
+            # FOLLOW PATH
             # [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
-            [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+
+            # SPEED CHALLENGE
             # [ActionType.SEARCH, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
             # [ActionType.TASK, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
+
+            # DOCKING
             # [ActionType.SEARCH, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
             # [ActionType.TASK, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
+
+            # DELIVERY
             # [ActionType.SEARCH, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
             # [ActionType.TASK, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+
+            # HARBOR ALERT
+            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), ReferenceInt(0), ReferenceInt(0), "harbor_marina"],
+            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0)],
+
+
+            # FALLBACKS
             # [ActionType.TASK, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.TASK, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.TASK, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, ActionClient(self, Task, "delivery_qual"), ReferenceInt(0), ReferenceInt(0)],
         ]
         self.term_tasks = [
             # [ActionType.SEARCH, ActionClient(self, Search, "search_return"), "return"],

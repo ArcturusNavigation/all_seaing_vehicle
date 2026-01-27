@@ -20,8 +20,8 @@ return: # put the coordinates of the second gate
 
 harbor_marina:
   x: 0.0
-  y: 0.0
+  y: 70.0
 
 harbor_sprint:
-  x: 0.0
-  y: 0.0
+  x: 50.0
+  y: 50.0

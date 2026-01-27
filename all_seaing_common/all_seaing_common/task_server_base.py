@@ -84,7 +84,7 @@ class TaskServerBase(ActionServerBase):
         self.result = True
 
     # Return True if we should accept the request in goal_request
-    def should_accept_task(self, goal_request):
+    def should_accept_task(self, goal_request=None):
         return True
 
     # Initial setup - implement here, do initial setup
@@ -350,7 +350,7 @@ class TaskServerBase(ActionServerBase):
             return False, None
         
     def search_goal_callback(self, goal_request):
-        self.get_logger().info('Searching Server for [{self.server_name}] called')
+        self.get_logger().info(f'Searching Server for [{self.server_name}] called')
         return GoalResponse.ACCEPT
 
     def search_execute_callback(self, goal_handle):
@@ -358,7 +358,7 @@ class TaskServerBase(ActionServerBase):
         
         self.found_task = False
         
-        if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task(None):
+        if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task():
             self.found_task = True
 
         if not self.found_task:
@@ -393,7 +393,7 @@ class TaskServerBase(ActionServerBase):
                 goal_handle.canceled()
                 return Search.Result()
 
-            if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task(None):
+            if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task():
                 self.found_task = True
                 self.cancel_navigation()
             elif self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality

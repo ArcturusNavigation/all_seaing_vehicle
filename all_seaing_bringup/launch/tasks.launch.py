@@ -226,6 +226,22 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    harbor_alert = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="harbor_alert.py",
+        parameters=[
+            {"is_sim": False},
+            # {"color_label_mappings_file": buoy_label_mappings},
+            {"color_label_mappings_file": all_label_mappings},
+            {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
+            {"buoy_dist_thres": 40.0},
+            {"stationkeep_dist": 5.0},
+        ],
+        remappings=[
+        ]
+    )
+
     follow_buoy_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_pid.py",
@@ -380,6 +396,7 @@ def launch_setup(context, *args, **kwargs):
         docking,
         mechanism_navigation,
         return_home,
+        harbor_alert,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback
