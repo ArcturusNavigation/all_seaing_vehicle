@@ -83,6 +83,12 @@ class GridMapGenerator(Node):
             .bool_value
         )
 
+        self.bayesian = (
+            self.declare_parameter("bayesian", False)
+            .get_parameter_value()
+            .bool_value
+        )
+
         # --------------- SUBSCRIBERS, PUBLISHERS, AND TIMERS ---------------#
 
         self.obstacle_map_sub = self.create_subscription(
@@ -125,7 +131,8 @@ class GridMapGenerator(Node):
 
         self.grid.data = [-1] * self.grid.info.width * self.grid.info.height
         self.active_cells = [False] * self.grid.info.width * self.grid.info.height
-        self.log_odds = [self.prior_occ] * self.grid.info.width * self.grid.info.height
+        if self.bayesian:
+            self.log_odds = [self.prior_occ] * self.grid.info.width * self.grid.info.height
 
     def world_to_grid(self, x, y):
         """Convert world coordinates to grid coordinates."""
@@ -272,7 +279,8 @@ class GridMapGenerator(Node):
                 for x in range(x_start, x_end + 1):
                     if 0 <= x < self.grid.info.width and 0 <= y < self.grid.info.height:
                         self.active_cells[x + y * self.grid.info.width] = make_active
-                        # self.grid.data[x + y * self.grid.info.width] = 100
+                        if not self.bayesian:
+                            self.grid.data[x + y * self.grid.info.width] = 100
 
             for edge in active_edge_table:
                 edge["x"] += edge["inverse_slope"]
@@ -307,24 +315,32 @@ class GridMapGenerator(Node):
                     y - self.ship_pos[1]
                 ) ** 2 > lidar_range_grid**2:
                     continue
-                # curVal = self.grid.data[x + y * self.grid.info.width]
-                # if curVal == -1:
-                #     curVal = self.prior_occ*100.0
-                prev_log_odds = self.log_odds[x + y * self.grid.info.width]
-                if self.active_cells[x + y * self.grid.info.width]:
-                    # curVal += 1
-                    # curVal *= 5
-                    # curVal = min(100, curVal)
-                    # curVal = 100.0*self.from_log_odds(self.to_log_odds(curVal/100.0)-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_occ))
-                    new_log_odds = prev_log_odds-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_occ)
+                if not self.bayesian:
+                    curVal = self.grid.data[x + y * self.grid.info.width]
+                    if curVal == -1:
+                        # curVal = self.prior_occ*100.0
+                        curVal = 0
                 else:
-                    # curVal /= self.decay_rate # decrease probability by some small amount
-                    # curVal = 100.0*self.from_log_odds(self.to_log_odds(curVal/100.0)-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_non_occ))
-                    new_log_odds = prev_log_odds-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_non_occ)
-                # curVal = math.floor(curVal)
-                new_log_odds = min(max(new_log_odds, -5.0), 20.0) # to allow for rapid update in case of global map drift
-                curVal = math.floor(self.from_log_odds(new_log_odds)*100.0)
-                self.log_odds[x + y * self.grid.info.width] = new_log_odds
+                    prev_log_odds = self.log_odds[x + y * self.grid.info.width]
+                if self.active_cells[x + y * self.grid.info.width]:
+                    if not self.bayesian:
+                        curVal += 1
+                        curVal *= 5
+                        curVal = min(100, curVal)
+                    else:
+                        # curVal = 100.0*self.from_log_odds(self.to_log_odds(curVal/100.0)-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_occ))
+                        new_log_odds = prev_log_odds-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_occ)
+                else:
+                    if not self.bayesian:
+                        curVal /= self.decay_rate # decrease probability by some small amount
+                        curVal = math.floor(curVal)
+                    else:
+                        # curVal = 100.0*self.from_log_odds(self.to_log_odds(curVal/100.0)-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_non_occ))
+                        new_log_odds = prev_log_odds-self.to_log_odds(self.prior_occ)+self.to_log_odds(self.prob_occ_non_occ)
+                if self.bayesian:
+                    new_log_odds = min(max(new_log_odds, -5.0), 20.0) # to allow for rapid update in case of global map drift
+                    curVal = math.floor(self.from_log_odds(new_log_odds)*100.0)
+                    self.log_odds[x + y * self.grid.info.width] = new_log_odds
                 self.grid.data[x + y * self.grid.info.width] = curVal
 
     def timer_callback(self):

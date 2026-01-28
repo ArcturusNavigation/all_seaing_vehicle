@@ -504,6 +504,10 @@ def launch_setup(context, *args, **kwargs):
             {"inv_decay_rate": 1.2},
             {"default_lidar_range": 40.0},
             {"dynamic_origin": True},
+            {"bayesian": True},
+            {"prob_occ_occ": 0.95},
+            {"prob_occ_non_occ": 0.35},
+            {"prior_occ": 0.45},
         ],
     )
 
