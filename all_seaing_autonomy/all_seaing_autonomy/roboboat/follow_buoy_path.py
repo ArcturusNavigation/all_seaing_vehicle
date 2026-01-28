@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
 
 
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
-from all_seaing_interfaces.action import FollowPath, Task, Waypoint
+from all_seaing_interfaces.action import Task
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
-from nav_msgs.msg import Odometry
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
-from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_common.task_server_base import TaskServerBase
-from action_msgs.msg import GoalStatus
 from all_seaing_controller.pid_controller import PIDController
 
 import math
@@ -892,7 +888,8 @@ class FollowBuoyPath(TaskServerBase):
         the buoy pair / waypoint sequence
         """
         self.obstacles = msg.obstacles
-
+        if self.paused:
+            return
         if self.state in [FollowPathState.WAITING_GREEN_BEACON, FollowPathState.CIRCLING_GREEN_BEACON]:
             self.adapt_pair_to()
 
@@ -1111,10 +1108,13 @@ class FollowBuoyPath(TaskServerBase):
         self.move_to_waypoint([nav_x, nav_y, heading - (30.0 * 2 * math.pi / 360)], is_stationary=False, busy_wait=True, exit_func=self.green_beacon_detected, cancel_on_exit=True)
 
     def should_accept_task(self, goal_request):
-        if self.obstacles is None:
-            return False
-        self.first_setup = True
-        return self.setup_buoys()
+        if self.first_run:
+            if self.obstacles is None:
+                return False
+            self.first_setup = True
+            return self.setup_buoys()
+        else:
+            return True
     
     # def init_setup(self):
     #     if self.obstacles is None:
@@ -1126,9 +1126,14 @@ class FollowBuoyPath(TaskServerBase):
     #         self.mark_successful()
 
     def init_setup(self):
-        self.get_logger().info("Setup buoys succeeded!")
-        self.state = FollowPathState.FOLLOWING_FIRST_PASS
-        self.mark_successful()
+        if self.first_run:
+            self.get_logger().info("Setup buoys succeeded!")
+            self.state = FollowPathState.FOLLOWING_FIRST_PASS
+            self.mark_successful()
+        else:
+            self.get_logger().info("Restarting...")
+            self.first_buoy_pair = True
+            self.mark_successful()
         
     def control_loop(self):
         # self.station_hold()

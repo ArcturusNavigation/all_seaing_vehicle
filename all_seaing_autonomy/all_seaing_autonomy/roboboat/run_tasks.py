@@ -17,12 +17,9 @@ import yaml
 import math
 from enum import Enum
 
-from tf2_ros import TransformException
-from tf2_ros.buffer import Buffer
-from tf2_ros.transform_listener import TransformListener
-
-from math import cos, sin
-from tf_transformations import euler_from_quaternion
+from all_seaing_interfaces.msg import KeyboardButton
+from sensor_msgs.msg import Joy
+from action_msgs.msg import GoalStatus
 
 ###
 
@@ -58,26 +55,46 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
-            # [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            # FOLLOW PATH
+            [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
             [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+
+            # SPEED CHALLENGE
             # [ActionType.SEARCH, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
             # [ActionType.TASK, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
+
+            # DOCKING
             # [ActionType.SEARCH, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
             # [ActionType.TASK, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
+
+            # DELIVERY
             # [ActionType.SEARCH, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
             # [ActionType.TASK, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+
+            # FALLBACKS
             # [ActionType.TASK, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.TASK, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.TASK, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, ActionClient(self, Task, "delivery_qual"), ReferenceInt(0), ReferenceInt(0)],
         ]
+
         self.term_tasks = [
+            # RETURN TO HOME
             # [ActionType.SEARCH, ActionClient(self, Search, "search_return"), "return"],
             # [ActionType.TASK, ActionClient(self, Task, "return_home")],
         ]
+
+        self.harbor_alert_tasks = [
+            # HARBOR ALERT
+            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_marina", "harbor_sprint"],
+            [ActionType.TASK, ActionClient(self, Task, "harbor_alert")],
+        ]
+
         self.current_task = None
         self.next_task_index = -1
         self.next_init_index = ReferenceInt(0)
         self.next_term_index = ReferenceInt(0)
+        self.next_harbor_index = ReferenceInt(0)
         self.declare_parameter("max_attempt_count", 1)
         self.max_attempt_count = self.get_parameter("max_attempt_count").get_parameter_value().integer_value
 
@@ -164,6 +181,46 @@ class RunTasks(ActionServerBase):
         self.waypoint_marker_pub = self.create_publisher(
             MarkerArray, "waypoint_markers", 10
         )
+
+        # harbor alert
+
+        self.keyboard_sub = None
+        if self.is_sim: 
+            self.get_logger().info("Running in simulation mode. Listening to joystick input.")
+            self.keyboard_sub = self.create_subscription(
+                Joy, "/joy", self.sim_keyboard_callback, 10
+            )
+        else: 
+            self.get_logger().info("Running in real mode. Listening to keyboard input.")
+            self.keyboard_sub = self.create_subscription(
+                KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
+            )
+        self.harbor_alerted = False
+        self.harbor_index = 0 # TODO add harbor index (selected area) in sim & real
+        self.cancelled_task_harbor = True
+
+        self.result_future = None
+        self.goal_handle = None
+
+    def sim_keyboard_callback(self, msg):
+        if self.harbor_alerted:
+            return
+        if msg.buttons[3]:
+            self.get_logger().info(f'HARBOR ALERTED')
+            self.harbor_alerted = True
+            self.harbor_index = 0
+            self.cancel_current_task()
+            self.find_task()
+    
+    def real_keyboard_callback(self, msg):
+        if self.harbor_alerted:
+            return
+        if msg.key == "h":
+            self.get_logger().info(f'HARBOR ALERTED')
+            self.harbor_alerted = True
+            self.harbor_index = 0
+            self.cancel_current_task()
+            self.find_task()
     
     def split_buoys(self, obstacles):
         """
@@ -350,7 +407,11 @@ class RunTasks(ActionServerBase):
                 return
             task_x = self.gate_mid[0] + self.gate_dir[1]*local_x + self.gate_dir[0]*local_y
             task_y = self.gate_mid[1] + self.gate_dir[1]*local_y - self.gate_dir[0]*local_x
-            task_goal_msg = Search.Goal(x = task_x, y = task_y)
+            task_theta = 0.0
+            search_theta = self.task_location_mappings[location_name]["search_theta"]
+            if search_theta:
+                task_theta = math.atan2(self.gate_dir[1], self.gate_dir[0]) + self.task_location_mappings[location_name]["theta"] - math.pi/2.0
+            task_goal_msg = Search.Goal(x = task_x, y = task_y, include_theta = search_theta, theta = task_theta, wait_time = self.task_location_mappings[location_name]["wait_time"])
         self.get_logger().info(f"Sending goal: {task_goal_msg}")
         send_goal_future = self.current_task.send_goal_async(
             task_goal_msg,
@@ -358,11 +419,31 @@ class RunTasks(ActionServerBase):
         )
         send_goal_future.add_done_callback(self.goal_response_callback)
 
+    def cancel_current_task(self):
+        self.get_logger().info('TRYING TO CANCEL CURRENT TASK')
+        if self.result_future is None or self.goal_handle is None: # TODO how to handle waypoint sent (& goal handle received) after us trying to cancel it? maybe ROS delay + retry for 3 times or smth
+            self.get_logger().info('FUTURE IS NONE')
+            self.cancelled_task_harbor = True
+            return
+        if ((self.result_future.result() is None) or 
+            (self.result_future.result().status not in [GoalStatus.STATUS_ABORTED, GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED, GoalStatus.STATUS_CANCELING])):
+            self.goal_handle.cancel_goal_async()
+            self.cancelled_task_harbor = False
+            self.get_logger().info('CANCELLED TASK')
+
     def find_task(self):
         if self.next_init_index.val < len(self.init_tasks):
             self.attempt_task(ActionType.TASK, self.init_tasks[self.next_init_index.val], self.next_init_index, None)
+            self.harbor_alerted = False
             return
-
+        
+        if self.harbor_alerted:
+            if self.next_harbor_index.val >= len(self.harbor_alert_tasks):
+                self.harbor_alerted = False
+                self.next_harbor_index.val = 0
+            else:
+                self.attempt_task(self.harbor_alert_tasks[self.next_harbor_index.val][0], self.harbor_alert_tasks[self.next_harbor_index.val][1], self.next_harbor_index, None, self.harbor_alert_tasks[self.next_harbor_index.val][2+self.harbor_index] if self.harbor_alert_tasks[self.next_harbor_index.val][0] == ActionType.SEARCH else None)
+                return
         # print(self.task_list)
 
         for _ in range(len(self.task_list)):
@@ -387,16 +468,16 @@ class RunTasks(ActionServerBase):
         self.get_logger().info(f"Current task: {self.current_task}")
 
     def goal_response_callback(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
+        self.goal_handle = future.result()
+        if not self.goal_handle.accepted:
             self.get_logger().info("Goal rejected, looking for new task")
             if not (self.incr_on_fail is None): # consider failure to start task (goal rejected when setup conditions not met) as failure to do the task?
                 self.incr_on_fail.val += 1
             self.find_task()
             return
         self.get_logger().info("Goal accepted")
-        result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self.get_result_callback)
+        self.result_future = self.goal_handle.get_result_async()
+        self.result_future.add_done_callback(self.get_result_callback)
 
     def get_result_callback(self, future):
         result = future.result().result
@@ -404,6 +485,9 @@ class RunTasks(ActionServerBase):
             self.get_logger().info("Task success, marked as completed, looking for new task")
             self.incr_on_success.val += 1
         else:
+            if not self.cancelled_task_harbor:
+                self.cancelled_task_harbor = True
+                return
             self.get_logger().info("Task failure, looking for new task")
             if not (self.incr_on_fail is None):
                 self.incr_on_fail.val += 1

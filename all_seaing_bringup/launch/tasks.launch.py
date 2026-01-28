@@ -171,10 +171,10 @@ def launch_setup(context, *args, **kwargs):
             {"max_vel": [0.7, 0.7, 0.2]},
             # {"avoid_max_dist": 1.5},
             # {"avoid_vel_coeff": 2.0},
-            {"avoid_max_dist": 5.0},
+            {"avoid_max_dist": 2.0},
             {"avoid_vel_coeff": 1.0},
-            {"rot_avoid_vel_coeff": 1.0},
-            {"avoid_rot_vel_mag": True},
+            {"rot_avoid_vel_coeff": 3.0},
+            {"avoid_rot_vel_mag": False},
         ],
         remappings=[
             
@@ -221,6 +221,22 @@ def launch_setup(context, *args, **kwargs):
             {"gate_dist_back": 5.0},
             {"gate_probe_dist": 10.0},
             {"gate_dist_thres": 50.0},
+        ],
+        remappings=[
+        ]
+    )
+
+    harbor_alert = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="harbor_alert.py",
+        parameters=[
+            {"is_sim": False},
+            # {"color_label_mappings_file": buoy_label_mappings},
+            {"color_label_mappings_file": all_label_mappings},
+            {"robot_frame_id": "base_link"},
+            {"search_task_radius": 50.0},
+            {"buoy_dist_thres": 40.0},
+            {"stationkeep_dist": 5.0},
         ],
         remappings=[
         ]
@@ -294,10 +310,10 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_y": [0.5, 0.0, 0.1]},
             {"Kpid_theta": [0.6, 0.0, 0.0]},
             {"max_vel": [1.5, 1.0, 0.3]},
-            {"avoid_max_dist": 5.0},
-            {"avoid_vel_coeff": 1.0},
-            {"rot_avoid_vel_coeff": 1.0},
-            {"avoid_rot_vel_mag": True},
+            {"avoid_max_dist": 4.0},
+            {"avoid_vel_coeff": 2.0},
+            {"rot_avoid_vel_coeff": 7.0},
+            {"avoid_rot_vel_mag": False},
         ],
         output="screen",
     )
@@ -323,12 +339,12 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_y": [1.0, 0.0, 0.1]},
             {"Kpid_theta": [0.6, 0.0, 0.1]},
             {"max_vel": [1.5, 1.0, 0.3]},
-            {"forward_dist": 4.0},
+            {"forward_dist": 2.0},
             {"avoid_obs": True},
-            {"avoid_max_dist": 5.0},
-            {"avoid_vel_coeff": 1.0},
-            {"rot_avoid_vel_coeff": 1.0},
-            {"avoid_rot_vel_mag": True},
+            {"avoid_max_dist": 4.0},
+            {"avoid_vel_coeff": 2.0},
+            {"rot_avoid_vel_coeff": 7.0},
+            {"avoid_rot_vel_mag": False},
         ],
         output="screen",
     )
@@ -380,6 +396,7 @@ def launch_setup(context, *args, **kwargs):
         docking,
         mechanism_navigation,
         return_home,
+        harbor_alert,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback

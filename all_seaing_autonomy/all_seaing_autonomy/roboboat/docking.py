@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from rclpy.action import ActionServer, ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from visualization_msgs.msg import Marker, MarkerArray
 from sensor_msgs.msg import PointCloud2
@@ -13,10 +11,8 @@ from std_msgs.msg import Header, ColorRGBA
 
 from ament_index_python.packages import get_package_share_directory
 
-from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_controller.pid_controller import PIDController, CircularPID
-from all_seaing_interfaces.action import FollowPath, Task, Waypoint
-from all_seaing_interfaces.msg import LabeledObjectPlaneArray, LabeledObjectPlane, ControlOption
+from all_seaing_interfaces.msg import LabeledObjectPlaneArray, LabeledObjectPlane
 from all_seaing_controller.potential_field import PotentialField
 from all_seaing_common.task_server_base import TaskServerBase
 
@@ -181,7 +177,6 @@ class Docking(TaskServerBase):
 
         self.got_dock = False
         self.picked_slot = False
-        self.started_task = False
 
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
@@ -236,7 +231,7 @@ class Docking(TaskServerBase):
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         self.plane_msg = msg
-        if not self.started_task:
+        if self.paused:
             return
         self.find_docking_slot()
         
@@ -418,14 +413,20 @@ class Docking(TaskServerBase):
         return scale * x_vel, scale * y_vel
     
     def should_accept_task(self, goal_request):
-        if self.state == DockingState.WAITING_DOCK:
-            return self.find_docking_slot()
-        else:
-            return True
+        # if self.state == DockingState.WAITING_DOCK:
+        #     self.selected_slot = None
+        #     return self.find_docking_slot()
+        # else:
+        #     return True
+        self.selected_slot = None
+        self.state = DockingState.WAITING_DOCK
+        return self.find_docking_slot()
 
     def init_setup(self):
-        self.started_task = True
-        self.set_pid_setpoints(0, 0, 0)
+        self.x_pid.reset()
+        self.y_pid.reset()
+        self.theta_pid.reset()
+        # self.set_pid_setpoints(0, 0, 0)
         self.mark_successful()
     
     def control_loop(self):
