@@ -56,12 +56,12 @@ class RunTasks(ActionServerBase):
         ]
         self.task_list = [
             # FOLLOW PATH
-            # [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
-            # [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
 
             # SPEED CHALLENGE
-            [ActionType.SEARCH, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
-            [ActionType.TASK, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
+            # [ActionType.TASK, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
 
             # DOCKING
             # [ActionType.SEARCH, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
