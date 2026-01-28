@@ -526,6 +526,11 @@ def launch_setup(context, *args, **kwargs):
             {"grid_resolution": 0.3},
             {"inflate_dist": 2.5},
             {"inv_decay_rate": 1.2},
+            {"default_lidar_range": 40.0},
+            {"bayesian": True},
+            {"prob_occ_occ": 0.95},
+            {"prob_occ_non_occ": 0.35},
+            {"prior_occ": 0.45},
         ],
         remappings=[
             ("scan", "/wamv/sensors/lidars/lidar_wamv_sensor/scan"),
