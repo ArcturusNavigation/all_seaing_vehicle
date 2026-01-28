@@ -251,6 +251,7 @@ class SpeedChallenge(TaskServerBase):
         self.get_logger().info("Setup buoys succeeded!")
         self.state = SpeedChallengeState.GATES
         self.turn_pid.reset()
+        self.reset_challenge()
         self.mark_successful()
 
     def control_loop(self):
@@ -275,10 +276,18 @@ class SpeedChallenge(TaskServerBase):
             self.move_to_point(self.gate_wpt, busy_wait=True,
                 goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
             
+            if self.goal_handle.is_cancel_requested:
+                self.mark_unsuccessful()
+                return
+            
             self.get_logger().info('going in front of the gate')
             
             self.move_to_point(self.gate_wpt, busy_wait=True,
                 goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.init_gate_dist)))
+            
+            if self.goal_handle.is_cancel_requested:
+                self.mark_unsuccessful()
+                return
             
             self.state = SpeedChallengeState.PROBING_BUOY
         

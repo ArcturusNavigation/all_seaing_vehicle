@@ -113,6 +113,8 @@ class TaskServerBase(ActionServerBase):
     def execute_callback(self, goal_handle):
         self.start_process(f"Task Server [{self.server_name}] started task with goal handle {goal_handle}")
 
+        self.goal_handle = goal_handle
+
         self.paused = False
 
         self.result = False
@@ -171,6 +173,14 @@ class TaskServerBase(ActionServerBase):
 
             self.control_loop()
             time.sleep(self.timer_period)
+
+        if goal_handle.is_cancel_requested:
+            self.end_process(f"Task Server [{self.server_name}] cancelled due to request cancellation in control")
+            goal_handle.canceled()
+            self.cancel_navigation()
+            self.paused = True
+            self.first_run = False
+            return Task.Result()
         
         if not self.result:
             self.get_logger().info("ROS shutdown detected or loop ended unexpectedly in control.")
@@ -245,6 +255,9 @@ class TaskServerBase(ActionServerBase):
                     self._send_goal(goal_msg)
                     self.waypoint_rejected = False
                     self.waypoint_aborted = False
+                if self.goal_handle.is_cancel_requested:
+                    self.cancel_navigation()
+                    return False
                 time.sleep(self.timer_period)
         return False
 
@@ -327,6 +340,9 @@ class TaskServerBase(ActionServerBase):
 
                         self.get_logger().info('ADAPTING WAYPOINT')
                         self._send_wpt_goal(goal_msg)
+                if self.goal_handle.is_cancel_requested:
+                    self.cancel_navigation()
+                    return False
                 time.sleep(self.timer_period)
         return False
 
@@ -473,6 +489,12 @@ class TaskServerBase(ActionServerBase):
                 self.found_task = True
                 self.cancel_navigation()
             time.sleep(self.timer_period)
+        
+        if goal_handle.is_cancel_requested:
+            self.end_process(f"Searching Server for [{self.server_name}] cancelled due to request cancellation in control")
+            self.cancel_navigation()
+            goal_handle.canceled()
+            return Search.Result()
 
         self.end_process(f"Searching Server for [{self.server_name}] task completed with result {self.found_task}")
         goal_handle.succeed()
