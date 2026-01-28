@@ -1,27 +1,48 @@
 follow_path:
   x: 0.0
   y: 0.0
+  search_theta: false
+  theta: 0.0
+  wait_time: 0.0
 
 speed_challenge:
   x: 0.0
   y: 0.0
+  search_theta: false
+  theta: 0.0
+  wait_time: 0.0
 
 docking:
   x: 0.0
   y: 0.0
+  search_theta: false
+  theta: 0.0
+  wait_time: 0.0
 
 delivery:
   x: 0.0
   y: 0.0
+  search_theta: false
+  theta: 0.0
+  wait_time: 0.0
 
 return: # put the coordinates of the second gate
   x: 0.0
   y: 20.0
+  search_theta: false
+  theta: 0.0
+  wait_time: 0.0
 
 harbor_marina:
   x: 0.0
   y: 70.0
+  search_theta: false
+  theta: 0.0
+  wait_time: 0.0
 
 harbor_sprint:
   x: 50.0
   y: 50.0
+  search_theta: false
+  theta: 0.0
+  wait_time: 0.0

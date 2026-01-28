@@ -1,6 +1,9 @@
 # Goal
 float64 x
 float64 y
+bool include_theta
+float64 theta
+float64 wait_time
 ---
 # Result
 bool success

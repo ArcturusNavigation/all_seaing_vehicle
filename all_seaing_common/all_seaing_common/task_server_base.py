@@ -84,7 +84,7 @@ class TaskServerBase(ActionServerBase):
         self.result = True
 
     # Return True if we should accept the request in goal_request
-    def should_accept_task(self, goal_request=None):
+    def should_accept_task(self, goal_request):
         return True
 
     # Initial setup - implement here, do initial setup
@@ -358,7 +358,7 @@ class TaskServerBase(ActionServerBase):
         
         self.found_task = False
         
-        if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task():
+        if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task(None):
             self.found_task = True
 
         if not self.found_task:
@@ -393,7 +393,7 @@ class TaskServerBase(ActionServerBase):
                 goal_handle.canceled()
                 return Search.Result()
 
-            if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task():
+            if math.sqrt((self.robot_pos[0]-goal_handle.request.x)**2 + (self.robot_pos[1]-goal_handle.request.y)**2) < self.search_task_radius and self.should_accept_task(None):
                 self.found_task = True
                 self.cancel_navigation()
             elif self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality
@@ -401,6 +401,57 @@ class TaskServerBase(ActionServerBase):
                 self._send_goal(goal_msg)
                 self.waypoint_rejected = False
                 self.waypoint_aborted = False
+            time.sleep(self.timer_period)
+
+        if (not self.found_task) and goal_handle.request.include_theta:
+            self.get_logger().info(f"Moving to waypoint {(goal_handle.request.x, goal_handle.request.y, goal_handle.request.theta)}")
+            self.moved_to_point = False
+            goal_msg = Waypoint.Goal()
+            goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
+            goal_msg.theta_threshold = self.get_parameter("wpt_theta_threshold").value
+            goal_msg.x = goal_handle.request.x
+            goal_msg.y = goal_handle.request.y
+            goal_msg.theta = goal_handle.request.theta
+            goal_msg.ignore_theta = False
+            goal_msg.is_stationary = False
+            self._send_wpt_goal(goal_msg)
+
+            while (not self.found_task) and (not self.moved_to_point) and rclpy.ok():
+                if self.should_abort():
+                    self.end_process(f"Searching Server for [{self.server_name}] aborted due to new request in control")
+                    self.cancel_navigation()
+                    goal_handle.abort()
+                    return Search.Result()
+
+                if goal_handle.is_cancel_requested:
+                    self.end_process(f"Searching Server for [{self.server_name}] cancelled due to request cancellation in control")
+                    self.cancel_navigation()
+                    goal_handle.canceled()
+                    return Search.Result()
+
+                if self.should_accept_task(None):
+                    self.found_task = True
+                    self.cancel_navigation()
+                time.sleep(self.timer_period)
+        
+        wait_start_time = time.time()
+        self.get_logger().info(f"Waiting...")
+        while (not self.found_task) and (time.time() - wait_start_time < goal_handle.request.wait_time) and rclpy.ok():
+            if self.should_abort():
+                self.end_process(f"Searching Server for [{self.server_name}] aborted due to new request in control")
+                self.cancel_navigation()
+                goal_handle.abort()
+                return Search.Result()
+
+            if goal_handle.is_cancel_requested:
+                self.end_process(f"Searching Server for [{self.server_name}] cancelled due to request cancellation in control")
+                self.cancel_navigation()
+                goal_handle.canceled()
+                return Search.Result()
+
+            if self.should_accept_task(None):
+                self.found_task = True
+                self.cancel_navigation()
             time.sleep(self.timer_period)
 
         self.end_process(f"Searching Server for [{self.server_name}] task completed with result {self.found_task}")

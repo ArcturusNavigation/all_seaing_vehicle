@@ -59,8 +59,8 @@ class RunTasks(ActionServerBase):
         ]
         self.task_list = [
             # FOLLOW PATH
-            # [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
-            # [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
 
             # SPEED CHALLENGE
             # [ActionType.SEARCH, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
@@ -74,21 +74,25 @@ class RunTasks(ActionServerBase):
             # [ActionType.SEARCH, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
             # [ActionType.TASK, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
 
-            # HARBOR ALERT
-            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), ReferenceInt(0), ReferenceInt(0), "harbor_marina"],
-            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0)],
-
-
             # FALLBACKS
             # [ActionType.TASK, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.TASK, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.TASK, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.TASK, ActionClient(self, Task, "delivery_qual"), ReferenceInt(0), ReferenceInt(0)],
         ]
+
         self.term_tasks = [
+            # RETURN TO HOME
             # [ActionType.SEARCH, ActionClient(self, Search, "search_return"), "return"],
             # [ActionType.TASK, ActionClient(self, Task, "return_home")],
         ]
+
+        self.harbor_alert_tasks = [
+            # HARBOR ALERT
+            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), ReferenceInt(0), ReferenceInt(0), "harbor_marina"],
+            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0)],
+        ]
+
         self.current_task = None
         self.next_task_index = -1
         self.next_init_index = ReferenceInt(0)
@@ -365,7 +369,11 @@ class RunTasks(ActionServerBase):
                 return
             task_x = self.gate_mid[0] + self.gate_dir[1]*local_x + self.gate_dir[0]*local_y
             task_y = self.gate_mid[1] + self.gate_dir[1]*local_y - self.gate_dir[0]*local_x
-            task_goal_msg = Search.Goal(x = task_x, y = task_y)
+            task_theta = 0.0
+            search_theta = self.task_location_mappings[location_name]["search_theta"]
+            if search_theta:
+                task_theta = math.atan2(self.gate_dir[1], self.gate_dir[0]) + self.task_location_mappings[location_name]["theta"] - math.pi/2.0
+            task_goal_msg = Search.Goal(x = task_x, y = task_y, include_theta = search_theta, theta = task_theta, wait_time = self.task_location_mappings[location_name]["wait_time"])
         self.get_logger().info(f"Sending goal: {task_goal_msg}")
         send_goal_future = self.current_task.send_goal_async(
             task_goal_msg,
