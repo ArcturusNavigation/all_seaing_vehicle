@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 from ast import Num
 import rclpy
-from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.callback_groups import ReentrantCallbackGroup
 
 from all_seaing_controller.pid_controller import PIDController
-from all_seaing_interfaces.msg import ObstacleMap, Obstacle, ControlOption
-from all_seaing_interfaces.action import FollowPath, Task
+from all_seaing_interfaces.msg import ObstacleMap, Obstacle
+from all_seaing_interfaces.action import Task
 from ament_index_python.packages import get_package_share_directory
-from sensor_msgs.msg import CameraInfo
 from visualization_msgs.msg import Marker, MarkerArray
-from all_seaing_common.action_server_base import ActionServerBase
-from action_msgs.msg import GoalStatus
 from std_msgs.msg import Header, ColorRGBA
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from all_seaing_common.task_server_base import TaskServerBase
@@ -255,6 +250,8 @@ class SpeedChallenge(TaskServerBase):
     def init_setup(self):
         self.get_logger().info("Setup buoys succeeded!")
         self.state = SpeedChallengeState.GATES
+        self.turn_pid.reset()
+        self.reset_challenge()
         self.mark_successful()
 
     def control_loop(self):
@@ -279,10 +276,18 @@ class SpeedChallenge(TaskServerBase):
             self.move_to_point(self.gate_wpt, busy_wait=True,
                 goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
             
+            if self.goal_handle.is_cancel_requested:
+                self.mark_unsuccessful()
+                return
+            
             self.get_logger().info('going in front of the gate')
             
             self.move_to_point(self.gate_wpt, busy_wait=True,
                 goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.init_gate_dist)))
+            
+            if self.goal_handle.is_cancel_requested:
+                self.mark_unsuccessful()
+                return
             
             self.state = SpeedChallengeState.PROBING_BUOY
         
@@ -296,7 +301,8 @@ class SpeedChallenge(TaskServerBase):
         Gets the labeled map from all_seaing_perception.
         '''
         self.obstacles = msg.obstacles
-
+        if self.paused:
+            return
         for obstacle in self.obstacles:
             if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.beacon_dist_thres:
                 continue

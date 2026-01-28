@@ -6,12 +6,10 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import qos_profile_sensor_data
 
 
-from all_seaing_interfaces.action import Task
 from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_interfaces.msg import ControlOption, LabeledObjectPlane, LabeledObjectPlaneArray
 from all_seaing_common.task_server_base import TaskServerBase
-from sensor_msgs.msg import CameraInfo
 from enum import Enum
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Pose, Point, Vector3, Quaternion
@@ -155,7 +153,6 @@ class MechanismNavigation(TaskServerBase):
 
         self.got_target = False
         self.picked_target = False
-        self.started_task = False
 
         self.state = DeliveryState.WAITING_TARGET
 
@@ -169,7 +166,7 @@ class MechanismNavigation(TaskServerBase):
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         self.plane_msg = msg
-        if not self.started_task:
+        if self.paused:
             return
         self.find_target()
         
@@ -338,15 +335,20 @@ class MechanismNavigation(TaskServerBase):
         return scale * x_vel, scale * y_vel
     
     def should_accept_task(self, goal_request):
-        if self.state == DeliveryState.WAITING_TARGET:
-            return self.find_target()
-        else:
-            return True
+        # if self.state == DeliveryState.WAITING_TARGET:
+        #     return self.find_target()
+        # else:
+        #     return True
+        self.selected_target = None
+        self.state = DeliveryState.WAITING_TARGET
+        return self.find_target()
     
     def init_setup(self):
-        self.started_task = True
         self.time_last_had_target = time.time()
-        self.set_pid_setpoints(0, 0, 0)
+        # self.set_pid_setpoints(0, 0, 0)
+        self.x_pid.reset()
+        self.y_pid.reset()
+        self.theta_pid.reset()
         self.mark_successful()
 
     def vel_to_marker(self, vel, scale=1.0, rgb=(1.0, 0.0, 0.0), id=0):
