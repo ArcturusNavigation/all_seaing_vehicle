@@ -72,6 +72,12 @@ class TaskServerBase(ActionServerBase):
         self.active_future_request = 0 # active future requests
         self.active_waypoint_request = 0 # keeps track of the number of active waypoint requests
 
+        self._get_result_future = None
+        self.wpt_goal_handle = None
+
+        self.first_run = True
+        self.paused = True
+
     # Mark result of task as successful, exit control loop
     # IN THEORY, supports directly marking .result as true, and will mark _succeed as true by default
     def mark_successful(self):
@@ -107,6 +113,8 @@ class TaskServerBase(ActionServerBase):
     def execute_callback(self, goal_handle):
         self.start_process(f"Task Server [{self.server_name}] started task with goal handle {goal_handle}")
 
+        self.paused = False
+
         self.result = False
         self._succeed = True
 
@@ -118,10 +126,12 @@ class TaskServerBase(ActionServerBase):
             firstLoop = False
             if self.should_abort():
                 self.end_process(f"Task Server [{self.server_name}] aborted due to new request in setup")
+                self.paused = True
                 goal_handle.abort()
                 return Task.Result()
             if goal_handle.is_cancel_requested:
                 self.end_process(f"Task Server [{self.server_name}] cancelled due to request cancellation in setup")
+                self.paused = True
                 goal_handle.canceled()
                 return Task.Result()
             
@@ -129,11 +139,13 @@ class TaskServerBase(ActionServerBase):
 
         if not self.result:
             self.get_logger().info("ROS shutdown detected or loop ended unexpectedly in setup")
+            self.paused = True
             goal_handle.abort()
             return Task.Result(success=False)
 
         if (not self._succeed):
             self.end_process(f"Task Server [{self.server_name}] task failed in setup")
+            self.paused = True
             goal_handle.abort()
             return Task.Result(success=False)
 
@@ -144,12 +156,17 @@ class TaskServerBase(ActionServerBase):
 
             if self.should_abort():
                 self.end_process(f"Task Server [{self.server_name}] aborted due to new request in control")
+                self.paused = True
+                self.cancel_navigation()
                 goal_handle.abort()
                 return Task.Result()
 
             if goal_handle.is_cancel_requested:
                 self.end_process(f"Task Server [{self.server_name}] cancelled due to request cancellation in control")
                 goal_handle.canceled()
+                self.cancel_navigation()
+                self.paused = True
+                self.first_run = False
                 return Task.Result()
 
             self.control_loop()
@@ -158,10 +175,12 @@ class TaskServerBase(ActionServerBase):
         if not self.result:
             self.get_logger().info("ROS shutdown detected or loop ended unexpectedly in control.")
             goal_handle.abort()
+            self.paused = True
             return Task.Result(success=False)
 
         self.end_process(f"Task Server [{self.server_name}] task completed with result {self._succeed}")
         goal_handle.succeed()
+        self.paused = True
         return Task.Result(success=self._succeed)
     
     def _send_goal(self, goal_msg):
@@ -434,8 +453,9 @@ class TaskServerBase(ActionServerBase):
                     self.cancel_navigation()
                 time.sleep(self.timer_period)
         
-        wait_start_time = time.time()
-        self.get_logger().info(f"Waiting...")
+        if not self.found_task:
+            wait_start_time = time.time()
+            self.get_logger().info(f"Waiting...")
         while (not self.found_task) and (time.time() - wait_start_time < goal_handle.request.wait_time) and rclpy.ok():
             if self.should_abort():
                 self.end_process(f"Searching Server for [{self.server_name}] aborted due to new request in control")

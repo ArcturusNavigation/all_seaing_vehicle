@@ -203,11 +203,8 @@ class ReturnHome(TaskServerBase):
         self.mark_successful()
 
     def control_loop(self):
-        action_result = self.return_to_start()
-        if action_result.success:
-            self.mark_successful()
-        else:
-            self.mark_unsuccessful()
+        self.return_to_start()
+        self.mark_successful()
         
 
     def map_cb(self, msg):

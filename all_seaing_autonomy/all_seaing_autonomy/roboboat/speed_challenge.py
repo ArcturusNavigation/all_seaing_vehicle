@@ -250,6 +250,7 @@ class SpeedChallenge(TaskServerBase):
     def init_setup(self):
         self.get_logger().info("Setup buoys succeeded!")
         self.state = SpeedChallengeState.GATES
+        self.turn_pid.reset()
         self.mark_successful()
 
     def control_loop(self):
@@ -291,7 +292,8 @@ class SpeedChallenge(TaskServerBase):
         Gets the labeled map from all_seaing_perception.
         '''
         self.obstacles = msg.obstacles
-
+        if self.paused:
+            return
         for obstacle in self.obstacles:
             if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.beacon_dist_thres:
                 continue

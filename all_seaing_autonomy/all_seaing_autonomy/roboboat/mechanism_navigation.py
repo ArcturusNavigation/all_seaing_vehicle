@@ -153,7 +153,6 @@ class MechanismNavigation(TaskServerBase):
 
         self.got_target = False
         self.picked_target = False
-        self.started_task = False
 
         self.state = DeliveryState.WAITING_TARGET
 
@@ -167,7 +166,7 @@ class MechanismNavigation(TaskServerBase):
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         self.plane_msg = msg
-        if not self.started_task:
+        if self.paused:
             return
         self.find_target()
         
@@ -336,15 +335,20 @@ class MechanismNavigation(TaskServerBase):
         return scale * x_vel, scale * y_vel
     
     def should_accept_task(self, goal_request):
-        if self.state == DeliveryState.WAITING_TARGET:
-            return self.find_target()
-        else:
-            return True
+        # if self.state == DeliveryState.WAITING_TARGET:
+        #     return self.find_target()
+        # else:
+        #     return True
+        self.selected_target = None
+        self.state = DeliveryState.WAITING_TARGET
+        return self.find_target()
     
     def init_setup(self):
-        self.started_task = True
         self.time_last_had_target = time.time()
-        self.set_pid_setpoints(0, 0, 0)
+        # self.set_pid_setpoints(0, 0, 0)
+        self.x_pid.reset()
+        self.y_pid.reset()
+        self.theta_pid.reset()
         self.mark_successful()
 
     def vel_to_marker(self, vel, scale=1.0, rgb=(1.0, 0.0, 0.0), id=0):

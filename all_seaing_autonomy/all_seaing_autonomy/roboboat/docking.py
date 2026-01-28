@@ -177,7 +177,6 @@ class Docking(TaskServerBase):
 
         self.got_dock = False
         self.picked_slot = False
-        self.started_task = False
 
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
@@ -232,7 +231,7 @@ class Docking(TaskServerBase):
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         self.plane_msg = msg
-        if not self.started_task:
+        if self.paused:
             return
         self.find_docking_slot()
         
@@ -414,14 +413,20 @@ class Docking(TaskServerBase):
         return scale * x_vel, scale * y_vel
     
     def should_accept_task(self, goal_request):
-        if self.state == DockingState.WAITING_DOCK:
-            return self.find_docking_slot()
-        else:
-            return True
+        # if self.state == DockingState.WAITING_DOCK:
+        #     self.selected_slot = None
+        #     return self.find_docking_slot()
+        # else:
+        #     return True
+        self.selected_slot = None
+        self.state = DockingState.WAITING_DOCK
+        return self.find_docking_slot()
 
     def init_setup(self):
-        self.started_task = True
-        self.set_pid_setpoints(0, 0, 0)
+        self.x_pid.reset()
+        self.y_pid.reset()
+        self.theta_pid.reset()
+        # self.set_pid_setpoints(0, 0, 0)
         self.mark_successful()
     
     def control_loop(self):
