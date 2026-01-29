@@ -227,8 +227,9 @@ class YOLOv11Node(Node):
                         color = (0,230,230)
                     elif color_name == "black":
                         color = (0,0,0)
+                        text_color = (255,255,255)
                     elif color_name == "white":
-                        color = (188,188,188)
+                        color = (255,255,255)
                     else: 
                         color = (128,128,128)
 

@@ -430,8 +430,9 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"ransac_params_file": ransac_params},
-            {"label_mappings_file": buoy_label_mappings},
+            # {"label_mappings_file": buoy_label_mappings},
             # {"label_mappings_file": shape_label_mappings},
+            {"label_config": "all_label_mappings"},
         ]
     )
 

@@ -45,6 +45,9 @@ def launch_setup(context, *args, **kwargs):
     buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "buoy_label_mappings.yaml"
     )
+    all_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "all_label_mappings.yaml"
+    )
     shape_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
     )
@@ -172,9 +175,9 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "buoy_label_mappings"},
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
-            {"confs": [0.6, 0.4]},
+            {"confs": [0.5, 0.3]},
             {"use_color_names": False},
-            {"filter_beacon_indicators": False},
+            {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
             {"indicator_to_beacon_bbox": True},
         ],
@@ -283,7 +286,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"ransac_params_file": ransac_params},
             # {"label_mappings_file": buoy_label_mappings},
-            {"label_mappings_file": shape_label_mappings},
+            # {"label_mappings_file": shape_label_mappings},
+            {"label_mappings_file": all_label_mappings},
         ]
     )
 
@@ -574,7 +578,7 @@ def launch_setup(context, *args, **kwargs):
         bbox_project_pcloud_node,
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
-        # ransac_node,
+        ransac_node,
         # multicam_detection_merge_node,
         # odometry_publisher_node,
         object_tracking_map_node,
