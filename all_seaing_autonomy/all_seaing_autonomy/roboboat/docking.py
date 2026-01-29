@@ -178,6 +178,8 @@ class Docking(TaskServerBase):
         self.got_dock = False
         self.picked_slot = False
 
+        self.time_docked = -1
+
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         self.declare_parameter(
@@ -200,8 +202,8 @@ class Docking(TaskServerBase):
             # TODO replace w/ numbers for the dock banner labels, as in the roboboat course
             # self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
             # self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
-            self.dock_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
-            self.boat_labels = []
+            self.dock_labels = [self.label_mappings[name] for name in ["black_cross"]]
+            self.boat_labels = [self.label_mappings[name] for name in ["black_triangle"]]
         
         self.inv_label_mappings = {}
         for key, value in self.label_mappings.items():
@@ -271,8 +273,11 @@ class Docking(TaskServerBase):
                 taken = False
                 for boat_label, (boat_ctr, boat_normal) in self.boat_banners:
                     # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
-                    if self.norm(boat_ctr, dock_ctr) < self.boat_dock_dist_thres and abs(self.angle_vec(self.difference(dock_ctr, boat_ctr), dock_normal)) < self.boat_taken_angle_thres:
+                    dock_boat_angle = abs(self.angle_vec(self.difference(dock_ctr, boat_ctr), dock_normal))
+                    dock_boat_angle = min(dock_boat_angle, np.pi - dock_boat_angle)
+                    if self.norm(boat_ctr, dock_ctr) < self.boat_dock_dist_thres and dock_boat_angle < self.boat_taken_angle_thres*np.pi/2.0:
                         # taken
+                        self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                         taken = True
                 if taken:
                     self.taken.append(dock_label)
@@ -480,8 +485,11 @@ class Docking(TaskServerBase):
             self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
             if abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
-                self.send_vel_cmd(0.0,0.0,0.0)
-                self.mark_successful()
+                if self.time_docked == -1:
+                    self.time_docked = time.time()
+                elif time.time() - self.time_docked > 0.5:
+                    self.send_vel_cmd(0.0,0.0,0.0)
+                    self.mark_successful()
                 return
             x_output = self.x_pid.get_effort()
             y_output = self.y_pid.get_effort()
