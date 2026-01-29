@@ -34,6 +34,6 @@ coplanar:
 
 max_iters: 20
 dist_thres: 0.1
-min_inliers: 30
+min_inliers: 20
 clust_dist: 0.5
 plane_angle_thres: 30.0
