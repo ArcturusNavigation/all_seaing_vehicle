@@ -154,7 +154,8 @@ namespace all_seaing_perception {
     // for banners
     std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_banner_data_association(std::vector<std::shared_ptr<Banner>> tracked_obstacles,
         std::vector<std::shared_ptr<Banner>> detected_obstacles,
-        std::vector<std::vector<float>> p, float new_obj_thres);
+        std::vector<std::vector<float>> p, float new_obj_thres,
+        std::map<int, int> banner_label_number = std::map<int,int>());
 
 } // namespace all_seaing_perception
 

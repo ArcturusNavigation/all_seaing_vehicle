@@ -36,6 +36,20 @@ class Rectangle:
             return type(self)(0,0,0,0)
     __and__ = intersection
 
+    # Source - https://stackoverflow.com/a/40523389
+    def dist(self, other):
+        #overlaps in x or y:
+        if abs(self.x - other.x) <= (self.w + other.w):
+            dx = 0
+        else:
+            dx = abs(self.x - other.x) - (self.w + other.w)
+        #
+        if abs(self.y - other.y) <= (self.h + other.h):
+            dy = 0
+        else:
+            dy = abs(self.y - other.y) - (self.h + other.h)
+        return dx + dy
+
     def difference(self, other):
         inter = self&other
         if not inter:
@@ -59,6 +73,10 @@ class Rectangle:
         if x1>x2 or y1>y2:
             raise ValueError("Coordinates are invalid")
         self.x1, self.y1, self.x2, self.y2 = x1, y1, x2, y2
+        self.x = (x1+x2)/2.0
+        self.y = (y1+y2)/2.0
+        self.w = (self.x2-self.x1)/2.0
+        self.h = (self.y2-self.y1)/2.0
 
     def __iter__(self):
         yield self.x1
@@ -116,6 +134,11 @@ class YOLOv11Node(Node):
         self.indicator_to_beacon_bbox = self.declare_parameter(
             "indicator_to_beacon_bbox", False).get_parameter_value().bool_value
         
+        self.match_indicators_banners = self.declare_parameter(
+            "match_indicators_banners", False).get_parameter_value().bool_value
+        
+        self.indicator_banner_px_dist = self.declare_parameter(
+            "indicator_banner_px_dist", 0).get_parameter_value().integer_value        
 
         if self.device == "default":
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -128,8 +151,15 @@ class YOLOv11Node(Node):
         with open(yaml_file_path,"r") as f:
             self.label_dict = yaml.safe_load(f)
         
+        self.inv_label_dict = dict()
+        for key, value in self.label_dict.items():
+            self.inv_label_dict[value] = key
+        
         self.indicator_labels = [self.label_dict[name] for name in ["green_indicator", "red_indicator"]]
+        self.green_indicator_labels = [self.label_dict[name] for name in ["green_indicator"]]
+        self.red_indicator_labels = [self.label_dict[name] for name in ["red_indicator"]]
         self.beacon_label = self.label_dict["beacon"]
+        self.number_labels = [self.label_dict[name] for name in ["number_1", "number_2", "number_3"]]
 
         self.models:list[tuple[YOLO, int, float]] = []
         
@@ -174,6 +204,14 @@ class YOLOv11Node(Node):
         rect2 = Rectangle(bbox2.min_x, bbox2.min_y, bbox2.max_x, bbox2.max_y)
         return (rect1&rect2).area()/rect1.area()
 
+    def manhattan_distance(self, bbox1: LabeledBoundingBox2D, bbox2: LabeledBoundingBox2D):
+        """
+        Computing minimum Manhattan distance between bbox1 and bbox2
+        """
+        rect1 = Rectangle(bbox1.min_x, bbox1.min_y, bbox1.max_x, bbox1.max_y)
+        rect2 = Rectangle(bbox2.min_x, bbox2.min_y, bbox2.max_x, bbox2.max_y)
+        return rect1.dist(rect2)
+
     def image_cb(self, msg: Image) -> None:
 
         # Convert image to cv_image
@@ -181,8 +219,9 @@ class YOLOv11Node(Node):
         annotator = Annotator(cv_image, 2, 2, "Arial.ttf", False)
 
         # if self.filter_beacon_indicators:
-        pending_bounding_box_msgs: list[LabeledBoundingBox2D] = []
+        indicator_bboxes: list[LabeledBoundingBox2D] = []
         beacon_bboxes: list[LabeledBoundingBox2D] = []
+        number_bboxes: list[LabeledBoundingBox2D] = []
         
         labeled_bounding_box_msgs = LabeledBoundingBox2DArray()
         labeled_bounding_box_msgs.header = msg.header
@@ -257,7 +296,9 @@ class YOLOv11Node(Node):
                     #     labeled_bounding_box_msgs.boxes.append(box_msg)
                     # else:
                     if box_msg.label in self.indicator_labels:
-                        pending_bounding_box_msgs.append(box_msg)
+                        indicator_bboxes.append(box_msg)
+                    elif box_msg.label in self.number_labels:
+                        number_bboxes.append(box_msg)
                     else:
                         labeled_bounding_box_msgs.boxes.append(box_msg)
                     
@@ -265,7 +306,7 @@ class YOLOv11Node(Node):
                         beacon_bboxes.append(box_msg)
 
         # if self.filter_beacon_indicators:
-        for indicator_box in pending_bounding_box_msgs:
+        for indicator_box in indicator_bboxes:
             added = False
             for beacon_box in beacon_bboxes:
                 if self.overlap_ratio(indicator_box, beacon_box) > self.beacon_filter_ratio:
@@ -281,6 +322,29 @@ class YOLOv11Node(Node):
                     break
             if not self.filter_beacon_indicators and not added:
                 labeled_bounding_box_msgs.boxes.append(indicator_box)
+
+        for number_box in number_bboxes:
+            new_number = copy.deepcopy(number_box)
+            if self.match_indicators_banners:
+                min_dist = 10000000000
+                max_ratio = 0.0
+                for indicator_box in indicator_bboxes:
+                    dist = self.manhattan_distance(number_box, indicator_box)
+                    matched = False
+                    if dist < min_dist:
+                        min_dist = dist
+                        if dist <= self.indicator_banner_px_dist:
+                            new_number.label = self.label_dict[self.inv_label_dict[number_box.label]+("_green" if (indicator_box.label in self.green_indicator_labels) else "_red")]
+                            # self.get_logger().info(f'MATCHED W/ DIST: {dist}')
+                            matched = True
+                    if dist == 0:
+                        ratio = self.overlap_ratio(number_box, indicator_box)
+                        if ratio > max_ratio:
+                            max_ratio = ratio
+                            if not matched:
+                                new_number.label = self.label_dict[self.inv_label_dict[number_box.label]+("_green" if (indicator_box.label in self.green_indicator_labels) else "_red")]
+                            # self.get_logger().info(f'MATCHED W/ RATIO: {ratio}')
+            labeled_bounding_box_msgs.boxes.append(new_number)
 
         # Publish detections
         self._pub.publish(labeled_bounding_box_msgs)

@@ -121,6 +121,21 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     this->declare_parameter<bool>("gps_based_predictions", true);
     m_gps_based_predictions = this->get_parameter("gps_based_predictions").as_bool();
 
+    this->declare_parameter<bool>("match_numbers_indicators", false);
+    m_match_numbers_indicators = this->get_parameter("match_numbers_indicators").as_bool();
+
+    this->declare_parameter<std::vector<std::string>>("banner_names", std::vector<std::string>());
+    std::vector<std::string> banner_names = this->get_parameter("banner_names").as_string_array();
+
+    this->declare_parameter<std::vector<int64_t>>("banner_labels", std::vector<int64_t>());
+    std::vector<int64_t> banner_labels = this->get_parameter("banner_labels").as_integer_array();
+
+    this->declare_parameter<std::vector<int64_t>>("banner_numbers", std::vector<int64_t>());
+    std::vector<int64_t> banner_numbers = this->get_parameter("banner_numbers").as_integer_array();
+
+    this->declare_parameter<std::vector<bool>>("banner_indicator", std::vector<bool>());
+    std::vector<bool> banner_indicator = this->get_parameter("banner_indicator").as_bool_array();
+
     RCLCPP_INFO(this->get_logger(), m_banners_slam ? "BANNERS SLAM: ON" : "BANNERS SLAM: OFF");
 
     // Initialize navigation & odometry variables to 0
@@ -177,6 +192,15 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
                 std::bind(&ObjectTrackingMap::banners_cb, this, std::placeholders::_1));
         m_tracked_banners_pub = this->create_publisher<all_seaing_interfaces::msg::LabeledObjectPlaneArray>(
             "object_planes/global", 10);
+    }
+
+    if (m_match_numbers_indicators){
+        for (int i = 0; i < banner_names.size(); i++){
+            banner_name_to_label[banner_names[i]] = banner_labels[i];
+            banner_label_to_name[banner_labels[i]] = banner_names[i];
+            banner_label_to_number[banner_labels[i]] = banner_numbers[i];
+            banner_label_indicator[banner_labels[i]] = banner_indicator[i];
+        }
     }
 
     m_first_state = true;
@@ -1495,7 +1519,11 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
     std::vector<int> match;
     std::unordered_set<int> chosen_detected, chosen_tracked;
     double assoc_threshold = m_new_banner_slam_thres;
-    std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_banner_data_association(m_tracked_banners, detected_banners, p, assoc_threshold);
+    if (m_match_numbers_indicators){
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_banner_data_association(m_tracked_banners, detected_banners, p, assoc_threshold, banner_label_to_number);
+    }else{
+        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_banner_data_association(m_tracked_banners, detected_banners, p, assoc_threshold);
+    }
     
     // Update vectors, now with known correspondence
     for (size_t i = 0; i < detected_banners.size(); i++) {
@@ -1608,7 +1636,9 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         }
 
         // update data for matched obstacles (we'll update position after we update SLAM with all points)
-        detected_banners[i]->label = m_tracked_banners[tracked_id]->label;
+        if (banner_label_indicator.count(detected_banners[i]->label) && (!banner_label_indicator[detected_banners[i]->label])){
+            detected_banners[i]->label = m_tracked_banners[tracked_id]->label;
+        }
         detected_banners[i]->time_seen = m_tracked_banners[tracked_id]->time_seen;
         detected_banners[i]->last_dead = m_tracked_banners[tracked_id]->last_dead;
         detected_banners[i]->time_dead = m_tracked_banners[tracked_id]->time_dead;
@@ -1659,7 +1689,15 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         float min_dist = m_duplicate_thresh;
         for (int i : to_keep_set){
             for (int j : to_keep_set){
-                if (i == j || m_tracked_banners[i]->label != m_tracked_banners[j]->label){
+                if (i == j) continue;
+                bool banner_number_same = false;
+                if (banner_label_to_number.count(m_tracked_banners[i]->label) && banner_label_to_number.count(m_tracked_banners[j]->label)){
+                    if (banner_label_to_number[m_tracked_banners[i]->label] != banner_label_to_number[m_tracked_banners[j]->label]){
+                        continue;
+                    }
+                    banner_number_same = true;
+                }
+                else if (m_tracked_banners[i]->label != m_tracked_banners[j]->label){
                     continue;
                 }
                 float dist = pcl::euclideanDistance(
@@ -1673,6 +1711,15 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                     min_dist = dist;
                     // remove
                     // if (m_tracked_banners[i]->label == m_tracked_banners[j]->label){
+                    if (banner_number_same){
+                        if (banner_label_indicator[m_tracked_banners[i]->label] && (!banner_label_indicator[m_tracked_banners[j]->label])){
+                            ind_to_remove = j;
+                            continue;
+                        }else if (banner_label_indicator[m_tracked_banners[j]->label] && (!banner_label_indicator[m_tracked_banners[i]->label])){
+                            ind_to_remove = i;
+                            continue;
+                        }
+                    }
                     if (m_track_robot && m_banners_slam) {
                         ind_to_remove = (m_cov.block(3 + 2*m_num_obj + 3 * i, 3 + 2*m_num_obj + 3 * i, 3, 3).trace() < m_cov.block(3 + 2*m_num_obj + 3 * j, 3 + 2*m_num_obj + 3 * j, 3, 3).trace())?j:i;
                     }else{

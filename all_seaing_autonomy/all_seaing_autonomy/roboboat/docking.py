@@ -194,22 +194,83 @@ class Docking(TaskServerBase):
         ).value
         with open(shape_label_mappings_file, "r") as f:
             self.label_mappings = yaml.safe_load(f)
+
+        self.indicator_priority = dict()
+        self.number_priority = dict()
         
         if self.is_sim:
             self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
             self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
         else:
-            # TODO replace w/ numbers for the dock banner labels, as in the roboboat course
-            # self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
-            # self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
-            self.dock_labels = [self.label_mappings[name] for name in ["black_cross"]]
-            self.boat_labels = [self.label_mappings[name] for name in ["black_triangle"]]
+            self.dock_labels = [self.label_mappings[name] for name in ["number_1", "number_2", "number_3", "number_1_green", "number_2_green", "number_3_green", "number_1_red", "number_2_red", "number_3_red"]]
+            self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
+
+            # indicators
+            self.dock_green_labels = [self.label_mappings[name] for name in ["number_1_green", "number_2_green", "number_3_green"]]
+            self.dock_red_labels = [self.label_mappings[name] for name in ["number_1_red", "number_2_red", "number_3_red"]]
+            
+            # indicator priority
+            for label in self.dock_labels:
+                self.indicator_priority[label] = 1
+            for label in self.dock_green_labels:
+                self.indicator_priority[label] = 0
+            for label in self.dock_red_labels:
+                self.indicator_priority[label] = 2
+            
+            # number priority
+            for i, label in self.dock_labels[:3]:
+                self.number_priority[label] = i
+            for i, label in self.dock_green_labels[:3]:
+                self.number_priority[label] = i
+            for i, label in self.dock_red_labels[:3]:
+                self.number_priority[label] = i
         
         self.inv_label_mappings = {}
         for key, value in self.label_mappings.items():
             self.inv_label_mappings[value] = key
 
         self.state = DockingState.WAITING_DOCK
+    
+    def green_indicator(self, dock_label):
+        return dock_label in self.dock_green_labels
+    
+    def red_indicator(self, dock_label):
+        return dock_label in self.dock_red_labels
+    
+    def has_indicator(self, dock_label):
+        return dock_label in (self.dock_green_labels + self.dock_red_labels)        
+    
+    def no_indicator(self, dock_label):
+        return not self.has_indicator(dock_label)
+
+    def better_slot(self, slot, ref_slot):
+        # (dock_label, (dock_ctr, dock_normal))
+        dock_label = slot[0]
+        dock_ctr = slot[1][0]
+        dock_normal = slot[1][1]
+        ref_dock_label = ref_slot[0]
+        ref_dock_ctr = ref_slot[1][0]
+        ref_dock_normal = ref_slot[1][1]
+
+        if ref_dock_label in self.indicator_priority and dock_label in self.indicator_priority:
+            # check indicators
+            if self.indicator_priority[ref_dock_label] < self.indicator_priority[dock_label]:
+                return False
+            if self.indicator_priority[dock_label] < self.indicator_priority[ref_dock_label]:
+                return True
+            
+        if ref_dock_label in self.number_priority and dock_label in self.number_priority:
+            # if they both red, green, or no indicator then we go to numbers (will only matter if green but do it anyways)
+            if self.number_priority[ref_dock_label] < self.number_priority[dock_label]:
+                return False
+            if self.number_priority[dock_label] < self.number_priority[ref_dock_label]:
+                return True
+
+        # if same otherwise dock to closest
+        if (self.norm(ref_dock_ctr, self.robot_pos) > self.norm(dock_ctr, self.robot_pos) + self.update_slot_dist_thres):
+            return True
+        else:
+            return False
 
     def point_cloud_cb(self, msg):
         self.lidar_point_cloud = msg
@@ -299,7 +360,7 @@ class Docking(TaskServerBase):
                 self.picked_slot = True
                 if self.selected_slot is None:
                     self.updated_slot_pos = True
-                if (self.selected_slot is not None) and (self.selected_slot[0] == dock_label) and (self.norm(self.selected_slot[1][0], dock_ctr) < self.duplicate_dist):
+                if (self.selected_slot is not None) and self.better_slot((dock_label, (dock_ctr, dock_normal)), self.selected_slot):
                     # same slot, update position & normal
                     self.selected_slot = (dock_label, (dock_ctr, dock_normal))
                     self.updated_slot_pos = True
