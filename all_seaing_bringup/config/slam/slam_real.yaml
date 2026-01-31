@@ -44,3 +44,8 @@ object_tracking_map:
     odom_detection_timeout: 0.7
     gps_based_predictions: True
     # the way it's currently done, it's best to either have gps_based_predictions or diff_position_odom to be True, not both of them (diff_position_odom is basically useless if the gps callback is faster than the odometry one and gps_based_predictions is True)
+    match_numbers_indicators: True
+    banner_names: ["number_1", "number_2", "number_3", "number_1_green", "number_2_green", "number_3_green", "number_1_red", "number_2_red", "number_3_red"]
+    banner_labels: [27, 28, 29, 30, 31, 32, 33, 34, 35]
+    banner_numbers: [1, 2, 3, 1, 2, 3, 1, 2, 3]
+    banner_indicator: [False, False, False, True, True, True, True, True, True]

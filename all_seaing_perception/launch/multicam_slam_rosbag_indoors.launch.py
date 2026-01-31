@@ -180,6 +180,8 @@ def launch_setup(context, *args, **kwargs):
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
             {"indicator_to_beacon_bbox": True},
+            {"match_indicators_banners": True},
+            {"indicator_banner_px_dist": 0},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),

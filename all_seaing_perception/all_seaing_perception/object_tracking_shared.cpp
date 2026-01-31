@@ -307,7 +307,8 @@ namespace all_seaing_perception{
 
     std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_banner_data_association(std::vector<std::shared_ptr<Banner>> tracked_obstacles,
         std::vector<std::shared_ptr<Banner>> detected_obstacles,
-        std::vector<std::vector<float>> p, float new_obj_thres){
+        std::vector<std::vector<float>> p, float new_obj_thres,
+        std::map<int, int> banner_label_number){
         // Assign each detection to a tracked or new object using the computed squared Mahalanobis distance
         std::vector<int> match(detected_obstacles.size(), -1);
         float min_p = 0;
@@ -319,9 +320,14 @@ namespace all_seaing_perception{
                 if (chosen_detected.count(i))
                     continue;
                 for (int tracked_id = 0; tracked_id < tracked_obstacles.size(); tracked_id++) {
-                    if (chosen_tracked.count(tracked_id) ||
-                        (detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label))
+                    if (chosen_tracked.count(tracked_id)) continue;
+                    if (banner_label_number.count(detected_obstacles[i]->label) && 
+                        banner_label_number.count(tracked_obstacles[tracked_id]->label) &&
+                        banner_label_number[detected_obstacles[i]->label] == tracked_obstacles[tracked_id]->label){
+                        // we're good
+                    }else if (detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label){
                         continue;
+                    }
                     if (p[i][tracked_id] < min_p) {
                         best_match = std::make_pair(i, tracked_id);
                         min_p = p[i][tracked_id];
