@@ -47,6 +47,10 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
     )
 
+    all_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "all_label_mappings.yaml"
+    )
+
     matching_weights = os.path.join(
         bringup_prefix, "config", "perception", "matching_weights.yaml"
     )
@@ -218,7 +222,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "buoy_label_mappings"},
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
-            {"confs": [0.5, 0.3]},
+            {"confs": [0.3, 0.3]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -240,7 +244,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "buoy_label_mappings"},
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
-            {"confs": [0.5, 0.3]},
+            {"confs": [0.3, 0.3]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -263,7 +267,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "buoy_label_mappings"},
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
-            {"confs": [0.5, 0.3]},
+            {"confs": [0.3, 0.3]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -432,7 +436,7 @@ def launch_setup(context, *args, **kwargs):
             {"ransac_params_file": ransac_params},
             # {"label_mappings_file": buoy_label_mappings},
             # {"label_mappings_file": shape_label_mappings},
-            {"label_config": "all_label_mappings"},
+            {"label_mappings_file": all_label_mappings},
         ]
     )
 
