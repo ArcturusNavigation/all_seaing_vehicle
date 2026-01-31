@@ -89,6 +89,7 @@ pendulum-msgs==0.20.5
 platformdirs==4.3.7
 plotly==6.0.1
 point-cloud-interfaces==1.0.11
+protobuf==6.32.1
 py-cpuinfo==9.0.0
 pyserial==3.5
 python-qt-binding==1.1.2
