@@ -1659,7 +1659,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         float min_dist = m_duplicate_thresh;
         for (int i : to_keep_set){
             for (int j : to_keep_set){
-                if (i == j){
+                if (i == j || m_tracked_banners[i]->label != m_tracked_banners[j]->label){
                     continue;
                 }
                 float dist = pcl::euclideanDistance(
@@ -1672,15 +1672,16 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
                 if (dist < min_dist){
                     min_dist = dist;
                     // remove
-                    if (m_tracked_banners[i]->label == m_tracked_banners[j]->label){
-                        if (m_track_robot && m_banners_slam) {
-                            ind_to_remove = (m_cov.block(3 + 2*m_num_obj + 3 * i, 3 + 2*m_num_obj + 3 * i, 3, 3).trace() < m_cov.block(3 + 2*m_num_obj + 3 * j, 3 + 2*m_num_obj + 3 * j, 3, 3).trace())?j:i;
-                        }else{
-                            ind_to_remove = m_tracked_banners[i]->cov.trace() < m_tracked_banners[j]->cov.trace()?j:i;
-                        }
+                    // if (m_tracked_banners[i]->label == m_tracked_banners[j]->label){
+                    if (m_track_robot && m_banners_slam) {
+                        ind_to_remove = (m_cov.block(3 + 2*m_num_obj + 3 * i, 3 + 2*m_num_obj + 3 * i, 3, 3).trace() < m_cov.block(3 + 2*m_num_obj + 3 * j, 3 + 2*m_num_obj + 3 * j, 3, 3).trace())?j:i;
                     }else{
-                        ind_to_remove = (m_tracked_banners[i]->time_seen < m_tracked_banners[j]->time_seen)?i:j;
+                        ind_to_remove = m_tracked_banners[i]->cov.trace() < m_tracked_banners[j]->cov.trace()?j:i;
                     }
+                    // }
+                    // else{
+                    //     ind_to_remove = (m_tracked_banners[i]->time_seen < m_tracked_banners[j]->time_seen)?i:j;
+                    // }
                 }
             }
         }
