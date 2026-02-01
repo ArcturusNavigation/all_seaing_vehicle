@@ -197,10 +197,14 @@ class Docking(TaskServerBase):
 
         self.indicator_priority = dict()
         self.number_priority = dict()
+        self.noindicator_label = dict()
         
         if self.is_sim:
             self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
             self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
+
+            for label in self.dock_labels:
+                self.noindicator_label[label] = label
         else:
             self.dock_labels = [self.label_mappings[name] for name in ["number_1", "number_2", "number_3", "number_1_green", "number_2_green", "number_3_green", "number_1_red", "number_2_red", "number_3_red"]]
             self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
@@ -218,12 +222,22 @@ class Docking(TaskServerBase):
                 self.indicator_priority[label] = 2
             
             # number priority
-            for i, label in self.dock_labels[:3]:
+            for i, label in enumerate(self.dock_labels[:3]):
                 self.number_priority[label] = i
-            for i, label in self.dock_green_labels[:3]:
+            for i, label in enumerate(self.dock_green_labels):
                 self.number_priority[label] = i
-            for i, label in self.dock_red_labels[:3]:
+            for i, label in enumerate(self.dock_red_labels):
                 self.number_priority[label] = i
+
+            # no indicator label
+            for i, label in enumerate(self.dock_labels[:3]):
+                self.noindicator_label[label] = label
+            for i, label in enumerate(self.dock_green_labels):
+                self.noindicator_label[label] = self.dock_labels[i]
+            for i, label in enumerate(self.dock_red_labels):
+                self.noindicator_label[label] = self.dock_labels[i]
+
+        self.get_logger().info(f'no indicator label mappings: {self.noindicator_label}')
         
         self.inv_label_mappings = {}
         for key, value in self.label_mappings.items():
@@ -323,15 +337,22 @@ class Docking(TaskServerBase):
         self.dock_banners = new_dock_banners
         self.boat_banners = new_boat_banners
 
+        self.dock_banners.sort(key = lambda banner: -self.indicator_priority[banner[0]]) # to handle worse banners first and not reject a banner based on its indicator counterpart
+
         # self.get_logger().info(f'GOT {len(self.dock_banners)} SLOTS AND {len(self.boat_banners)} BOATS')
 
         if self.got_dock:
             # check for taken docks and stuff
             for dock_label, (dock_ctr, dock_normal) in self.dock_banners:
-                if (dock_label in self.taken):
+                # dock_label = self.noindicator_label[dock_label]
+                if self.noindicator_label[dock_label] in self.taken:
+                    # self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN BASED ON PREVIOUS OBSERVATIONS')
                     continue # just ignore, since we saw that it was taken once it's always taken
                 # check if any boat is in that slot
                 taken = False
+                if self.red_indicator(dock_label):
+                    self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS RED')
+                    taken = True
                 for boat_label, (boat_ctr, boat_normal) in self.boat_banners:
                     # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
                     dock_boat_angle = abs(self.angle_vec(self.difference(dock_ctr, boat_ctr), dock_normal))
@@ -341,8 +362,8 @@ class Docking(TaskServerBase):
                         self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                         taken = True
                 if taken:
-                    self.taken.append(dock_label)
-                    if(self.picked_slot and self.selected_slot[0] == dock_label):
+                    self.taken.append(self.noindicator_label[dock_label])
+                    if(self.picked_slot and self.selected_slot[0] == self.noindicator_label[dock_label]):
                         # we're cooked
                         self.selected_slot = None
                         self.picked_slot = False
@@ -360,14 +381,14 @@ class Docking(TaskServerBase):
                 self.picked_slot = True
                 if self.selected_slot is None:
                     self.updated_slot_pos = True
-                if (self.selected_slot is not None) and self.better_slot((dock_label, (dock_ctr, dock_normal)), self.selected_slot):
+                if (self.selected_slot is not None) and (self.selected_slot[0] == self.noindicator_label[dock_label]) and (self.norm(self.selected_slot[1][0], dock_ctr) < self.duplicate_dist):
                     # same slot, update position & normal
-                    self.selected_slot = (dock_label, (dock_ctr, dock_normal))
+                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal))
                     self.updated_slot_pos = True
-                if (self.selected_slot is None) or (self.norm(self.selected_slot[1][0], self.robot_pos) > self.norm(dock_ctr, self.robot_pos) + self.update_slot_dist_thres):
+                if (self.selected_slot is None) or self.better_slot((dock_label, (dock_ctr, dock_normal)), self.selected_slot):
                     self.state = DockingState.NEW_NAVIGATION
                     # found an empty one closer
-                    self.selected_slot = (dock_label, (dock_ctr, dock_normal))
+                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal))
                     self.updated_slot_pos = True
                     # self.pid.reset()
                     self.x_pid.reset()
