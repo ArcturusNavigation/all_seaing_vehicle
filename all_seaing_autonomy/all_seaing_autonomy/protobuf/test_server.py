@@ -1,4 +1,4 @@
-from msgs import report_pb2
+import report_pb2
 import socketserver
 
 class PbHandler(socketserver.BaseRequestHandler):
