@@ -57,6 +57,9 @@ def launch_setup(context, *args, **kwargs):
     shape_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
     )
+    all_label_mappings = os.path.join(
+        bringup_prefix, "config", "perception", "all_label_mappings.yaml"
+    )
     ransac_params = os.path.join(
         bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
@@ -299,10 +302,11 @@ def launch_setup(context, *args, **kwargs):
             ("camera_info_topic", "/wamv/sensors/cameras/front_left_camera_sensor/camera_info"),
             ("camera_topic", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
             ("lidar_topic", "point_cloud/filtered"),
-            ("detections/front", "obstacle_map/local"),
+            # ("detections/front", "obstacle_map/local"),
+            ("detections", "obstacle_map/local"),
         ],
         parameters=[
-            {"camera_name": "front"},
+            # {"camera_name": "front"},
             {"base_link_frame": "wamv/wamv/base_link"},
             {"bbox_object_margin": 0.0},
             {"color_label_mappings_file": color_buoy_label_mappings},

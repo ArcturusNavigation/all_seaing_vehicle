@@ -1582,7 +1582,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             }
         }
         int tracked_id = match[i] >= 0 ? match[i] : m_num_banners - 1;
-        RCLCPP_INFO(this->get_logger(), "ASSOCIATED LABEL: %d W/ %d", detected_banners[i]->label, m_tracked_banners[tracked_id]->label);
+        // RCLCPP_INFO(this->get_logger(), "ASSOCIATED LABEL: %d W/ %d", detected_banners[i]->label, m_tracked_banners[tracked_id]->label);
         if (m_track_robot && m_banners_slam) {
             float d_x = m_state(3 + 2*m_num_obj + 3 * tracked_id) - m_state(0);
             float d_y = m_state(3 + 2*m_num_obj + 3 * tracked_id + 1) - m_state(1);

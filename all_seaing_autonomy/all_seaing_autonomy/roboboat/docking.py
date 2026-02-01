@@ -203,7 +203,7 @@ class Docking(TaskServerBase):
             self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
             self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
 
-            for label in dock_labels:
+            for label in self.dock_labels:
                 self.noindicator_label[label] = label
         else:
             self.dock_labels = [self.label_mappings[name] for name in ["number_1", "number_2", "number_3", "number_1_green", "number_2_green", "number_3_green", "number_1_red", "number_2_red", "number_3_red"]]
@@ -236,6 +236,8 @@ class Docking(TaskServerBase):
                 self.noindicator_label[label] = self.dock_labels[i]
             for i, label in enumerate(self.dock_red_labels):
                 self.noindicator_label[label] = self.dock_labels[i]
+
+        self.get_logger().info(f'no indicator label mappings: {self.noindicator_label}')
         
         self.inv_label_mappings = {}
         for key, value in self.label_mappings.items():
@@ -335,6 +337,8 @@ class Docking(TaskServerBase):
         self.dock_banners = new_dock_banners
         self.boat_banners = new_boat_banners
 
+        self.dock_banners.sort(key = lambda banner: -self.indicator_priority[banner[0]]) # to handle worse banners first and not reject a banner based on its indicator counterpart
+
         # self.get_logger().info(f'GOT {len(self.dock_banners)} SLOTS AND {len(self.boat_banners)} BOATS')
 
         if self.got_dock:
@@ -342,11 +346,12 @@ class Docking(TaskServerBase):
             for dock_label, (dock_ctr, dock_normal) in self.dock_banners:
                 # dock_label = self.noindicator_label[dock_label]
                 if self.noindicator_label[dock_label] in self.taken:
+                    # self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN BASED ON PREVIOUS OBSERVATIONS')
                     continue # just ignore, since we saw that it was taken once it's always taken
                 # check if any boat is in that slot
                 taken = False
                 if self.red_indicator(dock_label):
-                    # self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS RED')
+                    self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS RED')
                     taken = True
                 for boat_label, (boat_ctr, boat_normal) in self.boat_banners:
                     # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
@@ -354,7 +359,7 @@ class Docking(TaskServerBase):
                     dock_boat_angle = min(dock_boat_angle, np.pi - dock_boat_angle)
                     if self.norm(boat_ctr, dock_ctr) < self.boat_dock_dist_thres and dock_boat_angle < self.boat_taken_angle_thres*np.pi/2.0:
                         # taken
-                        # self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
+                        self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                         taken = True
                 if taken:
                     self.taken.append(self.noindicator_label[dock_label])
