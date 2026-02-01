@@ -323,7 +323,7 @@ namespace all_seaing_perception{
                     if (chosen_tracked.count(tracked_id)) continue;
                     if (banner_label_number.count(detected_obstacles[i]->label) && 
                         banner_label_number.count(tracked_obstacles[tracked_id]->label) &&
-                        banner_label_number[detected_obstacles[i]->label] == tracked_obstacles[tracked_id]->label){
+                        banner_label_number[detected_obstacles[i]->label] == banner_label_number[tracked_obstacles[tracked_id]->label]){
                         // we're good
                     }else if (detected_obstacles[i]->label != -1 && tracked_obstacles[tracked_id]->label != detected_obstacles[i]->label){
                         continue;
