@@ -8,6 +8,7 @@ from std_msgs.msg import Bool
 from all_seaing_interfaces.action import Task, Search
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_common.action_server_base import ActionServerBase
+from all_seaing_common.report_pb2 import Heartbeat, RobotState, LatLng, TaskType
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header, ColorRGBA
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
@@ -20,6 +21,8 @@ from enum import Enum
 from all_seaing_interfaces.msg import KeyboardButton
 from sensor_msgs.msg import Joy
 from action_msgs.msg import GoalStatus
+
+import all_seaing_common.report_pb2
 
 ###
 
@@ -56,26 +59,26 @@ class RunTasks(ActionServerBase):
         ]
         self.task_list = [
             # FOLLOW PATH
-            [ActionType.SEARCH, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
-            [ActionType.TASK, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionType.SEARCH, TaskType.TASK_UNKNOWN, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
 
             # SPEED CHALLENGE
-            # [ActionType.SEARCH, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
-            # [ActionType.TASK, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
+            # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
 
             # DOCKING
-            # [ActionType.SEARCH, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
-            # [ActionType.TASK, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, TaskType.TASK_DOCKING, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
+            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
 
             # DELIVERY
-            # [ActionType.SEARCH, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
-            # [ActionType.TASK, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, TaskType.OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
+            # [ActionType.TASK, TaskType.OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
 
             # FALLBACKS
-            # [ActionType.TASK, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionType.TASK, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionType.TASK, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionType.TASK, ActionClient(self, Task, "delivery_qual"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "delivery_qual"), ReferenceInt(0), ReferenceInt(0)],
         ]
 
         self.term_tasks = [
@@ -170,11 +173,22 @@ class RunTasks(ActionServerBase):
             ),
         )
 
+        self.declare_parameter(
+            "latlng_locations_file",
+            os.path.join(
+                bringup_prefix, "config", "localization", "locations.yaml"
+            ),
+        )
+
         task_location_mappings_file = self.get_parameter(
             "task_locations_file"
         ).value
         with open(task_location_mappings_file, "r") as f:
             self.task_location_mappings = yaml.safe_load(f)
+
+        with open(self.get_parameter("latlng_locations_file").value, "r") as f:
+            self.latlng_location_mappings = yaml.safe_load(f)
+        self.latlng_origin = self.latlng_location_mappings["nbpark"]
         
         self.gate_pair = None
 
@@ -202,6 +216,39 @@ class RunTasks(ActionServerBase):
         self.result_future = None
         self.goal_handle = None
 
+        self.true_vel_interval = 0.1
+        self.true_vel_calulator = self.create_timer(self.true_vel_interval, self.calculate_vel)
+        self._prev_pose = None
+        self.true_vel = (0, 0)
+
+        self.heartbeat_reporter = self.create_timer(1, self.report_heartbeat)
+
+    def calculate_vel(self):
+        if self._prev_pose != None:
+            pose = self.get_robot_pose()
+            self.true_vel_x = (pose[0] - self._prev_pose[0]) / self.true_vel_interval
+            self.true_vel_y = (pose[1] - self._prev_pose[1]) / self.true_vel_interval
+            self.true_vel = (math.sqrt(self.true_vel_x * self.true_vel_x + self.true_vel_y * self.true_vel_y),
+                             math.atan2(self.true_vel_y, self.true_vel_x))
+
+        self._prev_pose = self.get_robot_pose()
+
+    def report_heartbeat(self):
+        EARTH_RADIUS = 6370000
+        pose = self.get_robot_pose()
+        initial_deg = -self.latlng_origin["heading"] * (math.pi / 180.0)
+        rot_pos = (pose[0] * math.cos(initial_deg) - pose[1] * math.sin(initial_deg), pose[0] * math.sin(initial_deg) + pose[1] * math.cos(initial_deg))
+        current_task = TaskType.TASK_NONE # TODO: make sure still works after harbor alert added
+        if self.current_task_type != None:
+            current_task = self.current_task_type
+
+        self.report_data(Heartbeat(state=RobotState.STATE_AUTO,
+                                   position=LatLng(latitude=self.latlng_origin["lat"] + rot_pos[0] / EARTH_RADIUS, longitude=self.latlng_origin["lon"] - rot_pos[1] / EARTH_RADIUS), # Deal with CW / CCW
+                                   spd_mps=self.true_vel[0],
+                                   heading_deg=self.latlng_origin["heading"] - (180.0 / math.pi) * (self.get_robot_pose()[2]), # Deal with CW / CCW
+                                   current_task=current_task))
+        # self.report_data(Heartbeat(state=RobotState.STATE_AUTO, position=LatLng(latitude=0.0, longitude=0.0), spd_mps=0.0, heading_deg=0.0, current_task=TaskType.TASK_NONE))
+        
     def sim_keyboard_callback(self, msg):
         if self.harbor_alerted:
             return
@@ -390,8 +437,9 @@ class RunTasks(ActionServerBase):
         if self.gate_pair is None:
             self.setup_buoys()
 
-    def attempt_task(self, action_type, current_task, incr_on_success, incr_on_fail = None, location_name = None):
+    def attempt_task(self, action_type, task_type, current_task, incr_on_success, incr_on_fail = None, location_name = None):
         self.current_task = current_task
+        self.current_task_type = task_type
         self.incr_on_success = incr_on_success
         self.incr_on_fail = incr_on_fail
         self.get_logger().info("Starting Task Manager States...")
@@ -433,7 +481,7 @@ class RunTasks(ActionServerBase):
 
     def find_task(self):
         if self.next_init_index.val < len(self.init_tasks):
-            self.attempt_task(ActionType.TASK, self.init_tasks[self.next_init_index.val], self.next_init_index, None)
+            self.attempt_task(ActionType.TASK, TaskType.TASK_NONE, self.init_tasks[self.next_init_index.val], self.next_init_index, None)
             self.harbor_alerted = False
             return
         
@@ -450,12 +498,12 @@ class RunTasks(ActionServerBase):
             self.next_task_index += 1
             if self.next_task_index >= len(self.task_list):
                 self.next_task_index -= len(self.task_list)
-            if self.task_list[self.next_task_index][2].val == 0 and self.task_list[self.next_task_index][3].val < self.max_attempt_count:
+            if self.task_list[self.next_task_index][3].val == 0 and self.task_list[self.next_task_index][4].val < self.max_attempt_count:
                 self.attempt_task(*self.task_list[self.next_task_index])
                 return
         
         if self.next_term_index.val < len(self.term_tasks):
-            self.attempt_task(self.term_tasks[self.next_term_index.val][0], self.term_tasks[self.next_term_index.val][1], self.next_term_index, None, self.term_tasks[self.next_term_index.val][2] if self.term_tasks[self.next_term_index.val][0] == ActionType.SEARCH else None)
+            self.attempt_task(self.term_tasks[self.next_term_index.val][0], TaskType.TASK_NONE, self.term_tasks[self.next_term_index.val][1], self.next_term_index, None, self.term_tasks[self.next_term_index.val][2] if self.term_tasks[self.next_term_index.val][0] == ActionType.SEARCH else None)
             return
         
         self.get_logger().info("All tasks completed. Shutting down node.")
