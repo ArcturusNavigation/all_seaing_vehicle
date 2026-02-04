@@ -234,18 +234,18 @@ class RunTasks(ActionServerBase):
         self._prev_pose = self.get_robot_pose()
 
     def report_heartbeat(self):
-        EARTH_RADIUS = 6370000
-        pose = self.get_robot_pose()
-        initial_deg = -self.latlng_origin["heading"] * (math.pi / 180.0)
-        rot_pos = (pose[0] * math.cos(initial_deg) - pose[1] * math.sin(initial_deg), pose[0] * math.sin(initial_deg) + pose[1] * math.cos(initial_deg))
+        EARTH_RADIUS = 6_370_000
+        RAD_TO_DEG = 180.0 / math.pi
+        pose = self.get_robot_pose() # (east, north, heading)
         current_task = TaskType.TASK_NONE # TODO: make sure still works after harbor alert added
         if self.current_task_type != None:
             current_task = self.current_task_type
 
         self.report_data(Heartbeat(state=RobotState.STATE_AUTO,
-                                   position=LatLng(latitude=self.latlng_origin["lat"] + rot_pos[0] / EARTH_RADIUS, longitude=self.latlng_origin["lon"] - rot_pos[1] / EARTH_RADIUS), # Deal with CW / CCW
+                                   position=LatLng(latitude=self.latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
+                                                   longitude=self.latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS), # Deal with CW / CCW
                                    spd_mps=self.true_vel[0],
-                                   heading_deg=self.latlng_origin["heading"] - (180.0 / math.pi) * (self.get_robot_pose()[2]), # Deal with CW / CCW
+                                   heading_deg= ((90 - (RAD_TO_DEG) * (self.get_robot_pose()[2])) % 360), # Deal with CW / CCW
                                    current_task=current_task))
         # self.report_data(Heartbeat(state=RobotState.STATE_AUTO, position=LatLng(latitude=0.0, longitude=0.0), spd_mps=0.0, heading_deg=0.0, current_task=TaskType.TASK_NONE))
         
