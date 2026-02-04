@@ -11,6 +11,7 @@ from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_common.report_pb2 import Heartbeat, RobotState, LatLng, TaskType
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header, ColorRGBA
+from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from ament_index_python.packages import get_package_share_directory
 import os
@@ -216,22 +217,27 @@ class RunTasks(ActionServerBase):
         self.result_future = None
         self.goal_handle = None
 
-        self.true_vel_interval = 0.1
-        self.true_vel_calulator = self.create_timer(self.true_vel_interval, self.calculate_vel)
-        self._prev_pose = None
-        self.true_vel = (0, 0)
+        self.vel = 0
+        self.odom = None
+
+        self.odom_sub = self.create_subscription(
+            Odometry, "odometry/gps", self.odom_cb, 10
+        )
+
 
         self.heartbeat_reporter = self.create_timer(1, self.report_heartbeat)
 
-    def calculate_vel(self):
-        if self._prev_pose != None:
-            pose = self.get_robot_pose()
-            self.true_vel_x = (pose[0] - self._prev_pose[0]) / self.true_vel_interval
-            self.true_vel_y = (pose[1] - self._prev_pose[1]) / self.true_vel_interval
-            self.true_vel = (math.sqrt(self.true_vel_x * self.true_vel_x + self.true_vel_y * self.true_vel_y),
-                             math.atan2(self.true_vel_y, self.true_vel_x))
+    def odom_cb(self, msg):
+        self.odom = msg
+        self.vel = self.norm(msg.twist.linear.x, msg.twist.linear.y)
 
-        self._prev_pose = self.get_robot_pose()
+    def map_cb(self, msg):
+        self.obstacles = msg.obstacles
+
+        if self.gate_pair is None:
+            self.setup_buoys()
+
+
 
     def report_heartbeat(self):
         EARTH_RADIUS = 6_370_000
@@ -244,7 +250,7 @@ class RunTasks(ActionServerBase):
         self.report_data(Heartbeat(state=RobotState.STATE_AUTO,
                                    position=LatLng(latitude=self.latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
                                                    longitude=self.latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS), # Deal with CW / CCW
-                                   spd_mps=self.true_vel[0],
+                                   spd_mps=self.vel,
                                    heading_deg= ((90 - (RAD_TO_DEG) * (self.get_robot_pose()[2])) % 360), # Deal with CW / CCW
                                    current_task=current_task))
         # self.report_data(Heartbeat(state=RobotState.STATE_AUTO, position=LatLng(latitude=0.0, longitude=0.0), spd_mps=0.0, heading_deg=0.0, current_task=TaskType.TASK_NONE))
