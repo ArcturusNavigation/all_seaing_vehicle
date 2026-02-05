@@ -111,6 +111,9 @@ class DeliveryServer(ActionServerBase):
             if self.is_aiming:
                 self.update_pid()
                 effort = self.aim_pid.get_effort()
+                # TODO this doesn't make sense as a PID controller (zero steady state error is literally impossible)
+                # convert to applying a certain velocity at each point & integrating (keeping track of angle at each step) to update the sent angle
+                # then when error is 0 we have 0 angle diff thus same angle, stabilizing the turret
                 servo_output = SERVO_HALF_RANGE + effort
                 req = CommandServo.Request()
                 req.enable = True
@@ -129,7 +132,10 @@ class DeliveryServer(ActionServerBase):
         self.bboxes = msg.boxes
 
     def update_pid(self):
+        # TODO if not find bbox with certain label, search right and left (sweep)
         largest_bbox_area = 0
+        # TODO add a parametrizable list of bbox labels to only consider those, to not start shooting towards the dock or something else
+        # TODO set a flag when the server is called to only consider the water or ball labels based on the request
         for bbox in self.bboxes:
             area = (bbox.max_x - bbox.min_x) * (bbox.max_y - bbox.min_y)
             if area > largest_bbox_area:
