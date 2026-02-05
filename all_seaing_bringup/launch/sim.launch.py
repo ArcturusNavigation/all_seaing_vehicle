@@ -781,6 +781,7 @@ def launch_setup(context, *args, **kwargs):
             # "world": "follow_path_task.sdf",
             # "world": "speed_course_world.sdf",
             # "world": "scan_dock_deliver_task.sdf",
+            # "world": "roboboat_full_course.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
