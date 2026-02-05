@@ -36,6 +36,10 @@ class DockingState(Enum):
     CANCELLING_NAVIGATION = 4
     NEW_NAVIGATION = 5
 
+class DockSide(Enum):
+    NORTH = 1
+    SOUTH = 2
+
 class Docking(TaskServerBase):
     def __init__(self):
         super().__init__(server_name = "docking_server", action_name = "docking", search_action_name = "search_docking")
@@ -202,9 +206,14 @@ class Docking(TaskServerBase):
         if self.is_sim:
             self.dock_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle", "red_circle", "red_cross", "red_triangle", "red_square"]]
             self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
+            
+            self.dock_green_labels = self.dock_labels
+            self.dock_red_labels = []
 
             for label in self.dock_labels:
                 self.noindicator_label[label] = label
+                self.indicator_priority[label] = 0
+                self.number_priority[label] = 0
         else:
             self.dock_labels = [self.label_mappings[name] for name in ["number_1", "number_2", "number_3", "number_1_green", "number_2_green", "number_3_green", "number_1_red", "number_2_red", "number_3_red"]]
             self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
@@ -285,6 +294,12 @@ class Docking(TaskServerBase):
             return True
         else:
             return False
+        
+    def dock_side(self, dock_normal):
+        if 0 < np.arctan2(dock_normal[1], dock_normal[0]) < np.pi: # facing north
+            return DockSide.SOUTH
+        else:
+            return DockSide.NORTH # facing south
 
     def point_cloud_cb(self, msg):
         self.lidar_point_cloud = msg
@@ -330,7 +345,7 @@ class Docking(TaskServerBase):
             if (obj_plane.label in self.dock_labels):
                 self.got_dock = True
                 ctr, normal = self.ctr_normal(obj_plane)
-                new_dock_banners.append((obj_plane.label, (ctr, normal)))
+                new_dock_banners.append((obj_plane.label, (ctr, normal), self.dock_side(normal)))
                 # self.get_logger().info(f'SLOT: {self.inv_label_mappings[obj_plane.label]} -> {(ctr, normal).__str__()}')
         
         # update global variables
@@ -343,9 +358,9 @@ class Docking(TaskServerBase):
 
         if self.got_dock:
             # check for taken docks and stuff
-            for dock_label, (dock_ctr, dock_normal) in self.dock_banners:
+            for (dock_label, (dock_ctr, dock_normal), dock_side) in self.dock_banners:
                 # dock_label = self.noindicator_label[dock_label]
-                if self.noindicator_label[dock_label] in self.taken:
+                if (self.noindicator_label[dock_label], dock_side) in self.taken:
                     # self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN BASED ON PREVIOUS OBSERVATIONS')
                     continue # just ignore, since we saw that it was taken once it's always taken
                 # check if any boat is in that slot
@@ -362,8 +377,8 @@ class Docking(TaskServerBase):
                         self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                         taken = True
                 if taken:
-                    self.taken.append(self.noindicator_label[dock_label])
-                    if(self.picked_slot and self.selected_slot[0] == self.noindicator_label[dock_label]):
+                    self.taken.append((self.noindicator_label[dock_label], dock_side))
+                    if self.picked_slot and self.selected_slot[0] == self.noindicator_label[dock_label] and self.selected_slot[2] == dock_side:
                         # we're cooked
                         self.selected_slot = None
                         self.picked_slot = False
@@ -375,26 +390,26 @@ class Docking(TaskServerBase):
                             self.state = DockingState.CANCELLING_NAVIGATION
                         else:
                             self.state = DockingState.WAITING_DOCK
-                        self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
+                        self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label], dock_side} IS TAKEN')
                     continue
                 # found empty docking slot
                 self.picked_slot = True
                 if self.selected_slot is None:
                     self.updated_slot_pos = True
-                if (self.selected_slot is not None) and (self.selected_slot[0] == self.noindicator_label[dock_label]) and (self.norm(self.selected_slot[1][0], dock_ctr) < self.duplicate_dist):
+                if (self.selected_slot is not None) and (self.selected_slot[0] == self.noindicator_label[dock_label]) and (self.selected_slot[2] == dock_side) and (self.norm(self.selected_slot[1][0], dock_ctr) < self.duplicate_dist):
                     # same slot, update position & normal
-                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal))
+                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side)
                     self.updated_slot_pos = True
-                if (self.selected_slot is None) or self.better_slot((dock_label, (dock_ctr, dock_normal)), self.selected_slot):
+                if (self.selected_slot is None) or self.better_slot((dock_label, (dock_ctr, dock_normal), dock_side), self.selected_slot):
                     self.state = DockingState.NEW_NAVIGATION
                     # found an empty one closer
-                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal))
+                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side)
                     self.updated_slot_pos = True
                     # self.pid.reset()
                     self.x_pid.reset()
                     self.y_pid.reset()
                     self.theta_pid.reset()
-                    self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]]}')
+                    self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]], dock_side}')
 
         if (not self.picked_slot) or (not self.updated_slot_pos):
         # if (not self.picked_slot):
