@@ -440,7 +440,7 @@ def launch_setup(context, *args, **kwargs):
         amcl_ld,
         # static_transforms_ld,
         robot_state_publisher,
-        # webcam_publisher,
+        webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,

@@ -321,3 +321,102 @@ class mech_power:
         self.ser.write((bytes([(1 << 7) + self.id, 0x04])))
         self.ser.write(struct.pack("<f", value))
         self.wait()
+
+class mechanisms:
+    def __init__(self, ser):
+        """
+        Mechanisms constructor.
+
+        Args:
+            ser (serial.Serial): Pyserial interface.
+        """
+        self.ser = ser
+        self.id = 0x07
+    
+    def wait(self):
+        """
+        Helper function, waits for EE system to respond before sending another command.
+        """
+        self.ser.read()
+
+    def switch1(self):
+        """
+        Status of Switch 1.
+    
+        Returns:
+            bool: True if closed.
+        """
+        self.ser.write((bytes([self.id, 0x00])))
+        return self.ser.read(1)[0]
+    
+    def switch2(self):
+        """
+        Status of Switch 2.
+    
+        Returns:
+            bool: True if closed.
+        """
+        self.ser.write((bytes([self.id, 0x01])))
+        return self.ser.read(1)[0]
+    
+    def pump_current(self):
+        """
+        Pump current (A).
+    
+        Returns:
+            float: Pump current (A).
+        """ 
+        self.ser.write((bytes([self.id, 0x02])))
+        return struct.unpack("<f", self.ser.read(4))[0]
+    
+    def motor_current(self):
+        """
+        Motor current (A).
+    
+        Returns:
+            float: Motor current (A).
+        """ 
+        self.ser.write((bytes([self.id, 0x03])))
+        return struct.unpack("<f", self.ser.read(4))[0]
+    
+    def servo1(self, angle):
+        """
+        Set Servo 1 angle.
+
+        Args:
+            angle (int): Angle in degrees.
+        """
+        self.ser.write((bytes([(1 << 7) + self.id, 0x04])))
+        self.ser.write(struct.pack("<h", angle))
+        self.wait()
+    
+    def servo2(self, angle):
+        """
+        Set Servo 2 angle.
+
+        Args:
+            angle (int): Angle in degrees.
+        """
+        self.ser.write((bytes([(1 << 7) + self.id, 0x05])))
+        self.ser.write(struct.pack("<h", angle))
+        self.wait()
+    
+    def pump_enable(self, value):
+        """
+        Enable/disable pump.
+
+        Args:
+            value (bool): True to enable, False to disable.
+        """
+        self.ser.write((bytes([(1 << 7) + self.id, 0x06, value])))
+        self.wait()
+
+    def motor_enable(self, value):
+        """
+        Enable/disable motor.
+
+        Args:
+            value (bool): True to enable, False to disable.
+        """
+        self.ser.write((bytes([(1 << 7) + self.id, 0x07, value])))
+        self.wait()

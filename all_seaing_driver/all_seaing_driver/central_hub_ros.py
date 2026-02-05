@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from all_seaing_driver.ArcturusEE import BMS, main_power, ESTOP, mech_power
+from all_seaing_driver.ArcturusEE import BMS, main_power, ESTOP, mech_power, mechanisms
 from all_seaing_interfaces.srv import CommandAdj, CommandServo, GetEstopStatus, CommandFan, AcknowledgeLowBattery
 import serial
 import time
@@ -26,6 +26,7 @@ class CentralHubROS(Node):
         self.estop = ESTOP(ser)
         self.mech_pow_a = mech_power(ser, 0x05)
         self.mech_pow_b = mech_power(ser, 0x06)
+        self.mechanisms = mechanisms(ser)
 
         self.cmd_adj_srv = self.create_service(
             CommandAdj,
@@ -73,9 +74,11 @@ class CentralHubROS(Node):
             if request.port == 1:
                 self.mech_pow_a.set_voltage(request.voltage)
                 self.mech_pow_a.output(True)
+                self.mechanisms.pump_enable(True)
             elif request.port == 2:
                 self.mech_pow_b.set_voltage(request.voltage)
                 self.mech_pow_b.output(True)
+                self.mechanisms.motor_enable(True)
             else:
                 self.get_logger().warn("Invalid adj port addressed")
                 response.success = False
@@ -83,8 +86,10 @@ class CentralHubROS(Node):
         else:
             if request.port == 1:
                 self.mech_pow_a.output(False)
+                self.mechanisms.pump_enable(False)
             elif request.port == 2:
                 self.mech_pow_b.output(False)
+                self.mechanisms.motor_enable(False)
             else:
                 self.get_logger().warn("Invalid adj port addressed")
                 response.success = False
@@ -106,16 +111,16 @@ class CentralHubROS(Node):
         return True
 
     def cmd_servo_cb(self, request, response):
-        # TODO: Implement when we know how many servos we are going to have/how we are going to use them & they are incorporated in the driver file
-        # if request.enable:
-        #     if request.port == 1:
-        #         self.mechanisms.servo1_angle(request.angle)
-        #     elif request.port == 2:
-        #         self.mechanisms.servo2_angle(request.angle)
-        #     else:
-        #         self.get_logger().warn("Invalid adj port addressed")
-        #         response.success = False
-        #         return response
+        if request.enable:
+            if request.port == 1:
+                self.mechanisms.servo1(request.angle)
+            elif request.port == 2:
+                self.mechanisms.servo2(request.angle)
+            else:
+                self.get_logger().warn("Invalid adj port addressed")
+                response.success = False
+                return response
+        # TODO is there a way to stop the servos?
         # else:
         #     if request.port == 1:
         #         self.mechanisms.stop_servo1()
@@ -135,7 +140,6 @@ class CentralHubROS(Node):
         response.drive_y2 = -self.estop.drive_y2()
         response.drive_x1 = -self.estop.drive_x1()
         response.drive_y1 = -self.estop.drive_y1()
-        # TODO: Implement side strafe using drive x2 and y2 (add those to the .srv as well)
         response.is_connected = bool(self.estop.connected())
         response.is_estopped = bool(self.main_pow.estop())
         # self.get_logger().info(f'{response.mode, response.is_connected, response.is_estopped}')

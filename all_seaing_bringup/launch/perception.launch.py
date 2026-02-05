@@ -89,130 +89,6 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    buoy_yolo_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {"model": "best"},
-            # {"model": "roboboat_shape_2025"},
-            # {"model": "beacons_best"},
-            {"label_config": "buoy_label_mappings"},
-            # {"label_config": "shape_label_mappings"},
-            # {"label_config": "beacon_label_mappings"},
-            {"conf": 0.6},
-            {"use_color_names": False},
-        ],
-        remappings=[
-            ("image", "/zed/zed_node/rgb/image_rect_color"),
-            ("annotated_image", "annotated_image/buoy"),
-        ],
-        output="screen",
-    )
-
-    buoy_yolo_node_back_left = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {"model": "best"},
-            # {"model": "roboboat_shape_2025"},
-            # {"model": "beacons_best"},
-            {"label_config": "buoy_label_mappings"},
-            # {"label_config": "shape_label_mappings"},
-            # {"label_config": "beacon_label_mappings"},
-            {"conf": 0.6},
-            {"use_color_names": False},
-        ],
-        remappings=[
-            ("image", "/back_left_oak/rgb/image_rect"),
-            ("annotated_image", "annotated_image/buoy/back_left"),
-            ("bounding_boxes", "bounding_boxes/back_left"),
-        ],
-        output="screen",
-    )
-
-    buoy_yolo_node_back_right = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {"model": "best"},
-            # {"model": "roboboat_shape_2025"},
-            # {"model": "beacons_best"},
-            {"label_config": "buoy_label_mappings"},
-            # {"label_config": "shape_label_mappings"},
-            # {"label_config": "beacon_label_mappings"},
-            {"conf": 0.6},
-            {"use_color_names": False},
-        ],
-        remappings=[
-            ("image", "/back_right_oak/rgb/image_rect"),
-            ("annotated_image", "annotated_image/buoy/back_right"),
-            ("bounding_boxes", "bounding_boxes/back_right"),
-        ],
-        output="screen",
-    )
-
-    beacon_yolo_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov11_beacon_node.py",
-        parameters=[
-            {"model": "beacons_best"},
-            # {"label_config": "buoy_label_mappings"},
-            {"label_config": "beacon_label_mappings"},
-            {"conf": 0.4},
-            {"use_color_names": False},
-            {"filter_beacon_indicators": False},
-            {"beacon_filter_ratio": 0.1},
-            {"indicator_to_beacon_bbox": True},
-        ],
-        remappings=[
-            ("image", "/zed/zed_node/rgb/image_rect_color"),
-            ("annotated_image", "annotated_image/buoy"),
-        ],
-        output="screen",
-    )
-
-    beacon_yolo_node_back_left = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov11_beacon_node.py",
-        parameters=[
-            {"model": "beacons_best"},
-            # {"label_config": "buoy_label_mappings"},
-            {"label_config": "beacon_label_mappings"},
-            {"conf": 0.4},
-            {"use_color_names": False},
-            {"filter_beacon_indicators": False},
-            {"beacon_filter_ratio": 0.1},
-            {"indicator_to_beacon_bbox": True},
-        ],
-        remappings=[
-            ("image", "/back_left_oak/rgb/image_rect"),
-            ("annotated_image", "annotated_image/buoy/back_left"),
-            ("bounding_boxes", "bounding_boxes/back_left"),
-        ],
-        output="screen",
-    )
-
-    beacon_yolo_node_back_right = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov11_beacon_node.py",
-        parameters=[
-            {"model": "beacons_best"},
-            # {"label_config": "buoy_label_mappings"},
-            {"label_config": "beacon_label_mappings"},
-            {"conf": 0.4},
-            {"use_color_names": False},
-            {"filter_beacon_indicators": False},
-            {"beacon_filter_ratio": 0.1},
-            {"indicator_to_beacon_bbox": True},
-        ],
-        remappings=[
-            ("image", "/back_right_oak/rgb/image_rect"),
-            ("annotated_image", "annotated_image/buoy/back_right"),
-            ("bounding_boxes", "bounding_boxes/back_right"),
-        ],
-        output="screen",
-    )
-
     all_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov11_all_node.py",
@@ -300,22 +176,6 @@ def launch_setup(context, *args, **kwargs):
             ("image", "turret_image"),
             ("annotated_image", "annotated_image/shape"),
             ("bounding_boxes", "shape_boxes"),
-        ],
-        output="screen",
-    )
-
-    static_shape_yolo_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {"model": "roboboat_shape_2025"},
-            {"label_config": "shape_label_mappings"},
-            {"conf": 0.4},
-        ],
-        remappings=[
-            ("image", "/zed/zed_node/rgb/image_rect_color"),
-            ("annotated_image", "annotated_image/shape"),
-            ("bounding_boxes", "static_shape_boxes"),
         ],
         output="screen",
     )
@@ -585,17 +445,10 @@ def launch_setup(context, *args, **kwargs):
 
     return [
         point_cloud_filter_obstacle_node,
-        # buoy_yolo_node,
-        # buoy_yolo_node_back_left,
-        # buoy_yolo_node_back_right,
-        # beacon_yolo_node,
-        # beacon_yolo_node_back_left,
-        # beacon_yolo_node_back_right,
         all_yolo_node,
         all_yolo_node_back_left,
         all_yolo_node_back_right,
-        # shape_yolo_node,
-        # static_shape_yolo_node,
+        shape_yolo_node,
         bbox_project_pcloud_node,
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,

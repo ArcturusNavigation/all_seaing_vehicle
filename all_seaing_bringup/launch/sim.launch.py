@@ -747,6 +747,14 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    delivery_server = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="delivery_server.py",
+        parameters=[
+            {"is_sim": True},
+        ]
+    )
+
     rviz_waypoint_sender = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
@@ -823,6 +831,7 @@ def launch_setup(context, *args, **kwargs):
         mechanism_navigation,
         return_home,
         harbor_alert,
+        delivery_server,
         # follow_buoy_pid,
         # speed_challenge_pid,
         # docking_fallback,
