@@ -8,7 +8,9 @@ from std_msgs.msg import Bool
 from all_seaing_interfaces.action import Task, Search
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_common.action_server_base import ActionServerBase
-from all_seaing_common.report_pb2 import Heartbeat, RobotState, LatLng, TaskType
+from all_seaing_common.report_pb2 import RobotState, LatLng, TaskType
+import all_seaing_common.report_pb2
+from all_seaing_interfaces.msg import Heartbeat
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header, ColorRGBA
 from nav_msgs.msg import Odometry
@@ -217,19 +219,29 @@ class RunTasks(ActionServerBase):
         self.result_future = None
         self.goal_handle = None
 
-        self.vel = 0
-        self.odom = None
 
+        # Roboboat comms protocol (shore heartbeat)
+        self.vel = 0
         self.odom_sub = self.create_subscription(
             Odometry, "odometry/gps", self.odom_cb, 10
         )
-
-
-        self.heartbeat_reporter = self.create_timer(1, self.report_heartbeat)
+        
+        self.heartbeat_sub = self.create_subscription(Heartbeat, "heartbeat", self.receive_heartbeat, 10)
+        self.heartbeat_state = RobotState.STATE_AUTO
+        self.shore_heartbeat_reporter = self.create_timer(1, self.report_shore_heartbeat)
 
     def odom_cb(self, msg):
-        self.odom = msg
         self.vel = self.norm(msg.twist.linear.x, msg.twist.linear.y)
+
+    def receive_heartbeat(self, msg):
+        self.heartbeat_msg = msg
+        if msg.e_stopped:
+            self.heartbeat_state = RobotState.STATE_KILLED
+        else:
+            if msg.in_teleop:
+                self.heartbeat_state = RobotState.STATE_MANUAL
+            else:
+                self.heartbeat_state = RobotState.STATE_AUTO
 
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
@@ -239,7 +251,7 @@ class RunTasks(ActionServerBase):
 
 
 
-    def report_heartbeat(self):
+    def report_shore_heartbeat(self):
         EARTH_RADIUS = 6_370_000
         RAD_TO_DEG = 180.0 / math.pi
         pose = self.get_robot_pose() # (east, north, heading)
@@ -247,13 +259,13 @@ class RunTasks(ActionServerBase):
         if self.current_task_type != None:
             current_task = self.current_task_type
 
-        self.report_data(Heartbeat(state=RobotState.STATE_AUTO,
-                                   position=LatLng(latitude=self.latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
-                                                   longitude=self.latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS), # Deal with CW / CCW
-                                   spd_mps=self.vel,
-                                   heading_deg= ((90 - (RAD_TO_DEG) * (self.get_robot_pose()[2])) % 360), # Deal with CW / CCW
-                                   current_task=current_task))
-        # self.report_data(Heartbeat(state=RobotState.STATE_AUTO, position=LatLng(latitude=0.0, longitude=0.0), spd_mps=0.0, heading_deg=0.0, current_task=TaskType.TASK_NONE))
+        self.report_data(all_seaing_common.report_pb2.Heartbeat(
+                            state=self.heartbeat_state,
+                            position=LatLng(latitude=self.latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
+                                            longitude=self.latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS), # Deal with CW / CCW
+                            spd_mps=self.vel,
+                            heading_deg= ((90 - (RAD_TO_DEG) * (self.get_robot_pose()[2])) % 360), # Deal with CW / CCW
+                            current_task=current_task))
         
     def sim_keyboard_callback(self, msg):
         if self.harbor_alerted:
