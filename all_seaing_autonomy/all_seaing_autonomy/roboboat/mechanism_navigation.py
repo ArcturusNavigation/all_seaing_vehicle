@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import rclpy
-from rclpy.action import ActionServer
+from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import qos_profile_sensor_data
 
@@ -9,11 +9,13 @@ from rclpy.qos import qos_profile_sensor_data
 from all_seaing_controller.pid_controller import PIDController, CircularPID
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_interfaces.msg import ControlOption, LabeledObjectPlane, LabeledObjectPlaneArray
+from all_seaing_interfaces.action import Task
 from all_seaing_common.task_server_base import TaskServerBase
 from enum import Enum
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Pose, Point, Vector3, Quaternion
 from std_msgs.msg import Header, ColorRGBA
+from action_msgs.msg import GoalStatus
 
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
@@ -53,6 +55,9 @@ class MechanismNavigation(TaskServerBase):
         self.controller_marker_pub = self.create_publisher(
             MarkerArray, "controller_markers", 10
         )
+
+        self.water_client = ActionClient(self, Task, "water_delivery")
+        self.ball_client = ActionClient(self, Task, "object_delivery")
 
         self.declare_parameter("forward_speed", 2.0)
         self.declare_parameter("max_yaw", 0.7)
@@ -158,6 +163,8 @@ class MechanismNavigation(TaskServerBase):
 
         self.shot_water = False
         self.shot_ball = False
+
+        self.finished_shooting = False
 
     def ctr_normal(self, plane: LabeledObjectPlane):
         center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
@@ -384,11 +391,11 @@ class MechanismNavigation(TaskServerBase):
         marker_arr.markers.append(VisualizationTools.visualize_line(target_back_mid, self.perp_vec(target_dir), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
 
-        if self.state == DeliveryState.STATIONKEEPING or self.norm(target_back_mid, self.robot_pos) < self.navigation_dist_thres:
+        if self.state == DeliveryState.STATIONKEEPING or self.norm(target_back_mid, self.robot_pos) < self.navigation_dist_thres or self.time_started_shooting != -1 or self.finished_shooting:
             if self.state == DeliveryState.NAVIGATING_TARGET:
                 self.get_logger().info('CANCELLING NAVIGATION')
                 self.cancel_navigation()
-            self.get_logger().info('STATIONKEEPING PID')
+            # self.get_logger().info('STATIONKEEPING PID')
             self.state = DeliveryState.STATIONKEEPING
             # go to that line and forward (negative error if boat left of line, positive if right)
             offset = -self.dot(self.difference(target_back_mid, self.robot_pos), self.perp_vec(target_dir))
@@ -399,25 +406,38 @@ class MechanismNavigation(TaskServerBase):
             dist_diff = self.dot(self.difference(target_back_mid, self.robot_pos), target_dir) - self.wpt_banner_dist
             # forward_speed = self.forward_speed*(1-np.exp(-dist_diff/self.slow_dist))
 
-            self.get_logger().info(f'side offset: {offset}')
-            self.get_logger().info(f'forward distance: {dist_diff}')
+            # self.get_logger().info(f'side offset: {offset}')
+            # self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, angle_error) # could also use PID for the x coordinate, instead of the exponential thing we did above
-            if abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres and abs(angle_error) < self.shooting_theta_thres/180.0*np.pi:
-                # TODO SHOOT BALL/WATER
+            if (abs(offset) < self.shooting_xy_thres and abs(dist_diff) < self.shooting_xy_thres and abs(angle_error) < self.shooting_theta_thres/180.0*np.pi) or self.time_started_shooting != -1 or self.finished_shooting:
                 # self.get_logger().info(f'SHOOTING {self.selected_target[0]}')
+                # if self.selected_target[0] == TargetType.WATER_TARGET:
+                #     self.shot_water = True
+                #     self.call_delivery_server("water")
+                # else:
+                #     self.shot_ball = True
+                #     self.call_delivery_server("ball")
 
                 if self.time_started_shooting == -1:
                     self.get_logger().info(f'STARTED SHOOTING {self.selected_target[0]}, TIME: {time.time()}')
                     self.time_started_shooting = time.time()
+
+                    if self.selected_target[0] == TargetType.WATER_TARGET:
+                        self.call_delivery_server("water")
+                    else:
+                        self.call_delivery_server("ball")
+                    
                     return
-                elif time.time() - self.time_started_shooting > 5:
+                # elif (time.time() - self.time_started_shooting > 5):
+                # elif self.finished_shooting:
+                elif self.finished_shooting or (time.time() - self.time_started_shooting > 5):
                     self.get_logger().info(f'SHOT {self.selected_target[0]}, TIME: {time.time()}')
                     # move on
                     self.shot_targets.append(self.selected_target)
 
                     if self.selected_target[0] == TargetType.WATER_TARGET:
                         self.shot_water = True
-                    if self.selected_target[0] == TargetType.BALL_TARGET:
+                    else:
                         self.shot_ball = True
 
                     self.state = DeliveryState.WAITING_TARGET
@@ -428,6 +448,7 @@ class MechanismNavigation(TaskServerBase):
                     self.y_pid.reset()
                     self.theta_pid.reset()
                     self.time_started_shooting = -1
+                    self.finished_shooting = False
                     self.send_vel_cmd(0.0,0.0,0.0)
                     return
             x_output = self.x_pid.get_effort()
@@ -460,6 +481,48 @@ class MechanismNavigation(TaskServerBase):
                     self.send_waypoint_to_server(self.sent_waypoint)
             
         self.delivery_marker_pub.publish(marker_arr)
+
+    def call_delivery_server(self, delivery_type="water"):
+        # if self.is_sim:
+        #     self.get_logger().info(f"simulated {delivery_type} delivery succeeded!")
+        #     return True
+        if delivery_type == "water":
+            client = self.water_client
+        elif delivery_type == "ball":
+            client = self.ball_client
+
+        goal = Task.Goal()
+        # future = client.send_goal_async(goal)
+        # rclpy.spin_until_future_complete(self, future)
+
+        # if future.result() is None:
+        #     self.get_logger().info("didnt work for some reason")
+        #     return False
+
+        # if future.result().result.success:
+        #     self.get_logger().info(f"{delivery_type} delivery succeeded!")
+        #     return True
+
+        client.wait_for_server()
+        self.delivery_goal_future = client.send_goal_async(goal)
+        self.delivery_goal_future.add_done_callback(self.delivery_response_cb)
+
+    def delivery_response_cb(self, future):
+        self.delivery_goal_handle = future.result()
+        
+        if not self.delivery_goal_handle.accepted:
+            self.get_logger().info('Delivery rejected')
+            self.delivery_rejected = True
+            self.finished_shooting = True
+            return
+
+        self.get_logger().info("Delivery accepted")
+        self.delivery_result_future = self.delivery_goal_handle.get_result_async()
+        self.delivery_result_future.add_done_callback(self.delivery_result_cb)
+
+    def delivery_result_cb(self, future):        
+        self.get_logger().info(f'Finished delivery')
+        self.finished_shooting = True
 
 
 def main(args=None):

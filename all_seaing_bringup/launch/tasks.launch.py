@@ -399,10 +399,10 @@ def launch_setup(context, *args, **kwargs):
         mechanism_navigation,
         return_home,
         harbor_alert,
+        delivery_server,
         # follow_buoy_pid,
         # speed_challenge_pid
-        # docking_fallback
-        # delivery_server
+        # docking_fallback,
     ]
 
 

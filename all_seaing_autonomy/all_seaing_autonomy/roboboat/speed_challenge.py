@@ -440,7 +440,7 @@ class SpeedChallenge(TaskServerBase):
             dist_to_buoy = self.norm(self.blue_buoy_pos, self.robot_pos)
             dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
 
-            self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
+            # self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
             self.turn_pid.update(dist_to_buoy,dt)
 
             # TODO: update in_Circling correctly (check 90 degrees)

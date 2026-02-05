@@ -552,7 +552,7 @@ class Docking(TaskServerBase):
             if self.state == DockingState.NAVIGATING_DOCK:
                 self.get_logger().info('CANCELLING NAVIGATION')
                 self.cancel_navigation()
-            self.get_logger().info('DOCKING PID')
+            # self.get_logger().info('DOCKING PID')
             self.state = DockingState.DOCKING
             # go to that line and forward (negative error if boat left of line, positive if right)
             offset = -self.dot(self.difference(slot_back_mid, self.robot_pos), self.perp_vec(slot_dir))
@@ -578,8 +578,8 @@ class Docking(TaskServerBase):
             # control_msg.twist.angular.z = float(yaw_rate)
             # self.control_pub.publish(control_msg)
 
-            self.get_logger().info(f'side offset: {offset}')
-            self.get_logger().info(f'forward distance: {dist_diff}')
+            # self.get_logger().info(f'side offset: {offset}')
+            # self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
             if abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
                 if self.time_docked == -1:
