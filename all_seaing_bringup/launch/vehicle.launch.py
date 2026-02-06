@@ -375,8 +375,7 @@ def launch_setup(context, *args, **kwargs):
         executable="rover_lora_reporter.py",
         remappings=[
         ],
-        parameters=[
-        ],
+        parameters=[{"port": "/dev/ttyACM3"}],
         output="screen",
     )
 

@@ -12,10 +12,13 @@ class RoverLoraReporter(Node):
     def __init__(self):
         super().__init__('rover_lora_controller')
 
+        port = self.declare_parameter(
+            "port", "/dev/ttyACM0").get_parameter_value().string_value
+
         self.report_queue = Queue()
 
         # Setup serial connection
-        self.serial_port = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+        self.serial_port = serial.Serial(port, 115200, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
 
         self.reporter_subscriber = self.create_subscription(ByteMultiArray, "task_reporter", self.add_message, 10)
