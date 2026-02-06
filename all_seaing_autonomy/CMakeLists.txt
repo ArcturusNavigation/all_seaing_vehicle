@@ -27,4 +27,4 @@ install(PROGRAMS
 )
 
 
-ament_auto_package(INSTALL_TO_SHARE)
+ament_auto_package(INSTALL_TO_SHARE protobuf)
