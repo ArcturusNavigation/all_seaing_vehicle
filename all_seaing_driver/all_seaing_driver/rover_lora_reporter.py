@@ -15,7 +15,7 @@ class RoverLoraReporter(Node):
         self.report_queue = Queue()
 
         # Setup serial connection
-        self.serial_port = serial.Serial('/dev/tty.usbmodem2089346352471', 57600, timeout=1)
+        self.serial_port = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
         time.sleep(2)  # Allow serial port to stabilize
 
         self.reporter_subscriber = self.create_subscription(ByteMultiArray, "task_reporter", self.add_message, 10)

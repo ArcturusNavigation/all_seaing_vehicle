@@ -231,7 +231,7 @@ class RunTasks(ActionServerBase):
         self.shore_heartbeat_reporter = self.create_timer(1, self.report_shore_heartbeat)
 
     def odom_cb(self, msg):
-        self.vel = self.norm(msg.twist.linear.x, msg.twist.linear.y)
+        self.vel = self.norm((msg.twist.twist.linear.x, msg.twist.twist.linear.y))
 
     def receive_heartbeat(self, msg):
         self.heartbeat_msg = msg
@@ -263,7 +263,7 @@ class RunTasks(ActionServerBase):
                             state=self.heartbeat_state,
                             position=LatLng(latitude=self.latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
                                             longitude=self.latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS), # Deal with CW / CCW
-                            spd_mps=self.vel,
+                            spd_mps=0,
                             heading_deg= ((90 - (RAD_TO_DEG) * (self.get_robot_pose()[2])) % 360), # Deal with CW / CCW
                             current_task=current_task))
         
