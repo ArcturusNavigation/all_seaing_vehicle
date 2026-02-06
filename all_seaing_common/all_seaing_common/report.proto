@@ -1,0 +1,172 @@
+syntax = "proto3";
+package robocommand.roboboat.v1;
+import "google/protobuf/timestamp.proto";
+
+enum RobotState {
+   STATE_UNKNOWN = 0; 
+   STATE_KILLED = 1; 
+   STATE_MANUAL = 2; 
+   STATE_AUTO = 3; 
+}
+
+enum TaskType { 
+   TASK_UNKNOWN = 0;
+   TASK_NONE = 1; 
+   TASK_ENTRY_EXIT = 2; 
+   TASK_NAV_CHANNEL = 3; 
+   TASK_SPEED_CHALLENGE = 4; 
+   TASK_OBJECT_DELIVERY = 5; 
+   TASK_DOCKING = 6; 
+   TASK_SOUND_SIGNAL = 7; 
+}
+
+enum ObjectType { 
+   OBJECT_UNKNOWN = 0; 
+   OBJECT_BOAT = 1; 
+   OBJECT_LIGHT_BEACON = 2; 
+   OBJECT_BUOY = 3; 
+}
+
+enum Color { 
+   COLOR_UNKNOWN = 0; 
+   COLOR_YELLOW = 1; 
+   COLOR_BLACK = 2; 
+   COLOR_RED = 3; 
+   COLOR_GREEN = 4; 
+}
+
+enum GateType { 
+   GATE_UNKNOWN = 0; 
+   GATE_ENTRY = 1; 
+   GATE_EXIT = 2; 
+   GATE_SPEED_START = 3; 
+   GATE_SPEED_END = 4;
+}
+
+enum SignalType { 
+   SIGNAL_UNKNOWN = 0; 
+   SIGNAL_ONE_BLAST = 1; 
+   SIGNAL_TWO_BLAST = 2; 
+}
+
+enum DeliveryType { 
+   DELIVERY_UNKNOWN = 0; 
+   DELIVERY_WATER = 1; 
+   DELIVERY_BALL = 2; 
+}
+
+/**
+ * Report is the only message sent to the RoboCommand server
+ * Report message contains:
+ * team_id: unique team identifier (i.e. RNRB, provided in Team Handbook)
+ * vehicle_id: unique vehicle identifier (i.e. S1, S2, where "S" signals Surface Vessel)
+ * seq: monotonically increasing sequence count
+ * sent_at: timestamp of message transmission
+ * body: one of the listed body messages
+ */
+message Report {
+  string team_id = 1;
+  string vehicle_id = 2;
+  uint32 seq = 3;
+  google.protobuf.Timestamp sent_at = 4;
+
+  oneof body {
+    Heartbeat heartbeat = 10;
+    ObjectDetected object_detected = 11;
+    GatePass gate_pass = 12;
+    ObjectDelivery object_delivery = 13;
+    Docking docking = 14;
+    SoundSignal sound_signal = 15;
+  }
+}
+
+/**
+ * Latitude and Longitude in decimal degrees.
+ * Latitude in the range -90.0 to +90.0
+ * Longitude in the range -180.0 to +180.0
+ */
+message LatLng {
+  double latitude = 1;   
+  double longitude = 2;  
+}
+
+/**
+ * Heartbeat message contains:
+ * RobotState: state of the ASV
+ * position: lat, lng position of ASV
+ * spd_mps: speed of AVS in m/s
+ * heading_deg: compass heading in degrees of ASV: North = 0, East = 90
+ * current_task: task the ASV is currently on
+ */
+message Heartbeat {
+  RobotState state = 1;
+  LatLng position = 2;       
+  float spd_mps = 3;
+  float heading_deg = 4;     
+  TaskType current_task = 5; 
+}
+
+/**
+ * Tasks 2, 3 & 4
+ * Object detected message contains:
+ * object_type: type of the object
+ * color: color of the object
+ * position: lat, lng position of object
+ * object_id: team-scoped stable ID
+ * task_context: type of task
+ */
+message ObjectDetected {       
+  ObjectType object_type = 1;  
+  Color color = 2;             
+  LatLng position = 3;
+  uint32 object_id = 4;
+  TaskType task_context = 5;
+}
+
+/**
+ * Tasks 1 & 3
+ * Gate pass message contains:
+ * type: type of gate
+ * position: lat, lng position of ASV
+ */
+message GatePass {
+  GateType type = 1;
+  LatLng position = 2;
+}
+
+/**
+ * Task 4
+ * Object delivery message contains:
+ * vessel_color: color of the vessel
+ * position: lat, lng position of ASV
+ * delivery_type: WATER or BALL
+*/
+message ObjectDelivery {
+  Color vessel_color = 1;
+  LatLng position = 2;
+  DeliveryType delivery_type = 3;
+}
+
+/**
+ * Task 5
+ * Docking message contains:
+ * dock: dock identifier - North(‘N’) or South(‘S’)
+ * slip: slip number - ‘1’, ‘2’, or ‘3’ 
+ */
+message Docking {
+  string dock = 1;
+  string slip = 2;
+}
+
+/**
+ * Task 6
+ * Sound signal message contains:
+ * signal_type: type of signal detected - one or two blasts
+ * frequency_hz: nominal frequency of detected blast - 600, 800, or 1000
+ * assigned_task: task assigned by signal_type
+ */
+message SoundSignal {
+  SignalType signal_type = 1;
+  uint32 frequency_hz = 2;
+  TaskType assigned_task = 3;
+}
