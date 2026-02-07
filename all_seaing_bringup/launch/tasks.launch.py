@@ -81,6 +81,9 @@ def launch_setup(context, *args, **kwargs):
             {"duplicate_dist": 0.3},
             {"inter_buoy_pair_dist": 0.5},
             {"buoy_pair_dist_thres": 0.2},
+        ],
+        remappings=[
+            # ("odometry/gps", "odom_rf2o/filtered"), # ONLY FOR INDOORS
         ]
     )
 
