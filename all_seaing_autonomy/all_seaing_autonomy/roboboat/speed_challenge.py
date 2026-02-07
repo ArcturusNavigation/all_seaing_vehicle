@@ -12,6 +12,8 @@ from std_msgs.msg import Header, ColorRGBA
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from all_seaing_common.task_server_base import TaskServerBase
 
+from all_seaing_common.report_pb2 import ObjectDetected, ObjectType, Color, TaskType, GatePass, GateType
+
 import os
 import yaml
 import math
@@ -170,6 +172,21 @@ class SpeedChallenge(TaskServerBase):
             
             self.green_beacon_labels.add(label_mappings["green_indicator"])
             self.red_beacon_labels.add(label_mappings["red_indicator"])
+        
+        self.declare_parameter(
+            "latlng_locations_file",
+            os.path.join(
+                bringup_prefix, "config", "localization", "locations.yaml"
+            ),
+        )
+
+        with open(self.get_parameter("latlng_locations_file").value, "r") as f:
+            self.latlng_location_mappings = yaml.safe_load(f)
+        
+        self.declare_parameter("location", "nbpark")
+        self.location = self.get_parameter("location").get_parameter_value().string_value
+
+        self.latlng_origin = self.latlng_location_mappings[self.location]
 
         self.gate_pair = None
         # self.first_setup = True
@@ -258,6 +275,11 @@ class SpeedChallenge(TaskServerBase):
         action_result = Task.Result(success=True)
         if self.state == SpeedChallengeState.RETURNING:
             action_result = self.return_to_start()
+
+            self.report_data(GatePass(
+                type=GateType.GATE_SPEED_END,
+                position=self.pos_to_latlng(self.latlng_origin, self.robot_pos)))
+
             if action_result.success:
                 self.mark_successful()
             else:
@@ -289,12 +311,37 @@ class SpeedChallenge(TaskServerBase):
                 self.mark_unsuccessful()
                 return
             
+            self.report_data(GatePass(
+                type=GateType.GATE_SPEED_START,
+                position=self.pos_to_latlng(self.latlng_origin, self.robot_pos)))
+            
             self.state = SpeedChallengeState.PROBING_BUOY
         
         # cancel control loop if a single action fails
         if not action_result.success:
             self.mark_unsuccessful()
-        
+
+    def identify_beacon(self):
+        for obstacle in self.obstacles:
+            if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.beacon_dist_thres:
+                continue
+            # below might toggle some times but will hopefully settle before we start circling, it's fixed once we start circling
+            if obstacle.label in self.red_beacon_labels:
+                self.temp_left_first = False
+                self.report_data(ObjectDetected(
+                    object_type=ObjectType.OBJECT_LIGHT_BEACON,
+                    color=Color.COLOR_RED,
+                    position=self.pos_to_latlng(self.latlng_origin, self.ob_coords(obstacle)),
+                    object_id=obstacle.id,
+                    task_context=TaskType.TASK_SPEED_CHALLENGE))
+            elif obstacle.label in self.green_beacon_labels:
+                self.temp_left_first = True
+                self.report_data(ObjectDetected(
+                    object_type=ObjectType.OBJECT_LIGHT_BEACON,
+                    color=Color.COLOR_GREEN,
+                    position=self.pos_to_latlng(self.latlng_origin, self.ob_coords(obstacle)),
+                    object_id=obstacle.id,
+                    task_context=TaskType.TASK_SPEED_CHALLENGE))
 
     def map_cb(self, msg):
         '''
@@ -303,14 +350,7 @@ class SpeedChallenge(TaskServerBase):
         self.obstacles = msg.obstacles
         if self.paused:
             return
-        for obstacle in self.obstacles:
-            if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.beacon_dist_thres:
-                continue
-            # below might toggle some times but will hopefully settle before we start circling, it's fixed once we start circling
-            if obstacle.label in self.red_beacon_labels:
-                self.temp_left_first = False
-            elif obstacle.label in self.green_beacon_labels:
-                self.temp_left_first = True
+        self.identify_beacon()
 
     def probe_blue_buoy(self):
         '''

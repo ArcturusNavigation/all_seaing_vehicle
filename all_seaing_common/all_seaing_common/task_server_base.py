@@ -8,6 +8,9 @@ from all_seaing_interfaces.msg import ControlOption
 from all_seaing_common.action_server_base import ActionServerBase
 from action_msgs.msg import GoalStatus
 
+from all_seaing_common.report_pb2 import LatLng
+import all_seaing_common.report_pb2
+
 import os
 import yaml
 import time
@@ -499,3 +502,4 @@ class TaskServerBase(ActionServerBase):
         self.end_process(f"Searching Server for [{self.server_name}] task completed with result {self.found_task}")
         goal_handle.succeed()
         return Search.Result(success=self.found_task)
+    

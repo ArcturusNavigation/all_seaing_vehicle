@@ -441,7 +441,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="boathouse"),
+            DeclareLaunchArgument("location", default_value="nbpark"),
             DeclareLaunchArgument(
                 "comms", default_value="custom", choices=["wifi", "lora", "custom"]
             ),

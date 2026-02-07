@@ -467,7 +467,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             # DeclareLaunchArgument('use_sim_time', default_value='true'),
-            DeclareLaunchArgument("location", default_value="pavillion"),
+            DeclareLaunchArgument("location", default_value="nbpark"),
             DeclareLaunchArgument("use_slam", default_value='true'),
             DeclareLaunchArgument("use_gps", default_value='true'),
             DeclareLaunchArgument("track_banners", default_value='true'),

@@ -20,6 +20,8 @@ from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
 
+from all_seaing_common.report_pb2 import Docking
+
 import time
 import math
 import yaml
@@ -253,6 +255,8 @@ class Docking(TaskServerBase):
             self.inv_label_mappings[value] = key
 
         self.state = DockingState.WAITING_DOCK
+
+        self.reported_docking = False
     
     def green_indicator(self, dock_label):
         return dock_label in self.dock_green_labels
@@ -544,6 +548,8 @@ class Docking(TaskServerBase):
         # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
         slot_back_mid = self.selected_slot[1][0]
         slot_dir = self.selected_slot[1][1]
+        slot_label = self.selected_slot[0]
+        slot_side = self.selected_slot[2]
         
         marker_arr.markers.append(VisualizationTools.visualize_line(slot_back_mid, self.perp_vec(slot_dir), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
@@ -554,6 +560,14 @@ class Docking(TaskServerBase):
                 self.cancel_navigation()
             # self.get_logger().info('DOCKING PID')
             self.state = DockingState.DOCKING
+
+            # to get the reporting points even without necessarily successfully docking
+            if not self.reported_docking:
+                self.report_data(Docking(
+                    dock="N" if slot_side == DockSide.NORTH else "S",
+                    slip=self.number_priority[slot_label]+1))
+                self.reported_docking = True
+
             # go to that line and forward (negative error if boat left of line, positive if right)
             offset = -self.dot(self.difference(slot_back_mid, self.robot_pos), self.perp_vec(slot_dir))
             approach_angle = self.angle_vec(self.negative(slot_dir), self.robot_dir) # TODO Check sign

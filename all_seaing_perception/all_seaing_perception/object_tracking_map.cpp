@@ -1554,6 +1554,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
             // increase object count and expand & initialize matrices
             m_num_banners++;
             // add object to tracked obstacles vector
+            detected_banners[i]->plane_msg.id = m_obstacle_id++;
             m_tracked_banners.push_back(detected_banners[i]);
             Eigen::Matrix<float, 3, 3> init_new_cov{
                 {(float)m_banner_init_new_cov*m_banner_init_new_cov, 0, 0},
@@ -1641,6 +1642,7 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
         if (banner_label_indicator.count(detected_banners[i]->label) && (!banner_label_indicator[detected_banners[i]->label])){
             detected_banners[i]->label = m_tracked_banners[tracked_id]->label;
         }
+        detected_banners[i]->plane_msg.id = m_tracked_banners[tracked_id]->plane_msg.id;
         detected_banners[i]->time_seen = m_tracked_banners[tracked_id]->time_seen;
         detected_banners[i]->last_dead = m_tracked_banners[tracked_id]->last_dead;
         detected_banners[i]->time_dead = m_tracked_banners[tracked_id]->time_dead;

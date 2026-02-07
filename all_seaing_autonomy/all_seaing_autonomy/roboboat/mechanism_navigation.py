@@ -15,7 +15,8 @@ from enum import Enum
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Pose, Point, Vector3, Quaternion
 from std_msgs.msg import Header, ColorRGBA
-from action_msgs.msg import GoalStatus
+
+from all_seaing_common.report_pb2 import ObjectDetected, ObjectType, Color, TaskType, ObjectDelivery, DeliveryType
 
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
@@ -148,6 +149,24 @@ class MechanismNavigation(TaskServerBase):
         else:
             self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
             self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+        
+        self.declare_parameter(
+            "latlng_locations_file",
+            os.path.join(
+                bringup_prefix, "config", "localization", "locations.yaml"
+            ),
+        )
+
+        with open(self.get_parameter("latlng_locations_file").value, "r") as f:
+            self.latlng_location_mappings = yaml.safe_load(f)
+        
+        self.declare_parameter("location", "nbpark")
+        self.location = self.get_parameter("location").get_parameter_value().string_value
+
+        self.latlng_origin = self.latlng_location_mappings[self.location]
+
+        self.tracked_targets = []
+        self.max_tracked_banner_id = -1
 
         # update from subs
         self.water_banners = []
@@ -171,11 +190,44 @@ class MechanismNavigation(TaskServerBase):
         _,_,theta = euler_from_quaternion([plane.normal_ctr.orientation.x, plane.normal_ctr.orientation.y, plane.normal_ctr.orientation.z, plane.normal_ctr.orientation.w])
         return (center_pt, (np.cos(theta), np.sin(theta)))
 
+    def banner_coords(self, banner: LabeledObjectPlane):
+        return self.ctr_normal(banner)[0]
+    
+    def report_new_targets(self):
+        banner: LabeledObjectPlane
+        for banner in self.plane_msg.objects:
+            if banner.label not in (self.water_labels+self.ball_labels):
+                continue
+            if banner.id > self.max_tracked_banner_id:
+                # potentially new target
+                new_banner = True
+                tracked_banner: LabeledObjectPlane
+                for tracked_banner in self.tracked_targets:
+                    if self.norm(self.banner_coords(tracked_banner), self.banner_coords(banner)) < self.duplicate_dist:
+                        new_banner = False
+                        break
+                if new_banner:
+                    # report & add to tracked targets
+                    self.tracked_targets.append(banner)
+                    obs_type = ObjectType.OBJECT_BOAT
+                    obs_color = Color.COLOR_UNKNOWN
+                    if banner.label in self.water_labels:
+                        obs_color = Color.COLOR_YELLOW
+                    else:
+                        obs_color = Color.COLOR_BLACK
+                    self.report_data(ObjectDetected(
+                        object_type=obs_type,
+                        color=obs_color,
+                        position=self.pos_to_latlng(self.latlng_origin, self.banner_coords(banner)),
+                        object_id=banner.id,
+                        task_context=TaskType.TASK_OBJECT_DELIVERY))
+
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         self.plane_msg = msg
         if self.paused:
             return
         self.find_target()
+        self.report_new_targets()
         
     def find_target(self):
         if self.plane_msg is None:
@@ -422,10 +474,22 @@ class MechanismNavigation(TaskServerBase):
                     self.get_logger().info(f'STARTED SHOOTING {self.selected_target[0]}, TIME: {time.time()}')
                     self.time_started_shooting = time.time()
 
+                    obs_color = Color.COLOR_UNKNOWN
+                    del_type = DeliveryType.DELIVERY_UNKNOWN
+
                     if self.selected_target[0] == TargetType.WATER_TARGET:
                         self.call_delivery_server("water")
+                        obs_color = Color.COLOR_YELLOW
+                        del_type = DeliveryType.DELIVERY_WATER
                     else:
                         self.call_delivery_server("ball")
+                        obs_color = Color.COLOR_BLACK
+                        del_type = DeliveryType.DELIVERY_BOAT
+
+                    self.report_data(ObjectDelivery(
+                        color=obs_color,
+                        position=self.pos_to_latlng(self.latlng_origin, self.robot_pos),
+                        delivery_type=del_type))
                     
                     return
                 # elif (time.time() - self.time_started_shooting > 5):

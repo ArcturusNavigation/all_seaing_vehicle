@@ -562,6 +562,23 @@ def launch_setup(context, *args, **kwargs):
         ],
         output="screen",
     )
+    
+    entry_gates = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="entry_gates.py",
+        parameters=[
+            {"is_sim": True},
+            {"red_left": True},
+            {"color_label_mappings_file": color_label_mappings},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"search_task_radius": 50.0},
+            # {"gate_dist_back": 5.0},
+            {"gate_probe_dist": 10.0},
+            {"gate_dist_thres": 50.0},
+        ],
+        remappings=[
+        ]
+    )
 
     follow_buoy_path = launch_ros.actions.Node(
         package="all_seaing_autonomy",
@@ -839,6 +856,7 @@ def launch_setup(context, *args, **kwargs):
         heartbeat_reporter,
         run_tasks,
         task_init_server,
+        entry_gates,
         follow_buoy_path,
         speed_challenge,
         docking,

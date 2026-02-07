@@ -62,6 +62,8 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "contour_matching_color_ranges.yaml"
     )
 
+    location = context.perform_substitution(LaunchConfiguration("location"))
+
     use_waypoint_client = LaunchConfiguration("use_waypoint_client")
 
     run_tasks = launch_ros.actions.Node(
@@ -70,7 +72,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             {"red_left": True},
-            {"global_frame_id": "map"},
+            {"location": location},
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
             {"task_locations_file": task_locations},
@@ -87,13 +89,31 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    entry_gates = launch_ros.actions.Node(
+        package="all_seaing_autonomy",
+        executable="entry_gates.py",
+        parameters=[
+            {"is_sim": False},
+            {"red_left": True},
+            {"location": location},
+            # {"color_label_mappings_file": buoy_label_mappings},
+            {"color_label_mappings_file": all_label_mappings},
+            {"search_task_radius": 50.0},
+            {"gate_dist_back": 5.0},
+            {"gate_probe_dist": 10.0},
+            {"gate_dist_thres": 50.0},
+        ],
+        remappings=[
+        ]
+    )
+
     follow_buoy_path = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_path.py",
         parameters=[
             {"is_sim": False},
             {"red_left": True},
-            {"global_frame_id": "map"},
+            {"location": location},
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
@@ -126,9 +146,9 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             {"red_left": True},
+            {"location": location},
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
-            {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
             {"gate_dist_thres": 40.0},
             {"beacon_dist_thres": 15.0},
@@ -158,7 +178,6 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             # {"shape_label_mappings_file": shape_label_mappings},
             {"shape_label_mappings_file": all_label_mappings},
-            {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
             {"dock_width": 3.0},
             {"dock_length": 5.0}, # TODO change to actual length: 7
@@ -191,10 +210,10 @@ def launch_setup(context, *args, **kwargs):
         executable="mechanism_navigation.py",
         parameters=[
             {"is_sim": False},
+            {"location": location},
             # {"shape_label_mappings_file": buoy_label_mappings},
             # {"shape_label_mappings_file": shape_label_mappings},
             {"shape_label_mappings_file": all_label_mappings},
-            {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
             {"wpt_banner_dist": 3.0},
             {"navigation_dist_thres": 5.0},
@@ -219,9 +238,9 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             {"red_left": False},
+            {"location": location},
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
-            {"robot_frame_id": "base_link"},
             {"search_task_radius": 50.0},
             {"gate_dist_back": 5.0},
             {"gate_probe_dist": 10.0},
@@ -412,6 +431,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
+            DeclareLaunchArgument("location", default_value="nbpark"),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),
