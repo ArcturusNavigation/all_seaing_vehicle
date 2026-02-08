@@ -22,6 +22,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/rover_lora_reporter.py
     ${PROJECT_NAME}/thrust_commander.py
     ${PROJECT_NAME}/webcam_publisher.py
+    ${PROJECT_NAME}/sound_signal_detector.py
     DESTINATION lib/${PROJECT_NAME}
 )
 

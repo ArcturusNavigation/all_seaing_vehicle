@@ -64,6 +64,8 @@ def launch_setup(context, *args, **kwargs):
 
     location = context.perform_substitution(LaunchConfiguration("location"))
 
+    target_freq = context.perform_substitution(LaunchConfiguration("target_freq"))
+
     use_waypoint_client = LaunchConfiguration("use_waypoint_client")
 
     run_tasks = launch_ros.actions.Node(
@@ -266,6 +268,14 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    sound_signal_node = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="sound_signal_detector.py",
+        parameters=[
+            {"target_freq": target_freq},
+        ],
+    )
+
     follow_buoy_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_pid.py",
@@ -436,6 +446,7 @@ def launch_setup(context, *args, **kwargs):
         return_home,
         harbor_alert,
         delivery_server,
+        sound_signal_node,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback,
@@ -446,6 +457,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("location", default_value="nbpark"),
+            DeclareLaunchArgument("target_freq", default_value=600.0),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),

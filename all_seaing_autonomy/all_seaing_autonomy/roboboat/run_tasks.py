@@ -8,11 +8,11 @@ from std_msgs.msg import Bool
 from all_seaing_interfaces.action import Task, Search
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
 from all_seaing_common.action_server_base import ActionServerBase
-from all_seaing_common.report_pb2 import RobotState, LatLng, TaskType
+from all_seaing_common.report_pb2 import RobotState, LatLng, TaskType, SoundSignal, SignalType
 import all_seaing_common.report_pb2
 from all_seaing_interfaces.msg import Heartbeat
 from visualization_msgs.msg import Marker, MarkerArray
-from std_msgs.msg import Header, ColorRGBA
+from std_msgs.msg import Header, ColorRGBA, String
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from ament_index_python.packages import get_package_share_directory
@@ -21,11 +21,8 @@ import yaml
 import math
 from enum import Enum
 
-from all_seaing_interfaces.msg import KeyboardButton
 from sensor_msgs.msg import Joy
 from action_msgs.msg import GoalStatus
-
-import all_seaing_common.report_pb2
 
 ###
 
@@ -100,7 +97,7 @@ class RunTasks(ActionServerBase):
 
         self.harbor_alert_tasks = [
             # HARBOR ALERT
-            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_marina", "harbor_sprint"],
+            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
             [ActionType.TASK, ActionClient(self, Task, "harbor_alert")],
         ]
 
@@ -214,18 +211,18 @@ class RunTasks(ActionServerBase):
         # harbor alert
 
         self.keyboard_sub = None
-        if self.is_sim: 
-            self.get_logger().info("Running in simulation mode. Listening to joystick input.")
-            self.keyboard_sub = self.create_subscription(
-                Joy, "/joy", self.sim_keyboard_callback, 10
-            )
-        else: 
-            self.get_logger().info("Running in real mode. Listening to keyboard input.")
-            self.keyboard_sub = self.create_subscription(
-                KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
-            )
+        # if self.is_sim: 
+        #     self.get_logger().info("Running in simulation mode. Listening to joystick input.")
+        #     self.keyboard_sub = self.create_subscription(
+        #         Joy, "/joy", self.sim_keyboard_callback, 10
+        #     )
+        # else: 
+        self.get_logger().info("Running in real mode. Listening to keyboard input.")
+        self.keyboard_sub = self.create_subscription(
+            String, "/harbor_detect", self.real_harbor_callback, 10
+        )
         self.harbor_alerted = False
-        self.harbor_index = 0 # TODO add harbor index (selected area) in sim & real
+        self.harbor_index = 0
         self.cancelled_task_harbor = True
 
         self.result_future = None
@@ -263,7 +260,7 @@ class RunTasks(ActionServerBase):
 
     def report_shore_heartbeat(self):
         RAD_TO_DEG = 180.0 / math.pi
-        current_task = TaskType.TASK_NONE # TODO: make sure still works after harbor alert added
+        current_task = TaskType.TASK_NONE
         if self.current_task_type != None:
             current_task = self.current_task_type
 
@@ -284,13 +281,30 @@ class RunTasks(ActionServerBase):
             self.cancel_current_task()
             self.find_task()
     
-    def real_keyboard_callback(self, msg):
+    def real_harbor_callback(self, msg):
         if self.harbor_alerted:
             return
-        if msg.key == "h":
-            self.get_logger().info(f'HARBOR ALERTED')
+        freq, type = msg.data.split("_")
+        if type == "single":
+            self.get_logger().info(f'HARBOR ALERTED SINGLE AT {freq}HZ')
             self.harbor_alerted = True
             self.harbor_index = 0
+            self.report_data(SoundSignal(
+                signal_type=SignalType.SIGNAL_ONE_BLAST,
+                frequency_hz=int(freq),
+                assigned_task=TaskType.TASK_SPEED_CHALLENGE,
+            ))
+            self.cancel_current_task()
+            self.find_task()
+        elif type == "double":
+            self.get_logger().info(f'HARBOR ALERTED DOUBLE AT {freq}HZ')
+            self.harbor_alerted = True
+            self.harbor_index = 1
+            self.report_data(SoundSignal(
+                signal_type=SignalType.SIGNAL_TWO_BLAST,
+                frequency_hz=int(freq),
+                assigned_task=TaskType.TASK_DOCKING,
+            ))
             self.cancel_current_task()
             self.find_task()
     
@@ -515,7 +529,7 @@ class RunTasks(ActionServerBase):
                 self.harbor_alerted = False
                 self.next_harbor_index.val = 0
             else:
-                self.attempt_task(self.harbor_alert_tasks[self.next_harbor_index.val][0], self.harbor_alert_tasks[self.next_harbor_index.val][1], self.next_harbor_index, None, self.harbor_alert_tasks[self.next_harbor_index.val][2+self.harbor_index] if self.harbor_alert_tasks[self.next_harbor_index.val][0] == ActionType.SEARCH else None)
+                self.attempt_task(self.harbor_alert_tasks[self.next_harbor_index.val][0], TaskType.TASK_SOUND_SIGNAL, self.harbor_alert_tasks[self.next_harbor_index.val][1], self.next_harbor_index, None, self.harbor_alert_tasks[self.next_harbor_index.val][2+self.harbor_index] if self.harbor_alert_tasks[self.next_harbor_index.val][0] == ActionType.SEARCH else None)
                 return
         # print(self.task_list)
 
