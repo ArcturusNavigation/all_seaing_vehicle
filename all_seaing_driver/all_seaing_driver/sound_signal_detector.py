@@ -11,13 +11,13 @@
 import pyaudio
 import numpy as np
 import time
-# import wave
-# from scipy.io.wavfile import write
-# import sounddevice
+import wave
+from scipy.io.wavfile import write
+import sounddevice
 
 SAMPLE_RATE = 44100
 CHUNK = 4096  # number of frames per read
-FORMAT = pyaudio.paInt16
+FORMAT = pyaudio.paFloat32
 CHANNELS = 1  # mono mic
 DEVICE_INDEX = 8
 # OUT_CHANNELS = 1
@@ -25,12 +25,14 @@ DEVICE_INDEX = 8
 
 # the 3 possible frequencies from the competition rules
 TARGET_FREQS = [600.0, 800.0, 1000.0]
-FREQ_TOLERANCE = 0.05  # it says +/- 5% on the frequencies but idk if we need to adjust it more
+FREQ_TOLERANCE = 0.1  # it says +/- 5% on the frequencies but idk if we need to adjust it more
 
 # these will probably need tuning
-POWER_THRESHOLD = 1e6   # how loud the fft peak needs to be to count as a real tone
+POWER_THRESHOLD = 0.8   # how loud the fft peak needs to be to count as a real tone
 MIN_BLAST_TIME = 0.2    # blast has to be at least this long (seconds) otherwise its just noise
-SILENCE_TIMEOUT = 2.0   # how long we wait after first blast to see if theres a second one
+MIN_SILENCE_TIME = 0.2 # if less than this ignore gap, probably missed detecting in between
+MAX_DOUBLE_SILENCE_TIME = 0.7
+SILENCE_TIMEOUT = 2.5   # how long we wait after first blast to see if theres a second one
 
 # RECORD_SECONDS = 5
 # WAVE_OUTPUT_FILENAME = "output.wav"
@@ -39,7 +41,7 @@ SILENCE_TIMEOUT = 2.0   # how long we wait after first blast to see if theres a 
 def get_peak_frequency(audio_data, sr):
     # print(audio_data)
     # convert raw bytes to numpy array
-    samples = np.frombuffer(audio_data, dtype=np.int16).astype(np.float64)
+    samples = np.frombuffer(audio_data, dtype=np.float32).astype(np.float64)
 
     # print(samples)
     # print(np.max(samples))
@@ -48,6 +50,8 @@ def get_peak_frequency(audio_data, sr):
     freqencies = np.fft.rfftfreq(len(samples), d=1.0 / sr)
     # to tell us what the energies are 
     spectrum = np.abs(np.fft.rfft(samples))
+
+    spectrum = spectrum / np.linalg.norm(spectrum)
 
     #so frequencies and spectrum each give at the beginning of each index the frequency and strength
 
@@ -95,6 +99,7 @@ def listen_for_blasts():
     hearing_tone = False
     tone_start = None
     silence_start = None
+    double = False
 
     try:
         while True: #reading some piece of audio
@@ -115,6 +120,12 @@ def listen_for_blasts():
                     hearing_tone = True
                     tone_start = now
                     detected_freqency = matched
+                    if silence_start is not None:
+                        if now - silence_start > MIN_SILENCE_TIME and now-silence_start < MAX_DOUBLE_SILENCE_TIME:
+                            # double
+                            blasts += 1
+                            double = True
+                            break
                 silence_start = None
 
             else: #make sure that we're counting to see if we got a valid sound duration sample
@@ -126,12 +137,12 @@ def listen_for_blasts():
                         #make sure to add the margin of error
                         blasts = blasts + 1
                         silence_start = now
-                        if blasts >= 2:
+                        if blasts >= 3:
                             break
                     else:
                         tone_start = None #if we're getting random noise just don't return it
 
-                if blasts == 1 and silence_start is not None: #waiting to see if we get another blast
+                if silence_start is not None: #waiting to see if we get another blast
                     if now - silence_start >= SILENCE_TIMEOUT:
                         break
 
@@ -141,19 +152,19 @@ def listen_for_blasts():
 
         # for i in range(0, int(SAMPLE_RATE / CHUNK * RECORD_SECONDS)):
         #         data = stream.read(CHUNK, False)
-        #         frames.append(np.fromstring(data, dtype=np.int16))
+        #         frames.append(np.fromstring(data, dtype=np.float32))
 
         # #Convert the list of numpy-arrays into a 1D array (column-wise)
-        # numpydata = np.hstack(frames)
+        # # numpydata = np.hstack(frames)
 
         # print("* done recording")
 
         # # # Save the recorded data as a WAV file
-        # # with wave.open(WAVE_OUTPUT_FILENAME, 'wb') as wf:
-        # #     wf.setnchannels(CHANNELS)
-        # #     wf.setsampwidth(p.get_sample_size(FORMAT))
-        # #     wf.setframerate(SAMPLE_RATE)
-        # #     wf.writeframes(b''.join(frames))
+        # with wave.open(WAVE_OUTPUT_FILENAME, 'wb') as wf:
+        #     wf.setnchannels(CHANNELS)
+        #     wf.setsampwidth(p.get_sample_size(FORMAT))
+        #     wf.setframerate(SAMPLE_RATE)
+        #     wf.writeframes(b''.join(frames))
 
         # write('test.wav', SAMPLE_RATE, numpydata)
 
@@ -162,9 +173,9 @@ def listen_for_blasts():
         stream.close()
         p.terminate() #have to close our microphone
 
-    return blasts, detected_freqency
+    return blasts, detected_freqency, double
 
 
 if __name__ == "__main__":
-    blasts, freqency = listen_for_blasts()
-    print(str(blasts) + " blasts at " + str(freqency) + " hz")
+    blasts, freqency, double = listen_for_blasts()
+    print(str(blasts) + " blasts at " + str(freqency) + " hz, "+("double" if double else "single"))
