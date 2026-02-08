@@ -1,6 +1,13 @@
-follow_path:
+entry: # put the coordinates of the first gate
   x: 0.0
   y: 0.0
+  search_theta: false
+  theta: 0.0
+  wait_time: 0.0
+
+follow_path:
+  x: 0.0
+  y: 40.0
   search_theta: false
   theta: 0.0
   wait_time: 0.0

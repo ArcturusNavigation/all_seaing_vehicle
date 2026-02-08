@@ -25,7 +25,7 @@ TIMER_PERIOD = 1 / 60
 
 class ReturnState(Enum):
     SETTING_UP = 1
-    RETURNING = 2
+    ENTERING = 2
 
 class InternalBuoyPair:
     def __init__(self, left_buoy=None, right_buoy=None):
@@ -39,9 +39,9 @@ class InternalBuoyPair:
         else:
             self.right = right_buoy
 
-class ReturnHome(TaskServerBase):
+class EntryGates(TaskServerBase):
     def __init__(self):
-        super().__init__(server_name = "return_home_server", action_name = "return_home", search_action_name = "search_return")
+        super().__init__(server_name = "entry_gates_server", action_name = "entry_gates", search_action_name = "search_entry")
 
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/global", self.map_cb, 10
@@ -54,7 +54,7 @@ class ReturnHome(TaskServerBase):
         self.declare_parameter("is_sim", False)
         self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
-        self.declare_parameter("red_left", False)
+        self.declare_parameter("red_left", True)
         self.red_left = self.get_parameter("red_left").get_parameter_value().bool_value
 
         self.declare_parameter("duplicate_dist", 0.5)
@@ -208,11 +208,11 @@ class ReturnHome(TaskServerBase):
 
     def init_setup(self):
         self.get_logger().info("Setup buoys succeeded!")
-        self.state = ReturnState.RETURNING
+        self.state = ReturnState.ENTERING
         self.mark_successful()
 
     def control_loop(self):
-        self.return_to_start()
+        self.enter_course()
         self.mark_successful()
         
 
@@ -222,8 +222,8 @@ class ReturnHome(TaskServerBase):
         '''
         self.obstacles = msg.obstacles
     
-    def return_to_start(self):
-        self.get_logger().info("Returning to home")
+    def enter_course(self):
+        self.get_logger().info("Entering the course")
         self.new_gate_pair = self.gate_pair
         while self.new_gate_pair is not None:
             self.gate_pair = self.new_gate_pair
@@ -236,7 +236,7 @@ class ReturnHome(TaskServerBase):
                 exit_func=partial(self.next_pair, self.gate_pair), goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.gate_probe_dist)))
         
         self.report_data(GatePass(
-            type=GateType.GATE_EXIT,
+            type=GateType.GATE_ENTRY,
             position=self.pos_to_latlng(self.latlng_origin, self.robot_pos)))
 
         return Task.Result(success=True)
@@ -362,7 +362,7 @@ class ReturnHome(TaskServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
+            if ob.local_point.point.x > 0 and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -593,7 +593,7 @@ class ReturnHome(TaskServerBase):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ReturnHome()
+    node = EntryGates()
     executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
     executor.spin()

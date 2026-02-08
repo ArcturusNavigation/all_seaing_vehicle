@@ -12,6 +12,8 @@ from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.task_server_base import TaskServerBase
 from all_seaing_controller.pid_controller import PIDController
 
+from all_seaing_common.report_pb2 import ObjectDetected, ObjectType, Color, TaskType
+
 import math
 import os
 import yaml
@@ -142,10 +144,10 @@ class FollowBuoyPath(TaskServerBase):
             # self.red_labels.add(17) # just to use old rosbags
             self.green_labels.add(label_mappings["green_buoy"])
             self.green_labels.add(label_mappings["green_circle"])
-            self.green_labels.add(label_mappings["green_pole_buoy"])
+            # self.green_labels.add(label_mappings["green_pole_buoy"])
             self.red_labels.add(label_mappings["red_buoy"])
             self.red_labels.add(label_mappings["red_circle"])
-            self.red_labels.add(label_mappings["red_pole_buoy"])
+            # self.red_labels.add(label_mappings["red_pole_buoy"])
             # self.red_labels.add(label_mappings["yellow_buoy"])
             # self.red_labels.add(label_mappings["yellow_racquet_ball"])
             # self.green_beacon_labels.add(label_mappings["yellow_buoy"])
@@ -191,6 +193,24 @@ class FollowBuoyPath(TaskServerBase):
         self.turn_pid = PIDController(*Turn_pid)
 
         self.first_back = True
+
+        self.tracked_buoys = []
+        self.max_tracked_buoy_id = -1
+
+        self.declare_parameter(
+            "latlng_locations_file",
+            os.path.join(
+                bringup_prefix, "config", "localization", "locations.yaml"
+            ),
+        )
+
+        with open(self.get_parameter("latlng_locations_file").value, "r") as f:
+            self.latlng_location_mappings = yaml.safe_load(f)
+        
+        self.declare_parameter("location", "nbpark")
+        self.location = self.get_parameter("location").get_parameter_value().string_value
+
+        self.latlng_origin = self.latlng_location_mappings[self.location]
 
     def norm_squared(self, vec, ref=(0, 0)):
         return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
@@ -355,7 +375,8 @@ class FollowBuoyPath(TaskServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if ((pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
+            # if ((pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
+            if ((pointing_direction is None) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -381,47 +402,48 @@ class FollowBuoyPath(TaskServerBase):
         #     self.get_logger().info("GREEN BUOYS LEFT, RED BUOYS RIGHT")
         # self.backup_pair = None
         # want to pick the pair that's far apart but has the closest midpoint
-        if self.first_setup:
-            green_to = None
-            red_to = None
-            for red_b in red_buoys:
-                for green_b in green_buoys:
-                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
-                        self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))}')
-                        continue
-                    elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
-                        self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} BETTER, DIST FROM ROBOT: {self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True)))}')
-                        green_to = green_b
-                        red_to = red_b
-            if green_to is None:
-                return False
-            if self.ccw((0, 0), self.ob_coords(green_to, local=True), self.ob_coords(red_to, local=True)):
-                self.red_left = True
-                self.pair_to = InternalBuoyPair(red_to, green_to)
-                self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
-            else:
-                self.red_left = False
-                self.pair_to = InternalBuoyPair(green_to, red_to)
-                self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
-            self.first_setup = False
-            return True
+        
+        # if self.first_setup:
+        #     green_to = None
+        #     red_to = None
+        #     for red_b in red_buoys:
+        #         for green_b in green_buoys:
+        #             if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+        #                 self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} REJECTED, INTER-BUOY DIST: {self.norm(self.ob_coords(red_b), self.ob_coords(green_b))}')
+        #                 continue
+        #             elif (green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True)))):
+        #                 self.get_logger().debug(f'RED: {self.ob_coords(red_b)}, GREEN: {self.ob_coords(green_b)} BETTER, DIST FROM ROBOT: {self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True)))}')
+        #                 green_to = green_b
+        #                 red_to = red_b
+        #     if green_to is None:
+        #         return False
+        #     if self.ccw((0, 0), self.ob_coords(green_to, local=True), self.ob_coords(red_to, local=True)):
+        #         self.red_left = True
+        #         self.pair_to = InternalBuoyPair(red_to, green_to)
+        #         self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
+        #     else:
+        #         self.red_left = False
+        #         self.pair_to = InternalBuoyPair(green_to, red_to)
+        #         self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
+        #     self.first_setup = False
+        #     return True
+        # else:
+        green_to = None
+        red_to = None
+        for red_b in red_buoys:
+            for green_b in green_buoys:
+                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+                    continue
+                elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
+                    green_to = green_b
+                    red_to = red_b
+        if green_to is None:
+            return False
+        if self.red_left:
+            self.pair_to = InternalBuoyPair(red_to, green_to)
         else:
-            green_to = None
-            red_to = None
-            for red_b in red_buoys:
-                for green_b in green_buoys:
-                    if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
-                        continue
-                    elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
-                        green_to = green_b
-                        red_to = red_b
-            if green_to is None:
-                return False
-            if self.red_left:
-                self.pair_to = InternalBuoyPair(red_to, green_to)
-            else:
-                self.pair_to = InternalBuoyPair(green_to, red_to)
-            return True
+            self.pair_to = InternalBuoyPair(green_to, red_to)
+        return True
 
     def ccw(self, a, b, c):
         """Return True if the points a, b, c are counterclockwise, respectively"""
@@ -880,6 +902,46 @@ class FollowBuoyPath(TaskServerBase):
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
         self.pair_to.left, _ = self.replace_closest(self.pair_to.left, red_buoys if self.red_left else green_buoys)
         self.pair_to.right, _ = self.replace_closest(self.pair_to.right, green_buoys if self.red_left else red_buoys)
+    
+    def report_new_obstacles(self):
+        obstacle: Obstacle
+        for obstacle in self.obstacles:
+            # TODO discard objects like dock or miscellaneous that shouldn't be tracked/don't exist in the course
+            if obstacle.id > self.max_tracked_buoy_id:
+                # potentially new obstacle
+                new_obs = True
+                tracked_obs: Obstacle
+                for tracked_obs in self.tracked_buoys:
+                    if self.norm(self.ob_coords(tracked_obs), self.ob_coords(obstacle)) < self.duplicate_dist:
+                        new_obs = False
+                        break
+                if new_obs:
+                    # report & add to tracked obs
+                    self.tracked_buoys.append(obstacle)
+                    obs_type = ObjectType.OBJECT_UNKNOWN
+                    obs_color = Color.COLOR_UNKNOWN
+                    if obstacle.label in self.green_beacon_labels:
+                        obs_type = ObjectType.OBJECT_LIGHT_BEACON
+                        obs_color = Color.COLOR_GREEN
+                    elif obstacle.label in self.red_beacon_labels:
+                        obs_type = ObjectType.OBJECT_LIGHT_BEACON
+                        obs_color = Color.COLOR_RED
+                    elif obstacle.label in self.green_labels:
+                        obs_type = ObjectType.OBJECT_BUOY
+                        obs_color = Color.COLOR_GREEN
+                    elif obstacle.label in self.red_labels:
+                        obs_type = ObjectType.OBJECT_BUOY
+                        obs_color = Color.COLOR_RED
+                    else:
+                        obs_type = ObjectType.OBJECT_BUOY
+                        obs_color = Color.COLOR_BLACK
+                    self.report_data(ObjectDetected(
+                        object_type=obs_type,
+                        color=obs_color,
+                        position=self.pos_to_latlng(self.latlng_origin, self.ob_coords(obstacle)),
+                        object_id=obstacle.id,
+                        task_context=TaskType.TASK_NAV_CHANNEL))
+
 
     def map_cb(self, msg):
         """
@@ -892,6 +954,7 @@ class FollowBuoyPath(TaskServerBase):
             return
         if self.state in [FollowPathState.WAITING_GREEN_BEACON, FollowPathState.CIRCLING_GREEN_BEACON]:
             self.adapt_pair_to()
+        self.report_new_obstacles()
 
     def probe_green_beacon(self):
         '''
@@ -1042,7 +1105,7 @@ class FollowBuoyPath(TaskServerBase):
             dist_to_buoy = self.norm(self.green_beacon_pos, self.robot_pos)
             dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
 
-            self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
+            # self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
             self.turn_pid.update(dist_to_buoy,dt)
 
             # TODO: update in_Circling correctly (check 90 degrees)

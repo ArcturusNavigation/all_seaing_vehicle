@@ -370,15 +370,6 @@ def launch_setup(context, *args, **kwargs):
         ),
     )
 
-    heartbeat_reporter = launch_ros.actions.Node(
-        package="all_seaing_driver",
-        executable="rover_lora_reporter.py",
-        remappings=[
-        ],
-        parameters=[{"port": "/dev/ttyACM3"}],
-        output="screen",
-    )
-
     perception_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -432,7 +423,6 @@ def launch_setup(context, *args, **kwargs):
         pcl_to_scan_node,
         rf2o_node,
         ekf_node_rf2o,
-        heartbeat_reporter,
         # perception_ld,
         # tasks_ld,
     ]
@@ -441,7 +431,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="boathouse"),
+            DeclareLaunchArgument("location", default_value="nbpark"),
             DeclareLaunchArgument(
                 "comms", default_value="custom", choices=["wifi", "lora", "custom"]
             ),

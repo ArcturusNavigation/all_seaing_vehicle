@@ -61,9 +61,13 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
+            # ENTRY GATES
+            # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
+            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0)],
+
             # FOLLOW PATH
-            [ActionType.SEARCH, TaskType.TASK_UNKNOWN, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
-            [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
 
             # SPEED CHALLENGE
             # [ActionType.SEARCH, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
@@ -74,9 +78,13 @@ class RunTasks(ActionServerBase):
             # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
 
             # DELIVERY
-            # [ActionType.SEARCH, TaskType.OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
-            # [ActionType.TASK, TaskType.OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
+            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
 
+            # EXIT GATES
+            # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_return"), ReferenceInt(0), ReferenceInt(0), "return"],
+            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "return_home"), ReferenceInt(0), ReferenceInt(0)],
+            
             # FALLBACKS
             # [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
             # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
@@ -191,7 +199,11 @@ class RunTasks(ActionServerBase):
 
         with open(self.get_parameter("latlng_locations_file").value, "r") as f:
             self.latlng_location_mappings = yaml.safe_load(f)
-        self.latlng_origin = self.latlng_location_mappings["nbpark"]
+
+        self.declare_parameter("location", "nbpark")
+        self.location = self.get_parameter("location").get_parameter_value().string_value
+
+        self.latlng_origin = self.latlng_location_mappings[self.location]
         
         self.gate_pair = None
 
@@ -249,22 +261,17 @@ class RunTasks(ActionServerBase):
         if self.gate_pair is None:
             self.setup_buoys()
 
-
-
     def report_shore_heartbeat(self):
-        EARTH_RADIUS = 6_370_000
         RAD_TO_DEG = 180.0 / math.pi
-        pose = self.get_robot_pose() # (east, north, heading)
         current_task = TaskType.TASK_NONE # TODO: make sure still works after harbor alert added
         if self.current_task_type != None:
             current_task = self.current_task_type
 
         self.report_data(all_seaing_common.report_pb2.Heartbeat(
                             state=self.heartbeat_state,
-                            position=LatLng(latitude=self.latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
-                                            longitude=self.latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS), # Deal with CW / CCW
+                            position=self.pos_to_latlng(self.latlng_origin, self.robot_pos), # (east, north)
                             spd_mps=self.vel,
-                            heading_deg= ((90 - (RAD_TO_DEG) * (self.get_robot_pose()[2])) % 360), # Deal with CW / CCW
+                            heading_deg= ((90 - (RAD_TO_DEG) * (self.get_robot_pose()[2])) % 360), # (east, north, heading), deal with CW / CCW
                             current_task=current_task))
         
     def sim_keyboard_callback(self, msg):

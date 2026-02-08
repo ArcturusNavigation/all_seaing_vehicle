@@ -15,6 +15,9 @@ from visualization_msgs.msg import Marker
 from std_msgs.msg import ByteMultiArray
 from all_seaing_common.report import report_factory
 
+import math
+from all_seaing_common.report_pb2 import LatLng
+
 
 class ActionServerBase(ABC, Node):
     """
@@ -151,3 +154,8 @@ class ActionServerBase(ABC, Node):
         msg.data = [bytes([b]) for b in report_factory(data).SerializeToString()]
         self.reporter_pub.publish(msg)
 
+    def pos_to_latlng(self, latlng_origin, pose):
+        EARTH_RADIUS = 6_370_000
+        RAD_TO_DEG = 180.0 / math.pi
+        return LatLng(latitude=latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
+                                            longitude=latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS) # Deal with CW / CCW
