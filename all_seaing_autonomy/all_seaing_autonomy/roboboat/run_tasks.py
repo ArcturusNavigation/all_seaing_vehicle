@@ -26,6 +26,7 @@ from sensor_msgs.msg import Joy
 from action_msgs.msg import GoalStatus
 
 import all_seaing_common.report_pb2
+from communication_utils import CommunicationUtils
 
 ###
 
@@ -176,23 +177,14 @@ class RunTasks(ActionServerBase):
             ),
         )
 
-        self.declare_parameter(
-            "latlng_locations_file",
-            os.path.join(
-                bringup_prefix, "config", "localization", "locations.yaml"
-            ),
-        )
-
         task_location_mappings_file = self.get_parameter(
             "task_locations_file"
         ).value
         with open(task_location_mappings_file, "r") as f:
             self.task_location_mappings = yaml.safe_load(f)
 
-        with open(self.get_parameter("latlng_locations_file").value, "r") as f:
-            self.latlng_location_mappings = yaml.safe_load(f)
-        self.latlng_origin = self.latlng_location_mappings["nbpark"]
-        
+        CommunicationUtils.static_init()
+
         self.gate_pair = None
 
         self.waypoint_marker_pub = self.create_publisher(
@@ -252,8 +244,6 @@ class RunTasks(ActionServerBase):
 
 
     def report_shore_heartbeat(self):
-        EARTH_RADIUS = 6_370_000
-        RAD_TO_DEG = 180.0 / math.pi
         pose = self.get_robot_pose() # (east, north, heading)
         current_task = TaskType.TASK_NONE # TODO: make sure still works after harbor alert added
         if self.current_task_type != None:
@@ -261,10 +251,9 @@ class RunTasks(ActionServerBase):
 
         self.report_data(all_seaing_common.report_pb2.Heartbeat(
                             state=self.heartbeat_state,
-                            position=LatLng(latitude=self.latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
-                                            longitude=self.latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS), # Deal with CW / CCW
+                            position=CommunicationUtils.convert_lat_lng(pose[0], pose[1]),
                             spd_mps=0,
-                            heading_deg= ((90 - (RAD_TO_DEG) * (self.get_robot_pose()[2])) % 360), # Deal with CW / CCW
+                            heading_deg=CommunicationUtils.convert_heading_deg(pose[2]), # Deal with CW / CCW
                             current_task=current_task))
         
     def sim_keyboard_callback(self, msg):

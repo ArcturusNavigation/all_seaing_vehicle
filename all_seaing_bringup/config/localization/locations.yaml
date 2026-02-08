@@ -26,6 +26,7 @@ nbpark:
   indoors: false
   lat: 27.3729
   lon: -82.4537
+  heading: 0
   utm: 17
 
 sydney:

@@ -25,7 +25,7 @@ class RoverLoraReporter(Node):
     def send_message_if_exists(self):
         if not self.report_queue.empty():
             raw_msg = self.report_queue.get()
-            frame = struct.pack("!I", len(raw_msg)) + raw_msg + "test".encode()
+            frame = b'$R' + struct.pack("!B", len(raw_msg)) + raw_msg + b'!!'
             self.serial_port.write(frame)
             self.serial_port.flush()
         

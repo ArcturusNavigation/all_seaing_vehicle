@@ -1,0 +1,478 @@
+[INFO] [launch]: All log files can be found below /home/brianxue/.ros/log/2025-11-16-14-52-32-969455-brianxue-Latitude-7420-17254
+[INFO] [launch]: Default logging verbosity is set to INFO
+['xacro', '/home/brianxue/arcturus/dev_ws/install/all_seaing_description/share/all_seaing_description/urdf/xdrive_wamv/wamv_target.urdf', 'namespace:=wamv', 'locked:=true', 'vrx_sensors_enabled:=true', 'thruster_config:=H']
+[INFO] [ekf_node-1]: process started with pid [17258]
+[INFO] [navsat_transform_node-2]: process started with pid [17260]
+[INFO] [xdrive_controller.py-3]: process started with pid [17262]
+[INFO] [controller_server.py-4]: process started with pid [17264]
+[INFO] [obstacle_detector-5]: process started with pid [17266]
+[INFO] [obstacle_detector-6]: process started with pid [17268]
+[INFO] [color_segmentation.py-7]: process started with pid [17270]
+[INFO] [point_cloud_filter-8]: process started with pid [17272]
+[INFO] [point_cloud_filter-9]: process started with pid [17274]
+[INFO] [bbox_project_pcloud-10]: process started with pid [17298]
+[INFO] [ransac_detector-11]: process started with pid [17300]
+[INFO] [object_tracking_map-12]: process started with pid [17302]
+[INFO] [rviz2-13]: process started with pid [17339]
+[INFO] [control_mux.py-14]: process started with pid [17345]
+[INFO] [navigation_server.py-15]: process started with pid [17348]
+[INFO] [grid_map_generator.py-16]: process started with pid [17359]
+[INFO] [onshore_node.py-17]: process started with pid [17362]
+[INFO] [run_tasks.py-18]: process started with pid [17364]
+[INFO] [task_init.py-19]: process started with pid [17375]
+[INFO] [follow_buoy_path.py-20]: process started with pid [17385]
+[INFO] [speed_challenge.py-21]: process started with pid [17391]
+[INFO] [docking.py-22]: process started with pid [17393]
+[INFO] [rviz_waypoint_sender.py-23]: process started with pid [17396]
+[INFO] [keyboard-24]: process started with pid [17399]
+[INFO] [keyboard_to_joy.py-25]: process started with pid [17407]
+[INFO] [ruby $(which gz) sim-26]: process started with pid [17423]
+[INFO] [monitor_sim-27]: process started with pid [17426]
+[INFO] [create-28]: process started with pid [17431]
+[INFO] [parameter_bridge-29]: process started with pid [17441]
+[bbox_project_pcloud-10] [INFO] [1763322753.647996045] [bbox_project_pcloud]: IS SIM: TRUE
+[bbox_project_pcloud-10] [INFO] [1763322753.658263337] [bbox_project_pcloud]: 3 -> black
+[bbox_project_pcloud-10] [INFO] [1763322753.658306182] [bbox_project_pcloud]: 6 -> blue
+[bbox_project_pcloud-10] [INFO] [1763322753.658318941] [bbox_project_pcloud]: 2 -> green
+[bbox_project_pcloud-10] [INFO] [1763322753.658330762] [bbox_project_pcloud]: 1 -> red
+[bbox_project_pcloud-10] [INFO] [1763322753.658342519] [bbox_project_pcloud]: 5 -> yellow
+[bbox_project_pcloud-10] [INFO] [1763322753.658354254] [bbox_project_pcloud]: 7 -> misc
+[ransac_detector-11] [INFO] [1763322753.540169505] [ransac_detector]: black_circle -> 0
+[ransac_detector-11] [INFO] [1763322753.540279490] [ransac_detector]: black_cross -> 1
+[ransac_detector-11] [INFO] [1763322753.540296370] [ransac_detector]: black_triangle -> 2
+[ransac_detector-11] [INFO] [1763322753.540308506] [ransac_detector]: blue_circle -> 3
+[ransac_detector-11] [INFO] [1763322753.540320981] [ransac_detector]: blue_cross -> 4
+[ransac_detector-11] [INFO] [1763322753.540334100] [ransac_detector]: blue_square -> 5
+[ransac_detector-11] [INFO] [1763322753.540346711] [ransac_detector]: blue_triangle -> 6
+[ransac_detector-11] [INFO] [1763322753.540359752] [ransac_detector]: dock -> 7
+[ransac_detector-11] [INFO] [1763322753.540374686] [ransac_detector]: green_circle -> 8
+[ransac_detector-11] [INFO] [1763322753.540387688] [ransac_detector]: green_cross -> 9
+[ransac_detector-11] [INFO] [1763322753.540400180] [ransac_detector]: green_square -> 10
+[ransac_detector-11] [INFO] [1763322753.540411976] [ransac_detector]: green_triangle -> 11
+[ransac_detector-11] [INFO] [1763322753.540424070] [ransac_detector]: red_circle -> 12
+[ransac_detector-11] [INFO] [1763322753.540435990] [ransac_detector]: red_cross -> 13
+[ransac_detector-11] [INFO] [1763322753.540448037] [ransac_detector]: red_square -> 14
+[ransac_detector-11] [INFO] [1763322753.540460262] [ransac_detector]: red_triangle -> 15
+[object_tracking_map-12] [INFO] [1763322753.559408177] [object_tracking_map]: SLAM: ON
+[object_tracking_map-12] [INFO] [1763322753.559563700] [object_tracking_map]: GPS: ON
+[object_tracking_map-12] [INFO] [1763322753.559611895] [object_tracking_map]: TRACK BANNERS: OFF
+[object_tracking_map-12] [INFO] [1763322753.559627005] [object_tracking_map]: BANNERS SLAM: ON
+[rviz2-13] qt.qpa.plugin: Could not find the Qt platform plugin "wayland" in ""
+[create-28] [INFO] [1763322753.917070617] [ros_gz_sim]: Requesting list of world names.
+[rviz2-13] [INFO] [1763322754.012444377] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-13] [INFO] [1763322754.012538240] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[rviz2-13] [INFO] [1763322754.033298674] [rviz2]: Stereo is NOT SUPPORTED
+[run_tasks.py-18] [INFO] [1763322754.113054038] [run_tasks]: Starting Task Manager States...
+[parameter_bridge-29] [INFO] [1763322754.141705825] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/clock (ignition.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-29] [INFO] [1763322754.145136799] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/vrx/task/info (ignition.msgs.Param) -> /vrx/task/info (ros_gz_interfaces/msg/ParamVec)] (Lazy 0)
+[parameter_bridge-29] [INFO] [1763322754.149071059] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/vrx/debug/wind/speed (ignition.msgs.Float) -> /vrx/debug/wind/speed (std_msgs/msg/Float32)] (Lazy 0)
+[parameter_bridge-29] [INFO] [1763322754.152013541] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/vrx/debug/wind/direction (ignition.msgs.Float) -> /vrx/debug/wind/direction (std_msgs/msg/Float32)] (Lazy 0)
+[ruby $(which gz) sim-26] qt.qpa.plugin: Could not find the Qt platform plugin "wayland" in ""
+[keyboard_to_joy.py-25] /opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/node.py:441: UserWarning: when declaring parameter named 'config_file_name', declaring a parameter only providing its name is deprecated. You have to either:
+[keyboard_to_joy.py-25] 	- Pass a name and a default value different to "PARAMETER NOT SET" (and optionally a descriptor).
+[keyboard_to_joy.py-25] 	- Pass a name and a parameter type.
+[keyboard_to_joy.py-25] 	- Pass a name and a descriptor with `dynamic_typing=True
+[keyboard_to_joy.py-25]   warnings.warn(
+[onshore_node.py-17] [INFO] [1763322755.199073122] [onshore_node]: Starting onshore node, teleop enabled
+[task_init.py-19] [INFO] [1763322755.285860918] [task_init_server]: Running in simulation mode. Listening to joystick input.
+[run_tasks.py-18] [INFO] [1763322755.365353719] [run_tasks]: Starting task: <rclpy.action.client.ActionClient object at 0x7ff924388400>
+[run_tasks.py-18] [INFO] [1763322755.366436162] [run_tasks]: Sending goal: all_seaing_interfaces.action.Task_Goal()
+[task_init.py-19] [INFO] [1763322755.367730202] [task_init_server]: Task Server [{self.server_name}] received task
+[run_tasks.py-18] [INFO] [1763322755.368416884] [run_tasks]: Goal accepted
+[task_init.py-19] [INFO] [1763322755.369491826] [task_init_server]: Task Server [task_init_server] started task with goal handle <rclpy.action.server.ServerGoalHandle object at 0x7f048f693fa0>
+[rviz2-13] [INFO] [1763322755.494058645] [rviz2]: Trying to create a map of size 800 x 800 using 1 swatches
+[rviz2-13] [ERROR] [1763322755.525934525] [rviz2]: Vertex Program:rviz/glsl120/indexed_8bit_image.vert Fragment Program:rviz/glsl120/indexed_8bit_image.frag GLSL link result : 
+[rviz2-13] active samplers with a different type refer to the same texture image unit
+[create-28] [INFO] [1763322756.298627655] [ros_gz_sim]: Requested creation of entity.
+[create-28] [INFO] [1763322756.298719714] [ros_gz_sim]: OK creation of entity.
+[INFO] [create-28]: process has finished cleanly [pid 17431]
+[INFO] [optical_frame_publisher-30]: process started with pid [17828]
+[INFO] [optical_frame_publisher-31]: process started with pid [17830]
+[INFO] [optical_frame_publisher-32]: process started with pid [17832]
+[INFO] [parameter_bridge-33]: process started with pid [17834]
+[INFO] [pose_tf_broadcaster-34]: process started with pid [17836]
+[INFO] [robot_state_publisher-35]: process started with pid [17852]
+[parameter_bridge-33] [INFO] [1763322756.682377946] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/wamv/pose (ignition.msgs.Pose_V) -> /model/wamv/pose (tf2_msgs/msg/TFMessage)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.973351275] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/wamv/pose_static (ignition.msgs.Pose_V) -> /model/wamv/pose_static (tf2_msgs/msg/TFMessage)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.974391899] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/joint_state (ignition.msgs.Model) -> /world/follow_path_new/model/wamv/joint_state (sensor_msgs/msg/JointState)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.978871731] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/vrx/contacts (ignition.msgs.Contacts) -> /vrx/contacts (ros_gz_interfaces/msg/Contacts)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.980228226] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/base_link/sensor/far_left_camera_sensor/image (ignition.msgs.Image) -> /world/follow_path_new/model/wamv/link/wamv/base_link/sensor/far_left_camera_sensor/image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.980772132] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/base_link/sensor/far_left_camera_sensor/camera_info (ignition.msgs.CameraInfo) -> /world/follow_path_new/model/wamv/link/wamv/base_link/sensor/far_left_camera_sensor/camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.981308887] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/base_link/sensor/front_left_camera_sensor/image (ignition.msgs.Image) -> /world/follow_path_new/model/wamv/link/wamv/base_link/sensor/front_left_camera_sensor/image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.981641219] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/base_link/sensor/front_left_camera_sensor/camera_info (ignition.msgs.CameraInfo) -> /world/follow_path_new/model/wamv/link/wamv/base_link/sensor/front_left_camera_sensor/camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.982664543] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/base_link/sensor/front_right_camera_sensor/image (ignition.msgs.Image) -> /world/follow_path_new/model/wamv/link/wamv/base_link/sensor/front_right_camera_sensor/image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.983738251] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/base_link/sensor/front_right_camera_sensor/camera_info (ignition.msgs.CameraInfo) -> /world/follow_path_new/model/wamv/link/wamv/base_link/sensor/front_right_camera_sensor/camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322756.985450643] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/base_link/sensor/lidar_wamv_sensor/scan (ignition.msgs.LaserScan) -> /world/follow_path_new/model/wamv/link/wamv/base_link/sensor/lidar_wamv_sensor/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.003237333] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/base_link/sensor/lidar_wamv_sensor/scan/points (ignition.msgs.PointCloudPacked) -> /world/follow_path_new/model/wamv/link/wamv/base_link/sensor/lidar_wamv_sensor/scan/points (sensor_msgs/msg/PointCloud2)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.050795244] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/gps_wamv_link/sensor/navsat/navsat (ignition.msgs.NavSat) -> /world/follow_path_new/model/wamv/link/wamv/gps_wamv_link/sensor/navsat/navsat (sensor_msgs/msg/NavSatFix)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.052273424] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/follow_path_new/model/wamv/link/wamv/imu_wamv_link/sensor/imu_wamv_sensor/imu (ignition.msgs.IMU) -> /world/follow_path_new/model/wamv/link/wamv/imu_wamv_link/sensor/imu_wamv_sensor/imu (sensor_msgs/msg/Imu)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.053640961] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [wamv/thrusters/front_left/thrust (std_msgs/msg/Float64) -> wamv/thrusters/front_left/thrust (ignition.msgs.Double)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.064116012] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [wamv/thrusters/front_left/pos (std_msgs/msg/Float64) -> wamv/thrusters/front_left/pos (ignition.msgs.Double)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.065220135] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [wamv/thrusters/front_right/thrust (std_msgs/msg/Float64) -> wamv/thrusters/front_right/thrust (ignition.msgs.Double)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.066011927] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [wamv/thrusters/front_right/pos (std_msgs/msg/Float64) -> wamv/thrusters/front_right/pos (ignition.msgs.Double)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.068578390] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [wamv/thrusters/back_left/thrust (std_msgs/msg/Float64) -> wamv/thrusters/back_left/thrust (ignition.msgs.Double)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.080864693] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [wamv/thrusters/back_left/pos (std_msgs/msg/Float64) -> wamv/thrusters/back_left/pos (ignition.msgs.Double)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.086244751] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [wamv/thrusters/back_right/thrust (std_msgs/msg/Float64) -> wamv/thrusters/back_right/thrust (ignition.msgs.Double)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.087453782] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [wamv/thrusters/back_right/pos (std_msgs/msg/Float64) -> wamv/thrusters/back_right/pos (ignition.msgs.Double)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.088720257] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [/wamv/shooters/ball_shooter/fire (std_msgs/msg/Bool) -> /wamv/shooters/ball_shooter/fire (ignition.msgs.Boolean)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.090409436] [wamv.ros_gz_bridge]: Creating GZ->ROS Bridge: [wamv/sensors/acoustics/receiver/range_bearing (ignition.msgs.Param) -> wamv/sensors/acoustics/receiver/range_bearing (ros_gz_interfaces/msg/ParamVec)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.118768958] [wamv.ros_gz_bridge]: Creating ROS->GZ Bridge: [/pinger/set_pinger_position (geometry_msgs/msg/Vector3) -> /pinger/set_pinger_position (ignition.msgs.Vector3d)] (Lazy 0)
+[parameter_bridge-33] [INFO] [1763322757.140484622] [wamv.ros_gz_bridge]: Passing message from ROS std_msgs/msg/Float64 to Gazebo gz.msgs.Double (showing msg only once per type)
+[robot_state_publisher-35] [WARN] [1763322757.172671219] [kdl_parser]: The root link wamv/base_link has an inertia specified in the URDF, but KDL does not support a root link with an inertia.  As a workaround, you can add an extra dummy link to your URDF.
+[robot_state_publisher-35] [INFO] [1763322757.173819863] [wamv.robot_state_publisher]: got segment wamv/back_left_engine_link
+[robot_state_publisher-35] [INFO] [1763322757.174531671] [wamv.robot_state_publisher]: got segment wamv/back_left_propeller_link
+[robot_state_publisher-35] [INFO] [1763322757.175017627] [wamv.robot_state_publisher]: got segment wamv/back_right_engine_link
+[robot_state_publisher-35] [INFO] [1763322757.175505337] [wamv.robot_state_publisher]: got segment wamv/back_right_propeller_link
+[robot_state_publisher-35] [INFO] [1763322757.175985625] [wamv.robot_state_publisher]: got segment wamv/ball_shooter_base_link
+[robot_state_publisher-35] [INFO] [1763322757.176464016] [wamv.robot_state_publisher]: got segment wamv/ball_shooter_launcher_link
+[robot_state_publisher-35] [INFO] [1763322757.179110730] [wamv.robot_state_publisher]: got segment wamv/base_link
+[robot_state_publisher-35] [INFO] [1763322757.179706591] [wamv.robot_state_publisher]: got segment wamv/cpu_cases_link
+[robot_state_publisher-35] [INFO] [1763322757.180208764] [wamv.robot_state_publisher]: got segment wamv/far_left_camera_link
+[robot_state_publisher-35] [INFO] [1763322757.180696333] [wamv.robot_state_publisher]: got segment wamv/far_left_camera_link_optical
+[robot_state_publisher-35] [INFO] [1763322757.181321181] [wamv.robot_state_publisher]: got segment wamv/far_left_camera_post_arm_link
+[robot_state_publisher-35] [INFO] [1763322757.181808897] [wamv.robot_state_publisher]: got segment wamv/far_left_camera_post_link
+[robot_state_publisher-35] [INFO] [1763322757.182275878] [wamv.robot_state_publisher]: got segment wamv/front_left_camera_link
+[robot_state_publisher-35] [INFO] [1763322757.182729746] [wamv.robot_state_publisher]: got segment wamv/front_left_camera_link_optical
+[robot_state_publisher-35] [INFO] [1763322757.183202507] [wamv.robot_state_publisher]: got segment wamv/front_left_camera_post_arm_link
+[robot_state_publisher-35] [INFO] [1763322757.183671902] [wamv.robot_state_publisher]: got segment wamv/front_left_camera_post_link
+[robot_state_publisher-35] [INFO] [1763322757.184140928] [wamv.robot_state_publisher]: got segment wamv/front_left_engine_link
+[robot_state_publisher-35] [INFO] [1763322757.184625804] [wamv.robot_state_publisher]: got segment wamv/front_left_propeller_link
+[robot_state_publisher-35] [INFO] [1763322757.185088882] [wamv.robot_state_publisher]: got segment wamv/front_right_camera_link
+[robot_state_publisher-35] [INFO] [1763322757.185099059] [wamv.robot_state_publisher]: got segment wamv/front_right_camera_link_optical
+[robot_state_publisher-35] [INFO] [1763322757.185105948] [wamv.robot_state_publisher]: got segment wamv/front_right_camera_post_arm_link
+[robot_state_publisher-35] [INFO] [1763322757.185111649] [wamv.robot_state_publisher]: got segment wamv/front_right_camera_post_link
+[robot_state_publisher-35] [INFO] [1763322757.185117513] [wamv.robot_state_publisher]: got segment wamv/front_right_engine_link
+[robot_state_publisher-35] [INFO] [1763322757.185123388] [wamv.robot_state_publisher]: got segment wamv/front_right_propeller_link
+[robot_state_publisher-35] [INFO] [1763322757.185129366] [wamv.robot_state_publisher]: got segment wamv/gps_wamv_link
+[robot_state_publisher-35] [INFO] [1763322757.185135492] [wamv.robot_state_publisher]: got segment wamv/imu_wamv_link
+[robot_state_publisher-35] [INFO] [1763322757.185141398] [wamv.robot_state_publisher]: got segment wamv/left_battery_link
+[robot_state_publisher-35] [INFO] [1763322757.185146803] [wamv.robot_state_publisher]: got segment wamv/lidar_wamv_link
+[robot_state_publisher-35] [INFO] [1763322757.185152766] [wamv.robot_state_publisher]: got segment wamv/lidar_wamv_post_arm_link
+[robot_state_publisher-35] [INFO] [1763322757.185158521] [wamv.robot_state_publisher]: got segment wamv/lidar_wamv_post_link
+[robot_state_publisher-35] [INFO] [1763322757.185164040] [wamv.robot_state_publisher]: got segment wamv/receiver
+[robot_state_publisher-35] [INFO] [1763322757.185169625] [wamv.robot_state_publisher]: got segment wamv/right_battery_link
+[navsat_transform_node-2] [INFO] [1763322764.312778179] [navsat_transform_node]: Datum (latitude, longitude, altitude) is (-33.72, 150.67, 0.00)
+[navsat_transform_node-2] [INFO] [1763322764.312955466] [navsat_transform_node]: Datum UTM coordinate is (56H, 284448.41, 6266148.49)
+[navsat_transform_node-2] [INFO] [1763322764.313060801] [navsat_transform_node]: Corrected for magnetic declination of 0, user-specified offset of 0 and meridian convergence of 0.0225502. Transform heading factor is now 0.0225502
+[obstacle_detector-6] [ERROR] [1763322764.548181262] [obstacle_detector]: "map" passed to lookupTransform argument target_frame does not exist. 
+[obstacle_detector-5] [ERROR] [1763322764.548247638] [obstacle_detector]: "map" passed to lookupTransform argument target_frame does not exist. 
+[point_cloud_filter-9] [INFO] [1763322765.533918112] [point_cloud_filter]: GOT LIDAR->BASE_LINK TF
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[robot_state_publisher-35] [INFO] [1763323098.836161181] [rclcpp]: signal_handler(signum=2)
+[ERROR] [monitor_sim-27]: process has died [pid 17426, exit code -2, cmd 'python3 /home/brianxue/arcturus/vrx_ws/install/share/vrx_ros/launch/monitor_sim.py'].
+[INFO] [keyboard-24]: process has finished cleanly [pid 17399]
+[INFO] [optical_frame_publisher-32]: process has finished cleanly [pid 17832]
+[INFO] [ransac_detector-11]: process has finished cleanly [pid 17300]
+[INFO] [optical_frame_publisher-30]: process has finished cleanly [pid 17828]
+[INFO] [pose_tf_broadcaster-34]: process has finished cleanly [pid 17836]
+[ERROR] [grid_map_generator.py-16]: process has died [pid 17359, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/grid_map_generator.py --ros-args --params-file /tmp/launch_params_aevedzz5 --params-file /tmp/launch_params_limbu54e --params-file /tmp/launch_params_5exd_mwl --params-file /tmp/launch_params_bccw8my4 --params-file /tmp/launch_params_0ekwfz6t --params-file /tmp/launch_params_qjlh9fob -r scan:=/wamv/sensors/lidars/lidar_wamv_sensor/scan -r odometry/filtered:=odometry/tracked'].
+[INFO] [optical_frame_publisher-31]: process has finished cleanly [pid 17830]
+[INFO] [robot_state_publisher-35]: process has finished cleanly [pid 17852]
+[INFO] [bbox_project_pcloud-10]: process has finished cleanly [pid 17298]
+[INFO] [point_cloud_filter-8]: process has finished cleanly [pid 17272]
+[INFO] [point_cloud_filter-9]: process has finished cleanly [pid 17274]
+[INFO] [object_tracking_map-12]: process has finished cleanly [pid 17302]
+[INFO] [navsat_transform_node-2]: process has finished cleanly [pid 17260]
+[INFO] [obstacle_detector-6]: process has finished cleanly [pid 17268]
+[pose_tf_broadcaster-34] [INFO] [1763323098.836172061] [rclcpp]: signal_handler(signum=2)
+[ERROR] [color_segmentation.py-7]: process has died [pid 17270, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_perception/lib/all_seaing_perception/color_segmentation.py --ros-args --params-file /tmp/launch_params_r66uouh7 -r image:=/wamv/sensors/cameras/front_left_camera_sensor/image_raw'].
+[optical_frame_publisher-31] [INFO] [1763323098.836208837] [rclcpp]: signal_handler(signum=2)
+[ERROR] [rviz_waypoint_sender.py-23]: process has died [pid 17396, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/rviz_waypoint_sender.py --ros-args --params-file /tmp/launch_params_6qly0l4r --params-file /tmp/launch_params_vjwwlk5o --params-file /tmp/launch_params_r1s4apyc'].
+[optical_frame_publisher-30] [INFO] [1763323098.836198760] [rclcpp]: signal_handler(signum=2)
+[obstacle_detector-6] [INFO] [1763323098.836306610] [rclcpp]: signal_handler(signum=2)
+[parameter_bridge-33] [INFO] [1763323098.836332252] [rclcpp]: signal_handler(signum=2)
+[ransac_detector-11] [INFO] [1763323098.836343508] [rclcpp]: signal_handler(signum=2)
+[INFO] [ekf_node-1]: process has finished cleanly [pid 17258]
+[parameter_bridge-29] [INFO] [1763323098.836379952] [rclcpp]: signal_handler(signum=2)
+[keyboard-24] [INFO] [1763323098.836396421] [rclcpp]: signal_handler(signum=2)
+[optical_frame_publisher-32] [INFO] [1763323098.836403210] [rclcpp]: signal_handler(signum=2)
+[point_cloud_filter-9] [INFO] [1763323098.836445459] [rclcpp]: signal_handler(signum=2)
+[navsat_transform_node-2] [INFO] [1763323098.836528942] [rclcpp]: signal_handler(signum=2)
+[rviz_waypoint_sender.py-23] Traceback (most recent call last):
+[rviz_waypoint_sender.py-23]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/rviz_waypoint_sender.py", line 74, in <module>
+[rviz_waypoint_sender.py-23]     main()
+[rviz_waypoint_sender.py-23]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/rviz_waypoint_sender.py", line 68, in main
+[rviz_waypoint_sender.py-23]     rclpy.spin(node)
+[rviz_waypoint_sender.py-23]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[rviz_waypoint_sender.py-23]     executor.spin_once()
+[rviz_waypoint_sender.py-23]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 751, in spin_once
+[rviz_waypoint_sender.py-23]     self._spin_once_impl(timeout_sec)
+[rviz_waypoint_sender.py-23]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 740, in _spin_once_impl
+[rviz_waypoint_sender.py-23]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[rviz_waypoint_sender.py-23]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[rviz_waypoint_sender.py-23]     return next(self._cb_iter)
+[rviz_waypoint_sender.py-23]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[rviz_waypoint_sender.py-23]     wait_set.wait(timeout_nsec)
+[rviz_waypoint_sender.py-23] KeyboardInterrupt
+[monitor_sim-27] Traceback (most recent call last):
+[monitor_sim-27]   File "/home/brianxue/arcturus/vrx_ws/install/share/vrx_ros/launch/monitor_sim.py", line 38, in <module>
+[monitor_sim-27]     monitor_sim()
+[monitor_sim-27]   File "/home/brianxue/arcturus/vrx_ws/install/share/vrx_ros/launch/monitor_sim.py", line 27, in monitor_sim
+[monitor_sim-27]     time.sleep(1)
+[monitor_sim-27] KeyboardInterrupt
+[object_tracking_map-12] [INFO] [1763323098.837785797] [rclcpp]: signal_handler(signum=2)
+[bbox_project_pcloud-10] [INFO] [1763323098.839202272] [rclcpp]: signal_handler(signum=2)
+[point_cloud_filter-8] [INFO] [1763323098.839303278] [rclcpp]: signal_handler(signum=2)
+[ekf_node-1] [INFO] [1763323098.839493891] [rclcpp]: signal_handler(signum=2)
+[ERROR] [run_tasks.py-18]: process has died [pid 17364, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/run_tasks.py --ros-args'].
+[ERROR] [controller_server.py-4]: process has died [pid 17264, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/controller_server.py --ros-args --params-file /tmp/launch_params_3xfhl5g6 --params-file /tmp/launch_params_rurlh9hm --params-file /tmp/launch_params_dhg38w0o --params-file /tmp/launch_params_m2jbtohi --params-file /tmp/launch_params_uanwbscz --params-file /tmp/launch_params_j0ex7lru --params-file /tmp/launch_params_dno1gytp --params-file /tmp/launch_params_d8v6vghn'].
+[ERROR] [onshore_node.py-17]: process has died [pid 17362, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_driver/lib/all_seaing_driver/onshore_node.py --ros-args --params-file /tmp/launch_params__36r698j --params-file /tmp/launch_params_lqyx0ref --params-file /tmp/launch_params_j2jvaec4'].
+[ERROR] [control_mux.py-14]: process has died [pid 17345, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/control_mux.py --ros-args'].
+[xdrive_controller.py-3] Traceback (most recent call last):
+[xdrive_controller.py-3]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/xdrive_controller.py", line 145, in <module>
+[xdrive_controller.py-3]     main()
+[xdrive_controller.py-3]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/xdrive_controller.py", line 139, in main
+[xdrive_controller.py-3]     rclpy.spin(node)
+[xdrive_controller.py-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[xdrive_controller.py-3]     executor.spin_once()
+[xdrive_controller.py-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 751, in spin_once
+[xdrive_controller.py-3]     self._spin_once_impl(timeout_sec)
+[xdrive_controller.py-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 740, in _spin_once_impl
+[xdrive_controller.py-3]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[xdrive_controller.py-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[xdrive_controller.py-3]     return next(self._cb_iter)
+[xdrive_controller.py-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[xdrive_controller.py-3]     wait_set.wait(timeout_nsec)
+[xdrive_controller.py-3] KeyboardInterrupt
+[onshore_node.py-17] Traceback (most recent call last):
+[onshore_node.py-17]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_driver/lib/all_seaing_driver/onshore_node.py", line 93, in <module>
+[onshore_node.py-17]     main()
+[onshore_node.py-17]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_driver/lib/all_seaing_driver/onshore_node.py", line 87, in main
+[onshore_node.py-17]     rclpy.spin(node)
+[onshore_node.py-17]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[onshore_node.py-17]     executor.spin_once()
+[onshore_node.py-17]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 751, in spin_once
+[onshore_node.py-17]     self._spin_once_impl(timeout_sec)
+[onshore_node.py-17]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 740, in _spin_once_impl
+[onshore_node.py-17]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[onshore_node.py-17]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[onshore_node.py-17]     return next(self._cb_iter)
+[onshore_node.py-17]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[onshore_node.py-17]     wait_set.wait(timeout_nsec)
+[onshore_node.py-17] KeyboardInterrupt
+[run_tasks.py-18] Traceback (most recent call last):
+[run_tasks.py-18]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/run_tasks.py", line 122, in <module>
+[run_tasks.py-18]     main()
+[run_tasks.py-18]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/run_tasks.py", line 117, in main
+[run_tasks.py-18]     rclpy.spin(node)
+[run_tasks.py-18]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[run_tasks.py-18]     executor.spin_once()
+[run_tasks.py-18]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 751, in spin_once
+[run_tasks.py-18]     self._spin_once_impl(timeout_sec)
+[run_tasks.py-18]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 740, in _spin_once_impl
+[run_tasks.py-18]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[run_tasks.py-18]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[run_tasks.py-18]     return next(self._cb_iter)
+[run_tasks.py-18]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[run_tasks.py-18]     wait_set.wait(timeout_nsec)
+[run_tasks.py-18] KeyboardInterrupt
+[control_mux.py-14] Traceback (most recent call last):
+[control_mux.py-14]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/control_mux.py", line 42, in <module>
+[control_mux.py-14]     main()
+[control_mux.py-14]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/control_mux.py", line 36, in main
+[control_mux.py-14]     rclpy.spin(control_mux)
+[control_mux.py-14]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[control_mux.py-14]     executor.spin_once()
+[control_mux.py-14]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 751, in spin_once
+[control_mux.py-14]     self._spin_once_impl(timeout_sec)
+[control_mux.py-14]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 740, in _spin_once_impl
+[control_mux.py-14]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[control_mux.py-14]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[control_mux.py-14]     return next(self._cb_iter)
+[control_mux.py-14]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[control_mux.py-14]     wait_set.wait(timeout_nsec)
+[control_mux.py-14] KeyboardInterrupt
+[color_segmentation.py-7] Traceback (most recent call last):
+[color_segmentation.py-7]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_perception/lib/all_seaing_perception/color_segmentation.py", line 123, in <module>
+[color_segmentation.py-7]     main()
+[color_segmentation.py-7]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_perception/lib/all_seaing_perception/color_segmentation.py", line 117, in main
+[color_segmentation.py-7]     rclpy.spin(color_segmentation)
+[color_segmentation.py-7]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[color_segmentation.py-7]     executor.spin_once()
+[color_segmentation.py-7]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 751, in spin_once
+[color_segmentation.py-7]     self._spin_once_impl(timeout_sec)
+[color_segmentation.py-7]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 740, in _spin_once_impl
+[color_segmentation.py-7]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[color_segmentation.py-7]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[color_segmentation.py-7]     return next(self._cb_iter)
+[color_segmentation.py-7]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[color_segmentation.py-7]     wait_set.wait(timeout_nsec)
+[color_segmentation.py-7] KeyboardInterrupt
+[follow_buoy_path.py-20] Traceback (most recent call last):
+[follow_buoy_path.py-20]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/follow_buoy_path.py", line 1034, in <module>
+[follow_buoy_path.py-20]     main()
+[follow_buoy_path.py-20]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/follow_buoy_path.py", line 1028, in main
+[follow_buoy_path.py-20]     executor.spin()
+[follow_buoy_path.py-20]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 294, in spin
+[follow_buoy_path.py-20]     self.spin_once()
+[follow_buoy_path.py-20]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 806, in spin_once
+[follow_buoy_path.py-20]     self._spin_once_impl(timeout_sec)
+[follow_buoy_path.py-20]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 787, in _spin_once_impl
+[follow_buoy_path.py-20]     handler, entity, node = self.wait_for_ready_callbacks(
+[follow_buoy_path.py-20]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[follow_buoy_path.py-20]     return next(self._cb_iter)
+[follow_buoy_path.py-20]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[follow_buoy_path.py-20]     wait_set.wait(timeout_nsec)
+[follow_buoy_path.py-20] KeyboardInterrupt
+[ERROR] [navigation_server.py-15]: process has died [pid 17348, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/navigation_server.py --ros-args --params-file /tmp/launch_params_6x3jz68b --params-file /tmp/launch_params_6z5dm8x2 --params-file /tmp/launch_params_f0mv1a8g'].
+[speed_challenge.py-21] Traceback (most recent call last):
+[speed_challenge.py-21]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/speed_challenge.py", line 625, in <module>
+[speed_challenge.py-21]     main()
+[speed_challenge.py-21]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/speed_challenge.py", line 619, in main
+[speed_challenge.py-21]     executor.spin()
+[speed_challenge.py-21]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 294, in spin
+[speed_challenge.py-21]     self.spin_once()
+[speed_challenge.py-21]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 806, in spin_once
+[speed_challenge.py-21]     self._spin_once_impl(timeout_sec)
+[speed_challenge.py-21]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 787, in _spin_once_impl
+[speed_challenge.py-21]     handler, entity, node = self.wait_for_ready_callbacks(
+[speed_challenge.py-21]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[speed_challenge.py-21]     return next(self._cb_iter)
+[speed_challenge.py-21]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[speed_challenge.py-21]     wait_set.wait(timeout_nsec)
+[speed_challenge.py-21] KeyboardInterrupt
+[ERROR] [keyboard_to_joy.py-25]: process has died [pid 17407, exit code 1, cmd '/home/brianxue/arcturus/dev_ws/install/keyboard/lib/keyboard/keyboard_to_joy.py --ros-args --params-file /tmp/launch_params_8qqdrp7s --params-file /tmp/launch_params_c5tx07a_'].
+[docking.py-22] Traceback (most recent call last):
+[docking.py-22]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/docking.py", line 526, in <module>
+[docking.py-22]     main()
+[docking.py-22]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/docking.py", line 520, in main
+[docking.py-22]     executor.spin()
+[docking.py-22]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 294, in spin
+[docking.py-22]     self.spin_once()
+[docking.py-22]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 806, in spin_once
+[docking.py-22]     self._spin_once_impl(timeout_sec)
+[docking.py-22]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 787, in _spin_once_impl
+[docking.py-22]     handler, entity, node = self.wait_for_ready_callbacks(
+[docking.py-22]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[docking.py-22]     return next(self._cb_iter)
+[docking.py-22]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[docking.py-22]     wait_set.wait(timeout_nsec)
+[docking.py-22] KeyboardInterrupt
+[task_init.py-19] Traceback (most recent call last):
+[task_init.py-19]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/task_init.py", line 58, in <module>
+[task_init.py-19]     main()
+[task_init.py-19]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/task_init.py", line 53, in main
+[task_init.py-19]     executor.spin()
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 294, in spin
+[task_init.py-19]     self.spin_once()
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 806, in spin_once
+[task_init.py-19]     self._spin_once_impl(timeout_sec)
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 787, in _spin_once_impl
+[task_init.py-19]     handler, entity, node = self.wait_for_ready_callbacks(
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[task_init.py-19]     return next(self._cb_iter)
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[task_init.py-19]     wait_set.wait(timeout_nsec)
+[task_init.py-19] KeyboardInterrupt
+[task_init.py-19] [INFO] [1763323099.064630426] [task_init_server]: ROS shutdown detected or loop ended unexpectedly in control.
+[task_init.py-19] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:389
+[task_init.py-19] [ERROR] [1763323099.074310249] [task_init_server]: Error raised in execute callback: Failed get goal status array: feedback publisher is invalid, at ./src/rcl_action/action_server.c:919
+[task_init.py-19] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:389
+[task_init.py-19] Traceback (most recent call last):
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/action/server.py", line 336, in _execute_goal
+[task_init.py-19]     execute_result = await await_or_execute(execute_callback, goal_handle)
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 107, in await_or_execute
+[task_init.py-19]     return callback(*args)
+[task_init.py-19]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_common/local/lib/python3.10/dist-packages/all_seaing_common/task_server_base.py", line 141, in execute_callback
+[task_init.py-19]     goal_handle.abort()
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/action/server.py", line 153, in abort
+[task_init.py-19]     self._update_state(_rclpy.GoalEvent.ABORT)
+[task_init.py-19]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/action/server.py", line 117, in _update_state
+[task_init.py-19]     self._action_server._handle.publish_status()
+[task_init.py-19] rclpy._rclpy_pybind11.RCLError: Failed get goal status array: feedback publisher is invalid, at ./src/rcl_action/action_server.c:919
+[obstacle_detector-5] [INFO] [1763323098.877446523] [rclcpp]: signal_handler(signum=2)
+[grid_map_generator.py-16] Traceback (most recent call last):
+[grid_map_generator.py-16]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/grid_map_generator.py", line 237, in <module>
+[grid_map_generator.py-16]     main()
+[grid_map_generator.py-16]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/grid_map_generator.py", line 231, in main
+[grid_map_generator.py-16]     rclpy.spin(node)
+[grid_map_generator.py-16]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[grid_map_generator.py-16]     executor.spin_once()
+[grid_map_generator.py-16]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 751, in spin_once
+[grid_map_generator.py-16]     self._spin_once_impl(timeout_sec)
+[grid_map_generator.py-16]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 746, in _spin_once_impl
+[grid_map_generator.py-16]     handler()
+[grid_map_generator.py-16]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/task.py", line 254, in __call__
+[grid_map_generator.py-16]     self._handler.send(None)
+[grid_map_generator.py-16]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 447, in handler
+[grid_map_generator.py-16]     await call_coroutine(entity, arg)
+[grid_map_generator.py-16]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 372, in _execute_subscription
+[grid_map_generator.py-16]     await await_or_execute(sub.callback, msg)
+[grid_map_generator.py-16]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 107, in await_or_execute
+[grid_map_generator.py-16]     return callback(*args)
+[grid_map_generator.py-16]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/grid_map_generator.py", line 212, in hulls_update_cb
+[grid_map_generator.py-16]     self.find_active_cells()
+[grid_map_generator.py-16]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/grid_map_generator.py", line 176, in find_active_cells
+[grid_map_generator.py-16]     self.modify_probability()
+[grid_map_generator.py-16]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/grid_map_generator.py", line 194, in modify_probability
+[grid_map_generator.py-16]     curVal = self.grid.data[x + y * self.grid.info.width]
+[grid_map_generator.py-16]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/nav_msgs/msg/_occupancy_grid.py", line 166, in data
+[grid_map_generator.py-16]     @builtins.property
+[grid_map_generator.py-16] KeyboardInterrupt
+[rviz2-13] [INFO] [1763323098.941445156] [rclcpp]: signal_handler(signum=2)
+[controller_server.py-4] Traceback (most recent call last):
+[controller_server.py-4]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/controller_server.py", line 262, in <module>
+[controller_server.py-4]     main()
+[controller_server.py-4]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/controller_server.py", line 256, in main
+[controller_server.py-4]     executor.spin()
+[controller_server.py-4]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 294, in spin
+[controller_server.py-4]     self.spin_once()
+[controller_server.py-4]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 806, in spin_once
+[controller_server.py-4]     self._spin_once_impl(timeout_sec)
+[controller_server.py-4]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 787, in _spin_once_impl
+[controller_server.py-4]     handler, entity, node = self.wait_for_ready_callbacks(
+[controller_server.py-4]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[controller_server.py-4]     return next(self._cb_iter)
+[controller_server.py-4]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 620, in _wait_for_ready_callbacks
+[controller_server.py-4]     wait_set.wait(timeout_nsec)
+[controller_server.py-4] KeyboardInterrupt
+[navigation_server.py-15] Traceback (most recent call last):
+[navigation_server.py-15]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/navigation_server.py", line 195, in <module>
+[navigation_server.py-15]     main()
+[navigation_server.py-15]   File "/home/brianxue/arcturus/dev_ws/install/all_seaing_navigation/lib/all_seaing_navigation/navigation_server.py", line 189, in main
+[navigation_server.py-15]     executor.spin()
+[navigation_server.py-15]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 294, in spin
+[navigation_server.py-15]     self.spin_once()
+[navigation_server.py-15]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 806, in spin_once
+[navigation_server.py-15]     self._spin_once_impl(timeout_sec)
+[navigation_server.py-15]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 787, in _spin_once_impl
+[navigation_server.py-15]     handler, entity, node = self.wait_for_ready_callbacks(
+[navigation_server.py-15]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+[navigation_server.py-15]     return next(self._cb_iter)
+[navigation_server.py-15]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 664, in _wait_for_ready_callbacks
+[navigation_server.py-15]     handler = self._make_handler(
+[navigation_server.py-15]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 453, in _make_handler
+[navigation_server.py-15]     task = Task(
+[navigation_server.py-15]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/task.py", line 212, in __init__
+[navigation_server.py-15]     super().__init__(executor=executor)
+[navigation_server.py-15]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/task.py", line 49, in __init__
+[navigation_server.py-15]     self._lock = threading.Lock()
+[navigation_server.py-15] KeyboardInterrupt
+[keyboard_to_joy.py-25] Traceback (most recent call last):
+[keyboard_to_joy.py-25]   File "/home/brianxue/arcturus/dev_ws/install/keyboard/lib/keyboard/keyboard_to_joy.py", line 140, in <module>
+[keyboard_to_joy.py-25]     main()
+[keyboard_to_joy.py-25]   File "/home/brianxue/arcturus/dev_ws/install/keyboard/lib/keyboard/keyboard_to_joy.py", line 136, in main
+[keyboard_to_joy.py-25]     rclpy.shutdown()
+[keyboard_to_joy.py-25]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 130, in shutdown
+[keyboard_to_joy.py-25]     _shutdown(context=context)
+[keyboard_to_joy.py-25]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/utilities.py", line 58, in shutdown
+[keyboard_to_joy.py-25]     return context.shutdown()
+[keyboard_to_joy.py-25]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/context.py", line 102, in shutdown
+[keyboard_to_joy.py-25]     self.__context.shutdown()
+[keyboard_to_joy.py-25] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:241
+[ERROR] [follow_buoy_path.py-20]: process has died [pid 17385, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/follow_buoy_path.py --ros-args --params-file /tmp/launch_params_0m_tqnna --params-file /tmp/launch_params_lx0pn5mh --params-file /tmp/launch_params_pck05mmp -r obstacle_map/labeled:=obstacle_map/global -r odometry/filtered:=odometry/tracked'].
+[ERROR] [docking.py-22]: process has died [pid 17393, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/docking.py --ros-args --params-file /tmp/launch_params_ghwhi0vl --params-file /tmp/launch_params_24jt3lsz --params-file /tmp/launch_params_5_o2ieqx --params-file /tmp/launch_params_jytjp3ed --params-file /tmp/launch_params_z8kvyz7k --params-file /tmp/launch_params_ij_9f47b --params-file /tmp/launch_params_w_pkq0y5 --params-file /tmp/launch_params_hk0hl1fz --params-file /tmp/launch_params_dlvmqhrl --params-file /tmp/launch_params_gb3r0o07 --params-file /tmp/launch_params_4ke1o0v7 --params-file /tmp/launch_params_qqps8m9u --params-file /tmp/launch_params_o0yqr3js'].
+[ERROR] [task_init.py-19]: process has died [pid 17375, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/task_init.py --ros-args --params-file /tmp/launch_params_aajuo6o6 --params-file /tmp/launch_params__bth70gr'].
+[ERROR] [speed_challenge.py-21]: process has died [pid 17391, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_autonomy/lib/all_seaing_autonomy/speed_challenge.py --ros-args --params-file /tmp/launch_params_9ppjoyl9 --params-file /tmp/launch_params_h6836x5i --params-file /tmp/launch_params_aq0k58i9 --params-file /tmp/launch_params_ne0r1awy -r obstacle_map/labeled:=obstacle_map/global -r odometry/filtered:=odometry/tracked'].
+[ERROR] [xdrive_controller.py-3]: process has died [pid 17262, exit code -2, cmd '/home/brianxue/arcturus/dev_ws/install/all_seaing_controller/lib/all_seaing_controller/xdrive_controller.py --ros-args --params-file /tmp/launch_params_jfkj5f8h -r thrusters/front_left/thrust:=/wamv/thrusters/front_left/thrust -r thrusters/front_right/thrust:=/wamv/thrusters/front_right/thrust -r thrusters/back_left/thrust:=/wamv/thrusters/back_left/thrust -r thrusters/back_right/thrust:=/wamv/thrusters/back_right/thrust'].
+[INFO] [obstacle_detector-5]: process has finished cleanly [pid 17266]
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT) again, ignoring...
+[INFO] [parameter_bridge-29]: process has finished cleanly [pid 17441]
+[INFO] [parameter_bridge-33]: process has finished cleanly [pid 17834]
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT) again, ignoring...
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT) again, ignoring...
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT) again, ignoring...
+[ERROR] [rviz2-13]: process has died [pid 17339, exit code -11, cmd '/opt/ros/humble/lib/rviz2/rviz2 -d /home/brianxue/arcturus/dev_ws/install/all_seaing_bringup/share/all_seaing_bringup/rviz/dashboard.rviz --ros-args --params-file /tmp/launch_params_cwc7yd37'].
+[ERROR] [ruby $(which gz) sim-26]: process[ruby $(which gz) sim-26] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [ruby $(which gz) sim-26]: sending signal 'SIGTERM' to process[ruby $(which gz) sim-26]
+[ERROR] [ruby $(which gz) sim-26]: process has died [pid 17423, exit code -15, cmd 'ruby $(which gz) sim -v 4 -r -v 0 rb2025/follow_path_new.sdf --force-version 7'].
