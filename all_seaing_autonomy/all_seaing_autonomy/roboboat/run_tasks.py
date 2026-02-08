@@ -62,8 +62,8 @@ class RunTasks(ActionServerBase):
         ]
         self.task_list = [
             # ENTRY GATES
-            [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
-            [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
+            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0)],
 
             # FOLLOW PATH
             [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
@@ -78,8 +78,8 @@ class RunTasks(ActionServerBase):
             # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
 
             # DELIVERY
-            # [ActionType.SEARCH, TaskType.OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
-            # [ActionType.TASK, TaskType.OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.SEARCH, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
+            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
 
             # EXIT GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_return"), ReferenceInt(0), ReferenceInt(0), "return"],

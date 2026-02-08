@@ -484,10 +484,10 @@ class MechanismNavigation(TaskServerBase):
                     else:
                         self.call_delivery_server("ball")
                         obs_color = Color.COLOR_BLACK
-                        del_type = DeliveryType.DELIVERY_BOAT
+                        del_type = DeliveryType.DELIVERY_BALL
 
                     self.report_data(ObjectDelivery(
-                        color=obs_color,
+                        vessel_color=obs_color,
                         position=self.pos_to_latlng(self.latlng_origin, self.robot_pos),
                         delivery_type=del_type))
                     

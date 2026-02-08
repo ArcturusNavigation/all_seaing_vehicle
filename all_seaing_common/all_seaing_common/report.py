@@ -29,7 +29,7 @@ def report_factory(data):
                 team_id=TEAM_ID,
                 vehicle_id=VEHICLE_ID,
                 seq=__report_seq[0],
-                object_detected=data
+                gate_pass=data
             )
         case ObjectDelivery():
             ret = Report(

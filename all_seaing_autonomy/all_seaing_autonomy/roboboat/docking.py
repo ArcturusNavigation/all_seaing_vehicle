@@ -20,7 +20,7 @@ from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
 
-from all_seaing_common.report_pb2 import Docking
+import all_seaing_common.report_pb2
 
 import time
 import math
@@ -390,6 +390,7 @@ class Docking(TaskServerBase):
                         self.x_pid.reset()
                         self.y_pid.reset()
                         self.theta_pid.reset()
+                        self.reported_docking = False
                         if self.state == DockingState.NAVIGATING_DOCK:
                             self.state = DockingState.CANCELLING_NAVIGATION
                         else:
@@ -413,6 +414,7 @@ class Docking(TaskServerBase):
                     self.x_pid.reset()
                     self.y_pid.reset()
                     self.theta_pid.reset()
+                    self.reported_docking = False
                     self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]], dock_side}')
 
         if (not self.picked_slot) or (not self.updated_slot_pos):
@@ -423,6 +425,7 @@ class Docking(TaskServerBase):
             self.x_pid.reset()
             self.y_pid.reset()
             self.theta_pid.reset()
+            self.reported_docking = False
             if self.state == DockingState.NAVIGATING_DOCK:
                 # was going to a fake slot (misdetection)
                 self.state = DockingState.CANCELLING_NAVIGATION
@@ -563,9 +566,9 @@ class Docking(TaskServerBase):
 
             # to get the reporting points even without necessarily successfully docking
             if not self.reported_docking:
-                self.report_data(Docking(
+                self.report_data(all_seaing_common.report_pb2.Docking(
                     dock="N" if slot_side == DockSide.NORTH else "S",
-                    slip=self.number_priority[slot_label]+1))
+                    slip=str(self.number_priority[slot_label]+1)))
                 self.reported_docking = True
 
             # go to that line and forward (negative error if boat left of line, positive if right)

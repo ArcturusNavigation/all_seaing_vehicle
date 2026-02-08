@@ -407,14 +407,28 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    heartbeat_reporter = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="rover_lora_reporter.py",
+        remappings=[
+        ],
+        parameters=[
+            {"port": "/dev/ttyACM3"},
+            {"is_sim": False},
+        ],
+        output="screen",
+    )
+
     return [
         controller_server,
         # navigation_server,
         navigation_server_tangent,
         # navigation_server_nomap,
         rviz_waypoint_sender,
+        heartbeat_reporter,
         run_tasks,
-        task_init_server, 
+        task_init_server,
+        entry_gates,
         follow_buoy_path,
         speed_challenge,
         docking,

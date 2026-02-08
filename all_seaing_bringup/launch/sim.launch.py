@@ -559,6 +559,8 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
         ],
         parameters=[
+            {"port": "/dev/ttyACM0"},
+            {"is_sim": True},
         ],
         output="screen",
     )

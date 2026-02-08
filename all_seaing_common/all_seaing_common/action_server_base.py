@@ -158,4 +158,4 @@ class ActionServerBase(ABC, Node):
         EARTH_RADIUS = 6_370_000
         RAD_TO_DEG = 180.0 / math.pi
         return LatLng(latitude=latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
-                                            longitude=latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS), # Deal with CW / CCW
+                                            longitude=latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS) # Deal with CW / CCW

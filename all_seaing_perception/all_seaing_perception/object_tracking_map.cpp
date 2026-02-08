@@ -216,6 +216,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_gps_based_dx = 0;
     m_gps_based_dy = 0;
     m_gps_based_dtheta = 0;
+
+    m_obstacle_id = 0;
 }
 
 template <typename T_matrix> std::string matrix_to_string(T_matrix matrix) {
