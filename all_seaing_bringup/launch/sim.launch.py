@@ -705,6 +705,14 @@ def launch_setup(context, *args, **kwargs):
         ]
     )
 
+    sound_signal_node = launch_ros.actions.Node(
+        package="all_seaing_driver",
+        executable="sound_signal_detector.py",
+        parameters=[
+            {"target_freq": 600.0},
+        ],
+    )
+
     follow_buoy_pid = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="follow_buoy_pid.py",
@@ -866,6 +874,7 @@ def launch_setup(context, *args, **kwargs):
         return_home,
         harbor_alert,
         delivery_server,
+        sound_signal_node,
         # follow_buoy_pid,
         # speed_challenge_pid,
         # docking_fallback,
