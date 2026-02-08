@@ -12,6 +12,12 @@ from tf_transformations import euler_from_quaternion
 from threading import Semaphore, Event
 from visualization_msgs.msg import Marker
 
+from std_msgs.msg import ByteMultiArray
+from all_seaing_common.report import report_factory
+
+import math
+from all_seaing_common.report_pb2 import LatLng
+
 
 class ActionServerBase(ABC, Node):
     """
@@ -39,6 +45,12 @@ class ActionServerBase(ABC, Node):
         # --------------- SUBSCRIBERS AND PUBLISHERS ---------------#
 
         self.marker_pub = self.create_publisher(Marker, "action_marker", 10)
+
+        self.reporter_pub = self.create_publisher(
+            ByteMultiArray, 
+            "task_reporter",
+            10
+        )
 
         # --------------- TF SETUP ---------------#
 
@@ -136,3 +148,14 @@ class ActionServerBase(ABC, Node):
             ]
         )
         return x, y, heading
+    
+    def report_data(self, data): # Pass in only the subobject - the Report / date / etc. is all filled out automatically 
+        msg = ByteMultiArray()
+        msg.data = [bytes([b]) for b in report_factory(data).SerializeToString()]
+        self.reporter_pub.publish(msg)
+
+    def pos_to_latlng(self, latlng_origin, pose):
+        EARTH_RADIUS = 6_370_000
+        RAD_TO_DEG = 180.0 / math.pi
+        return LatLng(latitude=latlng_origin["lat"] + RAD_TO_DEG * pose[1] / EARTH_RADIUS, 
+                                            longitude=latlng_origin["lon"] - RAD_TO_DEG * pose[0] / EARTH_RADIUS) # Deal with CW / CCW

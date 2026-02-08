@@ -370,31 +370,6 @@ def launch_setup(context, *args, **kwargs):
         ),
     )
 
-    # param_substitutions = {
-    #     'odom_frame': 'odom_amcl' if context.perform_substitution(LaunchConfiguration('use_amcl')).lower() == "true" else 'odom_rf2o',
-    # }
-
-    # configured_params = RewrittenYaml(
-    #         source_file=robot_localization_amcl_params,
-    #         root_key='',
-    #         param_rewrites=param_substitutions,
-    #         convert_types=True)
-
-    # ekf_node_amcl = launch_ros.actions.Node(
-    #     package="robot_localization",
-    #     executable="ekf_node",
-    #     parameters=[configured_params],
-    #     # parameters=[robot_localization_amcl_params],
-    #     remappings=[
-    #         ("odometry/filtered", "odometry/integrated"),
-    #     ],
-    #     condition=IfCondition(
-    #         PythonExpression([
-    #             "'", is_indoors, "' == 'true' or '", use_lio, "' == 'true'"
-    #         ]),
-    #     ),
-    # )
-
     perception_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -448,7 +423,6 @@ def launch_setup(context, *args, **kwargs):
         pcl_to_scan_node,
         rf2o_node,
         ekf_node_rf2o,
-        # ekf_node_amcl,
         # perception_ld,
         # tasks_ld,
     ]
@@ -457,7 +431,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="boathouse"),
+            DeclareLaunchArgument("location", default_value="nbpark"),
             DeclareLaunchArgument(
                 "comms", default_value="custom", choices=["wifi", "lora", "custom"]
             ),

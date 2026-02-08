@@ -11,6 +11,8 @@ from std_msgs.msg import Header, ColorRGBA
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from all_seaing_common.task_server_base import TaskServerBase
 
+from all_seaing_common.report_pb2 import GatePass, GateType
+
 import os
 import yaml
 import math
@@ -131,15 +133,22 @@ class ReturnHome(TaskServerBase):
             ),
         )
 
-        self.gate_pair = None
+        self.declare_parameter(
+            "latlng_locations_file",
+            os.path.join(
+                bringup_prefix, "config", "localization", "locations.yaml"
+            ),
+        )
 
-    def reset_challenge(self):
-        '''
-        Readies the server for the upcoming speed challenge.
-        '''
-        self.buoy_found = False
-        self.following_guide = True
-        self.moved_to_point = False
+        with open(self.get_parameter("latlng_locations_file").value, "r") as f:
+            self.latlng_location_mappings = yaml.safe_load(f)
+        
+        self.declare_parameter("location", "nbpark")
+        self.location = self.get_parameter("location").get_parameter_value().string_value
+
+        self.latlng_origin = self.latlng_location_mappings[self.location]
+
+        self.gate_pair = None
     
     def replace_closest(self, ref_obs, obstacles):
         if len(obstacles) == 0:
@@ -225,6 +234,11 @@ class ReturnHome(TaskServerBase):
             self.gate_wpt, _ = self.midpoint_pair_dir(self.gate_pair, self.gate_probe_dist)
             self.move_to_point(self.gate_wpt, busy_wait=True,
                 exit_func=partial(self.next_pair, self.gate_pair), goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.gate_probe_dist)))
+        
+        self.report_data(GatePass(
+            type=GateType.GATE_EXIT,
+            position=self.pos_to_latlng(self.latlng_origin, self.robot_pos)))
+
         return Task.Result(success=True)
 
     def norm_squared(self, vec, ref=(0, 0)):
