@@ -410,7 +410,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             # {"shape_label_mappings_file": shape_label_mappings},
             {"shape_label_mappings_file": all_label_mappings},
-            {"Kpid_x": [1.0, 0.0, 0.0]},
+            {"Kpid": [1.0, 0.0, 0.0]},
         ]
     )
     
