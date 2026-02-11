@@ -405,6 +405,13 @@ def launch_setup(context, *args, **kwargs):
     delivery_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="delivery_server.py",
+        parameters=[
+            {"is_sim": False},
+            # {"shape_label_mappings_file": buoy_label_mappings},
+            # {"shape_label_mappings_file": shape_label_mappings},
+            {"shape_label_mappings_file": all_label_mappings},
+            {"Kpid_x": [1.0, 0.0, 0.0]},
+        ]
     )
     
     rviz_waypoint_sender = launch_ros.actions.Node(

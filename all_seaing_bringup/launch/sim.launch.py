@@ -792,6 +792,7 @@ def launch_setup(context, *args, **kwargs):
         executable="delivery_server.py",
         parameters=[
             {"is_sim": True},
+            {"shape_label_mappings_file": shape_label_mappings},
         ]
     )
 
