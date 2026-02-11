@@ -8,11 +8,19 @@ from all_seaing_controller.pid_controller import PIDController
 from all_seaing_interfaces.action import Task
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray
 from all_seaing_interfaces.srv import CommandAdj, CommandServo
+from ament_index_python.packages import get_package_share_directory
 
 import time
+import yaml
+import os
 
 TIMER_PERIOD = 1 / 10
-SERVO_HALF_RANGE = 90.0
+SERVO_HALF_RANGE = 60.0
+SERVO_MAX = 120.0
+SERVO_MIN = 0.0
+SWEEP_MIN = 30.0
+SWEEP_MAX = 90.0
+SWEEP_OMEGA = 90.0
 
 class DeliveryServer(ActionServerBase):
     serial_instance = None
@@ -23,7 +31,7 @@ class DeliveryServer(ActionServerBase):
         # --------------- PARAMETERS ---------------#
 
         Kpid = (
-            self.declare_parameter("Kpid", [0.18, 0.0, 0.0])
+            self.declare_parameter("Kpid", [1.0, 0.0, 0.0])
             .get_parameter_value()
             .double_array_value
         )
@@ -104,27 +112,47 @@ class DeliveryServer(ActionServerBase):
         self.target_x = self.camera_width / 2
         self.is_aiming = False
         self.bboxes = []
+        self.servo_angle = SERVO_HALF_RANGE
+        self.sweep_sign = 1
 
+        bringup_prefix = get_package_share_directory("all_seaing_bringup")
+
+        self.declare_parameter(
+            "shape_label_mappings_file",
+            os.path.join(
+                bringup_prefix, "config", "perception", "shape_label_mappings.yaml"
+            ),
+        )
+
+        shape_label_mappings_file = self.get_parameter(
+            "shape_label_mappings_file"
+        ).value
+        with open(shape_label_mappings_file, "r") as f:
+            self.label_mappings = yaml.safe_load(f)
+
+        if self.is_sim:
+            self.water_labels = [self.label_mappings[name] for name in ["blue_circle", "blue_cross", "blue_triangle", "green_circle", "green_cross", "green_square", "green_triangle"]]
+            self.ball_labels = [self.label_mappings[name] for name in ["red_circle", "red_cross", "red_triangle", "red_square"]]
+        else:
+            self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
+            self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+
+        self.target_labels = []
+
+        # req = CommandServo.Request()
+        # req.enable = False
+        # # TODO set req.angle to fixed angle we want when not shooting
+        # req.port = 2
+        # self.command_servo_cli.call_async(req)
 
     def timer_callback(self):
         if not self.is_sim:
             if self.is_aiming:
                 self.update_pid()
-                effort = self.aim_pid.get_effort()
-                # TODO this doesn't make sense as a PID controller (zero steady state error is literally impossible)
-                # convert to applying a certain velocity at each point & integrating (keeping track of angle at each step) to update the sent angle
-                # then when error is 0 we have 0 angle diff thus same angle, stabilizing the turret
-                servo_output = SERVO_HALF_RANGE + effort
+                servo_output = self.servo_angle
                 req = CommandServo.Request()
                 req.enable = True
                 req.angle = int(servo_output)
-                req.port = 2
-                self.command_servo_cli.call_async(req)
-            else:
-                self.prev_update_time = self.get_clock().now()
-                self.aim_pid.reset()
-                req = CommandServo.Request()
-                req.enable = False
                 req.port = 2
                 self.command_servo_cli.call_async(req)
 
@@ -132,22 +160,38 @@ class DeliveryServer(ActionServerBase):
         self.bboxes = msg.boxes
 
     def update_pid(self):
-        # TODO if not find bbox with certain label, search right and left (sweep)
         largest_bbox_area = 0
-        # TODO add a parametrizable list of bbox labels to only consider those, to not start shooting towards the dock or something else
-        # TODO set a flag when the server is called to only consider the water or ball labels based on the request
         for bbox in self.bboxes:
+            if bbox.label not in self.target_labels:
+                continue
             area = (bbox.max_x - bbox.min_x) * (bbox.max_y - bbox.min_y)
             if area > largest_bbox_area:
                 largest_bbox_area = area
                 self.target_x = (bbox.min_x + bbox.max_x) / 2
-        self.aim_pid.set_setpoint(self.camera_width / 2)   # Want target in center
-        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-        self.aim_pid.update(self.target_x, dt)
-        self.prev_update_time = self.get_clock().now()
+        if largest_bbox_area == 0:
+            # if not find bbox with certain label, search right and left (sweep)
+            if self.servo_angle <= SWEEP_MIN:
+                self.sweep_sign = 1
+            elif self.servo_angle >= SWEEP_MAX:
+                self.sweep_sign = -1
+            self.servo_angle += self.sweep_sign*SWEEP_OMEGA*dt
+            self.servo_angle = min(max(self.servo_angle, SWEEP_MIN), SWEEP_MIN)
+        else:
+            self.aim_pid.set_setpoint(self.camera_width / 2)   # Want target in center
+            dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+            self.aim_pid.update(self.target_x, dt)
+            self.prev_update_time = self.get_clock().now()
+            effort = self.aim_pid.get_effort()
+            self.servo_angle += effort*dt # effort is considered to be omega basically
+            self.servo_angle = min(max(self.servo_angle, SERVO_MIN), SERVO_MAX)
 
     def water_callback(self, goal_handle):
         self.start_process("Water delivery started!")
+
+        self.target_labels = self.water_labels
+        self.prev_update_time = self.get_clock().now()
+        self.servo_angle = SERVO_HALF_RANGE
+        self.sweep_sign = 1
 
         if not self.is_sim:
             self.get_logger().info("Turning on water pump")
@@ -168,6 +212,8 @@ class DeliveryServer(ActionServerBase):
             self.command_adj_cli.call_async(req)
             self.is_aiming = False
 
+        self.target_labels = []
+
         self.end_process("Water delivery completed!")
         goal_handle.succeed()
         
@@ -176,6 +222,11 @@ class DeliveryServer(ActionServerBase):
     def object_callback(self, goal_handle):
         self.start_process("Object delivery started!")
 
+        self.target_labels = self.ball_labels
+        self.prev_update_time = self.get_clock().now()
+        self.servo_angle = SERVO_HALF_RANGE
+        self.sweep_sign = 1
+
         if not self.is_sim:
             self.get_logger().info("Turning on ball shooter")
 
@@ -183,16 +234,18 @@ class DeliveryServer(ActionServerBase):
             req = CommandAdj.Request()
             req.enable = True
             req.port = 2
-            req.voltage = 5.0
+            req.voltage = 7.4
             self.command_adj_cli.call_async(req)
 
             # Turn on ball shooter feeding servo
             req = CommandServo.Request()
             req.enable = True
-            req.angle = 0
+            req.angle = 0 # push, then 180 is to go back, and 90 is do nothing
             req.port = 1
             self.command_servo_cli.call_async(req)
             self.is_aiming = True
+            
+        self.target_labels = []
 
         # Aim until a ball is launched or timed out
         start = time.time()
@@ -211,9 +264,17 @@ class DeliveryServer(ActionServerBase):
             # Turn off ball shooter feeding servo
             req = CommandServo.Request()
             req.enable = False
+            req.angle = 90 # do nothing
             req.port = 1
             self.command_servo_cli.call_async(req)
             self.is_aiming = False
+        
+        self.aim_pid.reset()
+        req = CommandServo.Request()
+        req.enable = False
+        # TODO set req.angle to fixed angle we want when not shooting
+        req.port = 2
+        self.command_servo_cli.call_async(req)
 
         self.end_process("Object delivery completed!")
         goal_handle.succeed()

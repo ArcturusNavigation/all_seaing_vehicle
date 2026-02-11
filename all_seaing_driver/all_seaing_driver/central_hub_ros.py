@@ -74,11 +74,11 @@ class CentralHubROS(Node):
             if request.port == 1:
                 self.mech_pow_a.set_voltage(request.voltage)
                 self.mech_pow_a.output(True)
-                self.mechanisms.pump_enable(True)
             elif request.port == 2:
                 self.mech_pow_b.set_voltage(request.voltage)
                 self.mech_pow_b.output(True)
                 self.mechanisms.motor_enable(True)
+                self.mechanisms.pump_enable(True)
             else:
                 self.get_logger().warn("Invalid adj port addressed")
                 response.success = False
@@ -86,10 +86,10 @@ class CentralHubROS(Node):
         else:
             if request.port == 1:
                 self.mech_pow_a.output(False)
-                self.mechanisms.pump_enable(False)
             elif request.port == 2:
                 self.mech_pow_b.output(False)
                 self.mechanisms.motor_enable(False)
+                self.mechanisms.pump_enable(False)
             else:
                 self.get_logger().warn("Invalid adj port addressed")
                 response.success = False
