@@ -70,6 +70,7 @@ class CentralHubROS(Node):
         return response
 
     def cmd_adj_cb(self, request, response):
+        self.get_logger().info(f'cmd_adj: {request}')
         if request.enable:
             if request.port == 1:
                 self.mech_pow_a.set_voltage(request.voltage)
@@ -100,7 +101,7 @@ class CentralHubROS(Node):
     
     # TRUE if battery is OKAY, FALSE if battery is LOW
     def battery_check(self):
-        current_voltage = self.bms.stack_voltage()
+        # current_voltage = self.bms.stack_voltage()
         # self.get_logger().warn(f"Voltage: {current_voltage}V")
         # if current_voltage < self.low_battery_threshold and not self.estop.manual():
         #     if not self.battery_ack:
@@ -111,6 +112,7 @@ class CentralHubROS(Node):
         return True
 
     def cmd_servo_cb(self, request, response):
+        self.get_logger().info(f'cmd_servo: {request}')
         if request.enable:
             if request.port == 1:
                 self.mechanisms.servo1(request.angle)

@@ -168,6 +168,8 @@ class DeliveryServer(ActionServerBase):
             if area > largest_bbox_area:
                 largest_bbox_area = area
                 self.target_x = (bbox.min_x + bbox.max_x) / 2
+        dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+        self.prev_update_time = self.get_clock().now()
         if largest_bbox_area == 0:
             # if not find bbox with certain label, search right and left (sweep)
             if self.servo_angle <= SWEEP_MIN:
@@ -178,9 +180,7 @@ class DeliveryServer(ActionServerBase):
             self.servo_angle = min(max(self.servo_angle, SWEEP_MIN), SWEEP_MIN)
         else:
             self.aim_pid.set_setpoint(self.camera_width / 2)   # Want target in center
-            dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
             self.aim_pid.update(self.target_x, dt)
-            self.prev_update_time = self.get_clock().now()
             effort = self.aim_pid.get_effort()
             self.servo_angle += effort*dt # effort is considered to be omega basically
             self.servo_angle = min(max(self.servo_angle, SERVO_MIN), SERVO_MAX)

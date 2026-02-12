@@ -27,6 +27,7 @@ class WebcamPublisher(Node):
 
     def close(self):
         self.cap.release()
+        
 
 
 def main(args=None):

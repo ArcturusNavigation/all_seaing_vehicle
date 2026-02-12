@@ -442,16 +442,16 @@ def launch_setup(context, *args, **kwargs):
         navigation_server_tangent,
         # navigation_server_nomap,
         rviz_waypoint_sender,
-        heartbeat_reporter,
         run_tasks,
-        task_init_server,
-        entry_gates,
+        task_init_server, 
         follow_buoy_path,
         speed_challenge,
         docking,
         mechanism_navigation,
         return_home,
         harbor_alert,
+        heartbeat_reporter,
+        entry_gates,
         delivery_server,
         sound_signal_node,
         # follow_buoy_pid,
@@ -464,7 +464,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("location", default_value="nbpark"),
-            DeclareLaunchArgument("target_freq", default_value=600.0),
+            DeclareLaunchArgument("target_freq", default_value="600.0"),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),
