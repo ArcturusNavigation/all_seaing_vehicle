@@ -408,9 +408,9 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"is_sim": False},
             # {"shape_label_mappings_file": buoy_label_mappings},
-            # {"shape_label_mappings_file": shape_label_mappings},
-            {"shape_label_mappings_file": all_label_mappings},
-            {"Kpid": [1.0, 0.0, 0.0]},
+            {"shape_label_mappings_file": shape_label_mappings},
+            # {"shape_label_mappings_file": all_label_mappings},
+            {"Kpid": [0.1, 0.0, 0.0]},
         ]
     )
     
@@ -437,23 +437,23 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        controller_server,
-        # navigation_server,
-        navigation_server_tangent,
-        # navigation_server_nomap,
-        rviz_waypoint_sender,
-        run_tasks,
-        task_init_server, 
-        follow_buoy_path,
-        speed_challenge,
-        docking,
-        mechanism_navigation,
-        return_home,
-        harbor_alert,
-        heartbeat_reporter,
-        entry_gates,
+        # controller_server,
+        # # navigation_server,
+        # navigation_server_tangent,
+        # # navigation_server_nomap,
+        # rviz_waypoint_sender,
+        # run_tasks,
+        # task_init_server, 
+        # follow_buoy_path,
+        # speed_challenge,
+        # docking,
+        # mechanism_navigation,
+        # return_home,
+        # harbor_alert,
+        # heartbeat_reporter,
+        # entry_gates,
         delivery_server,
-        sound_signal_node,
+        # sound_signal_node,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback,

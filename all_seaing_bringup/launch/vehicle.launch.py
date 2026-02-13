@@ -215,7 +215,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="webcam_publisher.py",
         parameters=[
-            {"video_index": 0},
+            {"video_index": 2},
         ],
         remappings=[
             ("webcam_image", "turret_image"),
@@ -225,7 +225,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM0"}],
+        parameters=[{"port": "/dev/ttyACM3"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -245,7 +245,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1"
+            "port": "/dev/ttyACM0"
         }.items(),
     )
 
