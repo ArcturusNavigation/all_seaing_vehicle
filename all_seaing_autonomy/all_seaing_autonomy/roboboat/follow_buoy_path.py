@@ -1143,7 +1143,7 @@ class FollowBuoyPath(TaskServerBase):
             was_exit_angle_met = currently_met
 
             time.sleep(self.timer_period)
-            
+
         self.get_logger().info(f"Finished circling buoy")
         return Task.Result(success=True)
     
