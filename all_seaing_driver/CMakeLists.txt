@@ -19,7 +19,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/onshore_node.py
     ${PROJECT_NAME}/rover_custom_controller.py
     ${PROJECT_NAME}/rover_lora_controller.py
-    ${PROJECT_NAME}/rover_lora_reporter.py
+    ${PROJECT_NAME}/comm_protocol_reporter.py
     ${PROJECT_NAME}/thrust_commander.py
     ${PROJECT_NAME}/webcam_publisher.py
     ${PROJECT_NAME}/sound_signal_detector.py
