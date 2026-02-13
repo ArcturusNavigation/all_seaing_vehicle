@@ -34,7 +34,7 @@ def read_frame(ser):
 
 # Setup serial connection
 # serial_port = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
-serial_port = serial.Serial('/dev/tty.usbmodem2080345752471', 115200, timeout=1)
+serial_port = serial.Serial('/dev/tty.usbmodem2089346352471', 115200, timeout=1)
 time.sleep(2)  # Allow serial port to stabilize
 
 while True:
