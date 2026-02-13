@@ -70,6 +70,7 @@ class CentralHubROS(Node):
         return response
 
     def cmd_adj_cb(self, request, response):
+        self.get_logger().debug(f'cmd_adj: {request}')
         if request.enable:
             if request.port == 1:
                 self.mech_pow_a.set_voltage(request.voltage)
@@ -78,6 +79,11 @@ class CentralHubROS(Node):
                 self.mech_pow_b.set_voltage(request.voltage)
                 self.mech_pow_b.output(True)
                 self.mechanisms.motor_enable(True)
+                # self.mechanisms.pump_enable(True)
+            elif request.port == 3:
+                self.mech_pow_b.set_voltage(request.voltage)
+                self.mech_pow_b.output(True)
+                # self.mechanisms.motor_enable(True)
                 self.mechanisms.pump_enable(True)
             else:
                 self.get_logger().warn("Invalid adj port addressed")
@@ -89,6 +95,10 @@ class CentralHubROS(Node):
             elif request.port == 2:
                 self.mech_pow_b.output(False)
                 self.mechanisms.motor_enable(False)
+                # self.mechanisms.pump_enable(False)
+            elif request.port == 3:
+                self.mech_pow_b.output(False)
+                # self.mechanisms.motor_enable(False)
                 self.mechanisms.pump_enable(False)
             else:
                 self.get_logger().warn("Invalid adj port addressed")
@@ -100,20 +110,21 @@ class CentralHubROS(Node):
     
     # TRUE if battery is OKAY, FALSE if battery is LOW
     def battery_check(self):
-        current_voltage = self.bms.stack_voltage()
-        # self.get_logger().warn(f"Voltage: {current_voltage}V")
+        # current_voltage = self.bms.stack_voltage()
+        # # self.get_logger().warn(f"Voltage: {current_voltage}V")
         # if current_voltage < self.low_battery_threshold and not self.estop.manual():
         #     if not self.battery_ack:
         #         self.get_logger().warn(f"Warning: battery is low! {current_voltage}V < {self.low_battery_threshold}V")
         #         self.get_logger().warn("Please run the command: ros2 service call /acknowledge_low_battery all_seaing_interfaces/srv/AcknowledgeLowBattery \"{ack: true}\" in order to continue")
         #         return False
-        # return True
         return True
 
     def cmd_servo_cb(self, request, response):
+        # self.get_logger().info(f'cmd_servo: {request}')
         if request.enable:
+            self.mech_pow_a.output(True)
             if request.port == 1:
-                self.mechanisms.servo1(request.angle)
+                self.mechanisms.servo1(int(180.0/270.0*request.angle))
             elif request.port == 2:
                 self.mechanisms.servo2(request.angle)
             else:
@@ -121,15 +132,18 @@ class CentralHubROS(Node):
                 response.success = False
                 return response
         # TODO is there a way to stop the servos?
-        # else:
-        #     if request.port == 1:
-        #         self.mechanisms.stop_servo1()
-        #     elif request.port == 2:
-        #         self.mechanisms.stop_servo2()
-        #     else:
-        #         self.get_logger().warn("Invalid servo port addressed")
-        #         response.success = False
-        #         return response
+        else:
+            self.mech_pow_a.output(False)
+            # if request.port == 1:
+            #     # self.mechanisms.stop_servo1()
+            #     self.mech_pow_a.output(False)
+            # elif request.port == 2:
+            #     # self.mechanisms.stop_servo2()
+            #     self.mech_pow_a.output(False)
+            # else:
+            #     self.get_logger().warn("Invalid servo port addressed")
+            #     response.success = False
+            #     return response
         response.success = False
         return response
 
