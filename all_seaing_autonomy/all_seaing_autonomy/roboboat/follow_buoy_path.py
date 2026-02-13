@@ -1143,21 +1143,7 @@ class FollowBuoyPath(TaskServerBase):
             was_exit_angle_met = currently_met
 
             time.sleep(self.timer_period)
-        while (not in_circling) or (not exit_angle_met()):
-            pid_output = self.turn_pid.get_effort()
-            # send velocity commands
-            self.send_vel_cmd(self.max_turn_vel[0], 0.0, -pid_output)
-            # get feedback
-            self.green_beacon_detected()
-            dist_to_buoy = self.norm(self.green_beacon_pos, self.robot_pos)
-            dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-
-            # self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
-            self.turn_pid.update(dist_to_buoy,dt)
-
-            # TODO: update in_Circling correctly (check 90 degrees)
-            in_circling = True
-            time.sleep(self.timer_period)
+            
         self.get_logger().info(f"Finished circling buoy")
         return Task.Result(success=True)
     
