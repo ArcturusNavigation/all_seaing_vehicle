@@ -110,6 +110,9 @@ class FollowBuoyPath(TaskServerBase):
         self.declare_parameter("beacon_probe_dist", 10.0)
         self.beacon_probe_dist = self.get_parameter("beacon_probe_dist").get_parameter_value().double_value
 
+        self.declare_parameter("green_buoy_loop_count", 2)
+        self.green_buoy_loop_count = self.get_parameter("green_buoy_loop_count").get_parameter_value().double_value
+
         self.declare_parameter("turn_offset", 5.0)
         self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value
 
@@ -1030,21 +1033,32 @@ class FollowBuoyPath(TaskServerBase):
         first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
         second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
         third_dir = (-first_dir[0], -first_dir[1])
-
+        fourth_dir = (-second_dir[0], -second_dir[1])
 
         add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
         first_base = add_tuple(self.green_beacon_pos, first_dir)
         second_base = add_tuple(self.green_beacon_pos, second_dir)
         third_base = add_tuple(self.green_beacon_pos, third_dir)
+        fourth_base = add_tuple(self.green_beacon_pos, fourth_dir)
 
-        bases = [first_base, second_base, third_base]
-        self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
-        self.get_logger().info(f"green beacon pose: {self.green_beacon_pos}")
-        self.get_logger().info(f"bases: {bases}")
-        self.prev_sent_beacon_pos = self.green_beacon_pos
-        for base, offset in zip(bases, [first_dir, second_dir, third_dir]):
-            self.move_to_point(base, busy_wait=True, goal_update_func=partial(self.update_green_beacon_pos, offset))
-            self.get_logger().info(f"moved to point = {self.moved_to_point}")
+        bases = [first_base, second_base, third_base, fourth_base]
+        dirs = [first_dir, second_dir, third_dir, fourth_dir]
+        
+        for i in range(self.green_buoy_loop_count):
+            if i < self.green_buoy_loop_count - 1:
+                loop_bases = bases  # all 4
+                loop_dirs = dirs
+            else:
+                loop_bases = bases[:3]  # only 3 on last lap
+                loop_dirs = dirs[:3]
+
+            self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
+            self.get_logger().info(f"green beacon pose: {self.green_beacon_pos}")
+            self.get_logger().info(f"bases: {bases}")
+            self.prev_sent_beacon_pos = self.green_beacon_pos
+            for base, offset in zip(loop_bases, loop_dirs):
+                self.move_to_point(base, busy_wait=True, goal_update_func=partial(self.update_green_beacon_pos, offset))
+                self.get_logger().info(f"moved to point = {self.moved_to_point}")
 
         return Task.Result(success=True)
     
@@ -1096,6 +1110,39 @@ class FollowBuoyPath(TaskServerBase):
         self.turn_pid.set_effort_min(-self.max_turn_vel[2])
         self.prev_update_time = self.get_clock().now()
         self.get_logger().info(f"Circling buoy via PID")
+
+        laps_completed = 0
+        in_circling = False
+        was_exit_angle_met = False  # track previous state to detect transitions
+        initial_robot_dir = self.robot_dir
+
+        while laps_completed < self.green_buoy_loop_count:
+            pid_output = self.turn_pid.get_effort()
+            self.send_vel_cmd(self.max_turn_vel[0], 0.0, -pid_output)
+            self.green_beacon_detected()
+            dist_to_buoy = self.norm(self.green_beacon_pos, self.robot_pos)
+            dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
+            self.turn_pid.update(dist_to_buoy, dt)
+
+             # check if robot has turned at least 90 degrees from initial heading
+            if not in_circling:
+                angle_from_start = math.atan2(self.robot_dir[1], self.robot_dir[0]) - math.atan2(initial_robot_dir[1], initial_robot_dir[0])
+                if angle_from_start < 0:
+                    angle_from_start += 2 * math.pi
+                if angle_from_start > math.pi / 2 and angle_from_start < 3 * math.pi / 2:
+                    in_circling = True
+                    self.get_logger().info("Robot has turned 90 degrees, now tracking laps")
+
+            currently_met = exit_angle_met()
+            if in_circling and currently_met and not was_exit_angle_met:
+                laps_completed += 1
+                self.get_logger().info(f"Completed lap {laps_completed}/{self.green_buoy_loop_count}")
+                if laps_completed < self.green_buoy_loop_count:
+                    in_circling = False
+                    initial_robot_dir = self.robot_dir
+            was_exit_angle_met = currently_met
+
+            time.sleep(self.timer_period)
         while (not in_circling) or (not exit_angle_met()):
             pid_output = self.turn_pid.get_effort()
             # send velocity commands
