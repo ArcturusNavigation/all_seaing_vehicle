@@ -15,11 +15,11 @@
 class AStarServer : public rclcpp::Node {
 public:
     AStarServer() : Node("a_star_server") {
-        map_sub = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
+        map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
             "/dynamic_map", 10,
             [this](const nav_msgs::msg::OccupancyGrid::SharedPtr msg) { map_ = msg; });
 
-        service = this->create_service<all_seaing_interfaces::srv::PlanPath>(
+        service_ = this->create_service<all_seaing_interfaces::srv::PlanPath>(
             "plan_path",
             std::bind(&AStarServer::plan_callback, this,
                 std::placeholders::_1, std::placeholders::_2));

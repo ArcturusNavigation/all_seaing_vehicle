@@ -561,7 +561,7 @@ def launch_setup(context, *args, **kwargs):
 
     heartbeat_reporter = launch_ros.actions.Node(
         package="all_seaing_driver",
-        executable="rover_lora_reporter.py",
+        executable="comm_protocol_reporter.py",
         remappings=[
         ],
         parameters=[
