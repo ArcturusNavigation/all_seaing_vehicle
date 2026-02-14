@@ -172,6 +172,12 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    a_star_server = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="a_star_server",
+        output="screen",
+    )
+
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
@@ -233,6 +239,7 @@ def launch_setup(context, *args, **kwargs):
         set_use_sim_time,
         controller_server,
         grid_map_generator,
+        a_star_server,
         navigation_server,
         # navigation_server_nomap,
         run_tasks,
