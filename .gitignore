@@ -54,3 +54,6 @@ bag/
 # Nix related
 # ignore package.nix in favor of package.xml
 package.nix
+
+# Comms related
+*.csv

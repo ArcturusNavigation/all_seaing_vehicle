@@ -34,19 +34,19 @@
     </joint>
 
     <joint name="velodyne_to_zed" type="fixed">
-        <origin xyz="-0.06 0.11237 -0.27" rpy="-1.6 0.0 0.0"/>
+        <origin xyz="-0.06 0.11237 -0.10" rpy="-1.6 0.0 0.0"/>
         <parent link="velodyne"/>
         <child link="zed_left_camera_optical_frame"/>
     </joint>
 
     <joint name="velodyne_to_back_left_oak" type="fixed">
-        <origin xyz="-0.118 0.008 -0.24" rpy="-1.57079632679 0.0 1.01259265359"/>
+        <origin xyz="-0.118 0.008 -0.07" rpy="-1.57079632679 0.0 1.01259265359"/>
         <parent link="velodyne"/>
         <child link="back_left_oak_rgb_camera_optical_frame"/>
     </joint>
 
     <joint name="velodyne_to_back_right_oak" type="fixed">
-        <origin xyz="0.118 0.008 -0.24" rpy="-1.57079632679 0.0 -1.01259265359"/>
+        <origin xyz="0.118 0.008 -0.07" rpy="-1.57079632679 0.0 -1.01259265359"/>
         <parent link="velodyne"/>
         <child link="back_right_oak_rgb_camera_optical_frame"/>
     </joint>

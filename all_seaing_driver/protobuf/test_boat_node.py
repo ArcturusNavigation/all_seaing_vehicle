@@ -23,8 +23,9 @@ ts = Timestamp(); ts.FromDatetime(datetime.now(timezone.utc))
 msg.sent_at.CopyFrom(ts)
 
 # Serialize (binary protobuf) and send with 4-byte big-endian length prefix,
-wire = msg.SerializeToString()
-frame = struct.pack("!I", len(wire)) + wire + "test".encode()
+payload = msg.SerializeToString()
+checksum = sum(payload) % 256
+frame = b'$R' + struct.pack("!B", len(payload)) + struct.pack("!B", checksum) + payload + b'!!'
 
 serial_port.write(frame)
 serial_port.flush() 

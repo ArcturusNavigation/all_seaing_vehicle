@@ -172,7 +172,8 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"range_radius": [0.8, 60.0]},
+            {"range_radius": [0.6, 60.0]},
+            {"filter_theta_range": [230.0, 310.0]},
         ],
     )
 
@@ -225,7 +226,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM0"}],
+        parameters=[{"port": "/dev/ttyACM4"}],
     )
 
     lidar_ld = IncludeLaunchDescription(

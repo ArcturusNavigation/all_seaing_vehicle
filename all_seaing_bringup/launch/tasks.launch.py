@@ -101,8 +101,8 @@ def launch_setup(context, *args, **kwargs):
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
-            {"gate_dist_back": 5.0},
-            {"gate_probe_dist": 10.0},
+            {"gate_dist_back": 0.0},
+            {"gate_probe_dist": 5.0},
             {"gate_dist_thres": 50.0},
         ],
         remappings=[
@@ -218,7 +218,7 @@ def launch_setup(context, *args, **kwargs):
             {"shape_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
             {"wpt_banner_dist": 3.0},
-            {"navigation_dist_thres": 5.0},
+            {"navigation_dist_thres": 7.0},
             # {"update_target_dist_thres": 3.0},
             {"shooting_xy_thres": 0.8},
             {"shooting_theta_thres": 10.0},
@@ -244,8 +244,8 @@ def launch_setup(context, *args, **kwargs):
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
-            {"gate_dist_back": 5.0},
-            {"gate_probe_dist": 10.0},
+            {"gate_dist_back": 0.5},
+            {"gate_probe_dist": 5.0},
             {"gate_dist_thres": 50.0},
         ],
         remappings=[
@@ -405,6 +405,13 @@ def launch_setup(context, *args, **kwargs):
     delivery_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="delivery_server.py",
+        parameters=[
+            {"is_sim": False},
+            # {"shape_label_mappings_file": buoy_label_mappings},
+            {"shape_label_mappings_file": shape_label_mappings},
+            # {"shape_label_mappings_file": all_label_mappings},
+            {"Kpid": [0.1, 0.0, 0.0]},
+        ]
     )
     
     rviz_waypoint_sender = launch_ros.actions.Node(
@@ -419,11 +426,11 @@ def launch_setup(context, *args, **kwargs):
 
     heartbeat_reporter = launch_ros.actions.Node(
         package="all_seaing_driver",
-        executable="rover_lora_reporter.py",
+        executable="comm_protocol_reporter.py",
         remappings=[
         ],
         parameters=[
-            {"port": "/dev/ttyACM3"},
+            {"port": "/dev/ttyACM0"},
             {"is_sim": False},
         ],
         output="screen",
@@ -435,18 +442,18 @@ def launch_setup(context, *args, **kwargs):
         navigation_server_tangent,
         # navigation_server_nomap,
         rviz_waypoint_sender,
-        heartbeat_reporter,
         run_tasks,
-        task_init_server,
-        entry_gates,
+        task_init_server, 
         follow_buoy_path,
         speed_challenge,
         docking,
         mechanism_navigation,
         return_home,
         harbor_alert,
+        heartbeat_reporter,
+        entry_gates,
         delivery_server,
-        sound_signal_node,
+        # sound_signal_node,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback,
@@ -457,7 +464,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("location", default_value="nbpark"),
-            DeclareLaunchArgument("target_freq", default_value=600.0),
+            DeclareLaunchArgument("target_freq", default_value="600.0"),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]
             ),

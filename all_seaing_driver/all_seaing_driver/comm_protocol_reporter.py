@@ -35,7 +35,8 @@ class RoverLoraReporter(Node):
         # TODO we need to process heartbeat in a separate queue and publish it as it arrives, to not have it get dropped/put back in the queue
         if not self.report_queue.empty():
             raw_msg = self.report_queue.get()
-            frame = struct.pack("!I", len(raw_msg)) + raw_msg + "test".encode()
+            checksum = sum(raw_msg) % 256
+            frame = b'$R' + struct.pack("!B", len(raw_msg)) + struct.pack("!B", checksum) + raw_msg + b'!!'
             if not self.is_sim:
                 self.serial_port.write(frame)
                 self.serial_port.flush()
