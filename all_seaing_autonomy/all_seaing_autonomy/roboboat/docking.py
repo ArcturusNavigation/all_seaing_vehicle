@@ -38,6 +38,11 @@ class DockingState(Enum):
     CANCELLING_NAVIGATION = 4
     NEW_NAVIGATION = 5
 
+class WhileDockingState(Enum):
+    NONE = 1
+    FORWARD = 2
+    BACKWARD = 3
+
 class DockSide(Enum):
     NORTH = 1
     SOUTH = 2
@@ -94,6 +99,21 @@ class Docking(TaskServerBase):
 
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
+
+        self.declare_parameter("docking_offset", 3.0)
+        self.docking_offset = self.get_parameter("docking_offset").get_parameter_value().double_value
+
+        self.declare_parameter("forward_docking_time", 1.0)
+        self.forward_docking_time = self.get_parameter("forward_docking_time").get_parameter_value().double_value
+
+        self.declare_parameter("backward_undocking_time", 3.0)
+        self.backward_undocking_time = self.get_parameter("backward_undocking_time").get_parameter_value().double_value
+
+        self.declare_parameter("forward_docking_vel", 0.7)
+        self.forward_docking_vel = self.get_parameter("forward_docking_vel").get_parameter_value().double_value
+
+        self.declare_parameter("backward_undocking_vel", 0.7)
+        self.backward_undocking_vel = self.get_parameter("backward_undocking_vel").get_parameter_value().double_value
 
         Kpid_x = (
             self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
@@ -255,6 +275,7 @@ class Docking(TaskServerBase):
             self.inv_label_mappings[value] = key
 
         self.state = DockingState.WAITING_DOCK
+        self.while_docking_state = WhileDockingState.NONE
 
         self.reported_docking = False
     
@@ -390,6 +411,7 @@ class Docking(TaskServerBase):
                         self.x_pid.reset()
                         self.y_pid.reset()
                         self.theta_pid.reset()
+                        self.while_docking_state = WhileDockingState.NONE
                         self.reported_docking = False
                         if self.state == DockingState.NAVIGATING_DOCK:
                             self.state = DockingState.CANCELLING_NAVIGATION
@@ -414,6 +436,7 @@ class Docking(TaskServerBase):
                     self.x_pid.reset()
                     self.y_pid.reset()
                     self.theta_pid.reset()
+                    self.while_docking_state = WhileDockingState.NONE
                     self.reported_docking = False
                     self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]], dock_side}')
 
@@ -425,6 +448,7 @@ class Docking(TaskServerBase):
             self.x_pid.reset()
             self.y_pid.reset()
             self.theta_pid.reset()
+            self.while_docking_state = WhileDockingState.NONE
             self.reported_docking = False
             if self.state == DockingState.NAVIGATING_DOCK:
                 # was going to a fake slot (misdetection)
@@ -584,10 +608,11 @@ class Docking(TaskServerBase):
             # control_msg.priority = 1
 
             # forward speed decreasing exponentially as we get closer
-            dist_diff = self.dot(self.difference(slot_back_mid, self.robot_pos), slot_dir) - self.dock_length/2.0
+            dist_diff = self.dot(self.difference(slot_back_mid, self.robot_pos), slot_dir) - self.dock_length/2.0 - self.docking_offset
             # subtract half the dock length when further than the half the width sideways
             if abs(offset) > self.dock_width/2.0:
                 dist_diff -= self.dock_length/2.0
+                dist_diff += self.docking_offset
             # forward_speed = self.forward_speed*(1-np.exp(-dist_diff/self.slow_dist))
 
             # control_msg.twist.linear.x = float(forward_speed)
@@ -599,18 +624,34 @@ class Docking(TaskServerBase):
             # self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
             if abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
-                if self.time_docked == -1:
+                if self.while_docking_state == WhileDockingState.NONE:
+                    self.get_logger().info(f'DOCKED, WILL GO FORWARDS')
                     self.time_docked = time.time()
-                elif time.time() - self.time_docked > 0.5:
+                    self.while_docking_state = WhileDockingState.FORWARD
+                elif self.while_docking_state == WhileDockingState.FORWARD and time.time() - self.time_docked > self.forward_docking_time:
+                    self.get_logger().info(f'UNDOCKING')
+                    self.while_docking_state = WhileDockingState.BACKWARD
+                elif self.while_docking_state == WhileDockingState.BACKWARD and time.time() - self.time_docked > self.forward_docking_time + self.backward_undocking_time:
+                    self.get_logger().info(f'FINISHED UNDOCKING')
+                    self.while_docking_state = WhileDockingState.NONE
                     self.send_vel_cmd(0.0,0.0,0.0)
                     self.mark_successful()
-                return
-            x_output = self.x_pid.get_effort()
-            y_output = self.y_pid.get_effort()
-            theta_output = self.theta_pid.get_effort()
-            x_vel = x_output*np.cos(approach_angle) + y_output*np.sin(approach_angle)
-            # x_vel = forward_speed
-            y_vel = y_output*np.cos(approach_angle) - x_output*np.sin(approach_angle)
+                    return
+            if self.while_docking_state == WhileDockingState.NONE:
+                x_output = self.x_pid.get_effort()
+                y_output = self.y_pid.get_effort()
+                theta_output = self.theta_pid.get_effort()
+                x_vel = x_output*np.cos(approach_angle) + y_output*np.sin(approach_angle)
+                # x_vel = forward_speed
+                y_vel = y_output*np.cos(approach_angle) - x_output*np.sin(approach_angle)
+            elif self.while_docking_state == WhileDockingState.FORWARD:
+                x_vel = self.forward_docking_vel
+                y_vel = 0.0
+                theta_output = 0.0
+            elif self.while_docking_state == WhileDockingState.BACKWARD:
+                x_vel = -self.backward_undocking_vel
+                y_vel = 0.0
+                theta_output = 0.0
 
             marker_array = MarkerArray()
             marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))
