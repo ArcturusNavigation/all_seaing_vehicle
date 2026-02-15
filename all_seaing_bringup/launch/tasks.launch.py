@@ -202,6 +202,11 @@ def launch_setup(context, *args, **kwargs):
             {"avoid_vel_coeff": 1.0},
             {"rot_avoid_vel_coeff": 3.0},
             {"avoid_rot_vel_mag": True},
+            {"docking_offset": 1.0},
+            {"forward_docking_time": 2.0},
+            {"backward_undocking_time": 4.0},
+            {"forward_docking_vel": 0.8},
+            {"backward_undocking_vel": 1.0},
         ],
         remappings=[
             
