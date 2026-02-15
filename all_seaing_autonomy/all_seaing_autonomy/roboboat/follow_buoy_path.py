@@ -111,7 +111,7 @@ class FollowBuoyPath(TaskServerBase):
         self.beacon_probe_dist = self.get_parameter("beacon_probe_dist").get_parameter_value().double_value
 
         self.declare_parameter("green_buoy_loop_count", 2)
-        self.green_buoy_loop_count = self.get_parameter("green_buoy_loop_count").get_parameter_value().double_value
+        self.green_buoy_loop_count = self.get_parameter("green_buoy_loop_count").get_parameter_value().integer_value
 
         self.declare_parameter("turn_offset", 5.0)
         self.turn_offset = self.get_parameter("turn_offset").get_parameter_value().double_value

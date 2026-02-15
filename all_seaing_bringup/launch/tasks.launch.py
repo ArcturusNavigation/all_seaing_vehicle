@@ -136,6 +136,7 @@ def launch_setup(context, *args, **kwargs):
             {"adaptive_distance": 0.2},
             {"max_turn_vel": [1.5, 0.0, 0.2]},
             {"turn_pid": [0.4,0.0,0.0]},
+            {"green_buoy_loop_count": 2},
         ],
         remappings=[
             ("odometry/filtered", "odometry/tracked"),

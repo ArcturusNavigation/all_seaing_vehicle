@@ -555,7 +555,7 @@ def launch_setup(context, *args, **kwargs):
 
     heartbeat_reporter = launch_ros.actions.Node(
         package="all_seaing_driver",
-        executable="rover_lora_reporter.py",
+        executable="comm_protocol_reporter.py",
         remappings=[
         ],
         parameters=[
@@ -593,6 +593,7 @@ def launch_setup(context, *args, **kwargs):
             {"robot_frame_id": "wamv/wamv/base_link"},
             # {"midpoint_pair_forward_dist": 5.0},
             {"gate_dist_thres": 50.0},
+            {"green_buoy_loop_count": 2},
         ],
         remappings=[
             ("odometry/filtered", "odometry/tracked"),
