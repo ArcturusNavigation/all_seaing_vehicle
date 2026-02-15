@@ -31,6 +31,7 @@ public:
         this->declare_parameter<std::vector<double>>("local_range_x", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("local_range_y", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("local_range_z", {-100000.0, 100000.0});
+        this->declare_parameter<std::vector<double>>("filter_theta_range", {0.0, 0.0});
         this->declare_parameter<double>("leaf_size_xy", 0.0);
         this->declare_parameter<double>("leaf_size_z", 0.0);
         this->declare_parameter<int>("min_pts_per_voxel", 1);
@@ -64,6 +65,7 @@ public:
         m_local_range_x = this->get_parameter("local_range_x").as_double_array();
         m_local_range_y = this->get_parameter("local_range_y").as_double_array();
         m_local_range_z = this->get_parameter("local_range_z").as_double_array();
+        m_filter_theta_range = this->get_parameter("filter_theta_range").as_double_array();
         m_leaf_size_xy = this->get_parameter("leaf_size_xy").as_double();
         m_leaf_size_z = this->get_parameter("leaf_size_z").as_double();
         m_min_pts_per_voxel = this->get_parameter("min_pts_per_voxel").as_int();
@@ -113,10 +115,13 @@ private:
             // if (m_range_x[0] <= point_tf.x && point_tf.x <= m_range_x[1] &&
             //     m_range_y[0] <= point_tf.y && point_tf.y <= m_range_y[1] &&
             //     m_range_z[0] <= point_tf.z && point_tf.z <= m_range_z[1] &&
+            float angle = std::atan2(point.y, point.x);
+            angle = angle > 0 ? angle : angle+2*M_PI;
             if (m_range_radius[0] <= radius && radius <= m_range_radius[1] &&
                 m_local_range_x[0] <= point.x && point.x <= m_local_range_x[1] &&
                 m_local_range_y[0] <= point.y && point.y <= m_local_range_y[1] &&
                 m_local_range_z[0] <= point.z && point.z <= m_local_range_z[1] &&
+                !(m_filter_theta_range[0] < angle*180/M_PI && angle*180/M_PI < m_filter_theta_range[1]) &&
                 m_range_intensity[0] <= point.intensity &&
                 point.intensity <= m_range_intensity[1] && 
                 pcl::isFinite(point)) {
@@ -191,6 +196,7 @@ private:
     std::vector<double> m_local_range_x;
     std::vector<double> m_local_range_y;
     std::vector<double> m_local_range_z;
+    std::vector<double> m_filter_theta_range;
     double m_leaf_size_xy, m_leaf_size_z;
     int m_min_pts_per_voxel;
     bool m_convert_to_robot;

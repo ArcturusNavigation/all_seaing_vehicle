@@ -80,8 +80,9 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"robot_frame_id": "base_link"},
             {"global_frame_id": "map"},
-            {"range_radius": [0.8, 5.0]},
+            {"range_radius": [0.6, 5.0]},
             {"local_range_z": [-100000.0, 0.0]},
+            {"filter_theta_range": [230.0, 310.0]},
             {"leaf_size_xy": 1.0},
             {"leaf_size_z": 1.0},
             {"min_pts_per_voxel": 10},
@@ -325,6 +326,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"range_radius": [1.0, 60.0]},
+            {"filter_theta_range": [230.0, 310.0]},
             {"leaf_size_xy": 0.3},
             {"leaf_size_z": 0.3},
             {"local_range_z": [-100000.0, 0.0]},
