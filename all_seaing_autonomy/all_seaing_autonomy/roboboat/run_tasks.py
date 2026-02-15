@@ -63,8 +63,8 @@ class RunTasks(ActionServerBase):
             [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0)],
 
             # FOLLOW PATH
-            # [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
-            # [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
 
             # SPEED CHALLENGE
             # [ActionType.SEARCH, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
