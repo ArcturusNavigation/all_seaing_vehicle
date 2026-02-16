@@ -394,7 +394,7 @@ class NavigationTangentServer(ActionServerBase):
 
         self.start_process()
 
-        self.get_logger().info(f"Path: {self.path}")
+        # self.get_logger().info(f"Path: {self.path}")
 
         self.visualize_path(self.path)
 

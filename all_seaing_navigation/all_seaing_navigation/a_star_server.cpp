@@ -199,13 +199,13 @@ private:
             return;
         }
 
-        RCLCPP_INFO(this->get_logger(), "Astar trace");
+        // RCLCPP_INFO(this->get_logger(), "Astar trace");
 
         int ci = found_idx;
         while (ci != start_idx) {
             int gx = ci % width;
             int gy = ci / width;
-            RCLCPP_INFO(this->get_logger(), "Point %d %d %d\n", gx, gy, map_data[gx + gy * width]);
+            // RCLCPP_INFO(this->get_logger(), "Point %d %d %d\n", gx, gy, map_data[gx + gy * width]);
 
             geometry_msgs::msg::Pose pose;
             pose.position.x = gx * resolution + origin_x;
