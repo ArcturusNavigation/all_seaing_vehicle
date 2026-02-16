@@ -4,6 +4,7 @@
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <all_seaing_interfaces/srv/plan_path.hpp>
+#include <rclcpp/executors/multi_threaded_executor.hpp>
 
 #include <queue>
 #include <vector>
@@ -52,6 +53,7 @@ private:
         all_seaing_interfaces::srv::PlanPath::Response::SharedPtr response)
     {
         geometry_msgs::msg::PoseArray result;
+        RCLCPP_INFO(this->get_logger(), "Astar server received request");
 
         if (!map_) {
             RCLCPP_WARN(this->get_logger(), "No map received yet");
@@ -82,7 +84,7 @@ private:
 
         auto is_occupied = [&](int x, int y) -> bool {
             int val = int(map_data[x + y * width]);
-            return val >= obstacle_tol || val == -1;
+            return val >= obstacle_tol; // assume val == -1 is not occupied
         };
 
         auto rect_occupied = [&](int x1, int y1, int x2, int y2) -> bool {
@@ -92,14 +94,15 @@ private:
             int maxy = std::max(y1, y2);
             for (int y = miny; y <= maxy; ++y) {
                 for (int x = minx; x <= maxx; ++x) {
-                    int val = int(map_data[x + y * width]);
-                    if (val >= obstacle_tol || val == -1) return true;
+                    if (is_occupied(x, y)) return true;
                 }
             }
             return false;
         };
 
         if (!in_bounds(start_x, start_y) || !in_bounds(goal_x, goal_y) || is_occupied(start_x, start_y) || is_occupied(goal_x, goal_y)) {
+            RCLCPP_INFO(this->get_logger(), "Astar out of bounds/occupied, give up.");
+
             response->path = result;
             return;
         }
@@ -130,6 +133,8 @@ private:
 
         constexpr double EPSILON = 0.005;
         int found_idx = -1;
+
+        RCLCPP_INFO(this->get_logger(), "Astar server astar");
 
         while (!pq.empty()) {
             PQNode node = pq.top();
@@ -168,14 +173,19 @@ private:
         }
 
         if (found_idx == -1) {
-            response->path = result;
+            response->path = result;        
+            RCLCPP_INFO(this->get_logger(), "No path found..");
             return;
         }
+
+        RCLCPP_INFO(this->get_logger(), "Astar trace");
 
         int ci = found_idx;
         while (ci != start_idx) {
             int gx = ci % width;
             int gy = ci / width;
+            RCLCPP_INFO(this->get_logger(), "Point %d %d %d\n", gx, gy, map_data[gx + gy * width]);
+
             geometry_msgs::msg::Pose pose;
             pose.position.x = gx * resolution + origin_x;
             pose.position.y = gy * resolution + origin_y;
@@ -195,7 +205,10 @@ private:
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<AStarServer>());
+    rclcpp::executors::MultiThreadedExecutor executor = rclcpp::executors::MultiThreadedExecutor(rclcpp::ExecutorOptions(),2);
+    auto node = std::make_shared<AStarServer>();
+    executor.add_node(node);
+    executor.spin();
     rclcpp::shutdown();
     return 0;
 }

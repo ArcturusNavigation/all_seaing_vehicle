@@ -394,6 +394,8 @@ class NavigationTangentServer(ActionServerBase):
 
         self.start_process()
 
+        self.get_logger().info(f"Path: {self.path}")
+
         self.visualize_path(self.path)
 
         self.cur_seg = self.get_closest_seg(nav_x, nav_y)
