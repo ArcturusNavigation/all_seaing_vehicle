@@ -185,6 +185,8 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
                 std::bind(&ObjectTrackingMap::object_track_map_publish, this, std::placeholders::_1));
     }
 
+    m_restart_service = this->create_service<all_seaing_interfaces::srv::RestartSLAM>("restart_slam", std::bind(&ObjectTrackingMap::restart_slam, this, std::placeholders::_1, std::placeholders::_2));
+
     if (m_track_banners){
         m_banners_sub = 
             this->create_subscription<all_seaing_interfaces::msg::LabeledObjectPlaneArray>(
@@ -218,6 +220,110 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_gps_based_dtheta = 0;
 
     m_obstacle_id = 0;
+}
+
+void ObjectTrackingMap::restart_slam(const std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Request> request,
+          std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Response> response){
+
+    if (m_track_robot && m_first_state) return;
+
+    if (request->restart_position){
+        RCLCPP_INFO(this->get_logger(), "RESTARTING SLAM POSITION");
+        if (m_track_robot){
+            m_state.head(3) = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+            Eigen::Matrix3f init_pose_noise{
+                {m_init_xy_noise*m_init_xy_noise, 0, 0},
+                {0, m_init_xy_noise*m_init_xy_noise, 0},
+                {0, 0, m_init_theta_noise*m_init_xy_noise},
+            };
+            m_cov.topLeftCorner(3,3) = init_pose_noise;
+            m_cov.bottomLeftCorner(m_state.size()-3, 3).fill(0);
+            m_cov.topRightCorner(3, m_state.size()-3).fill(0);
+        }
+        m_gps_based_predicted = false;
+        m_gps_based_dx = 0;
+        m_gps_based_dy = 0;
+        m_gps_based_dtheta = 0;
+    }
+
+    if (request->restart_buoys){
+        RCLCPP_INFO(this->get_logger(), "RESTARTING BUOYS");
+        std::vector<int> to_remove;
+        std::vector<int> to_keep_flat = {0, 1, 2};
+        for (int i = 0; i < m_tracked_obstacles.size(); i++){
+            to_remove.push_back(i);
+        }
+        if (m_track_banners && m_banners_slam){
+            for (int i = 0; i < m_tracked_banners.size(); i++){
+                if (m_track_robot) {
+                    to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * m_num_obj + 3*i, 3 + 2 * m_num_obj + 3*i + 1, 3 + 2 * m_num_obj + 3*i + 2});
+                }
+            }
+        }
+
+        // update vectors & matrices
+        if (!to_remove.empty()) {
+            if (m_track_robot) {
+                int new_size = 3 + ((m_track_banners && m_banners_slam)? 3*m_num_banners : 0);
+                Eigen::MatrixXf new_state(new_size, 1);
+                Eigen::MatrixXf new_cov(new_size, new_size);
+                int new_i = 0;
+                for (int i : to_keep_flat) {
+                    new_state(new_i) = m_state(i);
+                    int new_j = 0;
+                    for (int j : to_keep_flat) {
+                        new_cov(new_i, new_j) = m_cov(i, j);
+                        new_j++;
+                    }
+                    new_i++;
+                }
+                m_state = new_state;
+                m_cov = new_cov;
+            }
+
+            m_tracked_obstacles = std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>>();
+            m_num_obj = 0;
+        }
+    }
+
+    if (request->restart_banners){
+        RCLCPP_INFO(this->get_logger(), "RESTARTING BANNERS");
+        std::vector<int> to_remove;
+        std::vector<int> to_keep_flat = {0, 1, 2};
+        for (int i = 0; i < m_tracked_obstacles.size(); i++){
+            if (m_track_robot) {
+                to_keep_flat.insert(to_keep_flat.end(), {3 + 2 * i, 3 + 2 * i + 1});
+            }
+        }
+        for (int i = 0; i < m_tracked_banners.size(); i++){
+            to_remove.push_back(i);
+        }
+
+        // update vectors & matrices
+        if (!to_remove.empty()) {
+            if (m_track_robot && m_banners_slam) {
+                Eigen::VectorXf new_state(3 + 2*m_num_obj);
+                Eigen::MatrixXf new_cov(3 + 2*m_num_obj, 3 + 2*m_num_obj);
+                int new_i = 0;
+                for (int i : to_keep_flat) {
+                    new_state(new_i) = m_state(i);
+                    int new_j = 0;
+                    for (int j : to_keep_flat) {
+                        new_cov(new_i, new_j) = m_cov(i, j);
+                        new_j++;
+                    }
+                    new_i++;
+                }
+                m_state = new_state;
+                m_cov = new_cov;
+            }
+
+            m_tracked_banners = std::vector<std::shared_ptr<all_seaing_perception::Banner>>();
+            m_num_banners = 0;
+        }
+    }
+
+    m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
 }
 
 template <typename T_matrix> std::string matrix_to_string(T_matrix matrix) {
@@ -1400,7 +1506,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     
     // RCLCPP_INFO(this->get_logger(), "REMOVING FILTERED OBSTACLES FROM MATRICES: %lfms", ms_double.count());
 
-    // m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
+    m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
 
     if (m_track_robot) {
         // make the trace only keep a # of points specified by a param
