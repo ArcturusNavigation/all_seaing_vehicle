@@ -101,8 +101,8 @@ def launch_setup(context, *args, **kwargs):
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
-            {"gate_dist_back": 5.0},
-            {"gate_probe_dist": 10.0},
+            {"gate_dist_back": 0.0},
+            {"gate_probe_dist": 3.0},
             {"gate_dist_thres": 50.0},
         ],
         remappings=[
@@ -124,7 +124,7 @@ def launch_setup(context, *args, **kwargs):
             {"max_inter_gate_dist": 25.0},
             {"max_gate_pair_dist": 25.0},
             {"duplicate_dist": 0.3},
-            {"forward_dist": 1.5},
+            {"forward_dist": 3.0},
             {"inter_buoy_pair_dist": 0.5},
             {"buoy_pair_dist_thres": 0.2},
             {"xy_threshold": 0.8},
@@ -136,6 +136,7 @@ def launch_setup(context, *args, **kwargs):
             {"adaptive_distance": 0.2},
             {"max_turn_vel": [1.5, 0.0, 0.2]},
             {"turn_pid": [0.4,0.0,0.0]},
+            {"green_buoy_loop_count": 2},
         ],
         remappings=[
             ("odometry/filtered", "odometry/tracked"),
@@ -201,6 +202,11 @@ def launch_setup(context, *args, **kwargs):
             {"avoid_vel_coeff": 1.0},
             {"rot_avoid_vel_coeff": 3.0},
             {"avoid_rot_vel_mag": True},
+            {"docking_offset": 1.0},
+            {"forward_docking_time": 2.0},
+            {"backward_undocking_time": 4.0},
+            {"forward_docking_vel": 0.8},
+            {"backward_undocking_vel": 1.0},
         ],
         remappings=[
             
@@ -218,7 +224,7 @@ def launch_setup(context, *args, **kwargs):
             {"shape_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
             {"wpt_banner_dist": 3.0},
-            {"navigation_dist_thres": 5.0},
+            {"navigation_dist_thres": 7.0},
             # {"update_target_dist_thres": 3.0},
             {"shooting_xy_thres": 0.8},
             {"shooting_theta_thres": 10.0},
@@ -228,6 +234,7 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_y": [2.0, 0.0, 0.5]},
             {"Kpid_theta": [0.3, 0.0, 1.0]},
             {"max_vel": [0.8, 0.8, 0.2]},
+            {"balls_loaded": 2},
         ],
         remappings=[
             
@@ -244,8 +251,8 @@ def launch_setup(context, *args, **kwargs):
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
-            {"gate_dist_back": 5.0},
-            {"gate_probe_dist": 10.0},
+            {"gate_dist_back": 0.5},
+            {"gate_probe_dist": 5.0},
             {"gate_dist_thres": 50.0},
         ],
         remappings=[
@@ -416,7 +423,8 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             # {"shape_label_mappings_file": all_label_mappings},
-            {"Kpid": [0.1, 0.0, 0.0]},
+            {"Kpid": [0.2, 0.01, 0.0]},
+            {"object_delivery_time": 10.0},
         ]
     )
     
@@ -436,29 +444,29 @@ def launch_setup(context, *args, **kwargs):
         remappings=[
         ],
         parameters=[
-            {"port": "/dev/ttyACM3"},
+            {"port": "/dev/ttyACM0"},
             {"is_sim": False},
         ],
         output="screen",
     )
 
     return [
-        # controller_server,
         a_star_server,
-        # # navigation_server,
-        # navigation_server_tangent,
-        # # navigation_server_nomap,
-        # rviz_waypoint_sender,
-        # run_tasks,
-        # task_init_server,
-        # follow_buoy_path,
-        # speed_challenge,
-        # docking,
-        # mechanism_navigation,
-        # return_home,
-        # harbor_alert,
-        # heartbeat_reporter,
-        # entry_gates,
+        controller_server,
+        # navigation_server,
+        navigation_server_tangent,
+        # navigation_server_nomap,
+        rviz_waypoint_sender,
+        run_tasks,
+        task_init_server, 
+        follow_buoy_path,
+        speed_challenge,
+        docking,
+        mechanism_navigation,
+        return_home,
+        harbor_alert,
+        heartbeat_reporter,
+        entry_gates,
         delivery_server,
         # sound_signal_node,
         # follow_buoy_pid,

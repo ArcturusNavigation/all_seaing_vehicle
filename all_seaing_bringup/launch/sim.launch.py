@@ -235,6 +235,7 @@ def launch_setup(context, *args, **kwargs):
             {"range_x": [0.0, 100000.0]},
             {"range_y": [5.0, 100000.0]},
             {"range_radius": [1.0, 100000.0]},
+            # {"filter_bbox": [-5.0, -5.0, -5.0, 5.0, 5.0, 5.0]},
             {"range_intensity": [0.0, 50.0]},
         ],
     )
@@ -599,6 +600,10 @@ def launch_setup(context, *args, **kwargs):
             {"robot_frame_id": "wamv/wamv/base_link"},
             # {"midpoint_pair_forward_dist": 5.0},
             {"gate_dist_thres": 50.0},
+            {"green_buoy_loop_count": 2},
+            {"forward_dist": 10.0},
+            {"max_turn_vel": [5.0, 0.0, 1.0]},
+            {"turn_pid": [0.5, 0.0, 0.0]},
         ],
         remappings=[
             ("odometry/filtered", "odometry/tracked"),
@@ -618,6 +623,8 @@ def launch_setup(context, *args, **kwargs):
             # {"init_gate_dist": 5.0},
             # {"gate_dist_back": 5.0},
             {"gate_dist_thres": 50.0},
+            {"max_turn_vel": [5.0, 0.0, 1.0]},
+            {"turn_pid": [0.5, 0.0, 0.0]},
         ],
         remappings=[
             ("odometry/filtered", "odometry/tracked"),
@@ -647,6 +654,11 @@ def launch_setup(context, *args, **kwargs):
             {"avoid_vel_coeff": 3.0},
             {"rot_avoid_vel_coeff": 3.0},
             {"avoid_rot_vel_mag": True},
+            {"docking_offset": 1.0},
+            {"forward_docking_time": 2.0},
+            {"backward_undocking_time": 6.0},
+            {"forward_docking_vel": 2.0},
+            {"backward_undocking_vel": 2.0},
         ],
         remappings=[
             

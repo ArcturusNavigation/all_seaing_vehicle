@@ -59,6 +59,7 @@
 
 #include "all_seaing_perception/obstacle.hpp"
 #include "all_seaing_perception/object_tracking_shared.hpp"
+#include "all_seaing_interfaces/srv/restart_slam.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
@@ -86,6 +87,9 @@ private:
     void visualize_predictions();
     
     void publish_slam();
+
+    void restart_slam(const std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Request> request,
+          std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Response> response);
 
     // Member variables
     std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>> m_tracked_obstacles;
@@ -159,6 +163,9 @@ private:
     std::map<int, std::string> banner_label_to_name;
     std::map<int, int> banner_label_to_number;
     std::map<int, bool> banner_label_indicator;
+
+    // SLAM restart service
+    rclcpp::Service<all_seaing_interfaces::srv::RestartSLAM>::SharedPtr m_restart_service;
 
 public:
     ObjectTrackingMap();

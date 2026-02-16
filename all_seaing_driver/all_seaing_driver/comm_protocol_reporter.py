@@ -43,7 +43,7 @@ class RoverLoraReporter(Node):
             else:
                 msg = Report()
                 msg.ParseFromString(raw_msg)
-                self.get_logger().info(msg.__str__())
+                # self.get_logger().info(msg.__str__())
         
     def add_message(self, msg: ByteMultiArray):
         self.report_queue.put(b"".join(msg.data))

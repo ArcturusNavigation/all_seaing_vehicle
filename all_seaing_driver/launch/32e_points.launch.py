@@ -14,7 +14,7 @@ def generate_launch_description():
     )
     tf_params = {}
     tf_params["calibration"] = os.path.join(pc_share_dir, "params", "32db.yaml")
-    tf_params["min_range"] = 0.9
+    tf_params["min_range"] = 0.1
     tf_params["max_range"] = 130.0
     tf_params["view_direction"] = 0.0
     tf_params["model"] = "32E"
