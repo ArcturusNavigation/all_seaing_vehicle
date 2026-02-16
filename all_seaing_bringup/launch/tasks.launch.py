@@ -359,6 +359,12 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    a_star_server = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="a_star_server",
+        output="screen",
+    )
+
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
@@ -445,6 +451,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
+        a_star_server,
         controller_server,
         # navigation_server,
         navigation_server_tangent,

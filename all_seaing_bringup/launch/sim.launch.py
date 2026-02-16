@@ -484,6 +484,12 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    a_star_server = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="a_star_server",
+        output="screen",
+    )
+
     navigation_server = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="navigation_server.py",
@@ -871,6 +877,7 @@ def launch_setup(context, *args, **kwargs):
         object_tracking_map_node,
         rviz_node,
         control_mux,
+        a_star_server,
         # navigation_server,
         # navigation_server_nomap,
         navigation_server_tangent,

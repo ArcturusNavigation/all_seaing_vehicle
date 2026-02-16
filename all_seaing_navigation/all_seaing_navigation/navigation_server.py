@@ -43,6 +43,7 @@ class NavigationServer(ActionServerBase):
         )
 
         self.map = None
+        self.planner = PlannerExecutor(self)
 
         self.stop_plan_semaphore = Semaphore(1)
         self.stop_plan_evt = Event()
@@ -84,8 +85,7 @@ class NavigationServer(ActionServerBase):
         obstacle_tol = goal_handle.request.obstacle_tol
         goal_tol = goal_handle.request.goal_tol
 
-        self.planner = PlannerExecutor(goal_handle.request.planner)
-        path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
+        path = self.planner.plan(start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
         path.poses = path.poses[(len(path.poses) - 1) % goal_handle.request.choose_every :: goal_handle.request.choose_every]
 
         self.stopped_plan()  # Release the semaphore

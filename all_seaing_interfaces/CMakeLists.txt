@@ -31,6 +31,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "srv/CommandServo.srv"
     "srv/GetEstopStatus.srv"
     "srv/AcknowledgeLowBattery.srv"
+    "srv/PlanPath.srv"
     "srv/RestartSLAM.srv"
     DEPENDENCIES
     geometry_msgs

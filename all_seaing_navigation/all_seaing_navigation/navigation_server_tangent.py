@@ -134,6 +134,7 @@ class NavigationTangentServer(ActionServerBase):
         # ------- #
 
         self.map = None
+        self.planner = PlannerExecutor(self)
 
         self.stop_plan_semaphore = Semaphore(1)
         self.stop_plan_evt = Event()
@@ -186,8 +187,7 @@ class NavigationTangentServer(ActionServerBase):
         obstacle_tol = goal_handle.request.obstacle_tol
         goal_tol = goal_handle.request.goal_tol
 
-        self.planner = PlannerExecutor(goal_handle.request.planner)
-        path = self.planner.plan(self.map, start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
+        path = self.planner.plan(start, goal, obstacle_tol, goal_tol, self.should_abort_plan)
         if len(path.poses) >= 3:
             self.get_logger().info('downsampling')
             path.poses[1:-1] = path.poses[1+(len(path.poses) - 2) % goal_handle.request.choose_every :-1: goal_handle.request.choose_every]
@@ -393,6 +393,8 @@ class NavigationTangentServer(ActionServerBase):
         self.get_logger().info("PATH FOUND")
 
         self.start_process()
+
+        # self.get_logger().info(f"Path: {self.path}")
 
         self.visualize_path(self.path)
 
