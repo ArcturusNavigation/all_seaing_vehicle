@@ -7,6 +7,7 @@ from std_msgs.msg import Bool
 
 from all_seaing_interfaces.action import Task, Search
 from all_seaing_interfaces.msg import ObstacleMap, Obstacle
+from all_seaing_interfaces.srv import RestartSLAM
 from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_common.report_pb2 import RobotState, LatLng, TaskType, SoundSignal, SignalType
 import all_seaing_common.report_pb2
@@ -23,6 +24,8 @@ from enum import Enum
 
 from sensor_msgs.msg import Joy
 from action_msgs.msg import GoalStatus
+from dataclasses import dataclass
+import time
 
 ###
 
@@ -51,6 +54,12 @@ class ActionType(Enum):
     TASK = 1
     SEARCH = 2
 
+@dataclass
+class RestartSLAMOptions:
+    restart_position: bool = False
+    restart_buoys: bool = False
+    restart_banners: bool = False
+
 class RunTasks(ActionServerBase):
     def __init__(self):
         super().__init__("run_tasks")
@@ -60,33 +69,33 @@ class RunTasks(ActionServerBase):
         self.task_list = [
             # ENTRY GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
-            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
 
             # FOLLOW PATH
             [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
-            [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0)],
+            [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # SPEED CHALLENGE
             # [ActionType.SEARCH, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
-            # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # DOCKING
             # [ActionType.SEARCH, TaskType.TASK_DOCKING, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
-            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # DELIVERY
             # [ActionType.SEARCH, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
-            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # EXIT GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_return"), ReferenceInt(0), ReferenceInt(0), "return"],
-            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "return_home"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "return_home"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
             
             # FALLBACKS
-            # [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0)],
-            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "delivery_qual"), ReferenceInt(0), ReferenceInt(0)],
+            # [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "follow_buoy_pid"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
+            # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
+            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
+            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "delivery_qual"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
         ]
 
         self.term_tasks = [
@@ -98,7 +107,7 @@ class RunTasks(ActionServerBase):
         self.harbor_alert_tasks = [
             # HARBOR ALERT
             [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
-            [ActionType.TASK, ActionClient(self, Task, "harbor_alert")],
+            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(True, True, False)],
         ]
 
         self.current_task = None
@@ -136,6 +145,8 @@ class RunTasks(ActionServerBase):
         self.map_sub = self.create_subscription(
             ObstacleMap, "obstacle_map/global", self.map_cb, 10
         )
+
+        self.restart_slam_client = self.create_client(RestartSLAM, "restart_slam")
 
         self.pause_publisher = self.create_publisher(Bool, "pause", 10)
         self.find_task() # um idk if this is right
@@ -238,6 +249,8 @@ class RunTasks(ActionServerBase):
         self.heartbeat_sub = self.create_subscription(Heartbeat, "heartbeat", self.receive_heartbeat, 10)
         self.heartbeat_state = RobotState.STATE_AUTO
         self.shore_heartbeat_reporter = self.create_timer(1, self.report_shore_heartbeat)
+
+        self.restart_slam_options = None
 
     def odom_cb(self, msg):
         self.vel = self.norm((msg.twist.twist.linear.x, msg.twist.twist.linear.y))
@@ -476,7 +489,7 @@ class RunTasks(ActionServerBase):
         if self.gate_pair is None:
             self.setup_buoys()
 
-    def attempt_task(self, action_type, task_type, current_task, incr_on_success, incr_on_fail = None, location_name = None):
+    def attempt_task(self, action_type, task_type, current_task, incr_on_success, incr_on_fail = None, location_name = None, restart_slam_options = None):
         self.current_task = current_task
         self.current_task_type = task_type
         self.incr_on_success = incr_on_success
@@ -500,6 +513,7 @@ class RunTasks(ActionServerBase):
                 task_theta = math.atan2(self.gate_dir[1], self.gate_dir[0]) + self.task_location_mappings[location_name]["theta"] - math.pi/2.0
             task_goal_msg = Search.Goal(x = task_x, y = task_y, include_theta = search_theta, theta = task_theta, wait_time = self.task_location_mappings[location_name]["wait_time"])
         self.get_logger().info(f"Sending goal: {task_goal_msg}")
+        self.restart_slam_options = restart_slam_options
         send_goal_future = self.current_task.send_goal_async(
             task_goal_msg,
             feedback_callback=self.feedback_callback
@@ -529,7 +543,7 @@ class RunTasks(ActionServerBase):
                 self.harbor_alerted = False
                 self.next_harbor_index.val = 0
             else:
-                self.attempt_task(self.harbor_alert_tasks[self.next_harbor_index.val][0], TaskType.TASK_SOUND_SIGNAL, self.harbor_alert_tasks[self.next_harbor_index.val][1], self.next_harbor_index, None, self.harbor_alert_tasks[self.next_harbor_index.val][2+self.harbor_index] if self.harbor_alert_tasks[self.next_harbor_index.val][0] == ActionType.SEARCH else None)
+                self.attempt_task(self.harbor_alert_tasks[self.next_harbor_index.val][0], TaskType.TASK_SOUND_SIGNAL, self.harbor_alert_tasks[self.next_harbor_index.val][1], self.next_harbor_index, None, self.harbor_alert_tasks[self.next_harbor_index.val][2+self.harbor_index] if self.harbor_alert_tasks[self.next_harbor_index.val][0] == ActionType.SEARCH else None, self.harbor_alert_tasks[self.next_harbor_index.val][2])
                 return
         # print(self.task_list)
 
@@ -578,6 +592,33 @@ class RunTasks(ActionServerBase):
             self.get_logger().info("Task failure, looking for new task")
             if not (self.incr_on_fail is None):
                 self.incr_on_fail.val += 1
+        if (self.restart_slam_options is not None) and self.restart_slam_client.wait_for_service(2.0): # self.restart_slam_client.service_is_ready()
+            self.get_logger().info(f"Calling restart SLAM service w/ options: {self.restart_slam_options}")
+            restart_future = self.restart_slam_client.call_async(RestartSLAM.Request(restart_position=self.restart_slam_options.restart_position,
+                                                                    restart_buoys=self.restart_slam_options.restart_buoys,
+                                                                    restart_banners=self.restart_slam_options.restart_banners))
+            
+            time.sleep(1.0)
+            # # Spin until the future is complete with a timeout
+            # timeout_start = time.time()
+            # while rclpy.ok():
+            #     if restart_future.done():
+            #         try:
+            #             response = restart_future.result()
+            #             self.get_logger().error(f'Service call succeeded')
+            #             break
+            #         except Exception as e:
+            #             self.get_logger().error(f'Service call failed: {e}')
+            #             break
+                
+            #     if time.time() - timeout_start > 2.0:
+            #         self.get_logger().error('Service call timed out')
+            #         break
+                
+            #     # Spin a little to process the response if it arrives
+            #     rclpy.spin_once(self)
+        # self.get_logger().error('Exiting result callback')
+        self.restart_slam_options = None
         self.find_task()
 
 def main(args=None):
