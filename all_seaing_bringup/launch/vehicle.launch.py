@@ -4,7 +4,9 @@ from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     OpaqueFunction,
-    GroupAction
+    GroupAction,
+    TimerAction,
+    ExecuteProcess
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -104,6 +106,22 @@ def launch_setup(context, *args, **kwargs):
     #         ]),
     #     ),
     # )
+
+    turn_fan_1 = TimerAction( # increase mavros rate after mavros itself has been launched
+        period=5.0,
+        actions=[ExecuteProcess(
+            cmd=['ros2', 'service', 'call', 'command_fan', 'all_seaing_interfaces/CommandFan', '{enable: True, port: 1}'],
+            output='screen'
+        )]
+    )
+
+    turn_fan_2 = TimerAction( # increase mavros rate after mavros itself has been launched
+        period=5.0,
+        actions=[ExecuteProcess(
+            cmd=['ros2', 'service', 'call', 'command_fan', 'all_seaing_interfaces/CommandFan', '{enable: True, port: 2}'],
+            output='screen'
+        )]
+    )
 
     odometry_publisher_node = launch_ros.actions.Node(
         package = "all_seaing_driver",
@@ -227,7 +245,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM4"}],
+        parameters=[{"port": "/dev/ttyACM1"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -247,7 +265,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM1"
+            "port": "/dev/ttyACM3"
         }.items(),
     )
 
@@ -403,28 +421,30 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        control_mux,
-        controller_node,
-        # ekf_node,
-        # navsat_node,
-        odometry_publisher_node,
-        point_cloud_filter_node,
-        rover_custom_controller,
-        rover_lora_controller,
-        rviz_waypoint_sender,
-        thrust_commander_node,
-        central_hub,
-        amcl_ld,
-        # static_transforms_ld,
-        robot_state_publisher,
+        # turn_fan_1,
+        # turn_fan_2,
+        # control_mux,
+        # controller_node,
+        # # ekf_node,
+        # # navsat_node,
+        # odometry_publisher_node,
+        # point_cloud_filter_node,
+        # rover_custom_controller,
+        # rover_lora_controller,
+        # rviz_waypoint_sender,
+        # thrust_commander_node,
+        # central_hub,
+        # amcl_ld,
+        # # static_transforms_ld,
+        # robot_state_publisher,
         webcam_publisher,
-        lidar_ld,
-        mavros_ld,
-        zed_ld,
-        oak_ld,
-        pcl_to_scan_node,
-        rf2o_node,
-        ekf_node_rf2o,
+        # lidar_ld,
+        # mavros_ld,
+        # zed_ld,
+        # oak_ld,
+        # pcl_to_scan_node,
+        # rf2o_node,
+        # ekf_node_rf2o,
         # perception_ld,
         # tasks_ld,
     ]

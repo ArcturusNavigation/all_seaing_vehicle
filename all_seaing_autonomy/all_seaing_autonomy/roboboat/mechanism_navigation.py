@@ -89,6 +89,9 @@ class MechanismNavigation(TaskServerBase):
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
 
+        self.declare_parameter("balls_loaded", 2)
+        self.balls_loaded = self.get_parameter("balls_loaded").get_parameter_value().integer_value
+
         Kpid_x = (
             self.declare_parameter("Kpid_x", [0.75, 0.0, 0.0])
             .get_parameter_value()
@@ -125,6 +128,8 @@ class MechanismNavigation(TaskServerBase):
 
         self.time_last_had_target = time.time()
         self.time_started_shooting = -1
+        
+        self.ball_counter = 0
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
         self.declare_parameter("is_sim", False)
@@ -253,8 +258,10 @@ class MechanismNavigation(TaskServerBase):
         self.water_banners = new_water_banners
         self.ball_banners = new_ball_banners
 
-        # ensure that we first shoot two targets of different type
-        if self.shot_water and not self.shot_ball and len(self.ball_banners) > 0:
+        
+        if self.ball_counter >= self.balls_loaded: # check that we have balls to shoot
+            target_banners = self.water_banners
+        elif self.shot_water and not self.shot_ball and len(self.ball_banners) > 0: # ensure that we first shoot two targets of different type
             target_banners = self.ball_banners
         elif self.shot_ball and not self.shot_water and len(self.water_banners) > 0:
             target_banners = self.water_banners
@@ -494,7 +501,7 @@ class MechanismNavigation(TaskServerBase):
                     return
                 # elif (time.time() - self.time_started_shooting > 5):
                 # elif self.finished_shooting:
-                elif self.finished_shooting or (time.time() - self.time_started_shooting > 5):
+                elif self.finished_shooting or (time.time() - self.time_started_shooting > 10):
                     self.get_logger().info(f'SHOT {self.selected_target[0]}, TIME: {time.time()}')
                     # move on
                     self.shot_targets.append(self.selected_target)
@@ -503,6 +510,7 @@ class MechanismNavigation(TaskServerBase):
                         self.shot_water = True
                     else:
                         self.shot_ball = True
+                        self.ball_counter += 1
 
                     self.state = DeliveryState.WAITING_TARGET
                     self.selected_target = None
