@@ -102,7 +102,7 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
             {"gate_dist_back": 0.0},
-            {"gate_probe_dist": 5.0},
+            {"gate_probe_dist": 3.0},
             {"gate_dist_thres": 50.0},
         ],
         remappings=[
@@ -124,7 +124,7 @@ def launch_setup(context, *args, **kwargs):
             {"max_inter_gate_dist": 25.0},
             {"max_gate_pair_dist": 25.0},
             {"duplicate_dist": 0.3},
-            {"forward_dist": 1.5},
+            {"forward_dist": 3.0},
             {"inter_buoy_pair_dist": 0.5},
             {"buoy_pair_dist_thres": 0.2},
             {"xy_threshold": 0.8},

@@ -1,0 +1,7 @@
+# Goal
+bool restart_buoys
+bool restart_banners
+bool restart_position
+---
+# Result
+# no need

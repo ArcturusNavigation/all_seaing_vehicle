@@ -594,6 +594,7 @@ def launch_setup(context, *args, **kwargs):
             # {"midpoint_pair_forward_dist": 5.0},
             {"gate_dist_thres": 50.0},
             {"green_buoy_loop_count": 2},
+            {"forward_dist": 10.0},
             {"max_turn_vel": [5.0, 0.0, 1.0]},
             {"turn_pid": [0.5, 0.0, 0.0]},
         ],
