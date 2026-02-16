@@ -32,6 +32,7 @@ public:
         this->declare_parameter<std::vector<double>>("local_range_y", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("local_range_z", {-100000.0, 100000.0});
         this->declare_parameter<std::vector<double>>("filter_theta_range", {0.0, 0.0});
+        this->declare_parameter<std::vector<double>>("filter_bbox", {0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
         this->declare_parameter<double>("leaf_size_xy", 0.0);
         this->declare_parameter<double>("leaf_size_z", 0.0);
         this->declare_parameter<int>("min_pts_per_voxel", 1);
@@ -66,6 +67,7 @@ public:
         m_local_range_y = this->get_parameter("local_range_y").as_double_array();
         m_local_range_z = this->get_parameter("local_range_z").as_double_array();
         m_filter_theta_range = this->get_parameter("filter_theta_range").as_double_array();
+        m_filter_bbox = this->get_parameter("filter_bbox").as_double_array();
         m_leaf_size_xy = this->get_parameter("leaf_size_xy").as_double();
         m_leaf_size_z = this->get_parameter("leaf_size_z").as_double();
         m_min_pts_per_voxel = this->get_parameter("min_pts_per_voxel").as_int();
@@ -122,6 +124,7 @@ private:
                 m_local_range_y[0] <= point.y && point.y <= m_local_range_y[1] &&
                 m_local_range_z[0] <= point.z && point.z <= m_local_range_z[1] &&
                 !(m_filter_theta_range[0] < angle*180/M_PI && angle*180/M_PI < m_filter_theta_range[1]) &&
+                !(m_filter_bbox[0] < point.x && m_filter_bbox[1] < point.y && m_filter_bbox[2] < point.z && point.x < m_filter_bbox[3] && point.y < m_filter_bbox[4] && point.z < m_filter_bbox[5]) &&
                 m_range_intensity[0] <= point.intensity &&
                 point.intensity <= m_range_intensity[1] && 
                 pcl::isFinite(point)) {
@@ -197,6 +200,7 @@ private:
     std::vector<double> m_local_range_y;
     std::vector<double> m_local_range_z;
     std::vector<double> m_filter_theta_range;
+    std::vector<double> m_filter_bbox;
     double m_leaf_size_xy, m_leaf_size_z;
     int m_min_pts_per_voxel;
     bool m_convert_to_robot;

@@ -172,8 +172,9 @@ def launch_setup(context, *args, **kwargs):
         ],
         parameters=[
             {"global_frame_id": "map"},
-            {"range_radius": [0.6, 60.0]},
-            {"filter_theta_range": [230.0, 310.0]},
+            {"range_radius": [0.0, 60.0]},
+            # {"filter_theta_range": [230.0, 310.0]},
+            {"filter_bbox": [-0.5, -1.0, -1.0, 0.5, 0.5, 0.5]}, # (min_x, min_y, min_z, max_x, max_y, max_z)
         ],
     )
 
