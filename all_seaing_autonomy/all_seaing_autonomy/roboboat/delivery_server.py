@@ -9,12 +9,13 @@ from all_seaing_interfaces.action import Task
 from all_seaing_interfaces.msg import LabeledBoundingBox2DArray
 from all_seaing_interfaces.srv import CommandAdj, CommandServo
 from ament_index_python.packages import get_package_share_directory
+from std_msgs.msg import Bool
 
 import time
 import yaml
 import os
 
-TIMER_PERIOD = 1 / 20
+TIMER_PERIOD = 1 / 10
 SERVO_HALF_RANGE = 180.0
 SERVO_MAX = 240.0
 SERVO_MIN = 120.0
@@ -99,8 +100,10 @@ class DeliveryServer(ActionServerBase):
             execute_callback=self.object_callback,
             cancel_callback=self.default_cancel_callback,
         )
-        self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "shape_boxes", self.bbox_callback, 10)
+        self.object_sub = self.create_subscription(LabeledBoundingBox2DArray, "shape_boxes", self.bbox_callback, 1)
         self.timer = self.create_timer(TIMER_PERIOD, self.timer_callback)
+
+        self.switch_sub = self.create_subscription(Bool, "switch_status", self.switch_cb, 10)
 
         if not self.is_sim:
             self.command_adj_cli = self.create_client(CommandAdj, "command_adj")
@@ -145,6 +148,8 @@ class DeliveryServer(ActionServerBase):
 
         self.target_labels = []
 
+        self.switch_status = True
+
         if not self.is_sim:
             # turn on turret servo
             req = CommandAdj.Request()
@@ -179,6 +184,9 @@ class DeliveryServer(ActionServerBase):
 
     def bbox_callback(self, msg):
         self.bboxes = msg.boxes
+
+    def switch_cb(self, msg):
+        self.switch_status = msg.data
 
     def update_pid(self):
         largest_bbox_area = 0
@@ -300,8 +308,12 @@ class DeliveryServer(ActionServerBase):
             self.command_servo_cli.call_async(req)
             
         # Aim until a ball is launched or timed out
+        prev_status = False
+        curr_status = False
         start = time.time()
-        while time.time() - start < self.object_delivery_time:
+        while time.time() - start < self.object_delivery_time and not (prev_status == True and curr_status == False):
+            prev_status = curr_status
+            curr_status = self.switch_status
             time.sleep(TIMER_PERIOD)
         
         if not self.is_sim:

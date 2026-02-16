@@ -234,6 +234,7 @@ def launch_setup(context, *args, **kwargs):
             {"Kpid_y": [2.0, 0.0, 0.5]},
             {"Kpid_theta": [0.3, 0.0, 1.0]},
             {"max_vel": [0.8, 0.8, 0.2]},
+            {"balls_loaded": 2},
         ],
         remappings=[
             
@@ -416,7 +417,8 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": buoy_label_mappings},
             {"shape_label_mappings_file": shape_label_mappings},
             # {"shape_label_mappings_file": all_label_mappings},
-            {"Kpid": [0.1, 0.0, 0.0]},
+            {"Kpid": [0.2, 0.01, 0.0]},
+            {"object_delivery_time": 10.0},
         ]
     )
     
