@@ -1,5 +1,6 @@
 from all_seaing_interfaces.srv import PlanPath
 from geometry_msgs.msg import PoseArray
+from std_msgs.msg import Empty
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.logging import get_logger
 
@@ -14,6 +15,7 @@ class PlannerExecutor:
         self.client = node.create_client(
             PlanPath, "plan_path", callback_group=self.cb_group
         )
+        self.abort_pub = node.create_publisher(Empty, "abort_planning", 10)
 
     def plan(self, start, goal, obstacle_tol=50, goal_tol=0.5, should_abort=lambda: False):
         if not self.client.wait_for_service(timeout_sec=2.0):
@@ -32,6 +34,7 @@ class PlannerExecutor:
             time.sleep(0.05)
 
         if not future.done():
+            self.abort_pub.publish(Empty())
             future.cancel()
             return PoseArray()
 

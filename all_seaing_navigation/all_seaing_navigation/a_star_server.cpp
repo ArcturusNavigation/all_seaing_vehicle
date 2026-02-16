@@ -3,6 +3,7 @@
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/point.hpp>
+#include <std_msgs/msg/empty.hpp>
 #include <all_seaing_interfaces/srv/plan_path.hpp>
 #include <rclcpp/executors/multi_threaded_executor.hpp>
 
@@ -12,13 +13,23 @@
 #include <algorithm>
 #include <limits>
 #include <float.h>
+#include <atomic>
 
 class AStarServer : public rclcpp::Node {
 public:
     AStarServer() : Node("a_star_server") {
+        abort_cb_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
         map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
             "/dynamic_map", 10,
             [this](const nav_msgs::msg::OccupancyGrid::SharedPtr msg) { map_ = msg; });
+
+        rclcpp::SubscriptionOptions abort_sub_opts;
+        abort_sub_opts.callback_group = abort_cb_group_;
+        abort_sub_ = this->create_subscription<std_msgs::msg::Empty>(
+            "abort_planning", 10,
+            [this](const std_msgs::msg::Empty::SharedPtr) { abort_flag_.store(true); },
+            abort_sub_opts);
 
         service_ = this->create_service<all_seaing_interfaces::srv::PlanPath>(
             "plan_path",
@@ -43,7 +54,10 @@ private:
 
     nav_msgs::msg::OccupancyGrid::SharedPtr map_;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
+    rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr abort_sub_;
+    rclcpp::CallbackGroup::SharedPtr abort_cb_group_;
     rclcpp::Service<all_seaing_interfaces::srv::PlanPath>::SharedPtr service_;
+    std::atomic<bool> abort_flag_{false};
 
     std::vector<double> gscore_;
     std::vector<int> parent_;
@@ -54,6 +68,7 @@ private:
     {
         geometry_msgs::msg::PoseArray result;
         RCLCPP_INFO(this->get_logger(), "Astar server received request");
+        abort_flag_.store(false);
 
         if (!map_) {
             RCLCPP_WARN(this->get_logger(), "No map received yet");
@@ -137,6 +152,12 @@ private:
         RCLCPP_INFO(this->get_logger(), "Astar server astar");
 
         while (!pq.empty()) {
+            if (abort_flag_.load()) {
+                RCLCPP_INFO(this->get_logger(), "A* search aborted");
+                response->path = result;
+                return;
+            }
+
             PQNode node = pq.top();
             pq.pop();
 
@@ -205,7 +226,7 @@ private:
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
-    rclcpp::executors::MultiThreadedExecutor executor = rclcpp::executors::MultiThreadedExecutor(rclcpp::ExecutorOptions(),2);
+    rclcpp::executors::MultiThreadedExecutor executor = rclcpp::executors::MultiThreadedExecutor(rclcpp::ExecutorOptions(), 3);
     auto node = std::make_shared<AStarServer>();
     executor.add_node(node);
     executor.spin();
