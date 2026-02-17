@@ -199,6 +199,7 @@ class DeliveryServer(ActionServerBase):
             if area > largest_bbox_area:
                 largest_bbox_area = area
                 self.target_x = (bbox.min_x + bbox.max_x) / 2
+                self.sweep_sign = 1 if self.target_x < self.camera_width/2 else -1 # will start sweeping towards the direction we last saw it
         dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
         self.prev_update_time = self.get_clock().now()
         if largest_bbox_area == 0:
