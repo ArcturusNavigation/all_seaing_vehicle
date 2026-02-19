@@ -13,7 +13,7 @@ from sensor_msgs.msg import PointCloud2
 from rclpy.qos import qos_profile_sensor_data
 from all_seaing_controller.potential_field import PotentialField
 
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA, String
 from nav_msgs.msg import OccupancyGrid
 from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import Point, PoseArray, Pose, Point, Vector3, Quaternion
@@ -110,6 +110,7 @@ class NavigationTangentServer(ActionServerBase):
         # Pub sub
 
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
+        self.special_com = self.create_subscription(String, "special_nav_comms", self.special_com_callback, 10)
         
         # for obstacle avoidance
         self.point_cloud_sub = self.create_subscription(
@@ -138,6 +139,14 @@ class NavigationTangentServer(ActionServerBase):
 
         self.stop_plan_semaphore = Semaphore(1)
         self.stop_plan_evt = Event()
+
+        self.paused = None
+
+    def special_com_callback(self, msg: String):
+        if msg.data == "pause":
+            self.paused = self.get_robot_pose()
+        elif msg.data == "unpause":
+            self.paused = None
 
     def scale_thrust(self, x_vel, y_vel):
         if abs(x_vel) <= self.max_vel[0] and abs(y_vel) <= self.max_vel[1]:
@@ -275,7 +284,62 @@ class NavigationTangentServer(ActionServerBase):
         marker_msg.id = 0
         self.marker_pub.publish(marker_msg)
 
+    def publish_controls(self, x_vel, y_vel, theta_output, marker_array):
+        x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
+        control_msg = ControlOption()
+        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
+        control_msg.twist.linear.x = x_vel
+        control_msg.twist.linear.y = y_vel
+        control_msg.twist.angular.z = theta_output
+        self.control_pub.publish(control_msg)
+        self.controller_marker_pub.publish(marker_array)
+
+    def get_avoidance_field(self, initial_x_vel, initial_y_vel):
+        avoid_x_vel, avoid_y_vel = 0.0, 0.0
+        if self.avoid_obs and (self.lidar_point_cloud is not None) and (self.lidar_point_cloud.width > 0):
+            avoid_x_vel, avoid_y_vel = PotentialField(self.lidar_point_cloud, self.avoid_max_dist).sketchy_gradient_descent_step()
+            # self.get_logger().info(f'{self.lidar_point_cloud.width} points, unscaled avoiding vel: {avoid_x_vel, avoid_y_vel}')
+            avoid_x_vel *= self.avoid_vel_coeff
+            avoid_y_vel *= self.avoid_vel_coeff
+            # rotational avoidance velocity
+            rot_avoid_x_vel, rot_avoid_y_vel = PotentialField(self.lidar_point_cloud, self.avoid_max_dist).rotational_force(vel_dir=(initial_x_vel, initial_y_vel))
+            # self.get_logger().info(f'{self.lidar_point_cloud.width} points, unscaled avoiding vel: {avoid_x_vel, avoid_y_vel}')
+            rot_avoid_x_vel *= self.rot_avoid_vel_coeff
+            rot_avoid_y_vel *= self.rot_avoid_vel_coeff
+            if self.avoid_rot_vel_mag:
+                vel_mag = math.sqrt(initial_x_vel**2+initial_y_vel**2)
+                rot_avoid_x_vel*=vel_mag
+                rot_avoid_y_vel*=vel_mag
+            avoid_x_vel += rot_avoid_x_vel
+            avoid_y_vel += rot_avoid_y_vel
+        return (avoid_x_vel, avoid_y_vel)
+
+    def get_output_using_target(self, target_pose):
+        target_robot_frame = self.global_to_robot((target_pose), self.get_robot_pose())
+        self.set_pid_setpoints(*target_robot_frame)
+        self.update_pid(0, 0, 0)
+
+        x_vel = self.x_pid.get_effort()
+        y_vel = self.y_pid.get_effort()
+        theta_output = self.theta_pid.get_effort()
+        return (x_vel, y_vel, theta_output)
+
+    def station_hold(self, keep_pos):
+        x_vel, y_vel, theta_output = self.get_output_using_target(keep_pos)
+        # avoid_x_vel, avoid_y_vel = self.get_avoidance_field(x_vel, y_vel)
+        avoid_x_vel, avoid_y_vel = (0.0, 0.0) # Should have no need for potential fields, just prevent drift
+
+        x_vel += avoid_x_vel
+        y_vel += avoid_y_vel
+
+        self.publish_controls(x_vel, y_vel, theta_output, MarkerArray())
+
     def control_loop(self):
+        if self.paused != None:
+            self.visualize_waypoint((self.paused[0], self.paused[1]))
+            self.station_hold(self.paused)
+            return
+        
         nav_x, nav_y, nav_theta = self.get_robot_pose()
         assert self.cur_seg != None
 
@@ -318,49 +382,23 @@ class NavigationTangentServer(ActionServerBase):
             target_pos = (nav_x + cor_off[0] + for_off[0], nav_y + cor_off[1] + for_off[1])
 
         self.visualize_waypoint(target_pos[0], target_pos[1])
-        target_robot_frame = self.global_to_robot((target_pos[0], target_pos[1], math.atan2(b[1]-a[1], b[0]-a[0])), (nav_x, nav_y, nav_theta))
-        self.set_pid_setpoints(*target_robot_frame)
-        self.update_pid(0, 0, 0)
+        target_pose = (target_pos[0], target_pos[1], math.atan2(b[1]-a[1], b[0]-a[0]))
 
-        x_vel = self.x_pid.get_effort()
-        y_vel = self.y_pid.get_effort()
-        theta_output = self.theta_pid.get_effort()
+        x_vel, y_vel, theta_output = self.get_output_using_target(target_pose)
 
         marker_array = MarkerArray()
         marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))
 
         # obstacle avoidance
-        avoid_x_vel, avoid_y_vel = 0.0, 0.0
-        if self.avoid_obs and (self.lidar_point_cloud is not None) and (self.lidar_point_cloud.width > 0):
-            avoid_x_vel, avoid_y_vel = PotentialField(self.lidar_point_cloud, self.avoid_max_dist).sketchy_gradient_descent_step()
-            # self.get_logger().info(f'{self.lidar_point_cloud.width} points, unscaled avoiding vel: {avoid_x_vel, avoid_y_vel}')
-            avoid_x_vel *= self.avoid_vel_coeff
-            avoid_y_vel *= self.avoid_vel_coeff
-            # rotational avoidance velocity
-            rot_avoid_x_vel, rot_avoid_y_vel = PotentialField(self.lidar_point_cloud, self.avoid_max_dist).rotational_force(vel_dir=(x_vel, y_vel))
-            # self.get_logger().info(f'{self.lidar_point_cloud.width} points, unscaled avoiding vel: {avoid_x_vel, avoid_y_vel}')
-            rot_avoid_x_vel *= self.rot_avoid_vel_coeff
-            rot_avoid_y_vel *= self.rot_avoid_vel_coeff
-            if self.avoid_rot_vel_mag:
-                vel_mag = math.sqrt(x_vel**2+y_vel**2)
-                rot_avoid_x_vel*=vel_mag
-                rot_avoid_y_vel*=vel_mag
-            avoid_x_vel += rot_avoid_x_vel
-            avoid_y_vel += rot_avoid_y_vel
-            x_vel += avoid_x_vel
-            y_vel += avoid_y_vel
+        avoid_x_vel, avoid_y_vel = self.get_avoidance_field(x_vel, y_vel)
+
+        x_vel += avoid_x_vel
+        y_vel += avoid_y_vel
 
         marker_array.markers.append(self.vel_to_marker((avoid_x_vel, avoid_y_vel), scale=self.vel_marker_scale, rgb=(1.0, 0.0, 0.0), id=1))
         marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 0.0, 1.0), id=2))
 
-        x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
-        control_msg = ControlOption()
-        control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
-        control_msg.twist.linear.x = x_vel
-        control_msg.twist.linear.y = y_vel
-        control_msg.twist.angular.z = theta_output
-        self.control_pub.publish(control_msg)
-        self.controller_marker_pub.publish(marker_array)
+        self.publish_controls(x_vel, y_vel, theta_output, marker_array)
 
     def get_closest_seg(self, nav_x, nav_y):
         opt = (1000000, 0)
