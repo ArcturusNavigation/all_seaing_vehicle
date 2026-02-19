@@ -6,7 +6,7 @@ from rclpy.action import ActionClient
 from std_msgs.msg import Bool
 
 from all_seaing_interfaces.action import Task, Search
-from all_seaing_interfaces.msg import ObstacleMap, Obstacle
+from all_seaing_interfaces.msg import ObstacleMap, Obstacle, LabeledBoundingBox2DArray
 from all_seaing_interfaces.srv import RestartSLAM
 from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_common.report_pb2 import RobotState, LatLng, TaskType, SoundSignal, SignalType
@@ -251,6 +251,36 @@ class RunTasks(ActionServerBase):
         self.shore_heartbeat_reporter = self.create_timer(1, self.report_shore_heartbeat)
 
         self.restart_slam_options = None
+
+        # not clean but we'll deal with it later
+        self.bbox_sub = self.create_subscription(
+            LabeledBoundingBox2DArray, 
+            "shape_boxes", 
+            self.bbox_callback, 
+            10
+        )
+        self.patrol_pause_publisher = self.create_publisher(String, "special_nav_comms", 10)
+        self.patrol_label = 5
+        self.declare_parameter("patrol_prob_thresh", 0.1)
+        self.patrol_prob_thresh = self.get_parameter("patrol_prob_thresh").get_parameter_value().double_value
+        self.declare_parameter("patrol_box_minsize", 10000.0)
+        self.patrol_box_minsize = self.get_parameter("patrol_box_minsize").get_parameter_value().double_value
+
+    def bbox_callback(self, bbox_array):
+        patrol_close = False
+        for bbox in bbox_array.boxes:
+            if bbox.label == self.patrol_label and bbox.probability >= self.patrol_prob_thresh and (bbox.max_x - bbox.min_x) * (bbox.max_y - bbox.min_y) >= self.patrol_box_minsize:
+                patrol_close = True
+
+        if patrol_close:
+            if not self.patrol_paused:
+                self.patrol_pause_publisher.publish(String(data="pause"))
+                # Need to also send a message
+            self.patrol_paused = True
+        else:
+            if self.patrol_paused:
+                self.patrol_pause_publisher.publish(String(data="unpause"))
+            self.patrol_paused = False
 
     def odom_cb(self, msg):
         self.vel = self.norm((msg.twist.twist.linear.x, msg.twist.twist.linear.y))
