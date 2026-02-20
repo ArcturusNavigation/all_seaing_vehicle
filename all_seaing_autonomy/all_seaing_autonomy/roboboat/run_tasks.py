@@ -69,7 +69,7 @@ class RunTasks(ActionServerBase):
         self.task_list = [
             # ENTRY GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
-            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
+            [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
 
             # FOLLOW PATH
             [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
