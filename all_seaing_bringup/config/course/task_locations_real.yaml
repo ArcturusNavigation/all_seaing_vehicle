@@ -7,7 +7,7 @@ entry: # put the coordinates of the first gate
 
 follow_path:
   x: 0.0
-  y: 0.0
+  y: 30.0
   search_theta: false
   theta: 0.0
   wait_time: 0.0
@@ -35,7 +35,7 @@ delivery:
 
 return: # put the coordinates of the second gate
   x: 0.0
-  y: 20.0
+  y: 15.0
   search_theta: false
   theta: 0.0
   wait_time: 0.0
