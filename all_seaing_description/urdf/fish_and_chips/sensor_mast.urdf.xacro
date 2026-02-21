@@ -16,7 +16,7 @@
     </joint>
 
     <joint name="base_to_gps" type="fixed">
-        <origin xyz="20.0 0.0 0.0" rpy="0 0 0"/>
+        <origin xyz="0.2 0.0 0.0" rpy="0 0 0"/>
         <parent link="base_link"/>
         <child link="gps_link"/>
     </joint>
