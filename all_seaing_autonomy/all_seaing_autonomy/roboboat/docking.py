@@ -467,12 +467,6 @@ class Docking(TaskServerBase):
         #     self.x_pid.reset()
         #     self.y_pid.reset()
         #     self.theta_pid.reset()
-    
-    def distance(self, point, wall_params):
-        x, y = point
-        (a, b, c), _ = wall_params
-        return (a*x+b+y)/math.sqrt(a**2+b**2)
-    
     def dot(self, vec1, vec2):
         return vec1[0]*vec2[0]+vec1[1]*vec2[1]
 

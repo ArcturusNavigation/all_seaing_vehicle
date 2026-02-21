@@ -589,7 +589,7 @@ class FollowBuoyPath(TaskServerBase):
         quat = self.quaternion_from_euler(0, 0, angle)
         return Pose(
             position=Point(x=pair[0], y=pair[1]),
-            orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
+            orientation=Quaternion(x=quat[0], y=quat[1], z=quat[2], w=quat[3]),
         )
     
     def buoy_pairs_angle(self, p1, p2, loc=False):
@@ -673,8 +673,8 @@ class FollowBuoyPath(TaskServerBase):
             old_angle = old_left if old_right_duplicate else old_right
             new_angle = new_left if new_right_duplicate else new_right
             return new_angle > old_angle + self.better_angle_thres
-        elif ((old_left_duplicate or old_right_duplicate) and (new_left_duplicate or new_right_duplicate)):
-            return (old_left_duplicate or old_right_duplicate)
+        elif (old_left_duplicate or old_right_duplicate) and not (new_left_duplicate or new_right_duplicate):
+            return True  # new is better since it has no duplicates
         else:
             return ((new_left > (old_left + self.better_angle_thres)) and (new_right > (old_right + self.better_angle_thres))) if (mode == "both") else (new_left > (old_left + self.better_angle_thres)) or (new_right > (old_right + self.better_angle_thres))
         
