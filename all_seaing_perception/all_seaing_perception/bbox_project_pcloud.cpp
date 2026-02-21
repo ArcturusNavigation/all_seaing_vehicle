@@ -399,7 +399,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                 }else{
                     adjusted_color_range = contour_matching_color_range_map["red"]; //(Hmin,Hmax, ...)
                     adjusted_color_range[1] += 90; // Hmax from red is low, add 90
-                    adjusted_color_range[1] = contour_matching_color_range_map["red2"][0]-90; // Hmin from red2 is high, add 90 and subtract 180 -> -90
+                    adjusted_color_range[0] = contour_matching_color_range_map["red2"][0]-90; // Hmin from red2 is high, add 90 and subtract 180 -> -90
                 }
                 //approximate to make things faster
                 contour_qts.first.second[0] = mu.m00*(long long)(float(adjusted_color_range[0]+adjusted_color_range[1])/2);

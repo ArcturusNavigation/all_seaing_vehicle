@@ -221,7 +221,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
         parameters=[
-            {"joy_x_scale": -1.0},
+            {"joy_x_scale": -3.0},
             {"joy_ang_scale": 0.3},
         ],
         condition=IfCondition(
@@ -437,7 +437,7 @@ def launch_setup(context, *args, **kwargs):
         amcl_ld,
         # static_transforms_ld,
         robot_state_publisher,
-        webcam_publisher,
+        # webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,

@@ -204,7 +204,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"camera_name": "front"},
             {"base_link_frame": "base_link"},
-            {"bbox_object_margin": 0.0},
+            {"bbox_object_margin": 20.0},
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             # {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
@@ -235,7 +235,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"camera_name": "back_left"},
             {"base_link_frame": "base_link"},
-            {"bbox_object_margin": 0.0},
+            {"bbox_object_margin": 20.0},
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             # {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
@@ -265,7 +265,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"camera_name": "back_right"},
             {"base_link_frame": "base_link"},
-            {"bbox_object_margin": 0.0},
+            {"bbox_object_margin": 20.0},
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             # {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
