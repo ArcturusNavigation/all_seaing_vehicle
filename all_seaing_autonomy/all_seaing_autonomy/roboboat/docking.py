@@ -623,20 +623,21 @@ class Docking(TaskServerBase):
             # self.get_logger().info(f'side offset: {offset}')
             # self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
-            if abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
-                if self.while_docking_state == WhileDockingState.NONE:
-                    self.get_logger().info(f'DOCKED, WILL GO FORWARDS')
-                    self.time_docked = time.time()
-                    self.while_docking_state = WhileDockingState.FORWARD
-                elif self.while_docking_state == WhileDockingState.FORWARD and time.time() - self.time_docked > self.forward_docking_time:
-                    self.get_logger().info(f'UNDOCKING')
-                    self.while_docking_state = WhileDockingState.BACKWARD
-                elif self.while_docking_state == WhileDockingState.BACKWARD and time.time() - self.time_docked > self.forward_docking_time + self.backward_undocking_time:
-                    self.get_logger().info(f'FINISHED UNDOCKING')
-                    self.while_docking_state = WhileDockingState.NONE
-                    self.send_vel_cmd(0.0,0.0,0.0)
-                    self.mark_successful()
-                    return
+            if self.while_docking_state == WhileDockingState.NONE and abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
+                # if self.while_docking_state == WhileDockingState.NONE:
+                self.get_logger().info(f'DOCKED, WILL GO FORWARDS')
+                self.time_docked = time.time()
+                self.while_docking_state = WhileDockingState.FORWARD
+            elif self.while_docking_state == WhileDockingState.FORWARD and time.time() - self.time_docked > self.forward_docking_time:
+                self.get_logger().info(f'UNDOCKING')
+                self.while_docking_state = WhileDockingState.BACKWARD
+            elif self.while_docking_state == WhileDockingState.BACKWARD and time.time() - self.time_docked > self.forward_docking_time + self.backward_undocking_time:
+                self.get_logger().info(f'FINISHED UNDOCKING')
+                self.while_docking_state = WhileDockingState.NONE
+                self.send_vel_cmd(0.0,0.0,0.0)
+                self.mark_successful()
+                return
+            
             if self.while_docking_state == WhileDockingState.NONE:
                 x_output = self.x_pid.get_effort()
                 y_output = self.y_pid.get_effort()
