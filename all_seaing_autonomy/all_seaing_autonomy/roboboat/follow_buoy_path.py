@@ -11,7 +11,7 @@ from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.task_server_base import TaskServerBase
 from all_seaing_controller.pid_controller import PIDController
-
+from tf_transformations import quaternion_from_euler
 from all_seaing_common.report_pb2 import ObjectDetected, ObjectType, Color, TaskType
 
 import math
@@ -133,6 +133,7 @@ class FollowBuoyPath(TaskServerBase):
         ).value
         with open(color_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
+        self.label_mappings = label_mappings
         # hardcoded from reading YAML
         if self.is_sim:
             self.green_labels.add(label_mappings["green"])
@@ -561,32 +562,11 @@ class FollowBuoyPath(TaskServerBase):
     def pair_to_pose(self, pair):
         return Pose(position=Point(x=pair[0], y=pair[1]))
     
-    def quaternion_from_euler(self, roll, pitch, yaw):
-        """
-        Converts euler roll, pitch, yaw to quaternion (w in last place)
-        quat = [x, y, z, w]
-        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
-        """
-        cy = math.cos(yaw * 0.5)
-        sy = math.sin(yaw * 0.5)
-        cp = math.cos(pitch * 0.5)
-        sp = math.sin(pitch * 0.5)
-        cr = math.cos(roll * 0.5)
-        sr = math.sin(roll * 0.5)
-
-        q = [0] * 4
-        q[0] = cy * cp * cr + sy * sp * sr
-        q[1] = cy * cp * sr - sy * sp * cr
-        q[2] = sy * cp * sr + cy * sp * cr
-        q[3] = sy * cp * cr - cy * sp * sr
-
-        return q
-    
     def pair_angle_to_pose(self, pair, angle):
-        quat = self.quaternion_from_euler(0, 0, angle)
+        quat = quaternion_from_euler(0, 0, angle)
         return Pose(
             position=Point(x=pair[0], y=pair[1]),
-            orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
+            orientation=Quaternion(x=quat[0], y=quat[1], z=quat[2], w=quat[3]),
         )
     
     def buoy_pairs_angle(self, p1, p2, loc=False):
@@ -1203,9 +1183,9 @@ class FollowBuoyPath(TaskServerBase):
         if self.state in [FollowPathState.FOLLOWING_FIRST_PASS, FollowPathState.FOLLOWING_BACK]:
             if self.state == FollowPathState.FOLLOWING_BACK and self.first_back:
                 if "green_pole_buoy" in self.green_labels:
-                    self.green_labels.remove("green_pole_buoy")
+                    self.green_labels.remove(self.label_mappings["green_pole_buoy"])
                 if "red_pole_buoy" in self.red_labels:
-                    self.red_labels.remove("red_pole_buoy")
+                    self.red_labels.remove(self.label_mappings["red_pole_buoy"])
                 # make the robot face the previous gate
                 # self.get_logger().info('facing gate')
                 # _, intended_dir = self.midpoint_pair_dir(self.pair_to, 0.0)

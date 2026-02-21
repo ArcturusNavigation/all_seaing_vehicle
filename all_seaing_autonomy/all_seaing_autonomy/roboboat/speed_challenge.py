@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from ast import Num
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
