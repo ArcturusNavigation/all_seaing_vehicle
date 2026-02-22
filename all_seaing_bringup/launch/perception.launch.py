@@ -180,7 +180,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"model": "roboboat_shape_2025"},
             {"label_config": "shape_label_mappings"},
-            {"conf": 0.4},
+            {"conf": 0.1},
             {"use_color_names": False},
         ],
         remappings=[
@@ -384,7 +384,7 @@ def launch_setup(context, *args, **kwargs):
             {"grid_dim": [800, 800]},
             {"default_range": 60},
             {"grid_resolution": 0.1},
-            {"inflate_dist": 1.0},
+            {"inflate_dist": 0.0},
             {"inv_decay_rate": 1.2},
             {"default_lidar_range": 40.0},
             {"dynamic_origin": True},

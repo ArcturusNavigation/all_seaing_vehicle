@@ -102,8 +102,10 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
             {"gate_dist_back": 0.0},
-            {"gate_probe_dist": 30.0},
-            {"gate_dist_thres": 50.0},
+            {"gate_probe_dist": 40.0},
+            {"gate_dist_thres": 70.0},
+            {"max_gate_pair_dist": 50.0},
+            {"xy_threshold": 1.0},
         ],
         remappings=[
         ]
@@ -124,14 +126,14 @@ def launch_setup(context, *args, **kwargs):
             {"max_inter_gate_dist": 25.0},
             {"max_gate_pair_dist": 25.0},
             {"duplicate_dist": 1.0},
-            {"forward_dist": 10.0},
+            {"forward_dist": 5.0},
             {"inter_buoy_pair_dist": 0.5},
             {"buoy_pair_dist_thres": 0.2},
             {"xy_threshold": 0.8},
             {"thresh_dist": 0.8},
             {"choose_every": 25},
             {"turn_offset": 3.0},
-            {"beacon_probe_dist": 4.0},
+            {"beacon_probe_dist": 0.0},
             {"midpoint_pair_forward_dist": 0.5},
             {"adaptive_distance": 1.0},
             {"max_turn_vel": [1.5, 0.0, 0.2]},
@@ -279,7 +281,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="sound_signal_detector.py",
         parameters=[
-            {"target_freq": target_freq},
+            {"target_freq": float(target_freq)},
         ],
     )
 
@@ -468,7 +470,7 @@ def launch_setup(context, *args, **kwargs):
         heartbeat_reporter,
         entry_gates,
         delivery_server,
-        # sound_signal_node,
+        sound_signal_node,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback,

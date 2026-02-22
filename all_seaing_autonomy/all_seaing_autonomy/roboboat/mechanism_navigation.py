@@ -501,7 +501,7 @@ class MechanismNavigation(TaskServerBase):
                     return
                 # elif (time.time() - self.time_started_shooting > 5):
                 # elif self.finished_shooting:
-                elif self.finished_shooting or (time.time() - self.time_started_shooting > 10):
+                elif self.finished_shooting:
                     self.get_logger().info(f'SHOT {self.selected_target[0]}, TIME: {time.time()}')
                     # move on
                     self.shot_targets.append(self.selected_target)

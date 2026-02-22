@@ -118,11 +118,11 @@ class EntryGates(TaskServerBase):
         else:
             # self.green_labels.add(11) # just to use old rosbags
             # self.red_labels.add(17) # just to use old rosbags
-            # self.green_labels.add(label_mappings["green_buoy"])
-            # self.green_labels.add(label_mappings["green_circle"])
+            self.green_labels.add(label_mappings["green_buoy"])
+            self.green_labels.add(label_mappings["green_circle"])
             self.green_labels.add(label_mappings["green_pole_buoy"])
-            # self.red_labels.add(label_mappings["red_buoy"])
-            # self.red_labels.add(label_mappings["red_circle"])
+            self.red_labels.add(label_mappings["red_buoy"])
+            self.red_labels.add(label_mappings["red_circle"])
             self.red_labels.add(label_mappings["red_pole_buoy"])
             # self.red_labels.add(label_mappings["yellow_buoy"])
             # self.red_labels.add(label_mappings["yellow_racquet_ball"])

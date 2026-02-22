@@ -245,7 +245,7 @@ def launch_setup(context, *args, **kwargs):
     central_hub = launch_ros.actions.Node(
         package="all_seaing_driver",
         executable="central_hub_ros.py",
-        parameters=[{"port": "/dev/ttyACM1"}],
+        parameters=[{"port": "/dev/ttyACM3"}],
     )
 
     lidar_ld = IncludeLaunchDescription(
@@ -265,7 +265,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         ),
         launch_arguments={
-            "port": "/dev/ttyACM3"
+            "port": "/dev/ttyACM2"
         }.items(),
     )
 
@@ -437,7 +437,7 @@ def launch_setup(context, *args, **kwargs):
         amcl_ld,
         # static_transforms_ld,
         robot_state_publisher,
-        # webcam_publisher,
+        webcam_publisher,
         lidar_ld,
         mavros_ld,
         zed_ld,

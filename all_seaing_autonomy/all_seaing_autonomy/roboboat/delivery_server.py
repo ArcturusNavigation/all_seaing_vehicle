@@ -17,13 +17,13 @@ import os
 
 TIMER_PERIOD = 1 / 10
 SERVO_HALF_RANGE = 180.0
-SERVO_MAX = 240.0
-SERVO_MIN = 120.0
-SWEEP_MIN = 120.0
-SWEEP_MAX = 240.0
+SERVO_MAX = 250.0
+SERVO_MIN = 150.0
+SWEEP_MIN = 150.0
+SWEEP_MAX = 250.0
 SWEEP_OMEGA = 45.0
-SERVO_STATION = 180
-SERVO_INITIAL = 180
+SERVO_STATION = 210
+SERVO_INITIAL = 210
 
 class DeliveryServer(ActionServerBase):
     def __init__(self):
@@ -312,7 +312,7 @@ class DeliveryServer(ActionServerBase):
         prev_status = False
         curr_status = False
         start = time.time()
-        while time.time() - start < self.object_delivery_time and not (prev_status == True and curr_status == False):
+        while not (prev_status == True and curr_status == False):
             prev_status = curr_status
             curr_status = self.switch_status
             time.sleep(TIMER_PERIOD)
