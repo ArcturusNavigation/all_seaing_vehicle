@@ -8,6 +8,8 @@ from ament_index_python.packages import get_package_share_directory
 from all_seaing_common.task_server_base import TaskServerBase
 from all_seaing_interfaces.msg import KeyboardButton 
 from enum import Enum
+from sensor_msgs.msg import Joy
+from std_msgs.msg import String
 
 class ReturnState(Enum):
     SETTING_UP = 1
@@ -34,9 +36,7 @@ class HarborAlert(TaskServerBase):
 
         self.blue_buoy_pos = None
 
-        self.keyboard_sub = self.create_subscription(
-            KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
-        )
+        
         self.key_presses = 0
         # self.return_pos = None
         # self.return_dir = None
@@ -46,6 +46,16 @@ class HarborAlert(TaskServerBase):
         # self.obstacles = None
 
         self.state = ReturnState.SETTING_UP
+
+        if self.is_sim: 
+            self.get_logger().info("Running in simulation mode. Listening to joystick input.")
+            self.keyboard_sub = self.create_subscription(
+                Joy, "/joy", self.real_keyboard_callback, 10
+            )
+        else: 
+            self.keyboard_sub = self.create_subscription(
+                KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
+            )
 
         # bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
@@ -97,7 +107,7 @@ class HarborAlert(TaskServerBase):
             self.station_keep_blue_buoy()
             self.mark_successful()
         elif self.state == ReturnState.SETTING_UP:
-            if self.blue_buoy_pos == None:
+            if self.blue_buoy_pos is None:
                 self.blue_buoy_pos = self.robot_pos
                 self.get_logger().info(f'Finished setting up waypoint, ready to enter station keeping at {self.blue_buoy_pos}')
             if self.key_presses == 2:
