@@ -48,7 +48,7 @@ class WebcamPublisher(Node):
             self.cap = cv2.VideoCapture(video_index)
             self.get_logger().info(f'webcam publisher found camera')
         else:
-            self.destroy_node()
+            rclpy.shutdown()
 
     def publish_webcam_image(self):
         ret, frame = self.cap.read()

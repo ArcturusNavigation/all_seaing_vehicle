@@ -136,7 +136,7 @@ private:
         }
 
         auto round_nearest_unoccupied = [&](int&x, int&y) -> bool {
-            for(int cheb_dist = 0; cheb_dist < min(width, height); ++cheb_dist){ // If > min(width, height) I think we're cooked anyways
+            for(int cheb_dist = 0; cheb_dist < std::min(width, height); ++cheb_dist){ // If > min(width, height) I think we're cooked anyways
                 for (int d_main : {-cheb_dist, cheb_dist}){
                     for(int d_alt = -cheb_dist; d_alt <= cheb_dist; ++d_alt){
                         if(valid_and_unoccupied(x + d_main, y + d_alt)){

@@ -317,17 +317,16 @@ class NavigationTangentServer(ActionServerBase):
             b = (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y)
             while self.cur_seg + 2 < len(self.path.poses):
                 c = (self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y)
-                assert b != c # replacement of old if statement, if it evaluated to true you would just die
-                if self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > self.point_to_segment(b, c, (nav_x, nav_y)) or self.point_to_point_dist_less_than((nav_x, nav_y), b, self.fallback_seg_complete_threshold):
+                dist_to_next = self.point_to_segment(b, c, (nav_x, nav_y)) if b != c else self.norm((nav_x-b[0], nav_y-b[1]))
+                # assert b != c # replacement of old if statement, if it evaluated to true you would just die
+                if a == b or self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > dist_to_next or self.point_to_point_dist_less_than((nav_x, nav_y), b, self.fallback_seg_complete_threshold):
                     self.cur_seg += 1
                     a = b
                     b = c
                 else:
                     break
 
-            assert a != b
-
-            if self.cur_seg + 2 == len(self.path.poses):
+            if a == b or self.cur_seg + 2 >= len(self.path.poses):
                 target_pos = b
             else:
                 cor_off = self.proj_vector(a, b, (nav_x, nav_y)) # the perpendicular vector from robot pos to the line
@@ -348,7 +347,7 @@ class NavigationTangentServer(ActionServerBase):
                               target_pos[1] * (1 - self.pred_scale) + self.path.poses[self.cur_seg + 2].position.y * self.pred_scale)
             
             # Prod
-            target_theta = math.atan2(b[1]-a[1], b[0]-a[0])
+            target_theta = math.atan2(b[1]-a[1], b[0]-a[0]) if a == b else math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
             # Experimental version, needs to be tested, should increase speed and minimize strafing - useful when strafing is shit
             # target_theta = math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
 

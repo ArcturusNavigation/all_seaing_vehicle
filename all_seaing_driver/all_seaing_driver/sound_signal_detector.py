@@ -68,7 +68,7 @@ class SoundSignalDetector(Node):
                 break
 
         if DEVICE_INDEX == -1:
-            self.shutdown()
+            rclpy.shutdown()
 
         SAMPLE_RATE = int(self.p.get_device_info_by_index(DEVICE_INDEX)["defaultSampleRate"])
         # self.get_logger().info(f'Sample rate: {SAMPLE_RATE}')

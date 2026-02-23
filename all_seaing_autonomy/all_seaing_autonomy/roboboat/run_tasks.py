@@ -73,7 +73,7 @@ class RunTasks(ActionServerBase):
 
             # FOLLOW PATH
             # [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
-            # [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
+            [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # SPEED CHALLENGE
             # [ActionType.SEARCH, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
@@ -86,7 +86,7 @@ class RunTasks(ActionServerBase):
             # DELIVERY
             # [ActionType.SEARCH, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
             # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
-            [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
+            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # EXIT GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_return"), ReferenceInt(0), ReferenceInt(0), "return"],
