@@ -69,22 +69,23 @@ class RunTasks(ActionServerBase):
         self.task_list = [
             # ENTRY GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
-            [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
+            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
 
             # FOLLOW PATH
-            [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            # [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
             [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # SPEED CHALLENGE
             # [ActionType.SEARCH, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
             # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
+            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # DOCKING
             # [ActionType.SEARCH, TaskType.TASK_DOCKING, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
-            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # DELIVERY
             # [ActionType.SEARCH, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
+            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
             # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # EXIT GATES
@@ -177,11 +178,11 @@ class RunTasks(ActionServerBase):
         else:
             # self.green_labels.add(11) # just to use old rosbags
             # self.red_labels.add(17) # just to use old rosbags
-            self.green_labels.add(label_mappings["green_buoy"])
-            self.green_labels.add(label_mappings["green_circle"])
+            # self.green_labels.add(label_mappings["green_buoy"])
+            # self.green_labels.add(label_mappings["green_circle"])
             self.green_labels.add(label_mappings["green_pole_buoy"])
-            self.red_labels.add(label_mappings["red_buoy"])
-            self.red_labels.add(label_mappings["red_circle"])
+            # self.red_labels.add(label_mappings["red_buoy"])
+            # self.red_labels.add(label_mappings["red_circle"])
             self.red_labels.add(label_mappings["red_pole_buoy"])
             # self.red_labels.add(label_mappings["yellow_buoy"])
             # self.red_labels.add(label_mappings["yellow_racquet_ball"])

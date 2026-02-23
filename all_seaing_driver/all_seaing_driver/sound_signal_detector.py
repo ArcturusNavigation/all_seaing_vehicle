@@ -37,8 +37,7 @@ class SoundSignalDetector(Node):
         global CHUNK, SAMPLE_RATE
         FORMAT = pyaudio.paFloat32
         CHANNELS = 1  # mono mic
-        DEVICE_INDEX = 8
-        
+
         self.declare_parameter("target_freq", 600.0)
         global TARGET_FREQS
         TARGET_FREQS = [self.get_parameter("target_freq").get_parameter_value().double_value]
@@ -47,10 +46,32 @@ class SoundSignalDetector(Node):
 
         self.harbor_publisher = self.create_publisher(String, "harbor_detect", 10)
 
+        # DEVICE_INDEX = 8
+        DEVICE_INDEX = -1
+
         # setting up the microphone
         self.p = pyaudio.PyAudio()
+
+        self.get_logger().info("Available Audio Devices and their IDs:")
+
+        # Iterate through all devices
+        for i in range(self.p.get_device_count()):
+            # Get the device info by index
+            device_info = self.p.get_device_info_by_index(i)
+            
+            # Print the device ID and name
+            self.get_logger().info(f"Device ID {i}: {device_info['name']}")
+
+            if 'AB13X USB Audio' in device_info['name']:
+                self.get_logger().info(f"Desired audio device")
+                DEVICE_INDEX = i
+                break
+
+        if DEVICE_INDEX == -1:
+            rclpy.shutdown()
+
         SAMPLE_RATE = int(self.p.get_device_info_by_index(DEVICE_INDEX)["defaultSampleRate"])
-        print(f'Sample rate: {SAMPLE_RATE}')
+        # self.get_logger().info(f'Sample rate: {SAMPLE_RATE}')
         self.stream = self.p.open(
             format=FORMAT,
             channels=CHANNELS,

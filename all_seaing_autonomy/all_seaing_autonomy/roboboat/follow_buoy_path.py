@@ -654,7 +654,11 @@ class FollowBuoyPath(TaskServerBase):
             new_angle = new_left if new_right_duplicate else new_right
             return new_angle > old_angle + self.better_angle_thres
         elif (old_left_duplicate or old_right_duplicate) and not (new_left_duplicate or new_right_duplicate):
-            return True  # new is better since it has no duplicates
+            old_angle = old_left if old_right_duplicate else old_right
+            return ((new_left > (old_angle + self.better_angle_thres)) and (new_right > (old_angle + self.better_angle_thres))) if (mode == "both") else (new_left > (old_angle + self.better_angle_thres)) or (new_right > (old_angle + self.better_angle_thres))
+        elif (new_left_duplicate or new_right_duplicate) and not (old_left_duplicate or old_right_duplicate):
+            new_angle = new_left if new_right_duplicate else new_right
+            return ((new_angle > (old_left + self.better_angle_thres)) and (new_angle > (old_right + self.better_angle_thres))) if (mode == "both") else (new_angle > (old_left + self.better_angle_thres)) or (new_angle > (old_right + self.better_angle_thres))
         else:
             return ((new_left > (old_left + self.better_angle_thres)) and (new_right > (old_right + self.better_angle_thres))) if (mode == "both") else (new_left > (old_left + self.better_angle_thres)) or (new_right > (old_right + self.better_angle_thres))
         
@@ -970,7 +974,7 @@ class FollowBuoyPath(TaskServerBase):
         Check if the green beacon for turning is detected (returns boolean).
         Also sets the position of the green beacon if it is found.
         '''    
-        backup_buoy = None
+        # backup_buoy = None
         updated_pos = False
         for obstacle in self.obstacles:
             if obstacle.label in self.green_beacon_labels:
@@ -980,8 +984,8 @@ class FollowBuoyPath(TaskServerBase):
                             obstacle.global_point.point.y-self.robot_pos[1])
                 dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
                 buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                if (backup_buoy is None) or (self.green_beacon_found and (self.norm(self.green_beacon_pos, buoy_pos) < self.norm(self.green_beacon_pos, backup_buoy))):
-                    backup_buoy = buoy_pos
+                # if (backup_buoy is None) or (self.green_beacon_found and (self.norm(self.green_beacon_pos, buoy_pos) < self.norm(self.green_beacon_pos, backup_buoy))):
+                #     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.green_beacon_found) or (self.norm(self.green_beacon_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
                     if not self.green_beacon_found:
                         self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
@@ -991,9 +995,9 @@ class FollowBuoyPath(TaskServerBase):
                     robot_buoy_dist = self.norm(buoy_dir)
                     self.buoy_direction = (buoy_dir[0]/robot_buoy_dist, buoy_dir[1]/robot_buoy_dist)
                     break
-        if (not updated_pos) and (backup_buoy is not None):
-            self.get_logger().info('SWITCHING TO BACKUP GREEN BEACON BUOY')
-            self.green_beacon_pos = backup_buoy
+        # if (not updated_pos) and (backup_buoy is not None):
+        #     self.get_logger().info('SWITCHING TO BACKUP GREEN BEACON BUOY')
+        #     self.green_beacon_pos = backup_buoy
         return self.green_beacon_found
 
     def circle_green_beacon(self):
