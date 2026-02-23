@@ -645,6 +645,7 @@ def launch_setup(context, *args, **kwargs):
             {"wpt_banner_dist": 12.0},
             {"navigation_dist_thres": 15.0},
             {"duplicate_dist": 0.3},
+            {"update_slot_dist_thres": 3.0},
             {"docked_xy_thres": 1.0},
             {"Kpid_x": [0.75, 0.0, 0.0]},
             {"Kpid_y": [0.75, 0.0, 0.0]},

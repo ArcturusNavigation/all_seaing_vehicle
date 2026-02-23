@@ -190,7 +190,7 @@ def launch_setup(context, *args, **kwargs):
             {"boat_dock_dist_thres": 1.5},
             {"wpt_banner_dist": 7.0},
             {"navigation_dist_thres": 10.0},
-            # {"update_slot_dist_thres": 3.0},
+            {"update_slot_dist_thres": 3.0},
             {"docked_xy_thres": 1.0},
             {"duplicate_dist": 0.5},
             {"choose_every": 10},

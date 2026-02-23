@@ -172,26 +172,26 @@ class HarborAlert(TaskServerBase):
         Check if the blue buoy for turning is detected (returns boolean).
         Also sets the position of the blue buoy if it is found.
         '''
-        backup_buoy = None
+        # backup_buoy = None
         updated_pos = False
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
                 if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.buoy_dist_thres:
                     continue
-                buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
+                buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0],
                             obstacle.global_point.point.y-self.robot_pos[1])
                 dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
                 buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
-                    backup_buoy = buoy_pos
+                # if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
+                #     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
                     self.buoy_found = True
                     updated_pos = True
                     self.blue_buoy_pos = buoy_pos
                     break
-        if (not updated_pos) and (backup_buoy is not None):
-            self.get_logger().info('SWITCHING TO BACKUP BUOY')
-            self.blue_buoy_pos = backup_buoy
+        # if (not updated_pos) and (backup_buoy is not None):
+        #     self.get_logger().info('SWITCHING TO BACKUP BUOY')
+        #     self.blue_buoy_pos = backup_buoy
         return self.buoy_found
 
 
