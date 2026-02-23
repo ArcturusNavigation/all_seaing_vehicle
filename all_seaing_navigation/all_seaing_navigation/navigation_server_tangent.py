@@ -278,44 +278,44 @@ class NavigationTangentServer(ActionServerBase):
     def control_loop(self):
         nav_x, nav_y, nav_theta = self.get_robot_pose()
         assert self.cur_seg != None
-
-        if self.cur_seg + 1 >= len(self.path.poses):
-            return
-
         target_pos = (0, 0)
 
-        a = (self.path.poses[self.cur_seg].position.x, self.path.poses[self.cur_seg].position.y)
-        b = (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y)
-        while self.cur_seg + 2 < len(self.path.poses):
-            c = (self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y)
-            if b == c:
-                continue
-            if a == b or self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > self.point_to_segment(b, c, (nav_x, nav_y)):
-                self.cur_seg += 1
-                a = b
-                b = c
+        if self.cur_seg + 1 < len(self.path.poses):
+
+            a = (self.path.poses[self.cur_seg].position.x, self.path.poses[self.cur_seg].position.y)
+            b = (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y)
+            while self.cur_seg + 2 < len(self.path.poses):
+                c = (self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y)
+                if b == c:
+                    continue
+                if a == b or self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-3 > self.point_to_segment(b, c, (nav_x, nav_y)):
+                    self.cur_seg += 1
+                    a = b
+                    b = c
+                else:
+                    break
+
+            if a == b:
+                return
+
+            if self.cur_seg + 2 == len(self.path.poses):
+                target_pos = b
             else:
-                break
+                cor_off = self.proj_vector(a, b, (nav_x, nav_y)) # the perpendicular vector from robot pos to the line
 
-        if a == b:
-            return
+                ds_scale = self.point_segment_scale(a, b, (nav_x, nav_y))
 
-        if self.cur_seg + 2 == len(self.path.poses):
-            target_pos = b
+                if ds_scale < 0: # before a
+                    cor_off = (a[0]-nav_x, a[1]-nav_y)
+                elif ds_scale > 1: # after b, shouldn't really happen bc we are considering the closest segment
+                    cor_off = (b[0]-nav_x, b[1]-nav_y)
+
+                for_sca = self.forward_dist / self.norm((b[0] - a[0], b[1] - a[1]))
+                for_off = ((b[0] - a[0]) * for_sca, (b[1] - a[1]) * for_sca) # the tangent vector of the line
+
+                target_pos = (nav_x + cor_off[0] + for_off[0], nav_y + cor_off[1] + for_off[1])
         else:
-            cor_off = self.proj_vector(a, b, (nav_x, nav_y)) # the perpendicular vector from robot pos to the line
-
-            ds_scale = self.point_segment_scale(a, b, (nav_x, nav_y))
-
-            if ds_scale < 0: # before a
-                cor_off = (a[0]-nav_x, a[1]-nav_y)
-            elif ds_scale > 1: # after b, shouldn't really happen bc we are considering the closest segment
-                cor_off = (b[0]-nav_x, b[1]-nav_y)
-
-            for_sca = self.forward_dist / self.norm((b[0] - a[0], b[1] - a[1]))
-            for_off = ((b[0] - a[0]) * for_sca, (b[1] - a[1]) * for_sca) # the tangent vector of the line
-
-            target_pos = (nav_x + cor_off[0] + for_off[0], nav_y + cor_off[1] + for_off[1])
+            target_pos=(self.path.poses[-1].position.x,self.path.poses[-1].position.y)
 
         self.visualize_waypoint(target_pos[0], target_pos[1])
         target_robot_frame = self.global_to_robot((target_pos[0], target_pos[1], math.atan2(b[1]-a[1], b[0]-a[0])), (nav_x, nav_y, nav_theta))

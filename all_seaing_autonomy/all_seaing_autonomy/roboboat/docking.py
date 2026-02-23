@@ -237,12 +237,13 @@ class Docking(TaskServerBase):
                 self.indicator_priority[label] = 0
                 self.number_priority[label] = 0
         else:
-            self.dock_labels = [self.label_mappings[name] for name in ["number_1", "number_2", "number_3", "number_1_green", "number_2_green", "number_3_green", "number_1_red", "number_2_red", "number_3_red"]]
+            self.dock_labels = [self.label_mappings[name] for name in ["number_3", "number_3_green", "number_3_red"]]
             self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
 
             # indicators
-            self.dock_green_labels = [self.label_mappings[name] for name in ["number_1_green", "number_2_green", "number_3_green"]]
-            self.dock_red_labels = [self.label_mappings[name] for name in ["number_1_red", "number_2_red", "number_3_red"]]
+            self.dock_green_labels = [self.label_mappings[name] for name in ["number_3_green", "number_3_red"]]
+            # self.dock_red_labels = [self.label_mappings[name] for name in ["number_3_red"]]
+            self.dock_red_labels = []
             
             # indicator priority
             for label in self.dock_labels:
@@ -315,10 +316,11 @@ class Docking(TaskServerBase):
                 return True
 
         # if same otherwise dock to closest
-        if (self.norm(ref_dock_ctr, self.robot_pos) > self.norm(dock_ctr, self.robot_pos) + self.update_slot_dist_thres):
-            return True
-        else:
-            return False
+        # if (self.norm(ref_dock_ctr, self.robot_pos) > self.norm(dock_ctr, self.robot_pos) + self.update_slot_dist_thres):
+        #     return True
+        # else:
+        #     return False
+        return False
         
     def dock_side(self, dock_normal):
         if 0 < np.arctan2(dock_normal[1], dock_normal[0]) < np.pi: # facing north

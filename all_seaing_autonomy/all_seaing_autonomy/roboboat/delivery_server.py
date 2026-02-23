@@ -52,7 +52,12 @@ class DeliveryServer(ActionServerBase):
             .integer_value
         )
         self.water_delivery_time = (
-            self.declare_parameter("water_delivery_time", 5.0)
+            self.declare_parameter("water_delivery_time", 25.0)
+            .get_parameter_value()
+            .double_value
+        )
+        self.water_aiming_time = (
+            self.declare_parameter("water_aiming_time", 0.0)
             .get_parameter_value()
             .double_value
         )
@@ -232,6 +237,9 @@ class DeliveryServer(ActionServerBase):
         self.servo_angle = SERVO_INITIAL
         self.sweep_sign = 1
 
+        self.is_aiming = True
+        time.sleep(self.water_aiming_time)
+
         if not self.is_sim:
             # turn on turret servo
             req = CommandServo.Request()
@@ -240,7 +248,7 @@ class DeliveryServer(ActionServerBase):
             req.angle = SERVO_INITIAL
             self.command_servo_cli.call_async(req)
 
-            self.is_aiming = True
+            # self.is_aiming = True
 
             self.get_logger().info("Turning on water pump")
             req = CommandAdj.Request()

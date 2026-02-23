@@ -153,7 +153,9 @@ class MechanismNavigation(TaskServerBase):
             self.ball_labels = [self.label_mappings[name] for name in ["red_circle", "red_cross", "red_triangle", "red_square"]]
         else:
             self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
-            self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+            # self.water_labels = []
+            # self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+            self.ball_labels = []
         
         self.declare_parameter(
             "latlng_locations_file",

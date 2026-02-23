@@ -350,7 +350,7 @@ class SpeedChallenge(TaskServerBase):
         self.obstacles = msg.obstacles
         if self.paused:
             return
-        self.identify_beacon()
+        # self.identify_beacon()
 
     def probe_blue_buoy(self):
         '''
