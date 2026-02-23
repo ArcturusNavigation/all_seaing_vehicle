@@ -107,6 +107,24 @@ class NavigationTangentServer(ActionServerBase):
             .double_value
         )
 
+        self.fallback_seg_complete_threshold = ( # Number of meters away from next navigation point at which we should forcefully switch to next point
+            self.declare_parameter("fallback_seg_complete_threshold", 0.05)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.fallback_brute_return_threshold = ( # Number of meters away from current segment at which we should just brute force to return to path
+            self.declare_parameter("fallback_brute_return_threshold", 5.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.pred_scale = ( # Scale weight of c in target point prediction (more aggresively shortcuts / linearizes path)
+            self.declare_parameter("pred_scale", 0.01) # Some pred scale is recommended to deal with right angles
+            .get_parameter_value()
+            .double_value
+        )
+
         # Pub sub
 
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
@@ -235,6 +253,9 @@ class NavigationTangentServer(ActionServerBase):
         dot_prod = self.dot_3(a, b, c)
         return dot_prod / ((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]))
 
+    def point_to_point_dist_less_than(self, a, b, x):
+        return (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) < x * x
+
     def point_to_segment(self, a, b, c): # point c to segment a-b
         dot_prod = self.dot_3(a, b, c)
         ds_scale = dot_prod / ((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]))
@@ -278,25 +299,33 @@ class NavigationTangentServer(ActionServerBase):
     def control_loop(self):
         nav_x, nav_y, nav_theta = self.get_robot_pose()
         assert self.cur_seg != None
+
         target_pos = (0, 0)
+        target_theta = None
 
-        if self.cur_seg + 1 < len(self.path.poses):
+        # Initial safe pass, there was some old suspicious logic that I'm fairly certain is wrong if it ever gets triggered
+        # I assume it was added for a reason, so I did a version of the logic that is correct
 
+        if self.cur_seg + 1 >= len(self.path.poses):
+            target_pos = (self.path.poses[-1].position.x, self.path.poses[-1].position.y)
+            target_theta = math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
+        elif not self.point_to_point_dist_less_than((nav_x, nav_y), (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y), self.fallback_brute_return_threshold): # Fallback if we get too far away from the path
+            target_pos = (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y)
+            target_theta = math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
+        else:
             a = (self.path.poses[self.cur_seg].position.x, self.path.poses[self.cur_seg].position.y)
             b = (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y)
             while self.cur_seg + 2 < len(self.path.poses):
                 c = (self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y)
-                if b == c:
-                    continue
-                if a == b or self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-3 > self.point_to_segment(b, c, (nav_x, nav_y)):
+                assert b != c # replacement of old if statement, if it evaluated to true you would just die
+                if self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > self.point_to_segment(b, c, (nav_x, nav_y)) or self.point_to_point_dist_less_than((nav_x, nav_y), b, self.fallback_seg_complete_threshold):
                     self.cur_seg += 1
                     a = b
                     b = c
                 else:
                     break
 
-            if a == b:
-                return
+            assert a != b
 
             if self.cur_seg + 2 == len(self.path.poses):
                 target_pos = b
@@ -305,20 +334,26 @@ class NavigationTangentServer(ActionServerBase):
 
                 ds_scale = self.point_segment_scale(a, b, (nav_x, nav_y))
 
-                if ds_scale < 0: # before a
-                    cor_off = (a[0]-nav_x, a[1]-nav_y)
-                elif ds_scale > 1: # after b, shouldn't really happen bc we are considering the closest segment
-                    cor_off = (b[0]-nav_x, b[1]-nav_y)
-
                 for_sca = self.forward_dist / self.norm((b[0] - a[0], b[1] - a[1]))
                 for_off = ((b[0] - a[0]) * for_sca, (b[1] - a[1]) * for_sca) # the tangent vector of the line
 
+                if ds_scale < 0: # before a
+                    cor_off = (a[0]-nav_x, a[1]-nav_y)
+                elif ds_scale > 1: # after b, shouldn't really happen bc we are considering the closest segment
+                    self.get_logger().info(f"Nav server after b flag, ds_scale {ds_scale}, is this a problem?")
+                    cor_off = (b[0]-nav_x, b[1]-nav_y)
+
                 target_pos = (nav_x + cor_off[0] + for_off[0], nav_y + cor_off[1] + for_off[1])
-        else:
-            target_pos=(self.path.poses[-1].position.x,self.path.poses[-1].position.y)
+                target_pos = (target_pos[0] * (1 - self.pred_scale) + self.path.poses[self.cur_seg + 2].position.x * self.pred_scale,
+                              target_pos[1] * (1 - self.pred_scale) + self.path.poses[self.cur_seg + 2].position.y * self.pred_scale)
+            
+            # Prod
+            target_theta = math.atan2(b[1]-a[1], b[0]-a[0])
+            # Experimental version, needs to be tested, should increase speed and minimize strafing - useful when strafing is shit
+            # target_theta = math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
 
         self.visualize_waypoint(target_pos[0], target_pos[1])
-        target_robot_frame = self.global_to_robot((target_pos[0], target_pos[1], math.atan2(b[1]-a[1], b[0]-a[0])), (nav_x, nav_y, nav_theta))
+        target_robot_frame = self.global_to_robot((target_pos[0], target_pos[1], target_theta), (nav_x, nav_y, nav_theta))
         self.set_pid_setpoints(*target_robot_frame)
         self.update_pid(0, 0, 0)
 
@@ -385,6 +420,7 @@ class NavigationTangentServer(ActionServerBase):
 
         # Generate path using requested planner
         self.path = self.generate_path(goal_handle, nav_x, nav_y)
+
         if not self.path.poses:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()

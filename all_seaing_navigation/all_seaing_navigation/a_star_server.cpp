@@ -58,6 +58,7 @@ private:
     rclcpp::CallbackGroup::SharedPtr abort_cb_group_;
     rclcpp::Service<all_seaing_interfaces::srv::PlanPath>::SharedPtr service_;
     std::atomic<bool> abort_flag_{false};
+    std::atomic<uint64_t> current_request_id_{0};
 
     std::vector<double> gscore_;
     std::vector<int> parent_;
@@ -68,6 +69,8 @@ private:
     {
         geometry_msgs::msg::PoseArray result;
         RCLCPP_INFO(this->get_logger(), "Astar server received request");
+
+        uint64_t my_request_id = ++current_request_id_;
         abort_flag_.store(false);
 
         if (!map_) {
@@ -102,6 +105,10 @@ private:
             return val >= obstacle_tol; // assume val == -1 is not occupied
         };
 
+        auto valid_and_unoccupied = [&](int x, int y) -> bool {
+            return in_bounds(x, y) && !is_occupied(x, y);
+        };
+
         auto rect_occupied = [&](int x1, int y1, int x2, int y2) -> bool {
             int minx = std::min(x1, x2);
             int maxx = std::max(x1, x2);
@@ -115,11 +122,59 @@ private:
             return false;
         };
 
-        if (!in_bounds(start_x, start_y) || !in_bounds(goal_x, goal_y) || is_occupied(start_x, start_y) || is_occupied(goal_x, goal_y)) {
-            RCLCPP_INFO(this->get_logger(), "Astar out of bounds/occupied, give up.");
+        // if (!in_bounds(start_x, start_y) || !in_bounds(goal_x, goal_y) || is_occupied(start_x, start_y) || is_occupied(goal_x, goal_y)) {
+        //     RCLCPP_INFO(this->get_logger(), "Astar out of bounds/occupied, give up.");
 
-            response->path = result;
+        //     response->path = result;
+        //     return;
+        // }
+
+        if (!in_bounds(start_x, start_y) || !in_bounds(goal_x, goal_y)){
+            RCLCPP_INFO(this->get_logger(), "Astar out of bounds, status %d %d", (int)in_bounds(start_x, start_y), (int)in_bounds(goal_x, goal_y));
+            response -> path = result;
             return;
+        }
+
+        auto round_nearest_unoccupied = [&](int&x, int&y) -> bool {
+            for(int cheb_dist = 0; cheb_dist < min(width, height); ++cheb_dist){ // If > min(width, height) I think we're cooked anyways
+                for (int d_main : {-cheb_dist, cheb_dist}){
+                    for(int d_alt = -cheb_dist; d_alt <= cheb_dist; ++d_alt){
+                        if(valid_and_unoccupied(x + d_main, y + d_alt)){
+                            x += d_main;
+                            y += d_alt;
+                            return true;
+                        }
+                        if(!valid_and_unoccupied(x + d_alt, y + d_main)){
+                            x += d_alt;
+                            y += d_main;
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        };
+
+        if (is_occupied(start_x, start_y)){
+            int ol_x = start_x, ol_y = start_y;
+            if (!round_nearest_unoccupied(start_x, start_y)) {
+                RCLCPP_WARN(this->get_logger(), "Astar start occupied and unable to round - something has gone very very wrong");
+                return;
+            }
+            else {
+                RCLCPP_INFO(this->get_logger(), "Astar start occupied, rounding from (%d, %d) to (%d, %d)", ol_x, ol_y, start_x, start_y);
+            }
+        }
+
+        if (is_occupied(goal_x, goal_y)){
+            int ol_x = goal_x, ol_y = goal_y;
+            if (!round_nearest_unoccupied(start_x, start_y)) {
+                RCLCPP_WARN(this->get_logger(), "Astar goal occupied and unable to round - something has gone very very wrong");
+                return;
+            }
+            else {
+                RCLCPP_INFO(this->get_logger(), "Astar goal occupied, rounding from (%d, %d) to (%d, %d)", ol_x, ol_y, goal_x, goal_y);
+            }
         }
 
         double goal_tol_sq = goal_tol * goal_tol;
@@ -152,8 +207,8 @@ private:
         RCLCPP_INFO(this->get_logger(), "Astar server astar");
 
         while (!pq.empty()) {
-            if (abort_flag_.load()) {
-                RCLCPP_INFO(this->get_logger(), "A* search aborted");
+            if (abort_flag_.load() && my_request_id != current_request_id_.load()) {
+                RCLCPP_INFO(this->get_logger(), "A* search aborted (superseded by newer request)");
                 response->path = result;
                 return;
             }
