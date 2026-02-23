@@ -411,7 +411,7 @@ class Docking(TaskServerBase):
                         taken = True
                 if taken:
                     self.taken.append((self.noindicator_label[dock_label], dock_side))
-                    if self.picked_slot and self.selected_slot.label == self.noindicator_label[dock_label] and self.selected_slot.side == dock_side:
+                    if self.picked_slot and self.noindicator_label[self.selected_slot.label] == self.noindicator_label[dock_label] and self.selected_slot.side == dock_side:
                         # we're cooked
                         self.selected_slot = None
                         self.picked_slot = False
@@ -431,14 +431,14 @@ class Docking(TaskServerBase):
                 self.picked_slot = True
                 if self.selected_slot is None:
                     self.updated_slot_pos = True
-                if (self.selected_slot is not None) and (self.selected_slot.label == self.noindicator_label[dock_label]) and (self.selected_slot.side == dock_side) and (self.norm(self.selected_slot.ctr, dock_ctr) < self.duplicate_dist):
+                if (self.selected_slot is not None) and (self.noindicator_label[self.selected_slot.label] == self.noindicator_label[dock_label]) and (self.selected_slot.side == dock_side) and (self.norm(self.selected_slot.ctr, dock_ctr) < self.duplicate_dist):
                     # same slot, update position & normal
-                    self.selected_slot = DockSlot(self.noindicator_label[dock_label], dock_ctr, dock_normal, dock_side)
+                    self.selected_slot = DockSlot(dock_label, dock_ctr, dock_normal, dock_side)
                     self.updated_slot_pos = True
                 if (self.selected_slot is None) or self.better_slot(DockSlot(dock_label, dock_ctr, dock_normal, dock_side), self.selected_slot):
                     self.state = DockingState.NEW_NAVIGATION
                     # found an empty one closer
-                    self.selected_slot = DockSlot(self.noindicator_label[dock_label], dock_ctr, dock_normal, dock_side)
+                    self.selected_slot = DockSlot(dock_label, dock_ctr, dock_normal, dock_side)
                     self.updated_slot_pos = True
                     # self.pid.reset()
                     self.x_pid.reset()
