@@ -67,6 +67,9 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
+            #HARBOR ALERT MANUAL WAYPOINT
+            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(True, True, False)],
+
             # ENTRY GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
             # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
@@ -96,9 +99,6 @@ class RunTasks(ActionServerBase):
             # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge_pid"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
             # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking_fallback"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
             # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "delivery_qual"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
-
-            #HARBOR ALERT MANUAL WAYPOINT
-            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(True, True, False)],
         ]
 
         self.term_tasks = [
@@ -109,6 +109,7 @@ class RunTasks(ActionServerBase):
 
         self.harbor_alert_tasks = [
             # HARBOR ALERT
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
             [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(True, True, False)],
         ]
 
