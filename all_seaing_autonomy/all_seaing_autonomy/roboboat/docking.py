@@ -403,7 +403,7 @@ class Docking(TaskServerBase):
                         taken = True
                 if taken:
                     self.taken.append((self.noindicator_label[dock_label], dock_side))
-                    if self.picked_slot and self.selected_slot[0] == self.noindicator_label[dock_label] and self.selected_slot[2] == dock_side:
+                    if self.picked_slot and self.noindicator_label[self.selected_slot[0]] == self.noindicator_label[dock_label] and self.selected_slot[2] == dock_side:
                         # we're cooked
                         self.selected_slot = None
                         self.picked_slot = False
@@ -423,14 +423,14 @@ class Docking(TaskServerBase):
                 self.picked_slot = True
                 if self.selected_slot is None:
                     self.updated_slot_pos = True
-                if (self.selected_slot is not None) and (self.selected_slot[0] == self.noindicator_label[dock_label]) and (self.selected_slot[2] == dock_side) and (self.norm(self.selected_slot[1][0], dock_ctr) < self.duplicate_dist):
+                if (self.selected_slot is not None) and (self.noindicator_label[self.selected_slot[0]] == self.noindicator_label[dock_label]) and (self.selected_slot[2] == dock_side) and (self.norm(self.selected_slot[1][0], dock_ctr) < self.duplicate_dist):
                     # same slot, update position & normal
-                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side)
+                    self.selected_slot = (dock_label, (dock_ctr, dock_normal), dock_side)
                     self.updated_slot_pos = True
                 if (self.selected_slot is None) or self.better_slot((dock_label, (dock_ctr, dock_normal), dock_side), self.selected_slot):
                     self.state = DockingState.NEW_NAVIGATION
                     # found an empty one closer
-                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side)
+                    self.selected_slot = (dock_label, (dock_ctr, dock_normal), dock_side)
                     self.updated_slot_pos = True
                     # self.pid.reset()
                     self.x_pid.reset()
@@ -569,7 +569,7 @@ class Docking(TaskServerBase):
         # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
         slot_back_mid = self.selected_slot[1][0]
         slot_dir = self.selected_slot[1][1]
-        slot_label = self.selected_slot[0]
+        slot_label = self.noindicator_label[self.selected_slot[0]]
         slot_side = self.selected_slot[2]
         
         marker_arr.markers.append(VisualizationTools.visualize_line(slot_back_mid, self.perp_vec(slot_dir), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
