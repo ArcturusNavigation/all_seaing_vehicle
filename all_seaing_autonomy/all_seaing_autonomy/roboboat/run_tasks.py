@@ -67,6 +67,9 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
+            #HARBOR ALERT MANUAL WAYPOINT
+            [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
+
             # ENTRY GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
             # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
@@ -107,8 +110,8 @@ class RunTasks(ActionServerBase):
 
         self.harbor_alert_tasks = [
             # HARBOR ALERT
-            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
-            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(True, True, False)],
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
+            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(False, False, False)],
         ]
 
         self.current_task = None
@@ -223,16 +226,16 @@ class RunTasks(ActionServerBase):
         # harbor alert
 
         self.keyboard_sub = None
-        # if self.is_sim: 
-        #     self.get_logger().info("Running in simulation mode. Listening to joystick input.")
-        #     self.keyboard_sub = self.create_subscription(
-        #         Joy, "/joy", self.sim_keyboard_callback, 10
-        #     )
-        # else: 
-        self.get_logger().info("Running in real mode. Listening to keyboard input.")
-        self.keyboard_sub = self.create_subscription(
-            String, "/harbor_detect", self.real_harbor_callback, 10
-        )
+        if self.is_sim: 
+            self.get_logger().info("Running in simulation mode. Listening to joystick input.")
+            self.keyboard_sub = self.create_subscription(
+                Joy, "/joy", self.sim_keyboard_callback, 10
+            )
+        else: 
+            self.get_logger().info("Running in real mode. Listening to keyboard input.")
+            self.keyboard_sub = self.create_subscription(
+                String, "/harbor_detect", self.real_harbor_callback, 10
+            )
         self.harbor_alerted = False
         self.harbor_index = 0
         self.cancelled_task_harbor = True
@@ -299,6 +302,8 @@ class RunTasks(ActionServerBase):
         if self.harbor_alerted:
             return
         freq, type = msg.data.split("_")
+        allowed = [600, 800, 1000]
+        freq = min(allowed, key=lambda x: abs(x - freq))
         if type == "single":
             self.get_logger().info(f'HARBOR ALERTED SINGLE AT {freq}HZ')
             self.harbor_alerted = True
@@ -560,8 +565,8 @@ class RunTasks(ActionServerBase):
             self.attempt_task(self.term_tasks[self.next_term_index.val][0], TaskType.TASK_NONE, self.term_tasks[self.next_term_index.val][1], self.next_term_index, None, self.term_tasks[self.next_term_index.val][2] if self.term_tasks[self.next_term_index.val][0] == ActionType.SEARCH else None)
             return
         
-        self.get_logger().info("All tasks completed. Shutting down node.")
-        self.destroy_node()
+        # self.get_logger().info("All tasks completed. Shutting down node.")
+        # self.destroy_node()
         return
 
     def feedback_callback(self, feedback_msg):
