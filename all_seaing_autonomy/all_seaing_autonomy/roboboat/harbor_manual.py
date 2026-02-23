@@ -7,7 +7,7 @@ from all_seaing_interfaces.action import Task
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_common.task_server_base import TaskServerBase
 from all_seaing_interfaces.msg import KeyboardButton 
-from enum import Enum
+# from enum import Enum
 
 # class ReturnState(Enum):
 #     SETTING_UP = 1
