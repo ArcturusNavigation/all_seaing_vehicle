@@ -67,7 +67,9 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
-            #HARBOR ALERT MANUAL WAYPOINT
+            # HARBOR ALERT MANUAL WAYPOINT
+            # FIRST SPEED WAYPOINT THEN DOCKING WAYPOINT
+            [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
             [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
 
             # ENTRY GATES
