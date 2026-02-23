@@ -46,6 +46,7 @@ class WebcamPublisher(Node):
 
         if video_index != -1:
             self.cap = cv2.VideoCapture(video_index)
+            self.get_logger().info(f'webcam publisher found camera')
         else:
             self.destroy_node()
 

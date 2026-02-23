@@ -225,7 +225,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": shape_label_mappings},
             {"shape_label_mappings_file": all_label_mappings},
             {"search_task_radius": 1000.0},
-            {"wpt_banner_dist": 7.0},
+            {"wpt_banner_dist": 3.0},
             {"navigation_dist_thres": 100.0},
             # {"update_target_dist_thres": 3.0},
             {"shooting_xy_thres": 100.0},
