@@ -67,6 +67,9 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
+            #HARBOR ALERT MANUAL WAYPOINT
+            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(True, True, False)],
+
             # ENTRY GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
             # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
@@ -107,7 +110,7 @@ class RunTasks(ActionServerBase):
 
         self.harbor_alert_tasks = [
             # HARBOR ALERT
-            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
             [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(True, True, False)],
         ]
 
@@ -299,6 +302,8 @@ class RunTasks(ActionServerBase):
         if self.harbor_alerted:
             return
         freq, type = msg.data.split("_")
+        allowed = [600, 800, 1000]
+        freq = min(allowed, key=lambda x: abs(x - freq))
         if type == "single":
             self.get_logger().info(f'HARBOR ALERTED SINGLE AT {freq}HZ')
             self.harbor_alerted = True
