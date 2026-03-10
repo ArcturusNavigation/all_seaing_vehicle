@@ -91,7 +91,7 @@ class SoundSignalDetector(Node):
 
     def timer_callback(self):
         # these will probably need tuning
-        POWER_THRESHOLD = 0.8   # how loud the fft peak needs to be to count as a real tone
+        POWER_THRESHOLD = 1.0   # how loud the fft peak needs to be to count as a real tone
         MIN_BLAST_TIME = 0.2    # blast has to be at least this long (seconds) otherwise its just noise
         MIN_SILENCE_TIME = 0.2 # if less than this ignore gap, probably missed detecting in between
         MAX_DOUBLE_SILENCE_TIME = 0.7

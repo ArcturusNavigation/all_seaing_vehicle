@@ -427,6 +427,7 @@ def launch_setup(context, *args, **kwargs):
             # {"shape_label_mappings_file": all_label_mappings},
             {"Kpid": [0.2, 0.01, 0.0]},
             {"object_delivery_time": 10.0},
+            {"water_delivery_time": 10.0},
         ]
     )
     
@@ -470,7 +471,7 @@ def launch_setup(context, *args, **kwargs):
         heartbeat_reporter,
         entry_gates,
         delivery_server,
-        # sound_signal_node,
+        sound_signal_node,
         # follow_buoy_pid,
         # speed_challenge_pid
         # docking_fallback,
