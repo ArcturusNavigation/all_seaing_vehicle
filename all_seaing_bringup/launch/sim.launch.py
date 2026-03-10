@@ -845,9 +845,9 @@ def launch_setup(context, *args, **kwargs):
         PythonLaunchDescriptionSource([vrx_gz_prefix, "/launch/competition.launch.py"]),
         launch_arguments={
             # "world": "rb2025/rb2025_task1_task2.sdf",
-            # "world": "rb2025/follow_path_new.sdf",
+            "world": "rb2025/follow_path_new.sdf",
             # "world": "follow_path_task.sdf",
-            "world": "speed_course_world.sdf",
+            # "world": "speed_course_world.sdf",
             # "world": "scan_dock_deliver_task.sdf",
             # "world": "roboboat_full_course.sdf",
             "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
