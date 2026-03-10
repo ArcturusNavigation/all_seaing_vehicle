@@ -381,7 +381,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"timer_period": 0.4},
-            {"grid_dim": [800, 800]},
+            {"grid_dim": [2000, 2000]},
             {"default_range": 60},
             {"grid_resolution": 0.1},
             {"inflate_dist": 0.0},

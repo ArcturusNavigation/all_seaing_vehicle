@@ -12,8 +12,9 @@ from sensor_msgs.msg import Joy
 from std_msgs.msg import String
 
 class ReturnState(Enum):
-    SETTING_UP = 1
-    STATIONKEEPING = 2
+    SETTING_UP_SPEED_POINT = 1
+    SETTING_UP_DOCK_POINT = 2
+    STATIONKEEPING = 3
 
 class HarborAlert(TaskServerBase):
     def __init__(self):
@@ -34,10 +35,15 @@ class HarborAlert(TaskServerBase):
 
         self.declare_parameter("is_sim", False)
 
+        self.dock_buoy_pos = None
+        self.speed_buoy_pos = None
         self.blue_buoy_pos = None
+        self.detected_location = 0 # 0 for dock, 1 for speed
 
         
         self.key_presses = 0
+        self.add_p = 1
+        self.after_init = False
         # self.return_pos = None
         # self.return_dir = None
         
@@ -45,17 +51,24 @@ class HarborAlert(TaskServerBase):
 
         # self.obstacles = None
 
-        self.state = ReturnState.SETTING_UP
+        self.state = ReturnState.SETTING_UP_SPEED_POINT
 
+        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
         if self.is_sim: 
             self.get_logger().info("Running in simulation mode. Listening to joystick input.")
             self.keyboard_sub = self.create_subscription(
-                Joy, "/joy", self.real_keyboard_callback, 10
+                Joy, "/joy", self.sim_keyboard_callback, 10
+            )
+            self.detection_sub = self.create_subscription(
+                Joy, "/joy", self.sim_keyboard_callback, 10
             )
         else: 
             self.keyboard_sub = self.create_subscription(
                 KeyboardButton, "/keyboard_button", self.real_keyboard_callback, 10
             )
+        self.detection_sub = self.create_subscription(
+            String, "/harbor_detect", self.real_harbor_callback, 10
+        )
 
         # bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
@@ -91,29 +104,47 @@ class HarborAlert(TaskServerBase):
         self.get_logger().info(f'Task Server [{self.server_name}] received task')
         return GoalResponse.ACCEPT
     
+    def real_harbor_callback(self, msg):
+        freq, harbor_type = msg.data.split("_")
+        if harbor_type == "single":
+            self.detected_location = 1
+        elif harbor_type == "double":
+            self.detected_location = 0
+    
     # def search_goal_callback(self, goal_request):
-    #     self.return_pos = self.robot_pos
-    #     self.return_dir = self.robot_dir
+    #     self.
     #     self.get_logger().info(f'Searching Server for [{self.server_name}] called')
     #     return GoalResponse.ACCEPT
 
     def init_setup(self):
-        self.blue_buoy_pos = None
+        self.dock_buoy_pos = None
+        self.speed_buoy_pos = None
         self.mark_successful()
 
     def control_loop(self):
         if self.state == ReturnState.STATIONKEEPING:
+            self.blue_buoy_pos = self.dock_buoy_pos if self.detected_location == 0 else self.speed_buoy_pos
             self.get_logger().info(f'Going to waypoint at {self.blue_buoy_pos}')
             self.station_keep_blue_buoy()
             self.mark_successful()
-        elif self.state == ReturnState.SETTING_UP:
-            if self.blue_buoy_pos is None:
-                self.blue_buoy_pos = self.robot_pos
-                self.get_logger().info(f'Finished setting up waypoint, ready to enter station keeping at {self.blue_buoy_pos}')
-            if self.key_presses == 2:
+        elif self.state == ReturnState.SETTING_UP_DOCK_POINT:
+            if self.speed_buoy_pos is None:
+                self.speed_buoy_pos = self.robot_pos
+                self.get_logger().info(f'Finished setting up DOCK waypoint, ready to enter station keeping at {self.dock_buoy_pos}')
+            if self.key_presses == 3:
                 self.state = ReturnState.STATIONKEEPING
                 self.mark_successful()
-                self.get_logger().info(f'Key pressed, moving on to next task')
+                self.get_logger().info(f'Key pressed, proceeding to next task')
+        elif self.state == ReturnState.SETTING_UP_SPEED_POINT:
+            if self.speed_buoy_pos is None:
+                self.speed_buoy_pos = self.robot_pos
+                self.get_logger().info(f'Finished setting up SPEED waypoint, ready to enter station keeping at {self.speed_buoy_pos}')
+            if self.key_presses == 2:
+                self.state = ReturnState.SETTING_UP_DOCK_POINT
+                self.mark_successful()
+                self.get_logger().info(f'Key pressed, now go and record dock waypoint')
+
+                ## TODO: fix this. TIMEOUT BEFORE GOING TO NEXT TASK
 
         
     # def map_cb(self, msg):
@@ -121,10 +152,6 @@ class HarborAlert(TaskServerBase):
     #     Gets the labeled map from all_seaing_perception.
     #     '''
     #     self.obstacles = msg.obstacles
-
-    def real_keyboard_callback(self, msg):
-        if msg.key == "p":
-            self.key_presses += 1
 
     def station_keep_blue_buoy(self):
         self.get_logger().info("Going to the preset waypoint")

@@ -711,7 +711,7 @@ def launch_setup(context, *args, **kwargs):
 
     harbor_alert = launch_ros.actions.Node(
         package="all_seaing_autonomy",
-        executable="harbor_alert.py",
+        executable="harbor_manual.py",
         parameters=[
             {"is_sim": True},
             {"color_label_mappings_file": color_label_mappings},
