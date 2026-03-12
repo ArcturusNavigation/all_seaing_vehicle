@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from ast import Num
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
@@ -12,11 +11,13 @@ from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from all_seaing_common.task_server_base import TaskServerBase
 
 from all_seaing_common.report_pb2 import GatePass, GateType
+from all_seaing_autonomy.geometry_utils import ccw, quaternion_from_euler
 
 import os
 import yaml
 import math
 import time
+import numpy as np
 from collections import deque
 from functools import partial
 from enum import Enum
@@ -154,7 +155,7 @@ class ReturnHome(TaskServerBase):
         if len(obstacles) == 0:
             return ref_obs, False
         opt_buoy = self.get_closest_to(self.ob_coords(ref_obs), obstacles)
-        if self.norm(self.ob_coords(ref_obs), self.ob_coords(opt_buoy)) < self.duplicate_dist:
+        if np.linalg.norm(self.ob_coords(ref_obs) - self.ob_coords(opt_buoy)) < self.duplicate_dist:
             return opt_buoy, True
         else:
             return ref_obs, False
@@ -162,27 +163,6 @@ class ReturnHome(TaskServerBase):
     def pair_to_pose(self, pair):
         return Pose(position=Point(x=pair[0], y=pair[1]))
         
-    def quaternion_from_euler(self, roll, pitch, yaw):
-        """
-        Converts euler roll, pitch, yaw to quaternion (w in last place)
-        quat = [x, y, z, w]
-        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
-        """
-        cy = math.cos(yaw * 0.5)
-        sy = math.sin(yaw * 0.5)
-        cp = math.cos(pitch * 0.5)
-        sp = math.sin(pitch * 0.5)
-        cr = math.cos(roll * 0.5)
-        sr = math.sin(roll * 0.5)
-
-        q = [0] * 4
-        q[0] = cy * cp * cr + sy * sp * sr
-        q[1] = cy * cp * sr - sy * sp * cr
-        q[2] = sy * cp * sr + cy * sp * cr
-        q[3] = sy * cp * cr - cy * sp * sr
-
-        return q
-
     def update_gate_wpt_pos(self, forward_dist = 0.0, tryhard=False):
         # split the buoys into red and green
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
@@ -241,41 +221,31 @@ class ReturnHome(TaskServerBase):
 
         return Task.Result(success=True)
 
-    def norm_squared(self, vec, ref=(0, 0)):
-        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
-
-    def norm(self, vec, ref=(0, 0)):
-        return math.sqrt(self.norm_squared(vec, ref))
-    
     def ob_coords(self, buoy, local=False):
         if local:
-            return (buoy.local_point.point.x, buoy.local_point.point.y)
+            return np.array([buoy.local_point.point.x, buoy.local_point.point.y])
         else:
-            return (buoy.global_point.point.x, buoy.global_point.point.y)
+            return np.array([buoy.global_point.point.x, buoy.global_point.point.y])
 
     def get_closest_to(self, source, buoys, local=False):
         return min(
             buoys,
-            key=lambda buoy: math.dist(source, self.ob_coords(buoy, local)),
+            key=lambda buoy: np.linalg.norm(source - self.ob_coords(buoy, local)),
         )
-
-    def midpoint(self, vec1, vec2):
-        return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
 
     def midpoint_pair_dir(self, pair, forward_dist):
         left_coords = self.ob_coords(pair.left)
         right_coords = self.ob_coords(pair.right)
-        midpoint = self.midpoint(left_coords, right_coords)
-        
-        scale = forward_dist
-        dy = right_coords[1] - left_coords[1]
-        dx = right_coords[0] - left_coords[0]
-        norm = math.sqrt(dx**2 + dy**2)
-        dx /= norm
-        dy /= norm
-        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
+        midpoint = (left_coords + right_coords) / 2
 
-        return midpoint, (-dy, dx)
+        scale = forward_dist
+        diff = right_coords - left_coords
+        norm = np.linalg.norm(diff)
+        dx = diff[0] / norm
+        dy = diff[1] / norm
+        midpoint = midpoint + np.array([-scale * dy, scale * dx])
+
+        return midpoint, np.array([-dy, dx])
 
     def split_buoys(self, obstacles):
         """
@@ -294,7 +264,7 @@ class ReturnHome(TaskServerBase):
         return [self.ob_coords(ob, local=False) for ob in obs]
 
     def obs_to_pos_label(self, obs):
-        return [self.ob_coords(ob, local=False) + (ob.label,) for ob in obs]
+        return [(*self.ob_coords(ob, local=False), ob.label) for ob in obs]
 
     def buoy_pairs_to_markers(self, buoy_pairs):
         """
@@ -362,7 +332,7 @@ class ReturnHome(TaskServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
+            if np.linalg.norm(np.array(self.robot_pos) - self.ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -381,10 +351,10 @@ class ReturnHome(TaskServerBase):
         red_to = None
         for red_b in red_buoys:
             for green_b in green_buoys:
-                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+                if np.linalg.norm(self.ob_coords(red_b) - self.ob_coords(green_b)) < self.inter_buoy_pair_dist or np.linalg.norm(self.ob_coords(red_b) - self.ob_coords(green_b)) > self.max_inter_gate_dist:
                     continue
-                # elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
-                elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))):
+                # elif ((green_to is None) or (np.linalg.norm((self.ob_coords(red_b, local=True) + self.ob_coords(green_b, local=True)) / 2) < np.linalg.norm((self.ob_coords(red_to, local=True) + self.ob_coords(green_to, local=True)) / 2))) and (self.red_left == ccw(np.array([0, 0]), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
+                elif ((green_to is None) or (np.linalg.norm((self.ob_coords(red_b, local=True) + self.ob_coords(green_b, local=True)) / 2) < np.linalg.norm((self.ob_coords(red_to, local=True) + self.ob_coords(green_to, local=True)) / 2))):
                     green_to = green_b
                     red_to = red_b
         if green_to is None:
@@ -409,41 +379,41 @@ class ReturnHome(TaskServerBase):
         return [
             buoy
             for buoy in buoys
-            if (self.ccw(
+            if (ccw(
                 self.ob_coords(pair.left),
                 self.ob_coords(pair.right),
                 self.ob_coords(buoy),
-            ) and (min(self.norm(self.ob_coords(buoy), self.ob_coords(pair.left)), self.norm(self.ob_coords(buoy), self.ob_coords(pair.right))) > self.buoy_pair_dist_thres))
+            ) and (min(np.linalg.norm(self.ob_coords(buoy) - self.ob_coords(pair.left)), np.linalg.norm(self.ob_coords(buoy) - self.ob_coords(pair.right))) > self.buoy_pair_dist_thres))
         ]
 
     def pick_buoy(self, buoys, prev_mid, ref_buoy):
         # sort by distance
-        buoys.sort(key=lambda buoy: self.norm(prev_mid, self.ob_coords(buoy)))
+        buoys.sort(key=lambda buoy: np.linalg.norm(prev_mid - self.ob_coords(buoy)))
         for buoy in buoys:
-            if self.norm(self.ob_coords(ref_buoy), self.ob_coords(buoy)) > self.duplicate_dist:
+            if np.linalg.norm(self.ob_coords(ref_buoy) - self.ob_coords(buoy)) > self.duplicate_dist:
                 return False, buoy
         return True, ref_buoy
     
     def buoy_pairs_distance(self, p1, p2, mode="min", loc=False):
         p1_left, p1_right = self.ob_coords(p1.left, local=loc), self.ob_coords(p1.right, local=loc)
         p2_left, p2_right = self.ob_coords(p2.left, local=loc), self.ob_coords(p2.right, local=loc)
-        if mode=="mid":
-            p1_mid = ((p1_right[0]+p1_left[0])/2.0, (p1_right[1]+p1_left[1])/2.0)
-            p2_mid = ((p2_right[0]+p2_left[0])/2.0, (p2_right[1]+p2_left[1])/2.0)
-            dist = self.norm(p1_mid, p2_mid)
+        if mode == "mid":
+            p1_mid = (p1_right + p1_left) / 2
+            p2_mid = (p2_right + p2_left) / 2
+            dist = np.linalg.norm(p1_mid - p2_mid)
         else:
-            left_diff = (p2_left[0]-p1_left[0], p2_left[1]-p1_left[1])
-            right_diff = (p2_right[0]-p1_right[0], p2_right[1]-p1_right[1])
-            dist = min(self.norm(left_diff), self.norm(right_diff))
+            left_diff = p2_left - p1_left
+            right_diff = p2_right - p1_right
+            dist = min(np.linalg.norm(left_diff), np.linalg.norm(right_diff))
         return dist
     
     def buoy_pairs_angle(self, p1, p2, loc=False):
         p1_left, p1_right = (self.ob_coords(p1.left, local=loc), self.ob_coords(p1.right, local=loc))
         p2_left, p2_right = (self.ob_coords(p2.left, local=loc), self.ob_coords(p2.right, local=loc))
-        p1_diff = (p1_right[0]-p1_left[0], p1_right[1]-p1_left[1])
-        p2_diff = (p2_right[0]-p2_left[0], p2_right[1]-p2_left[1])
+        p1_diff = p1_right - p1_left
+        p2_diff = p2_right - p2_left
         # TODO: change angle to be away from the boat, use dot product
-        angle = math.acos((p1_diff[0]*p2_diff[0]+p1_diff[1]*p2_diff[1])/(self.norm(p1_diff)*self.norm(p2_diff)))
+        angle = math.acos((p1_diff @ p2_diff) / (np.linalg.norm(p1_diff) * np.linalg.norm(p2_diff)))
         return angle
     
     def get_acute_angle(self, angle):
@@ -482,10 +452,10 @@ class ReturnHome(TaskServerBase):
         E----F
         CD is better than AB wrt EF (closer to right angles wrt to E, F)
         """
-        old_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(old_pair.left)) < self.duplicate_dist)
-        old_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(old_pair.right)) < self.duplicate_dist)
-        new_left_duplicate = (self.norm(self.ob_coords(ref_pair.left), self.ob_coords(new_pair.left)) < self.duplicate_dist)
-        new_right_duplicate = (self.norm(self.ob_coords(ref_pair.right), self.ob_coords(new_pair.right)) < self.duplicate_dist)
+        old_left_duplicate = (np.linalg.norm(self.ob_coords(ref_pair.left) - self.ob_coords(old_pair.left)) < self.duplicate_dist)
+        old_right_duplicate = (np.linalg.norm(self.ob_coords(ref_pair.right) - self.ob_coords(old_pair.right)) < self.duplicate_dist)
+        new_left_duplicate = (np.linalg.norm(self.ob_coords(ref_pair.left) - self.ob_coords(new_pair.left)) < self.duplicate_dist)
+        new_right_duplicate = (np.linalg.norm(self.ob_coords(ref_pair.right) - self.ob_coords(new_pair.right)) < self.duplicate_dist)
 
         old_left = 0 if old_left_duplicate else self.get_triangle_angle(ref_pair.left, old_pair.left, old_pair.right)
         old_right = 0 if old_right_duplicate else self.get_triangle_angle(ref_pair.right, old_pair.right, old_pair.left)
@@ -565,7 +535,7 @@ class ReturnHome(TaskServerBase):
                 if right_buoy[0] and (not self.check_better_one_side(prev_pair.right, prev_pair.left, left_buoy[1])):
                     continue
 
-                if self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(left_buoy[1]), self.ob_coords(right_buoy[1])) > self.max_inter_gate_dist:
+                if np.linalg.norm(self.ob_coords(left_buoy[1]) - self.ob_coords(right_buoy[1])) < self.inter_buoy_pair_dist or np.linalg.norm(self.ob_coords(left_buoy[1]) - self.ob_coords(right_buoy[1])) > self.max_inter_gate_dist:
                     continue
 
                 cur = InternalBuoyPair(left_buoy[1], right_buoy[1]) 
@@ -578,17 +548,6 @@ class ReturnHome(TaskServerBase):
                     improved = True
         return improved
 
-    def ccw(self, a, b, c):
-        """Return True if the points a, b, c are counterclockwise, respectively"""
-        area = (
-            a[0] * b[1]
-            + b[0] * c[1]
-            + c[0] * a[1]
-            - a[1] * b[0]
-            - b[1] * c[0]
-            - c[1] * a[0]
-        )
-        return area > 0
 
 
 def main(args=None):

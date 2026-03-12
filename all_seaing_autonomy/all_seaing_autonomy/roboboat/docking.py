@@ -19,6 +19,7 @@ from all_seaing_common.task_server_base import TaskServerBase
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
+from all_seaing_autonomy.geometry_utils import angle_between
 
 import all_seaing_common.report_pb2
 
@@ -315,7 +316,8 @@ class Docking(TaskServerBase):
                 return True
 
         # if same otherwise dock to closest
-        if (self.norm(ref_dock_ctr, self.robot_pos) > self.norm(dock_ctr, self.robot_pos) + self.update_slot_dist_thres):
+        robot_pos = np.array(self.robot_pos)
+        if (np.linalg.norm(ref_dock_ctr - robot_pos) > np.linalg.norm(dock_ctr - robot_pos) + self.update_slot_dist_thres):
             return True
         else:
             return False
@@ -342,9 +344,9 @@ class Docking(TaskServerBase):
         )
 
     def ctr_normal(self, plane: LabeledObjectPlane):
-        center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
+        center_pt = np.array([plane.normal_ctr.position.x, plane.normal_ctr.position.y])
         _,_,theta = euler_from_quaternion([plane.normal_ctr.orientation.x, plane.normal_ctr.orientation.y, plane.normal_ctr.orientation.z, plane.normal_ctr.orientation.w])
-        return (center_pt, (np.cos(theta), np.sin(theta)))
+        return (center_pt, np.array([np.cos(theta), np.sin(theta)]))
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         self.plane_msg = msg
@@ -395,9 +397,9 @@ class Docking(TaskServerBase):
                     taken = True
                 for boat_label, (boat_ctr, boat_normal) in self.boat_banners:
                     # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
-                    dock_boat_angle = abs(self.angle_vec(self.difference(dock_ctr, boat_ctr), dock_normal))
+                    dock_boat_angle = abs(angle_between(boat_ctr - dock_ctr, dock_normal))
                     dock_boat_angle = min(dock_boat_angle, np.pi - dock_boat_angle)
-                    if self.norm(boat_ctr, dock_ctr) < self.boat_dock_dist_thres and dock_boat_angle < self.boat_taken_angle_thres*np.pi/2.0:
+                    if np.linalg.norm(boat_ctr - dock_ctr) < self.boat_dock_dist_thres and dock_boat_angle < self.boat_taken_angle_thres*np.pi/2.0:
                         # taken
                         self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                         taken = True
@@ -423,11 +425,11 @@ class Docking(TaskServerBase):
                 self.picked_slot = True
                 if self.selected_slot is None:
                     self.updated_slot_pos = True
-                if (self.selected_slot is not None) and (self.selected_slot[0] == self.noindicator_label[dock_label]) and (self.selected_slot[2] == dock_side) and (self.norm(self.selected_slot[1][0], dock_ctr) < self.duplicate_dist):
+                if (self.selected_slot is not None) and (self.selected_slot[0] == self.noindicator_label[dock_label]) and (self.selected_slot[2] == dock_side) and (np.linalg.norm(self.selected_slot[1][0] - dock_ctr) < self.duplicate_dist):
                     # same slot, update position & normal
                     self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side)
                     self.updated_slot_pos = True
-                if (self.selected_slot is None) or self.better_slot((dock_label, (dock_ctr, dock_normal), dock_side), self.selected_slot):
+                if (self.selected_slot is None) or self.better_slot((self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side), self.selected_slot):
                     self.state = DockingState.NEW_NAVIGATION
                     # found an empty one closer
                     self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side)
@@ -440,8 +442,8 @@ class Docking(TaskServerBase):
                     self.reported_docking = False
                     self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]], dock_side}')
 
-        if (not self.picked_slot) or (not self.updated_slot_pos):
-        # if (not self.picked_slot):
+        if (not self.picked_slot):
+        # if (not self.updated_slot_pos):
             self.selected_slot = None
             self.picked_slot = False
             # self.pid.reset()
@@ -472,59 +474,6 @@ class Docking(TaskServerBase):
         x, y = point
         (a, b, c), _ = wall_params
         return (a*x+b+y)/math.sqrt(a**2+b**2)
-    
-    def dot(self, vec1, vec2):
-        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
-
-    def midpoint(self, pt1, pt2):
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return ((x1+x2)/2.0, (y1+y2)/2.0)
-
-    def difference(self, pt1, pt2):
-        """
-        pt2 - pt1
-        """
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return (x2-x1, y2-y1)
-    
-    def norm_squared(self, vec, ref=(0, 0)):
-        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
-
-    def norm(self, vec, ref=(0, 0)):
-        return math.sqrt(self.norm_squared(vec, ref))
-    
-    def perp_vec(self, vec):
-        return (-vec[1], vec[0])
-    
-    # def angle_vec(self, vec1, vec2):
-    #     return math.acos(self.dot(vec1, vec2)/(self.norm(vec1)*self.norm(vec2))) 
-    
-    def negative(self, vec):
-        return (-vec[0], -vec[1])
-    
-    def sum(self, vec1, vec2):
-        return (vec1[0]+vec2[0], vec1[1]+vec2[1])
-    
-    def scalar_prod(self, vec, scalar):
-        return (scalar*vec[0], scalar*vec[1])
-    
-    def cross(self, vec1, vec2):
-        return vec1[0]*vec2[1]-vec1[1]*vec2[0]
-
-    def angle_vec(self, vec1, vec2):
-        return math.atan2(self.cross(vec1, vec2)/(self.norm(vec1)*self.norm(vec2)), self.dot(vec1, vec2)/(self.norm(vec1)*self.norm(vec2))) 
-
-    def angle_segments(self, p1, p2):
-        p1left, p1right = p1
-        p2left, p2right = p2
-        return self.angle_vec(self.difference(p1left, p1right), self.difference(p2left, p2right))
-    
-    def fit_pair(self, point_pair):
-        (x1,y1), (x2,y2) = point_pair
-        # (y-y1)(x2-x1) = (y2-y1)*(x-x1) -> y(x2-x1)+x(y1-y2)+x1(y2-y1)+y1(x1-x2) = 0 -> y(x2-x1)+x(y1-y2)+x1y2-x2y1
-        return (y1-y2, x2-x1, x1*y2-x2*y1), abs(x1*y2-x2*y1)/math.sqrt((y1-y2)**2+(x2-x1)**2)
     
     def set_pid_setpoints(self, x, y, theta):
         self.x_pid.set_setpoint(x)
@@ -578,10 +527,13 @@ class Docking(TaskServerBase):
         slot_label = self.selected_slot[0]
         slot_side = self.selected_slot[2]
         
-        marker_arr.markers.append(VisualizationTools.visualize_line(slot_back_mid, self.perp_vec(slot_dir), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
+        perp = np.array([-slot_dir[1], slot_dir[0]])
+        robot_pos = np.array(self.robot_pos)
+        robot_dir = np.array(self.robot_dir)
+        marker_arr.markers.append(VisualizationTools.visualize_line(slot_back_mid, perp, mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
 
-        if self.state == DockingState.DOCKING or self.norm(slot_back_mid, self.robot_pos) < self.navigation_dist_thres:
+        if self.state == DockingState.DOCKING or np.linalg.norm(slot_back_mid - robot_pos) < self.navigation_dist_thres:
             if self.state == DockingState.NAVIGATING_DOCK:
                 self.get_logger().info('CANCELLING NAVIGATION')
                 self.cancel_navigation()
@@ -596,8 +548,8 @@ class Docking(TaskServerBase):
                 self.reported_docking = True
 
             # go to that line and forward (negative error if boat left of line, positive if right)
-            offset = -self.dot(self.difference(slot_back_mid, self.robot_pos), self.perp_vec(slot_dir))
-            approach_angle = self.angle_vec(self.negative(slot_dir), self.robot_dir) # TODO Check sign
+            offset = -(robot_pos - slot_back_mid) @ perp
+            approach_angle = angle_between(-slot_dir, robot_dir) # TODO Check sign
 
             # dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
             # self.pid.update(offset + self.boat_angle_coeff*approach_angle, dt)            
@@ -608,7 +560,7 @@ class Docking(TaskServerBase):
             # control_msg.priority = 1
 
             # forward speed decreasing exponentially as we get closer
-            dist_diff = self.dot(self.difference(slot_back_mid, self.robot_pos), slot_dir) - self.dock_length/2.0 - self.docking_offset
+            dist_diff = (robot_pos - slot_back_mid) @ slot_dir - self.dock_length/2.0 - self.docking_offset
             # subtract half the dock length when further than the half the width sideways
             if abs(offset) > self.dock_width/2.0:
                 dist_diff -= self.dock_length/2.0
@@ -684,8 +636,8 @@ class Docking(TaskServerBase):
             self.send_vel_cmd(x_vel, y_vel, theta_output)
             self.controller_marker_pub.publish(marker_array)
         else:
-            waypoint = self.sum(slot_back_mid, self.scalar_prod(slot_dir, self.wpt_banner_dist))
-            if self.state == DockingState.NEW_NAVIGATION or ((self.sent_waypoint is not None) and (self.norm(waypoint, self.sent_waypoint) > self.adapt_dist)):
+            waypoint = slot_back_mid + slot_dir * self.wpt_banner_dist
+            if self.state == DockingState.NEW_NAVIGATION or ((self.sent_waypoint is not None) and (np.linalg.norm(waypoint - np.array(self.sent_waypoint)) > self.adapt_dist)):
                 self.get_logger().info('SENDING WAYPOINT')
                 # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
                 self.send_waypoint_to_server(waypoint)

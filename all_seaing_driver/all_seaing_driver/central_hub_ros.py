@@ -154,7 +154,7 @@ class CentralHubROS(Node):
             #     self.get_logger().warn("Invalid servo port addressed")
             #     response.success = False
             #     return response
-        response.success = False
+        response.success = True
         return response
 
     def estop_cb(self, _, response):

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from ast import Num
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
@@ -13,10 +12,12 @@ from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from all_seaing_common.task_server_base import TaskServerBase
 
 from all_seaing_common.report_pb2 import ObjectDetected, ObjectType, Color, TaskType, GatePass, GateType
+from all_seaing_autonomy.geometry_utils import ccw, quaternion_from_euler
 
 import os
 import yaml
 import math
+import numpy as np
 import time
 from collections import deque
 from functools import partial
@@ -107,9 +108,9 @@ class SpeedChallenge(TaskServerBase):
         self.declare_parameter("is_sim", False)
         self.declare_parameter("turn_offset", 5.0)
 
-        self.blue_buoy_pos = (0, 0)
-        
-        self.buoy_direction = (0,0)
+        self.blue_buoy_pos = np.array([0.0, 0.0])
+
+        self.buoy_direction = np.array([0.0, 0.0])
         self.buoy_found = False
         self.following_guide = False
         self.left_first = False # goes left of buoy first
@@ -203,7 +204,7 @@ class SpeedChallenge(TaskServerBase):
         if len(obstacles) == 0:
             return ref_obs, False
         opt_buoy = self.get_closest_to(self.ob_coords(ref_obs), obstacles)
-        if self.norm(self.ob_coords(ref_obs), self.ob_coords(opt_buoy)) < self.duplicate_dist:
+        if np.linalg.norm(self.ob_coords(ref_obs) - self.ob_coords(opt_buoy)) < self.duplicate_dist:
             return opt_buoy, True
         else:
             return ref_obs, False
@@ -211,27 +212,6 @@ class SpeedChallenge(TaskServerBase):
     def pair_to_pose(self, pair):
         return Pose(position=Point(x=pair[0], y=pair[1]))
         
-    def quaternion_from_euler(self, roll, pitch, yaw):
-        """
-        Converts euler roll, pitch, yaw to quaternion (w in last place)
-        quat = [x, y, z, w]
-        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
-        """
-        cy = math.cos(yaw * 0.5)
-        sy = math.sin(yaw * 0.5)
-        cp = math.cos(pitch * 0.5)
-        sp = math.sin(pitch * 0.5)
-        cr = math.cos(roll * 0.5)
-        sr = math.sin(roll * 0.5)
-
-        q = [0] * 4
-        q[0] = cy * cp * cr + sy * sp * sr
-        q[1] = cy * cp * sr - sy * sp * cr
-        q[2] = sy * cp * sr + cy * sp * cr
-        q[3] = sy * cp * cr - cy * sp * sr
-
-        return q
-
     def update_gate_wpt_pos(self, forward_dist = 0.0, tryhard=False):
         # split the buoys into red and green
         green_buoys, red_buoys = self.split_buoys(self.obstacles)
@@ -322,8 +302,9 @@ class SpeedChallenge(TaskServerBase):
             self.mark_unsuccessful()
 
     def identify_beacon(self):
+        robot_pos = np.array(self.robot_pos)
         for obstacle in self.obstacles:
-            if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.beacon_dist_thres:
+            if np.linalg.norm(robot_pos - self.ob_coords(obstacle)) > self.beacon_dist_thres:
                 continue
             # below might toggle some times but will hopefully settle before we start circling, it's fixed once we start circling
             if obstacle.label in self.red_beacon_labels:
@@ -359,8 +340,7 @@ class SpeedChallenge(TaskServerBase):
         '''
         self.get_logger().info("Probing for blue buoy")
         max_guide_d = self.get_parameter("probe_distance").value
-        current_guide_point = lambda: (max_guide_d*self.buoy_direction[0] + self.robot_pos[0], 
-                        max_guide_d*self.buoy_direction[1] + self.robot_pos[1])
+        current_guide_point = lambda: max_guide_d * self.buoy_direction + np.array(self.robot_pos)
         self.guide_point = current_guide_point()
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {self.guide_point}.")
             
@@ -389,20 +369,19 @@ class SpeedChallenge(TaskServerBase):
         # but require the path to go around buoy
 
         t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
-        robot_x, robot_y = self.robot_pos
-        robot_buoy_vector = (self.blue_buoy_pos[0]-robot_x, self.blue_buoy_pos[1]-robot_y)
-        robot_buoy_dist = self.norm(robot_buoy_vector)
-        self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
-        first_dir = (self.buoy_direction[1]*t_o, -self.buoy_direction[0]*t_o)
-        second_dir = (self.buoy_direction[0]*t_o, self.buoy_direction[1]*t_o)
-        third_dir = (-first_dir[0], -first_dir[1])
+        robot_pos = np.array(self.robot_pos)
+        robot_buoy_vector = self.blue_buoy_pos - robot_pos
+        robot_buoy_dist = np.linalg.norm(robot_buoy_vector)
+        self.buoy_direction = robot_buoy_vector / robot_buoy_dist
+        first_dir = np.array([self.buoy_direction[1], -self.buoy_direction[0]]) * t_o
+        second_dir = self.buoy_direction * t_o
+        third_dir = -first_dir
         if self.left_first:
             first_dir, third_dir = third_dir, first_dir
 
-        add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
-        first_base = add_tuple(self.blue_buoy_pos, first_dir)
-        second_base = add_tuple(self.blue_buoy_pos, second_dir)
-        third_base = add_tuple(self.blue_buoy_pos, third_dir)
+        first_base = self.blue_buoy_pos + first_dir
+        second_base = self.blue_buoy_pos + second_dir
+        third_base = self.blue_buoy_pos + third_dir
 
         bases = [first_base, second_base, third_base]
         dirs = [first_dir, second_dir, third_dir]
@@ -412,7 +391,7 @@ class SpeedChallenge(TaskServerBase):
         for base, dir in zip(bases, dirs):
             def update_current_point():
                 self.blue_buoy_detected()
-                return add_tuple(self.blue_buoy_pos, dir)
+                return self.blue_buoy_pos + dir
             self.base_point = base
             self.move_to_point(self.base_point, busy_wait=True,
                                goal_update_func=partial(self.update_point, "base_point", self.adaptive_distance, update_current_point) )
@@ -433,16 +412,15 @@ class SpeedChallenge(TaskServerBase):
         self.get_logger().info('LEFT FIRST' if self.left_first else 'RIGHT FIRST')
 
         t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
-        robot_x, robot_y = self.robot_pos
-        robot_buoy_vector = (self.blue_buoy_pos[0]-robot_x, self.blue_buoy_pos[1]-robot_y)
-        robot_buoy_dist = self.norm(robot_buoy_vector)
-        self.buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
-        first_dir = (self.buoy_direction[1]*(t_o+self.t_o_eps), -self.buoy_direction[0]*(t_o+self.t_o_eps))
+        robot_pos = np.array(self.robot_pos)
+        robot_buoy_vector = self.blue_buoy_pos - robot_pos
+        robot_buoy_dist = np.linalg.norm(robot_buoy_vector)
+        self.buoy_direction = robot_buoy_vector / robot_buoy_dist
+        first_dir = np.array([self.buoy_direction[1], -self.buoy_direction[0]]) * (t_o + self.t_o_eps)
         if self.left_first:
-            first_dir = (-first_dir[0], -first_dir[1])
+            first_dir = -first_dir
 
-        add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
-        self.first_base = add_tuple(self.blue_buoy_pos, first_dir)
+        self.first_base = self.blue_buoy_pos + first_dir
 
         self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
         self.get_logger().info(f"blue buoy pose: {self.blue_buoy_pos}")
@@ -450,16 +428,16 @@ class SpeedChallenge(TaskServerBase):
 
         def update_first_base():
             self.blue_buoy_detected()
-            return add_tuple(self.blue_buoy_pos, first_dir)
+            return self.blue_buoy_pos + first_dir
         self.move_to_point(self.first_base, busy_wait=True,
                             goal_update_func=partial(self.update_point, "first_base", self.adaptive_distance, update_first_base) )
         self.get_logger().info(f"moved to first base = {self.moved_to_point}")
 
         in_circling = False # boolean flag for whether boat is circling, set to True when boat has turned at least 90 degrees
         def exit_angle_met():
-            cur_robot_dir = self.robot_dir
-            buoy_gate_vector =  (self.gate_wpt[0]-self.blue_buoy_pos[0],self.gate_wpt[1] -self.blue_buoy_pos[1])
-            buoy_gate_dir = (buoy_gate_vector[0]/self.norm(buoy_gate_vector), buoy_gate_vector[1]/self.norm(buoy_gate_vector))
+            cur_robot_dir = np.array(self.robot_dir)
+            buoy_gate_vector = self.gate_wpt - self.blue_buoy_pos
+            buoy_gate_dir = buoy_gate_vector / np.linalg.norm(buoy_gate_vector)
             angle = math.atan2(cur_robot_dir[1], cur_robot_dir[0]) - math.atan2(buoy_gate_dir[1], buoy_gate_dir[0])
             if (angle < 0):
                 angle += 2*math.pi
@@ -477,7 +455,7 @@ class SpeedChallenge(TaskServerBase):
             self.send_vel_cmd(self.max_turn_vel[0], 0.0, (1.0 if self.left_first else -1.0)*pid_output)
             # get feedback
             self.blue_buoy_detected()
-            dist_to_buoy = self.norm(self.blue_buoy_pos, self.robot_pos)
+            dist_to_buoy = np.linalg.norm(self.blue_buoy_pos - np.array(self.robot_pos))
             dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
 
             # self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
@@ -519,23 +497,6 @@ class SpeedChallenge(TaskServerBase):
             goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.forward_dist_back)))
         return Task.Result(success=True)
 
-    def norm_squared(self, vec, ref=(0, 0)):
-        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
-
-    def norm(self, vec, ref=(0, 0)):
-        return math.sqrt(self.norm_squared(vec, ref))
-    
-    def dot(self, vec1, vec2):
-        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
-    
-    def difference(self, pt1, pt2):
-        """
-        pt2 - pt1
-        """
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return (x2-x1, y2-y1)
-
     def blue_buoy_detected(self, buoy_front=False):
         '''
         Check if the blue buoy for turning is detected (returns boolean).
@@ -543,17 +504,18 @@ class SpeedChallenge(TaskServerBase):
         '''
         backup_buoy = None
         updated_pos = False
+        robot_pos = np.array(self.robot_pos)
+        robot_dir = np.array(self.robot_dir)
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
-                if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.circling_buoy_dist_thres:
+                if np.linalg.norm(robot_pos - self.ob_coords(obstacle)) > self.circling_buoy_dist_thres:
                     continue
-                buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
-                            obstacle.global_point.point.y-self.robot_pos[1])
-                dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
-                buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
+                buoy_pos = self.ob_coords(obstacle)
+                buoy_dir = buoy_pos - robot_pos
+                dot_prod = buoy_dir @ robot_dir
+                if (backup_buoy is None) or (self.buoy_found and (np.linalg.norm(self.blue_buoy_pos - buoy_pos) < np.linalg.norm(self.blue_buoy_pos - backup_buoy))):
                     backup_buoy = buoy_pos
-                if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
+                if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (np.linalg.norm(self.blue_buoy_pos - buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
                     self.buoy_found = True
                     updated_pos = True
                     self.blue_buoy_pos = buoy_pos
@@ -565,33 +527,28 @@ class SpeedChallenge(TaskServerBase):
     
     def ob_coords(self, buoy, local=False):
         if local:
-            return (buoy.local_point.point.x, buoy.local_point.point.y)
+            return np.array([buoy.local_point.point.x, buoy.local_point.point.y])
         else:
-            return (buoy.global_point.point.x, buoy.global_point.point.y)
+            return np.array([buoy.global_point.point.x, buoy.global_point.point.y])
 
     def get_closest_to(self, source, buoys, local=False):
         return min(
             buoys,
-            key=lambda buoy: math.dist(source, self.ob_coords(buoy, local)),
+            key=lambda buoy: np.linalg.norm(source - self.ob_coords(buoy, local)),
         )
-
-    def midpoint(self, vec1, vec2):
-        return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
 
     def midpoint_pair_dir(self, pair, forward_dist):
         left_coords = self.ob_coords(pair.left)
         right_coords = self.ob_coords(pair.right)
-        midpoint = self.midpoint(left_coords, right_coords)
-        
-        scale = forward_dist
-        dy = right_coords[1] - left_coords[1]
-        dx = right_coords[0] - left_coords[0]
-        norm = math.sqrt(dx**2 + dy**2)
-        dx /= norm
-        dy /= norm
-        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
+        mid = (left_coords + right_coords) / 2
 
-        return midpoint, (-dy, dx)
+        diff = right_coords - left_coords
+        n = np.linalg.norm(diff)
+        diff = diff / n
+        perp = np.array([-diff[1], diff[0]])
+        mid = mid + forward_dist * perp
+
+        return mid, perp
 
     def split_buoys(self, obstacles):
         """
@@ -610,7 +567,7 @@ class SpeedChallenge(TaskServerBase):
         return [self.ob_coords(ob, local=False) for ob in obs]
 
     def obs_to_pos_label(self, obs):
-        return [self.ob_coords(ob, local=False) + (ob.label,) for ob in obs]
+        return [(*self.ob_coords(ob, local=False), ob.label) for ob in obs]
 
     def buoy_pairs_to_markers(self, buoy_pairs):
         """
@@ -676,10 +633,10 @@ class SpeedChallenge(TaskServerBase):
         green_init, red_init = self.split_buoys(self.obstacles)
 
         # lambda function that filters the buoys that are in front of the robot
+        robot_pos = np.array(self.robot_pos)
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            # if ((pointing_direction is None and ob.local_point.point.x > 0) or (pointing_direction is not None and self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0)) and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres
-            if (self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres and (pointing_direction is None or self.dot(self.difference(self.robot_pos, self.ob_coords(ob)), pointing_direction) > 0))
+            if (np.linalg.norm(robot_pos - self.ob_coords(ob)) < self.gate_dist_thres and (pointing_direction is None or (self.ob_coords(ob) - robot_pos) @ pointing_direction > 0))
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -721,10 +678,10 @@ class SpeedChallenge(TaskServerBase):
         red_to = None
         for red_b in red_buoys:
             for green_b in green_buoys:
-                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+                pair_dist = np.linalg.norm(self.ob_coords(red_b) - self.ob_coords(green_b))
+                if pair_dist < self.inter_buoy_pair_dist or pair_dist > self.max_inter_gate_dist:
                     continue
-                # elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
-                elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))):
+                elif ((green_to is None) or (np.linalg.norm((self.ob_coords(red_b, local=True) + self.ob_coords(green_b, local=True)) / 2) < np.linalg.norm((self.ob_coords(red_to, local=True) + self.ob_coords(green_to, local=True)) / 2))):
                     green_to = green_b
                     red_to = red_b
         if green_to is None:
@@ -739,18 +696,6 @@ class SpeedChallenge(TaskServerBase):
         self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(self.gate_mid), 0.0)]))
         return True
 
-    def ccw(self, a, b, c):
-        """Return True if the points a, b, c are counterclockwise, respectively"""
-        area = (
-            a[0] * b[1]
-            + b[0] * c[1]
-            + c[0] * a[1]
-            - a[1] * b[0]
-            - b[1] * c[0]
-            - c[1] * a[0]
-        )
-        return area > 0
-
     def filter_front_buoys(self, pair, buoys):
         """
         Returns the buoys (from the given array) that are in front of a pair of points,
@@ -761,18 +706,18 @@ class SpeedChallenge(TaskServerBase):
         return [
             buoy
             for buoy in buoys
-            if (self.ccw(
+            if (ccw(
                 self.ob_coords(pair.left),
                 self.ob_coords(pair.right),
                 self.ob_coords(buoy),
-            ) and (min(self.norm(self.ob_coords(buoy), self.ob_coords(pair.left)), self.norm(self.ob_coords(buoy), self.ob_coords(pair.right))) > self.buoy_pair_dist_thres))
+            ) and (min(np.linalg.norm(self.ob_coords(buoy) - self.ob_coords(pair.left)), np.linalg.norm(self.ob_coords(buoy) - self.ob_coords(pair.right))) > self.buoy_pair_dist_thres))
         ]
 
     def pick_buoy(self, buoys, prev_mid, ref_buoy):
         # sort by distance
-        buoys.sort(key=lambda buoy: self.norm(prev_mid, self.ob_coords(buoy)))
+        buoys.sort(key=lambda buoy: np.linalg.norm(prev_mid - self.ob_coords(buoy)))
         for buoy in buoys:
-            if self.norm(self.ob_coords(ref_buoy), self.ob_coords(buoy)) > self.duplicate_dist:
+            if np.linalg.norm(self.ob_coords(ref_buoy) - self.ob_coords(buoy)) > self.duplicate_dist:
                 return False, buoy
         return True, ref_buoy
 

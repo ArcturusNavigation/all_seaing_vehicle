@@ -13,10 +13,13 @@ from all_seaing_common.task_server_base import TaskServerBase
 
 from sensor_msgs.msg import CameraInfo
 
+import numpy as np
 import os
 import yaml
 import time
 import math
+
+from all_seaing_autonomy.geometry_utils import ccw
 
 class FollowBuoyPID(TaskServerBase):
     def __init__(self):
@@ -177,20 +180,6 @@ class FollowBuoyPID(TaskServerBase):
         self.height = msg.height
         self.width = msg.width
 
-    def dist_squared(self, vect):
-        return vect[0] * vect[0] + vect[1] * vect[1]
-
-    def ccw(self, right, yellow, left):
-        """Return True if the points a, b, c are counterclockwise, respectively"""
-        area = (
-            right[0] * yellow[1]
-            + yellow[0] * left[1]
-            + left[0] * right[1]
-            - right[1] * yellow[0]
-            - yellow[1] * left[0]
-            - left[1] * right[0]
-        )
-        return area > 0
 
     # Replaced by obstacle map
     def bbox_callback(self, msg):
@@ -318,17 +307,17 @@ class FollowBuoyPID(TaskServerBase):
                 front = None
                 # Sets whether yellow is in front or behind of the line of red, green intersection
                 if self.right_color == "green":
-                    front = self.ccw((green_y, green_x), (yellow_y, yellow_x), (red_y, red_x))
+                    front = ccw(np.array([green_y, green_x]), np.array([yellow_y, yellow_x]), np.array([red_y, red_x]))
                 else:
-                    front = self.ccw((red_y, red_x), (yellow_y, yellow_x), (green_y, green_x))
+                    front = ccw(np.array([red_y, red_x]), np.array([yellow_y, yellow_x]), np.array([green_y, green_x]))
                 # Checks if yellow is between the green and red buoys
                 if (self.right_color == "green" and red_y < yellow_y < green_y) or (self.right_color == "red" and green_y < yellow_y < red_y):
                     # If in front, finds intersection of red, green buoy line and its perpendicular line passing through yellow's location
                     if front:
-                        red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
-                        red_to_green = (green_x - red_x, green_y - red_y)
-                        dot_prod = red_to_yellow[0] * red_to_green[0] + red_to_yellow[1] * red_to_green[1]
-                        const_fact = dot_prod / self.dist_squared(red_to_green)
+                        red_to_yellow = np.array([yellow_x - red_x, yellow_y - red_y])
+                        red_to_green = np.array([green_x - red_x, green_y - red_y])
+                        dot_prod = red_to_yellow @ red_to_green
+                        const_fact = dot_prod / (red_to_green @ red_to_green)
                         intersection_x = red_to_green[0] * const_fact + red_x
                         intersection_y = red_to_green[1] * const_fact + red_y
 
@@ -343,10 +332,10 @@ class FollowBuoyPID(TaskServerBase):
                             self.waypoint_y = (green_y + intersection_y)/2
                     # If behind, then just finds largest red, yellow or green, yellow dist and takes the midpt
                     else:
-                        red_to_yellow = (yellow_x - red_x, yellow_y -red_y)
-                        green_to_yellow = (yellow_x - green_x, yellow_y -green_y)
-                        ry_dist = self.dist_squared(red_to_yellow)
-                        gy_dist = self.dist_squared(green_to_yellow)
+                        red_to_yellow = np.array([yellow_x - red_x, yellow_y - red_y])
+                        green_to_yellow = np.array([yellow_x - green_x, yellow_y - green_y])
+                        ry_dist = red_to_yellow @ red_to_yellow
+                        gy_dist = green_to_yellow @ green_to_yellow
                         if ry_dist >= gy_dist:
                             self.waypoint_x = (red_x + yellow_x)/2
                             self.waypoint_y = (red_y + yellow_y)/2

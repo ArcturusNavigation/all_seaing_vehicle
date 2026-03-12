@@ -17,6 +17,7 @@ from std_msgs.msg import Header, ColorRGBA, String
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from ament_index_python.packages import get_package_share_directory
+import numpy as np
 import os
 import yaml
 import math
@@ -253,7 +254,7 @@ class RunTasks(ActionServerBase):
         self.restart_slam_options = None
 
     def odom_cb(self, msg):
-        self.vel = self.norm((msg.twist.twist.linear.x, msg.twist.twist.linear.y))
+        self.vel = np.linalg.norm([msg.twist.twist.linear.x, msg.twist.twist.linear.y])
 
     def receive_heartbeat(self, msg):
         self.heartbeat_msg = msg
@@ -334,49 +335,27 @@ class RunTasks(ActionServerBase):
                 red_bouy_points.append(obstacle)
         return green_bouy_points, red_bouy_points
 
-    def norm_squared(self, vec, ref=(0, 0)):
-        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
-
-    def norm(self, vec, ref=(0, 0)):
-        return math.sqrt(self.norm_squared(vec, ref))
-    
-    def dot(self, vec1, vec2):
-        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
-    
-    def difference(self, pt1, pt2):
-        """
-        pt2 - pt1
-        """
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return (x2-x1, y2-y1)
 
     def ob_coords(self, buoy, local=False):
         if local:
-            return (buoy.local_point.point.x, buoy.local_point.point.y)
+            return np.array([buoy.local_point.point.x, buoy.local_point.point.y])
         else:
-            return (buoy.global_point.point.x, buoy.global_point.point.y)
-        
-    def midpoint(self, vec1, vec2):
-        return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
+            return np.array([buoy.global_point.point.x, buoy.global_point.point.y])
     
     def obs_to_pos_label(self, obs):
-        return [self.ob_coords(ob, local=False) + (ob.label,) for ob in obs]
-    
+        return [(*self.ob_coords(ob, local=False), ob.label) for ob in obs]
+
     def midpoint_pair_dir(self, pair, forward_dist):
         left_coords = self.ob_coords(pair.left)
         right_coords = self.ob_coords(pair.right)
-        midpoint = self.midpoint(left_coords, right_coords)
-        
-        scale = forward_dist
-        dy = right_coords[1] - left_coords[1]
-        dx = right_coords[0] - left_coords[0]
-        norm = math.sqrt(dx**2 + dy**2)
-        dx /= norm
-        dy /= norm
-        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
+        mid = (left_coords + right_coords) / 2
 
-        return midpoint, (-dy, dx)
+        d = right_coords - left_coords
+        d = d / np.linalg.norm(d)
+        forward = np.array([-d[1], d[0]])
+        mid = mid + forward_dist * forward
+
+        return tuple(mid), tuple(forward)
 
     def setup_buoys(self):
         """
@@ -394,9 +373,10 @@ class RunTasks(ActionServerBase):
         green_init, red_init = self.split_buoys(self.obstacles)
 
         # lambda function that filters the buoys that are in front of the robot
+        robot_pos = np.array(self.robot_pos)
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if ob.local_point.point.x > 0 and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
+            if ob.local_point.point.x > 0 and np.linalg.norm(robot_pos - self.ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
@@ -415,10 +395,10 @@ class RunTasks(ActionServerBase):
         red_to = None
         for red_b in red_buoys:
             for green_b in green_buoys:
-                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+                pair_dist = np.linalg.norm(self.ob_coords(red_b) - self.ob_coords(green_b))
+                if pair_dist < self.inter_buoy_pair_dist or pair_dist > self.max_inter_gate_dist:
                     continue
-                # elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
-                elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))):
+                elif ((green_to is None) or (np.linalg.norm((self.ob_coords(red_b, local=True) + self.ob_coords(green_b, local=True)) / 2) < np.linalg.norm((self.ob_coords(red_to, local=True) + self.ob_coords(green_to, local=True)) / 2))):
                     green_to = green_b
                     red_to = red_b
         if green_to is None:

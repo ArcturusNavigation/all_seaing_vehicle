@@ -17,6 +17,7 @@ from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
 from all_seaing_common.task_server_base import TaskServerBase
+from all_seaing_autonomy.geometry_utils import angle_segments, fit_line
 
 import time
 import math
@@ -125,10 +126,11 @@ class DockingFallback(TaskServerBase):
             self.inv_label_mappings[value] = key
 
     def pt_left_right(self, plane: LabeledObjectPlane):
-        center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
+        center_pt = np.array([plane.normal_ctr.position.x, plane.normal_ctr.position.y])
         _,_,theta = euler_from_quaternion([plane.normal_ctr.orientation.x, plane.normal_ctr.orientation.y, plane.normal_ctr.orientation.z, plane.normal_ctr.orientation.w])
         theta += np.pi/2.0 # to get the direction of the plane, not the normal
-        return ((center_pt[0]+np.cos(theta)*plane.size.y, center_pt[1]+np.sin(theta)*plane.size.y), (center_pt[0]-np.cos(theta)*plane.size.y, center_pt[1]-np.sin(theta)*plane.size.y))
+        offset = np.array([np.cos(theta), np.sin(theta)]) * plane.size.y
+        return (center_pt + offset, center_pt - offset)
 
     def plane_cb(self, msg: LabeledObjectPlaneArray):
         if not self.started_task:
@@ -172,11 +174,11 @@ class DockingFallback(TaskServerBase):
                 continue # just ignore, since we saw that it was taken once it's always taken
             # check if any boat is in that slot
             taken = False
-            mid_dock = self.midpoint(dock_left, dock_right)
+            mid_dock = (dock_left + dock_right) / 2
             for boat_label, (boat_left, boat_right) in self.boat_banners:
                 # check if boat is closer than dock and angle of dock and boat banners is relatively perpendicular to the dock
-                mid_boat = self.midpoint(boat_left, boat_right)
-                if (self.norm(mid_boat) < self.norm(mid_dock)) and (abs(self.angle_segments((mid_boat, mid_dock), self.dock_banner_line)-math.pi/2.0) < self.boat_taken_angle_thres):
+                mid_boat = (boat_left + boat_right) / 2
+                if (np.linalg.norm(mid_boat) < np.linalg.norm(mid_dock)) and (abs(abs(angle_segments((mid_boat, mid_dock), self.dock_banner_line))-math.pi/2.0) < self.boat_taken_angle_thres):
                     # taken
                     taken = True
             if taken:
@@ -192,7 +194,7 @@ class DockingFallback(TaskServerBase):
                 self.get_logger().info(f'DOCK {self.inv_label_mappings[dock_label]} IS TAKEN')
                 continue
             # found empty docking slot
-            if(self.selected_slot is None or (self.norm(self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])) > self.norm(mid_dock))):
+            if(self.selected_slot is None or (np.linalg.norm((self.selected_slot[1][0] + self.selected_slot[1][1]) / 2) > np.linalg.norm(mid_dock))):
                 # found an empty one closer
                 self.selected_slot = (dock_label, (dock_left, dock_right))
                 self.picked_slot = True
@@ -209,32 +211,6 @@ class DockingFallback(TaskServerBase):
         (a, b, c), _ = wall_params
         return (a*x+b+y)/math.sqrt(a**2+b**2)
 
-    def midpoint(self, pt1, pt2):
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return ((x1+x2)/2.0, (y1+y2)/2.0)
-
-    def difference(self, pt1, pt2):
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return (x2-x1, y2-y1)
-    
-    def norm(self, pt):
-        x, y = pt
-        return math.sqrt(x**2+y**2)
-
-    def angle_segments(self, p1, p2):
-        p1left, p1right = p1
-        p2left, p2right = p2
-        x1, y1 = self.difference(p1left, p1right)
-        x2, y2 = self.difference(p2left, p2right)
-        return math.acos(abs(x1*x2+y1*y2)/(self.norm((x1,y1))*self.norm((x2,y2))))
-    
-    def fit_pair(self, point_pair):
-        (x1,y1), (x2,y2) = point_pair
-        # (y-y1)(x2-x1) = (y2-y1)*(x-x1) -> y(x2-x1)+x(y1-y2)+x1(y2-y1)+y1(x1-x2) = 0 -> y(x2-x1)+x(y1-y2)+x1y2-x2y1
-        return (y1-y2, x2-x1, x1*y2-x2*y1), abs(x1*y2-x2*y1)/math.sqrt((y1-y2)**2+(x2-x1)**2)
-    
     def set_pid_setpoints(self, x, y, theta):
         self.x_pid.set_setpoint(x)
         self.y_pid.set_setpoint(y)
@@ -261,8 +237,8 @@ class DockingFallback(TaskServerBase):
         mark_id = 1
         # self.get_logger().info(f'CONTROL LOOP')
         # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
-        slot_back_mid = self.midpoint(self.selected_slot[1][0], self.selected_slot[1][1])
-        (a, b, c), _ = self.fit_pair(self.dock_banner_line)
+        slot_back_mid = (self.selected_slot[1][0] + self.selected_slot[1][1]) / 2
+        (a, b, c), _ = fit_line(self.dock_banner_line[0], self.dock_banner_line[1])
         perp_dock_line_params = (-b, a, 
                                  b*slot_back_mid[0] - a*slot_back_mid[1])
         
@@ -288,7 +264,7 @@ class DockingFallback(TaskServerBase):
         # control_msg.priority = 1
 
         # forward speed decreasing exponentially as we get closer
-        dist_diff = self.norm(slot_back_mid) - self.dock_length/2.0 # can improve to compute distance from projected center of dock instead, more accurate but not needed since we're gonna be aligned with it at some point anyways
+        dist_diff = np.linalg.norm(slot_back_mid) - self.dock_length/2.0 # can improve to compute distance from projected center of dock instead, more accurate but not needed since we're gonna be aligned with it at some point anyways
         # subtract half the dock length when further than the half the width sideways
         if abs(offset) > self.dock_width/2.0:
             dist_diff -= self.dock_length/2.0

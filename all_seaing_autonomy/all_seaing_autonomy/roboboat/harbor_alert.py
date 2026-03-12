@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from ast import Num
 import rclpy
 from rclpy.action import GoalResponse
 from rclpy.executors import MultiThreadedExecutor
@@ -9,9 +8,9 @@ from all_seaing_interfaces.action import Task
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_common.task_server_base import TaskServerBase
 
+import numpy as np
 import os
 import yaml
-import math
 import time
 from collections import deque
 from functools import partial
@@ -45,7 +44,7 @@ class HarborAlert(TaskServerBase):
 
         self.declare_parameter("is_sim", False)
 
-        self.blue_buoy_pos = (0, 0)
+        self.blue_buoy_pos = np.array([0.0, 0.0])
         self.return_pos = None
         self.return_dir = None
         
@@ -90,8 +89,8 @@ class HarborAlert(TaskServerBase):
         return GoalResponse.ACCEPT
     
     def search_goal_callback(self, goal_request):
-        self.return_pos = self.robot_pos
-        self.return_dir = self.robot_dir
+        self.return_pos = np.array(self.robot_pos)
+        self.return_dir = np.array(self.robot_dir)
         self.get_logger().info(f'Searching Server for [{self.server_name}] called')
         return GoalResponse.ACCEPT
 
@@ -120,19 +119,14 @@ class HarborAlert(TaskServerBase):
     def station_keep_blue_buoy(self):
         self.get_logger().info("Going closer to the buoy")
 
-        robot_x, robot_y = self.robot_pos
-        robot_buoy_vector = (self.blue_buoy_pos[0]-robot_x, self.blue_buoy_pos[1]-robot_y)
-        robot_buoy_dist = self.norm(robot_buoy_vector)
-        buoy_direction = (robot_buoy_vector[0]/robot_buoy_dist, robot_buoy_vector[1]/robot_buoy_dist)
-
-        add_tuple = lambda a,b: tuple(sum(x) for x in zip(a, b))
-        times_tuple = lambda a,b: tuple(a*x for x in b)
-        minus_tuple = lambda a,b: add_tuple(a, times_tuple(-1, b))
+        robot_pos = np.array(self.robot_pos)
+        robot_buoy_vector = self.blue_buoy_pos - robot_pos
+        robot_buoy_dist = np.linalg.norm(robot_buoy_vector)
+        buoy_direction = robot_buoy_vector / robot_buoy_dist
 
         def update_current_point():
             self.blue_buoy_detected()
-            
-            return minus_tuple(self.blue_buoy_pos, times_tuple(self.stationkeep_dist, buoy_direction))
+            return self.blue_buoy_pos - self.stationkeep_dist * buoy_direction
 
         self.stationkeep_point = update_current_point()
         self.move_to_point(self.stationkeep_point, busy_wait=True,
@@ -155,17 +149,11 @@ class HarborAlert(TaskServerBase):
         
         return Task.Result(success=True)
 
-    def norm_squared(self, vec, ref=(0, 0)):
-        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
-
-    def norm(self, vec, ref=(0, 0)):
-        return math.sqrt(self.norm_squared(vec, ref))
-    
     def ob_coords(self, buoy, local=False):
         if local:
-            return (buoy.local_point.point.x, buoy.local_point.point.y)
+            return np.array([buoy.local_point.point.x, buoy.local_point.point.y])
         else:
-            return (buoy.global_point.point.x, buoy.global_point.point.y)
+            return np.array([buoy.global_point.point.x, buoy.global_point.point.y])
 
     def blue_buoy_detected(self, buoy_front=False):
         '''
@@ -174,20 +162,21 @@ class HarborAlert(TaskServerBase):
         '''
         backup_buoy = None
         updated_pos = False
+        robot_pos = np.array(self.robot_pos)
+        robot_dir = np.array(self.robot_dir)
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
-                if self.norm(self.robot_pos, self.ob_coords(obstacle)) > self.buoy_dist_thres:
+                ob_pos = self.ob_coords(obstacle)
+                if np.linalg.norm(robot_pos - ob_pos) > self.buoy_dist_thres:
                     continue
-                buoy_dir = (obstacle.global_point.point.x-self.robot_pos[0], 
-                            obstacle.global_point.point.y-self.robot_pos[1])
-                dot_prod = buoy_dir[0] * self.robot_dir[0] + buoy_dir[1] * self.robot_dir[1]
-                buoy_pos = (obstacle.global_point.point.x, obstacle.global_point.point.y)
-                if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
-                    backup_buoy = buoy_pos
-                if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (self.norm(self.blue_buoy_pos, buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
+                buoy_dir = ob_pos - robot_pos
+                dot_prod = buoy_dir @ robot_dir
+                if (backup_buoy is None) or (self.buoy_found and (np.linalg.norm(self.blue_buoy_pos - ob_pos) < np.linalg.norm(self.blue_buoy_pos - backup_buoy))):
+                    backup_buoy = ob_pos
+                if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (np.linalg.norm(self.blue_buoy_pos - ob_pos) < self.duplicate_dist)):
                     self.buoy_found = True
                     updated_pos = True
-                    self.blue_buoy_pos = buoy_pos
+                    self.blue_buoy_pos = ob_pos
                     break
         if (not updated_pos) and (backup_buoy is not None):
             self.get_logger().info('SWITCHING TO BACKUP BUOY')
