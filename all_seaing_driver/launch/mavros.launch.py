@@ -19,7 +19,8 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "port",
-                default_value='/dev/ttyACM0',
+                # WARNING: value overwritten by launch file in vehicle.launch.py!
+                default_value='/dev/serial/by-id/usb-ArduPilot_Pixhawk6X_18002C000251323131373139-if00',
             ),
             launch_ros.actions.Node(
                 package="mavros",
