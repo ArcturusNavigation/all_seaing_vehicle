@@ -289,8 +289,9 @@ class TaskServerBase(ActionServerBase):
         if self._get_result_future is None or self.wpt_goal_handle is None: # TODO how to handle waypoint sent (& goal handle received) after us trying to cancel it? maybe ROS delay + retry for 3 times or smth
             self.get_logger().info('FUTURE IS NONE')
             return
-        if ((self._get_result_future.result() is None) or 
-            (self._get_result_future.result().status not in [GoalStatus.STATUS_ABORTED, GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED, GoalStatus.STATUS_CANCELING])):
+        result = self._get_result_future.result()
+        if ((result is None) or
+            (result.status not in [GoalStatus.STATUS_ABORTED, GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED, GoalStatus.STATUS_CANCELING])):
             self.wpt_goal_handle.cancel_goal_async()
             self.get_logger().info('CANCELLED NAVIGATION')
 

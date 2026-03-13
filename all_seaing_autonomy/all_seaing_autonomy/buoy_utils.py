@@ -114,7 +114,10 @@ def buoy_pairs_angle(p1, p2, local=False):
     p2_right = ob_coords(p2.right, local=local)
     p1_diff = p1_right - p1_left
     p2_diff = p2_right - p2_left
-    angle = math.acos((p1_diff @ p2_diff) / (np.linalg.norm(p1_diff) * np.linalg.norm(p2_diff)))
+    denom = np.linalg.norm(p1_diff) * np.linalg.norm(p2_diff)
+    if denom == 0:
+        return 0.0
+    angle = math.acos(np.clip((p1_diff @ p2_diff) / denom, -1.0, 1.0))
     return angle
 
 
