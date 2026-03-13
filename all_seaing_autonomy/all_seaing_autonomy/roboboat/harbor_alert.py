@@ -8,6 +8,8 @@ from all_seaing_interfaces.action import Task
 from ament_index_python.packages import get_package_share_directory
 from all_seaing_common.task_server_base import TaskServerBase
 
+from all_seaing_autonomy.buoy_utils import ob_coords
+
 import numpy as np
 import os
 import yaml
@@ -149,12 +151,6 @@ class HarborAlert(TaskServerBase):
         
         return Task.Result(success=True)
 
-    def ob_coords(self, buoy, local=False):
-        if local:
-            return np.array([buoy.local_point.point.x, buoy.local_point.point.y])
-        else:
-            return np.array([buoy.global_point.point.x, buoy.global_point.point.y])
-
     def blue_buoy_detected(self, buoy_front=False):
         '''
         Check if the blue buoy for turning is detected (returns boolean).
@@ -166,7 +162,7 @@ class HarborAlert(TaskServerBase):
         robot_dir = np.array(self.robot_dir)
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
-                ob_pos = self.ob_coords(obstacle)
+                ob_pos = ob_coords(obstacle)
                 if np.linalg.norm(robot_pos - ob_pos) > self.buoy_dist_thres:
                     continue
                 buoy_dir = ob_pos - robot_pos

@@ -28,6 +28,8 @@ from action_msgs.msg import GoalStatus
 from dataclasses import dataclass
 import time
 
+from all_seaing_autonomy.buoy_utils import (InternalBuoyPair, ob_coords, midpoint_pair_dir, split_buoys, obs_to_pos_label)
+
 ###
 
 # test using:
@@ -38,18 +40,6 @@ import time
 class ReferenceInt:
     def __init__(self, val: int):
         self.val = val
-
-class InternalBuoyPair:
-    def __init__(self, left_buoy=None, right_buoy=None):
-        if left_buoy is None:
-            self.left = Obstacle()
-        else:
-            self.left = left_buoy
-
-        if right_buoy is None:
-            self.right = Obstacle()
-        else:
-            self.right = right_buoy
 
 class ActionType(Enum):
     TASK = 1
@@ -322,41 +312,6 @@ class RunTasks(ActionServerBase):
             self.cancel_current_task()
             self.find_task()
     
-    def split_buoys(self, obstacles):
-        """
-        Splits the buoys into red and green based on their labels in the obstacle map
-        """
-        green_bouy_points = []
-        red_bouy_points = []
-        for obstacle in obstacles:
-            if obstacle.label in self.green_labels:
-                green_bouy_points.append(obstacle)
-            elif obstacle.label in self.red_labels:
-                red_bouy_points.append(obstacle)
-        return green_bouy_points, red_bouy_points
-
-
-    def ob_coords(self, buoy, local=False):
-        if local:
-            return np.array([buoy.local_point.point.x, buoy.local_point.point.y])
-        else:
-            return np.array([buoy.global_point.point.x, buoy.global_point.point.y])
-    
-    def obs_to_pos_label(self, obs):
-        return [(*self.ob_coords(ob, local=False), ob.label) for ob in obs]
-
-    def midpoint_pair_dir(self, pair, forward_dist):
-        left_coords = self.ob_coords(pair.left)
-        right_coords = self.ob_coords(pair.right)
-        mid = (left_coords + right_coords) / 2
-
-        d = right_coords - left_coords
-        d = d / np.linalg.norm(d)
-        forward = np.array([-d[1], d[0]])
-        mid = mid + forward_dist * forward
-
-        return tuple(mid), tuple(forward)
-
     def setup_buoys(self):
         """
         Runs when the first obstacle map is received, filters the buoys that are in front of
@@ -366,22 +321,22 @@ class RunTasks(ActionServerBase):
         """
         self.get_logger().debug("Setting up starting buoys!")
         self.get_logger().debug(
-            f"list of obstacles: {self.obs_to_pos_label(self.obstacles)}"
+            f"list of obstacles: {obs_to_pos_label(self.obstacles)}"
         )
 
         # Split all the buoys into red and green
-        green_init, red_init = self.split_buoys(self.obstacles)
+        green_init, red_init = split_buoys(self.obstacles, self.green_labels, self.red_labels)
 
         # lambda function that filters the buoys that are in front of the robot
         robot_pos = np.array(self.robot_pos)
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if ob.local_point.point.x > 0 and np.linalg.norm(robot_pos - self.ob_coords(ob)) < self.gate_dist_thres
+            if ob.local_point.point.x > 0 and np.linalg.norm(robot_pos - ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
         self.get_logger().debug(
-            f"initial red buoys: {[self.ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[self.ob_coords(buoy) for buoy in green_buoys]}"
+            f"initial red buoys: {[ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[ob_coords(buoy) for buoy in green_buoys]}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
             self.get_logger().debug("No starting buoy pairs!")
@@ -395,10 +350,10 @@ class RunTasks(ActionServerBase):
         red_to = None
         for red_b in red_buoys:
             for green_b in green_buoys:
-                pair_dist = np.linalg.norm(self.ob_coords(red_b) - self.ob_coords(green_b))
+                pair_dist = np.linalg.norm(ob_coords(red_b) - ob_coords(green_b))
                 if pair_dist < self.inter_buoy_pair_dist or pair_dist > self.max_inter_gate_dist:
                     continue
-                elif ((green_to is None) or (np.linalg.norm((self.ob_coords(red_b, local=True) + self.ob_coords(green_b, local=True)) / 2) < np.linalg.norm((self.ob_coords(red_to, local=True) + self.ob_coords(green_to, local=True)) / 2))):
+                elif ((green_to is None) or (np.linalg.norm((ob_coords(red_b, local=True) + ob_coords(green_b, local=True)) / 2) < np.linalg.norm((ob_coords(red_to, local=True) + ob_coords(green_to, local=True)) / 2))):
                     green_to = green_b
                     red_to = red_b
         if green_to is None:
@@ -409,7 +364,7 @@ class RunTasks(ActionServerBase):
             self.gate_pair = InternalBuoyPair(green_to, red_to)
         self.get_logger().info(f'FOUND STARTING GATE')
         self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
-        self.gate_mid, self.gate_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
+        self.gate_mid, self.gate_dir = midpoint_pair_dir(self.gate_pair, 0.0)
         self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(self.gate_mid), 0.0)]))
         return True
     
@@ -443,7 +398,7 @@ class RunTasks(ActionServerBase):
             marker_array.markers.append(
                 Marker(
                     type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(p_left)),
+                    pose=self.pair_to_pose(ob_coords(p_left)),
                     header=Header(frame_id=self.global_frame_id),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=left_color,
@@ -453,7 +408,7 @@ class RunTasks(ActionServerBase):
             marker_array.markers.append(
                 Marker(
                     type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(p_right)),
+                    pose=self.pair_to_pose(ob_coords(p_right)),
                     header=Header(frame_id=self.global_frame_id),
                     scale=Vector3(x=1.0, y=1.0, z=1.0),
                     color=right_color,
