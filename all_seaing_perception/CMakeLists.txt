@@ -15,6 +15,8 @@ find_package(PCL 1.12 REQUIRED COMPONENTS common visualization io)
 
 find_package(Eigen3 3.4 REQUIRED)
 
+find_package(GTSAM REQUIRED)
+
 ament_auto_add_executable(
     obstacle_detector
     ${PROJECT_NAME}/obstacle_detector.cpp
@@ -50,9 +52,20 @@ ament_auto_add_executable(
     ${PROJECT_NAME}/Hungarian.cpp
 )
 
+ament_auto_add_executable(
+    factor_graph_slam
+    ${PROJECT_NAME}/factor_graph_slam.cpp
+    ${PROJECT_NAME}/obstacle.cpp
+    ${PROJECT_NAME}/object_tracking_shared.cpp
+    ${PROJECT_NAME}/perception_utilities.cpp
+    ${PROJECT_NAME}/Hungarian.cpp
+)
+
 target_link_libraries(bbox_project_pcloud yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 target_link_libraries(object_tracking_map yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
 target_link_libraries(ransac_detector yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+target_link_libraries(factor_graph_slam gtsam yaml-cpp Eigen3::Eigen ${PCL_LIBRARIES} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES})
+
 
 install(TARGETS
     obstacle_detector
@@ -60,6 +73,7 @@ install(TARGETS
     bbox_project_pcloud
     ransac_detector
     object_tracking_map
+    factor_graph_slam
     DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -67,11 +81,10 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
     ${PROJECT_NAME}/color_segmentation.py
     ${PROJECT_NAME}/color_segmentation_ycrcb.py
-    ${PROJECT_NAME}/dock_detector.py
     ${PROJECT_NAME}/yolov11_all_node.py
     ${PROJECT_NAME}/perception_eval.py
     ${PROJECT_NAME}/multicam_detection_merge.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
-ament_auto_package(INSTALL_TO_SHARE launch models point_clouds)
+ament_auto_package(INSTALL_TO_SHARE launch models)
