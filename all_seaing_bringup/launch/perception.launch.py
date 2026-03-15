@@ -176,12 +176,14 @@ def launch_setup(context, *args, **kwargs):
 
     shape_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
-        executable="yolov8_node.py",
+        executable="yolov11_all_node.py",
         parameters=[
-            {"model": "roboboat_shape_2025"},
-            {"label_config": "shape_label_mappings"},
-            {"conf": 0.1},
+            {"model": ["roboboat_shape_2025"]},
+            {"label_config": ["shape_label_mappings"]},
+            {"label_offsets": [0]},
+            {"confs": [0.1]},
             {"use_color_names": False},
+            {"ignore_indicator_filters": True},
         ],
         remappings=[
             ("image", "turret_image"),
