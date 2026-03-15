@@ -176,14 +176,16 @@ def launch_setup(context, *args, **kwargs):
 
     buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
-        executable="yolov8_node.py",
+        executable="yolov11_all_node.py",
         parameters=[
-            {"model": "best"},
-            # {"model": "roboboat_shape_2025"},
+            {"model": ["best"]},
+            # {"model": ["roboboat_shape_2025"]},
+            {"label_offsets": [0]},
             {"label_config": "buoy_label_mappings"},
             # {"label_config": "shape_label_mappings"},
             # {"use_color_names": False},
-            {"conf": 0.3},
+            {"ignore_indicator_filters": True},
+            {"confs": [0.3]},
         ],
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
@@ -194,32 +196,18 @@ def launch_setup(context, *args, **kwargs):
 
     shape_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
-        executable="yolov8_node.py",
+        executable="yolov11_all_node.py",
         parameters=[
-            {"model": "roboboat_shape_2025"},
-            {"label_config": "shape_label_mappings"},
-            {"conf": 0.4},
+            {"model": ["roboboat_shape_2025"]},
+            {"label_config": ["shape_label_mappings"]},
+            {"label_offsets": [0]},
+            {"confs": [0.4]},
+            {"ignore_indicator_filters": True},
         ],
         remappings=[
             ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
             ("annotated_image", "annotated_image/shape"),
             ("bounding_boxes", "shape_boxes"),
-        ],
-        output="screen",
-    )
-
-    static_shape_yolo_node = launch_ros.actions.Node(
-        package="all_seaing_perception",
-        executable="yolov8_node.py",
-        parameters=[
-            {"model": "roboboat_shape_2025"},
-            {"label_config": "shape_label_mappings"},
-            {"conf": 0.4},
-        ],
-        remappings=[
-            ("image", "/wamv/sensors/cameras/front_left_camera_sensor/image_raw"),
-            ("annotated_image", "annotated_image/shape"),
-            ("bounding_boxes", "static_shape_boxes"),
         ],
         output="screen",
     )

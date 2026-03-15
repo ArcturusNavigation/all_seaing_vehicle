@@ -138,7 +138,10 @@ class YOLOv11Node(Node):
             "match_indicators_banners", False).get_parameter_value().bool_value
         
         self.indicator_banner_px_dist = self.declare_parameter(
-            "indicator_banner_px_dist", 0).get_parameter_value().integer_value        
+            "indicator_banner_px_dist", 0).get_parameter_value().integer_value
+        
+        self.ignore_indicator_filters = self.declare_parameter(
+            "ignore_indicator_filters", False).get_parameter_value().bool_value
 
         if self.device == "default":
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -155,11 +158,12 @@ class YOLOv11Node(Node):
         for key, value in self.label_dict.items():
             self.inv_label_dict[value] = key
         
-        self.indicator_labels = [self.label_dict[name] for name in ["green_indicator", "red_indicator"]]
-        self.green_indicator_labels = [self.label_dict[name] for name in ["green_indicator"]]
-        self.red_indicator_labels = [self.label_dict[name] for name in ["red_indicator"]]
-        self.beacon_label = self.label_dict["beacon"]
-        self.number_labels = [self.label_dict[name] for name in ["number_1", "number_2", "number_3"]]
+        if not self.ignore_indicator_filters:
+            self.indicator_labels = [self.label_dict[name] for name in ["green_indicator", "red_indicator"]]
+            self.green_indicator_labels = [self.label_dict[name] for name in ["green_indicator"]]
+            self.red_indicator_labels = [self.label_dict[name] for name in ["red_indicator"]]
+            self.beacon_label = self.label_dict["beacon"]
+            self.number_labels = [self.label_dict[name] for name in ["number_1", "number_2", "number_3"]]
 
         self.models:list[tuple[YOLO, int, float]] = []
         
@@ -295,56 +299,58 @@ class YOLOv11Node(Node):
                     # if not self.filter_beacon_indicators:
                     #     labeled_bounding_box_msgs.boxes.append(box_msg)
                     # else:
-                    if box_msg.label in self.indicator_labels:
-                        indicator_bboxes.append(box_msg)
-                    elif box_msg.label in self.number_labels:
-                        number_bboxes.append(box_msg)
-                    else:
-                        labeled_bounding_box_msgs.boxes.append(box_msg)
-                    
-                    if box_msg.label == self.beacon_label:
-                        beacon_bboxes.append(box_msg)
+                    if not self.ignore_indicator_filters:
+                        if box_msg.label in self.indicator_labels:
+                            indicator_bboxes.append(box_msg)
+                        elif box_msg.label in self.number_labels:
+                            number_bboxes.append(box_msg)
+                        else:
+                            labeled_bounding_box_msgs.boxes.append(box_msg)
+                        
+                        if box_msg.label == self.beacon_label:
+                            beacon_bboxes.append(box_msg)
 
         # if self.filter_beacon_indicators:
-        for indicator_box in indicator_bboxes:
-            added = False
-            for beacon_box in beacon_bboxes:
-                if self.overlap_ratio(indicator_box, beacon_box) > self.beacon_filter_ratio:
-                    if self.indicator_to_beacon_bbox:
-                        new_indicator = copy.deepcopy(beacon_box)
-                        new_indicator.label = indicator_box.label
-                        # beacon_box.label = indicator_box.label
-                        labeled_bounding_box_msgs.boxes.append(new_indicator)
-                    else:
-                        labeled_bounding_box_msgs.boxes.append(indicator_box)
-                    # self.get_logger().info(f"FOUND INDICATOR {indicator_box.label}")
-                    added = True
-                    break
-            if not self.filter_beacon_indicators and not added:
-                labeled_bounding_box_msgs.boxes.append(indicator_box)
+        if not self.ignore_indicator_filters:
+            for indicator_box in indicator_bboxes:
+                added = False
+                for beacon_box in beacon_bboxes:
+                    if self.overlap_ratio(indicator_box, beacon_box) > self.beacon_filter_ratio:
+                        if self.indicator_to_beacon_bbox:
+                            new_indicator = copy.deepcopy(beacon_box)
+                            new_indicator.label = indicator_box.label
+                            # beacon_box.label = indicator_box.label
+                            labeled_bounding_box_msgs.boxes.append(new_indicator)
+                        else:
+                            labeled_bounding_box_msgs.boxes.append(indicator_box)
+                        # self.get_logger().info(f"FOUND INDICATOR {indicator_box.label}")
+                        added = True
+                        break
+                if not self.filter_beacon_indicators and not added:
+                    labeled_bounding_box_msgs.boxes.append(indicator_box)
 
-        for number_box in number_bboxes:
-            new_number = copy.deepcopy(number_box)
-            if self.match_indicators_banners:
-                min_dist = 10000000000
-                max_ratio = 0.0
-                for indicator_box in indicator_bboxes:
-                    dist = self.manhattan_distance(number_box, indicator_box)
-                    matched = False
-                    if dist < min_dist:
-                        min_dist = dist
-                        if dist <= self.indicator_banner_px_dist:
-                            new_number.label = self.label_dict[self.inv_label_dict[number_box.label]+("_green" if (indicator_box.label in self.green_indicator_labels) else "_red")]
-                            # self.get_logger().info(f'MATCHED W/ DIST: {dist}')
-                            matched = True
-                    if dist == 0:
-                        ratio = self.overlap_ratio(number_box, indicator_box)
-                        if ratio > max_ratio:
-                            max_ratio = ratio
-                            if not matched:
+            for number_box in number_bboxes:
+                new_number = copy.deepcopy(number_box)
+                if self.match_indicators_banners:
+                    min_dist = 10000000000
+                    max_ratio = 0.0
+                    for indicator_box in indicator_bboxes:
+                        dist = self.manhattan_distance(number_box, indicator_box)
+                        matched = False
+                        if dist < min_dist:
+                            min_dist = dist
+                            if dist <= self.indicator_banner_px_dist:
                                 new_number.label = self.label_dict[self.inv_label_dict[number_box.label]+("_green" if (indicator_box.label in self.green_indicator_labels) else "_red")]
-                            # self.get_logger().info(f'MATCHED W/ RATIO: {ratio}')
-            labeled_bounding_box_msgs.boxes.append(new_number)
+                                # self.get_logger().info(f'MATCHED W/ DIST: {dist}')
+                                matched = True
+                        if dist == 0:
+                            ratio = self.overlap_ratio(number_box, indicator_box)
+                            if ratio > max_ratio:
+                                max_ratio = ratio
+                                if not matched:
+                                    new_number.label = self.label_dict[self.inv_label_dict[number_box.label]+("_green" if (indicator_box.label in self.green_indicator_labels) else "_red")]
+                                # self.get_logger().info(f'MATCHED W/ RATIO: {ratio}')
+                labeled_bounding_box_msgs.boxes.append(new_number)
 
         # Publish detections
         self._pub.publish(labeled_bounding_box_msgs)
