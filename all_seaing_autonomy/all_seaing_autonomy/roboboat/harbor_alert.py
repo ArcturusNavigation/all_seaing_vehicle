@@ -156,7 +156,7 @@ class HarborAlert(TaskServerBase):
         Check if the blue buoy for turning is detected (returns boolean).
         Also sets the position of the blue buoy if it is found.
         '''
-        backup_buoy = None
+        # backup_buoy = None
         updated_pos = False
         robot_pos = np.array(self.robot_pos)
         robot_dir = np.array(self.robot_dir)
@@ -167,16 +167,16 @@ class HarborAlert(TaskServerBase):
                     continue
                 buoy_dir = ob_pos - robot_pos
                 dot_prod = buoy_dir @ robot_dir
-                if (backup_buoy is None) or (self.buoy_found and (np.linalg.norm(self.blue_buoy_pos - ob_pos) < np.linalg.norm(self.blue_buoy_pos - backup_buoy))):
-                    backup_buoy = ob_pos
+                # if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
+                #     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (np.linalg.norm(self.blue_buoy_pos - ob_pos) < self.duplicate_dist)):
                     self.buoy_found = True
                     updated_pos = True
                     self.blue_buoy_pos = ob_pos
                     break
-        if (not updated_pos) and (backup_buoy is not None):
-            self.get_logger().info('SWITCHING TO BACKUP BUOY')
-            self.blue_buoy_pos = backup_buoy
+        # if (not updated_pos) and (backup_buoy is not None):
+        #     self.get_logger().info('SWITCHING TO BACKUP BUOY')
+        #     self.blue_buoy_pos = backup_buoy
         return self.buoy_found
 
 

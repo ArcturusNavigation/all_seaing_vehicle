@@ -29,8 +29,17 @@ import yaml
 import os
 import numpy as np
 import random
+from dataclasses import dataclass
 from enum import Enum
 from action_msgs.msg import GoalStatus
+
+
+@dataclass
+class DockSlot:
+    label: int
+    ctr: tuple
+    normal: tuple
+    side: "DockSide"
 
 class DockingState(Enum):
     WAITING_DOCK = 1
@@ -238,12 +247,13 @@ class Docking(TaskServerBase):
                 self.indicator_priority[label] = 0
                 self.number_priority[label] = 0
         else:
-            self.dock_labels = [self.label_mappings[name] for name in ["number_1", "number_2", "number_3", "number_1_green", "number_2_green", "number_3_green", "number_1_red", "number_2_red", "number_3_red"]]
+            self.dock_labels = [self.label_mappings[name] for name in ["number_3", "number_3_green", "number_3_red"]]
             self.boat_labels = [self.label_mappings[name] for name in ["black_cross", "black_triangle"]]
 
             # indicators
-            self.dock_green_labels = [self.label_mappings[name] for name in ["number_1_green", "number_2_green", "number_3_green"]]
-            self.dock_red_labels = [self.label_mappings[name] for name in ["number_1_red", "number_2_red", "number_3_red"]]
+            self.dock_green_labels = [self.label_mappings[name] for name in ["number_3_green", "number_3_red"]]
+            # self.dock_red_labels = [self.label_mappings[name] for name in ["number_3_red"]]
+            self.dock_red_labels = []
             
             # indicator priority
             for label in self.dock_labels:
@@ -292,14 +302,13 @@ class Docking(TaskServerBase):
     def no_indicator(self, dock_label):
         return not self.has_indicator(dock_label)
 
-    def better_slot(self, slot, ref_slot):
-        # (dock_label, (dock_ctr, dock_normal))
-        dock_label = slot[0]
-        dock_ctr = slot[1][0]
-        dock_normal = slot[1][1]
-        ref_dock_label = ref_slot[0]
-        ref_dock_ctr = ref_slot[1][0]
-        ref_dock_normal = ref_slot[1][1]
+    def better_slot(self, slot: DockSlot, ref_slot: DockSlot):
+        dock_label = slot.label
+        dock_ctr = slot.ctr
+        dock_normal = slot.normal
+        ref_dock_label = ref_slot.label
+        ref_dock_ctr = ref_slot.ctr
+        ref_dock_normal = ref_slot.normal
 
         if ref_dock_label in self.indicator_priority and dock_label in self.indicator_priority:
             # check indicators
@@ -405,7 +414,7 @@ class Docking(TaskServerBase):
                         taken = True
                 if taken:
                     self.taken.append((self.noindicator_label[dock_label], dock_side))
-                    if self.picked_slot and self.selected_slot[0] == self.noindicator_label[dock_label] and self.selected_slot[2] == dock_side:
+                    if self.picked_slot and self.noindicator_label[self.selected_slot.label] == self.noindicator_label[dock_label] and self.selected_slot.side == dock_side:
                         # we're cooked
                         self.selected_slot = None
                         self.picked_slot = False
@@ -425,14 +434,14 @@ class Docking(TaskServerBase):
                 self.picked_slot = True
                 if self.selected_slot is None:
                     self.updated_slot_pos = True
-                if (self.selected_slot is not None) and (self.selected_slot[0] == self.noindicator_label[dock_label]) and (self.selected_slot[2] == dock_side) and (np.linalg.norm(self.selected_slot[1][0] - dock_ctr) < self.duplicate_dist):
+                if (self.selected_slot is not None) and (self.noindicator_label[self.selected_slot.label] == self.noindicator_label[dock_label]) and (self.selected_slot.side == dock_side) and (self.norm(self.selected_slot.ctr, dock_ctr) < self.duplicate_dist):
                     # same slot, update position & normal
-                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side)
+                    self.selected_slot = DockSlot(dock_label, dock_ctr, dock_normal, dock_side)
                     self.updated_slot_pos = True
-                if (self.selected_slot is None) or self.better_slot((self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side), self.selected_slot):
+                if (self.selected_slot is None) or self.better_slot(DockSlot(dock_label, dock_ctr, dock_normal, dock_side), self.selected_slot):
                     self.state = DockingState.NEW_NAVIGATION
                     # found an empty one closer
-                    self.selected_slot = (self.noindicator_label[dock_label], (dock_ctr, dock_normal), dock_side)
+                    self.selected_slot = DockSlot(dock_label, dock_ctr, dock_normal, dock_side)
                     self.updated_slot_pos = True
                     # self.pid.reset()
                     self.x_pid.reset()
@@ -440,7 +449,7 @@ class Docking(TaskServerBase):
                     self.theta_pid.reset()
                     self.while_docking_state = WhileDockingState.NONE
                     self.reported_docking = False
-                    self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]], dock_side}')
+                    self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot.label], dock_side}')
 
         if (not self.picked_slot):
         # if (not self.updated_slot_pos):
@@ -522,10 +531,10 @@ class Docking(TaskServerBase):
         mark_id = 1
         # self.get_logger().info(f'CONTROL LOOP')
         # PID to go to the detected slot (consider its middle and the angle of the whole dock line)
-        slot_back_mid = self.selected_slot[1][0]
-        slot_dir = self.selected_slot[1][1]
-        slot_label = self.selected_slot[0]
-        slot_side = self.selected_slot[2]
+        slot_back_mid = self.selected_slot.ctr
+        slot_dir = self.selected_slot.normal
+        slot_label = self.selected_slot.label
+        slot_side = self.selected_slot.side
         
         perp = np.array([-slot_dir[1], slot_dir[0]])
         robot_pos = np.array(self.robot_pos)
@@ -575,20 +584,21 @@ class Docking(TaskServerBase):
             # self.get_logger().info(f'side offset: {offset}')
             # self.get_logger().info(f'forward distance: {dist_diff}')
             self.update_pid(-dist_diff, offset, approach_angle) # could also use PID for the x coordinate, instead of the exponential thing we did above
-            if abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
-                if self.while_docking_state == WhileDockingState.NONE:
-                    self.get_logger().info(f'DOCKED, WILL GO FORWARDS')
-                    self.time_docked = time.time()
-                    self.while_docking_state = WhileDockingState.FORWARD
-                elif self.while_docking_state == WhileDockingState.FORWARD and time.time() - self.time_docked > self.forward_docking_time:
-                    self.get_logger().info(f'UNDOCKING')
-                    self.while_docking_state = WhileDockingState.BACKWARD
-                elif self.while_docking_state == WhileDockingState.BACKWARD and time.time() - self.time_docked > self.forward_docking_time + self.backward_undocking_time:
-                    self.get_logger().info(f'FINISHED UNDOCKING')
-                    self.while_docking_state = WhileDockingState.NONE
-                    self.send_vel_cmd(0.0,0.0,0.0)
-                    self.mark_successful()
-                    return
+            if self.while_docking_state == WhileDockingState.NONE and abs(offset) < self.docked_xy_thres and abs(dist_diff) < self.docked_xy_thres:
+                # if self.while_docking_state == WhileDockingState.NONE:
+                self.get_logger().info(f'DOCKED, WILL GO FORWARDS')
+                self.time_docked = time.time()
+                self.while_docking_state = WhileDockingState.FORWARD
+            elif self.while_docking_state == WhileDockingState.FORWARD and time.time() - self.time_docked > self.forward_docking_time:
+                self.get_logger().info(f'UNDOCKING')
+                self.while_docking_state = WhileDockingState.BACKWARD
+            elif self.while_docking_state == WhileDockingState.BACKWARD and time.time() - self.time_docked > self.forward_docking_time + self.backward_undocking_time:
+                self.get_logger().info(f'FINISHED UNDOCKING')
+                self.while_docking_state = WhileDockingState.NONE
+                self.send_vel_cmd(0.0,0.0,0.0)
+                self.mark_successful()
+                return
+            
             if self.while_docking_state == WhileDockingState.NONE:
                 x_output = self.x_pid.get_effort()
                 y_output = self.y_pid.get_effort()

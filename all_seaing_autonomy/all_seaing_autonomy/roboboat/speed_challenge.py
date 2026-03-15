@@ -311,7 +311,7 @@ class SpeedChallenge(TaskServerBase):
         self.obstacles = msg.obstacles
         if self.paused:
             return
-        self.identify_beacon()
+        # self.identify_beacon()
 
     def probe_blue_buoy(self):
         '''
@@ -482,7 +482,7 @@ class SpeedChallenge(TaskServerBase):
         Check if the blue buoy for turning is detected (returns boolean).
         Also sets the position of the blue buoy if it is found.
         '''
-        backup_buoy = None
+        # backup_buoy = None
         updated_pos = False
         robot_pos = np.array(self.robot_pos)
         robot_dir = np.array(self.robot_dir)
@@ -493,16 +493,16 @@ class SpeedChallenge(TaskServerBase):
                 buoy_pos = ob_coords(obstacle)
                 buoy_dir = buoy_pos - robot_pos
                 dot_prod = buoy_dir @ robot_dir
-                if (backup_buoy is None) or (self.buoy_found and (np.linalg.norm(self.blue_buoy_pos - buoy_pos) < np.linalg.norm(self.blue_buoy_pos - backup_buoy))):
-                    backup_buoy = buoy_pos
+                # if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
+                #     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (np.linalg.norm(self.blue_buoy_pos - buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
                     self.buoy_found = True
                     updated_pos = True
                     self.blue_buoy_pos = buoy_pos
                     break
-        if (not updated_pos) and (backup_buoy is not None):
-            self.get_logger().info('SWITCHING TO BACKUP BUOY')
-            self.blue_buoy_pos = backup_buoy
+        # if (not updated_pos) and (backup_buoy is not None):
+        #     self.get_logger().info('SWITCHING TO BACKUP BUOY')
+        #     self.blue_buoy_pos = backup_buoy
         return self.buoy_found
 
     def buoy_pairs_to_markers(self, buoy_pairs):

@@ -154,7 +154,9 @@ class MechanismNavigation(TaskServerBase):
             self.ball_labels = [self.label_mappings[name] for name in ["red_circle", "red_cross", "red_triangle", "red_square"]]
         else:
             self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
-            self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+            # self.water_labels = []
+            # self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+            self.ball_labels = []
         
         self.declare_parameter(
             "latlng_locations_file",
@@ -452,7 +454,7 @@ class MechanismNavigation(TaskServerBase):
                     return
                 # elif (time.time() - self.time_started_shooting > 5):
                 # elif self.finished_shooting:
-                elif self.finished_shooting or (time.time() - self.time_started_shooting > 10):
+                elif self.finished_shooting:
                     self.get_logger().info(f'SHOT {self.selected_target[0]}, TIME: {time.time()}')
                     # move on
                     self.shot_targets.append(self.selected_target)

@@ -11,7 +11,7 @@ from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 from all_seaing_common.task_server_base import TaskServerBase
 from all_seaing_controller.pid_controller import PIDController
-
+from tf_transformations import quaternion_from_euler
 from all_seaing_common.report_pb2 import ObjectDetected, ObjectType, Color, TaskType
 from all_seaing_autonomy.geometry_utils import ccw, quaternion_from_euler
 from all_seaing_autonomy.buoy_utils import (InternalBuoyPair, ob_coords, get_closest_to, midpoint_pair_dir, split_buoys, obs_to_pos, obs_to_pos_label, filter_front_buoys, pick_buoy, replace_closest, buoy_pairs_distance, buoy_pairs_angle, get_acute_angle, get_triangle_angle, check_better_pair_angles, better_buoy_pair_transition, check_better_one_side)
@@ -127,6 +127,7 @@ class FollowBuoyPath(TaskServerBase):
         ).value
         with open(color_label_mappings_file, "r") as f:
             label_mappings = yaml.safe_load(f)
+        self.label_mappings = label_mappings
         # hardcoded from reading YAML
         if self.is_sim:
             self.green_labels.add(label_mappings["green"])
@@ -442,7 +443,7 @@ class FollowBuoyPath(TaskServerBase):
         quat = quaternion_from_euler(0, 0, angle)
         return Pose(
             position=Point(x=pair[0], y=pair[1]),
-            orientation=Quaternion(x=quat[0], y=quat[2], z=quat[2], w=quat[3]),
+            orientation=Quaternion(x=quat[0], y=quat[1], z=quat[2], w=quat[3]),
         )
 
     def find_better_pair_to(self, curr_pair, left_buoys, right_buoys):
@@ -739,8 +740,8 @@ class FollowBuoyPath(TaskServerBase):
         '''
         Check if the green beacon for turning is detected (returns boolean).
         Also sets the position of the green beacon if it is found.
-        '''
-        backup_buoy = None
+        '''    
+        # backup_buoy = None
         updated_pos = False
         robot_pos = np.array(self.robot_pos)
         robot_dir = np.array(self.robot_dir)
@@ -751,8 +752,8 @@ class FollowBuoyPath(TaskServerBase):
                 buoy_pos = ob_coords(obstacle)
                 buoy_dir = buoy_pos - robot_pos
                 dot_prod = buoy_dir @ robot_dir
-                if (backup_buoy is None) or (self.green_beacon_found and (np.linalg.norm(self.green_beacon_pos - buoy_pos) < np.linalg.norm(self.green_beacon_pos - backup_buoy))):
-                    backup_buoy = buoy_pos
+                # if (backup_buoy is None) or (self.green_beacon_found and (self.norm(self.green_beacon_pos, buoy_pos) < self.norm(self.green_beacon_pos, backup_buoy))):
+                #     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.green_beacon_found) or (np.linalg.norm(self.green_beacon_pos - buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
                     if not self.green_beacon_found:
                         self.get_logger().info(f"Found green beacon at {obstacle.global_point.point}")
@@ -762,9 +763,9 @@ class FollowBuoyPath(TaskServerBase):
                     robot_buoy_dist = np.linalg.norm(buoy_dir)
                     self.buoy_direction = buoy_dir / robot_buoy_dist
                     break
-        if (not updated_pos) and (backup_buoy is not None):
-            self.get_logger().info('SWITCHING TO BACKUP GREEN BEACON BUOY')
-            self.green_beacon_pos = backup_buoy
+        # if (not updated_pos) and (backup_buoy is not None):
+        #     self.get_logger().info('SWITCHING TO BACKUP GREEN BEACON BUOY')
+        #     self.green_beacon_pos = backup_buoy
         return self.green_beacon_found
 
     def circle_green_beacon(self):
@@ -986,9 +987,9 @@ class FollowBuoyPath(TaskServerBase):
         if self.state in [FollowPathState.FOLLOWING_FIRST_PASS, FollowPathState.FOLLOWING_BACK]:
             if self.state == FollowPathState.FOLLOWING_BACK and self.first_back:
                 if "green_pole_buoy" in self.green_labels:
-                    self.green_labels.remove("green_pole_buoy")
+                    self.green_labels.remove(self.label_mappings["green_pole_buoy"])
                 if "red_pole_buoy" in self.red_labels:
-                    self.red_labels.remove("red_pole_buoy")
+                    self.red_labels.remove(self.label_mappings["red_pole_buoy"])
                 # make the robot face the previous gate
                 # self.get_logger().info('facing gate')
                 # _, intended_dir = midpoint_pair_dir(self.pair_to, 0.0)
