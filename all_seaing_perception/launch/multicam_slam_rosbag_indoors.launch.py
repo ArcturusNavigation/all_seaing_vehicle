@@ -36,9 +36,6 @@ def launch_setup(context, *args, **kwargs):
     inc_color_buoy_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
     )
-    inc_color_beacon_label_mappings = os.path.join(
-        bringup_prefix, "config", "perception", "inc_color_beacon_label_mappings.yaml"
-    )
     inc_color_all_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "inc_color_all_label_mappings.yaml"
     )
@@ -188,7 +185,6 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 0.0},
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
-            # {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
