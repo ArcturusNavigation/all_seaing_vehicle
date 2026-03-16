@@ -91,8 +91,8 @@ class HarborAlert(TaskServerBase):
         return GoalResponse.ACCEPT
     
     def search_goal_callback(self, goal_request):
-        self.return_pos = np.array(self.robot_pos)
-        self.return_dir = np.array(self.robot_dir)
+        self.return_pos = self.robot_pos
+        self.return_dir = self.robot_dir
         self.get_logger().info(f'Searching Server for [{self.server_name}] called')
         return GoalResponse.ACCEPT
 
@@ -121,8 +121,7 @@ class HarborAlert(TaskServerBase):
     def station_keep_blue_buoy(self):
         self.get_logger().info("Going closer to the buoy")
 
-        robot_pos = np.array(self.robot_pos)
-        robot_buoy_vector = self.blue_buoy_pos - robot_pos
+        robot_buoy_vector = self.blue_buoy_pos - self.robot_pos
         robot_buoy_dist = np.linalg.norm(robot_buoy_vector)
         buoy_direction = robot_buoy_vector / robot_buoy_dist
 
@@ -158,15 +157,13 @@ class HarborAlert(TaskServerBase):
         '''
         # backup_buoy = None
         updated_pos = False
-        robot_pos = np.array(self.robot_pos)
-        robot_dir = np.array(self.robot_dir)
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
                 ob_pos = ob_coords(obstacle)
-                if np.linalg.norm(robot_pos - ob_pos) > self.buoy_dist_thres:
+                if np.linalg.norm(self.robot_pos - ob_pos) > self.buoy_dist_thres:
                     continue
-                buoy_dir = ob_pos - robot_pos
-                dot_prod = buoy_dir @ robot_dir
+                buoy_dir = ob_pos - self.robot_pos
+                dot_prod = buoy_dir @ self.robot_dir
                 # if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
                 #     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (np.linalg.norm(self.blue_buoy_pos - ob_pos) < self.duplicate_dist)):

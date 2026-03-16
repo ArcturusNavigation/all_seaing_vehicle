@@ -27,7 +27,7 @@ def ob_coords(buoy, local=False):
 def get_closest_to(source, buoys, local=False):
     return min(
         buoys,
-        key=lambda buoy: np.linalg.norm(np.array(source) - ob_coords(buoy, local)),
+        key=lambda buoy: np.linalg.norm(source - ob_coords(buoy, local)),
     )
 
 

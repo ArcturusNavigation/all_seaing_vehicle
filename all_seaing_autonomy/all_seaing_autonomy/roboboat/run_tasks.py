@@ -60,8 +60,8 @@ class RunTasks(ActionServerBase):
         self.task_list = [
             # HARBOR ALERT MANUAL WAYPOINT
             # FIRST SPEED WAYPOINT THEN DOCKING WAYPOINT
-            [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
-            [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
+            # [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
+            # [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
 
             # ENTRY GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
@@ -74,14 +74,13 @@ class RunTasks(ActionServerBase):
             # SPEED CHALLENGE
             # [ActionType.SEARCH, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
             # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
-            # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
-
+            
             # DOCKING
             # [ActionType.SEARCH, TaskType.TASK_DOCKING, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
+            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # DELIVERY
             # [ActionType.SEARCH, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Search, "search_delivery"), ReferenceInt(0), ReferenceInt(0), "delivery"],
-            # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
             # [ActionType.TASK, TaskType.TASK_OBJECT_DELIVERY, ActionClient(self, Task, "mechanism_navigation"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # EXIT GATES
@@ -104,7 +103,7 @@ class RunTasks(ActionServerBase):
         self.harbor_alert_tasks = [
             # HARBOR ALERT
             # [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
-            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(False, False, False)],
+            # [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(False, False, False)],
         ]
 
         self.current_task = None
@@ -336,10 +335,9 @@ class RunTasks(ActionServerBase):
         green_init, red_init = split_buoys(self.obstacles, self.green_labels, self.red_labels)
 
         # lambda function that filters the buoys that are in front of the robot
-        robot_pos = np.array(self.robot_pos)
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if ob.local_point.point.x > 0 and np.linalg.norm(robot_pos - ob_coords(ob)) < self.gate_dist_thres
+            if ob.local_point.point.x > 0 and np.linalg.norm(self.robot_pos - ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)

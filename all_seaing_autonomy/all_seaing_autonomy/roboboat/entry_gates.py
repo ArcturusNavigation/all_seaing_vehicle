@@ -258,10 +258,9 @@ class EntryGates(TaskServerBase):
 
         green_init, red_init = split_buoys(self.obstacles, self.green_labels, self.red_labels)
 
-        robot_pos = np.array(self.robot_pos)
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if ob.local_point.point.x > 0 and np.linalg.norm(robot_pos - ob_coords(ob)) < self.gate_dist_thres
+            if ob.local_point.point.x > 0 and np.linalg.norm(self.robot_pos - ob_coords(ob)) < self.gate_dist_thres
         ]
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
         self.get_logger().debug(

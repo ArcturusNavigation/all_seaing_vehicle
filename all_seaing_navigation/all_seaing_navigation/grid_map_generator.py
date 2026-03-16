@@ -2,11 +2,13 @@
 import rclpy
 from rclpy.node import Node
 import math
+import numpy as np
 
 from nav_msgs.msg import MapMetaData, OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 from all_seaing_interfaces.msg import ObstacleMap
 from geometry_msgs.msg import Polygon, Point32
+from all_seaing_autonomy.geometry_utils import ccw
 
 
 class GridMapGenerator(Node):
@@ -149,82 +151,39 @@ class GridMapGenerator(Node):
         x = gx * resolution + origin.x
         y = gy * resolution + origin.y
         return x, y
-    
-    def ccw(self, a, b, c):
-        """Return True if the points a, b, c are counterclockwise, respectively"""
-        area = (
-            a[0] * b[1]
-            + b[0] * c[1]
-            + c[0] * a[1]
-            - a[1] * b[0]
-            - b[1] * c[0]
-            - c[1] * a[0]
-        )
-        return area > 0
 
-    def point_diff(self, pt1: Point32, pt2: Point32) -> tuple[float, float]:
-        return (pt2.x-pt1.x, pt2.y-pt1.y)
-    
-    def norm(self, vec:tuple[float, float]) -> float:
-        return math.sqrt(vec[0]**2+vec[1]**2)
-    
-    def vec_normal(self, vec:tuple[float, float]) -> tuple[float, float]:
-        mag = self.norm(vec)
-        if mag == 0:
-            return (0.0,0.0)
-        return (vec[0]/mag, vec[1]/mag)
-    
-    def vec_perp_right(self, vec:tuple[float, float]) -> tuple[float, float]:
-        return (vec[1], -vec[0])
-    
-    def vec_perp_left(self, vec:tuple[float, float]) -> tuple[float, float]:
-        return (-vec[1], vec[0])
-    
-    def sum(self, vec1, vec2):
-        return (vec1[0]+vec2[0], vec1[1]+vec2[1])
-    
-    def scalar_prod(self, vec, scalar):
-        return (scalar*vec[0], scalar*vec[1])
-    
-    def cross(self, vec1, vec2):
-        return vec1[0]*vec2[1]-vec1[1]*vec2[0]
-    
-    def dot(self, vec1, vec2):
-        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
-    
-    def angle_vec(self, vec1, vec2):
-        return math.atan2(self.cross(vec1, vec2)/(self.norm(vec1)*self.norm(vec2)), self.dot(vec1, vec2)/(self.norm(vec1)*self.norm(vec2))) 
-    
+    def vec_perp_right(self, vec):
+        """Return the perpendicular vector to the right (clockwise rotation)."""
+        return np.array([vec[1], -vec[0]])
+
     def inflate_polygon(self, polygon: Polygon, dist: float = 0.0) -> Polygon:
         """
         Inflates the given polygon by a set distance, assuming the points are ordered CW
         """
-        new_poly = Polygon()
-        for i in range(len(polygon.points)):
-            pt_pre = polygon.points[-1-i]
-            pt_cur = polygon.points[-1-(i+1)%len(polygon.points)]
-            pt_post = polygon.points[-1-(i+2)%len(polygon.points)]
-            # assert self.ccw((pt_pre.x, pt_pre.y), (pt_cur.x, pt_cur.y), (pt_post.x, pt_post.y)), "polygon points are not ordered CW"
-            if not self.ccw((pt_pre.x, pt_pre.y), (pt_cur.x, pt_cur.y), (pt_post.x, pt_post.y)):
-                pt_pre, pt_cur, pt_post = pt_post, pt_cur, pt_pre
-            vec_pre_normal = self.vec_normal(self.point_diff(pt_pre, pt_cur))
+        points = np.array([[pt.x, pt.y] for pt in polygon.points])
+        n = len(points)
+        new_points = []
+        for i in range(n-1, -1, -1):
+            pt_cur = points[i]
+            pt_pre = points[(i-1) % n]
+            pt_post = points[(i+1) % n]
+            if not ccw(pt_pre, pt_cur, pt_post):
+                pt_pre, pt_post = pt_post, pt_pre
+            vec_pre = pt_cur - pt_pre
+            vec_pre_normal = vec_pre / np.linalg.norm(vec_pre)
             pre_infl_vec_normal = self.vec_perp_right(vec_pre_normal)
-            vec_post_normal = self.vec_normal(self.point_diff(pt_cur, pt_post))
+            vec_post = pt_post - pt_cur
+            vec_post_normal = vec_post / np.linalg.norm(vec_post)
             post_infl_vec_normal = self.vec_perp_right(vec_post_normal)
-            
-            # scaling_factor = 1.0/math.cos(self.angle_vec(pre_infl_vec_normal, post_infl_vec_normal)/2.0)
             scaling_factor = 1.0
-            infl_vec = self.scalar_prod(self.vec_normal(self.sum(pre_infl_vec_normal, post_infl_vec_normal)), dist*scaling_factor)
-            
-            new_pt_pre = self.sum((pt_cur.x, pt_cur.y), self.scalar_prod(pre_infl_vec_normal, dist))
-            new_pt_cur = self.sum((pt_cur.x, pt_cur.y), infl_vec)
-            new_pt_post = self.sum((pt_cur.x, pt_cur.y), self.scalar_prod(post_infl_vec_normal, dist))
-
-            new_poly.points.append(Point32(x=new_pt_pre[0], y=new_pt_pre[1]))
-            new_poly.points.append(Point32(x=new_pt_cur[0], y=new_pt_cur[1]))
-            new_poly.points.append(Point32(x=new_pt_post[0], y=new_pt_post[1]))
-        
-        new_poly.points.reverse()
+            infl_vec = (pre_infl_vec_normal + post_infl_vec_normal) / np.linalg.norm(pre_infl_vec_normal + post_infl_vec_normal) * dist * scaling_factor
+            new_pt_pre = pt_cur + pre_infl_vec_normal * dist
+            new_pt_cur = pt_cur + infl_vec
+            new_pt_post = pt_cur + post_infl_vec_normal * dist
+            new_points.extend([new_pt_pre, new_pt_cur, new_pt_post])
+        new_poly = Polygon()
+        for p in new_points:
+            new_poly.points.append(Point32(x=p[0], y=p[1]))
         return new_poly
 
     def set_active(self, make_active):

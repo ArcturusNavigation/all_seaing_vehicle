@@ -205,11 +205,6 @@ class DockingFallback(TaskServerBase):
 
         if(self.picked_slot):
             self.get_logger().info(f'WILL DOCK INTO {self.inv_label_mappings[self.selected_slot[0]]}')
-    
-    def distance(self, point, wall_params):
-        x, y = point
-        (a, b, c), _ = wall_params
-        return (a*x+b+y)/math.sqrt(a**2+b**2)
 
     def set_pid_setpoints(self, x, y, theta):
         self.x_pid.set_setpoint(x)

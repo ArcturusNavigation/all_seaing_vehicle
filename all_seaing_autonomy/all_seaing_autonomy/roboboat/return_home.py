@@ -273,7 +273,7 @@ class ReturnHome(TaskServerBase):
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if np.linalg.norm(np.array(self.robot_pos) - ob_coords(ob)) < self.gate_dist_thres
+            if np.linalg.norm(self.robot_pos - ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)

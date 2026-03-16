@@ -289,7 +289,7 @@ class MechanismNavigation(TaskServerBase):
                     # same target, update position & normal
                     self.selected_target = (target_type, (target_ctr, target_normal))
                     self.updated_target_pos = True
-                if (self.selected_target is None) or (np.linalg.norm(self.selected_target[1][0] - np.array(self.robot_pos)) > np.linalg.norm(target_ctr - np.array(self.robot_pos)) + self.update_target_dist_thres):
+                if (self.selected_target is None) or (np.linalg.norm(self.selected_target[1][0] - self.robot_pos) > np.linalg.norm(target_ctr - self.robot_pos) + self.update_target_dist_thres):
                     self.state = DeliveryState.NEW_NAVIGATION
                     # found a new one closer
                     self.selected_target = (target_type, (target_ctr, target_normal))
@@ -398,12 +398,10 @@ class MechanismNavigation(TaskServerBase):
         target_dir = self.selected_target[1][1]
         
         perp = np.array([-target_dir[1], target_dir[0]])
-        robot_pos = np.array(self.robot_pos)
-        robot_dir = np.array(self.robot_dir)
         marker_arr.markers.append(VisualizationTools.visualize_line(target_back_mid, perp, mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
 
-        if self.state == DeliveryState.STATIONKEEPING or np.linalg.norm(target_back_mid - robot_pos) < self.navigation_dist_thres or self.time_started_shooting != -1 or self.finished_shooting:
+        if self.state == DeliveryState.STATIONKEEPING or np.linalg.norm(target_back_mid - self.robot_pos) < self.navigation_dist_thres or self.time_started_shooting != -1 or self.finished_shooting:
             if self.state == DeliveryState.NAVIGATING_TARGET:
                 self.get_logger().info('CANCELLING NAVIGATION')
                 self.cancel_navigation()
@@ -498,7 +496,7 @@ class MechanismNavigation(TaskServerBase):
                 # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
                 self.send_waypoint_to_server(waypoint)
                 self.state = DeliveryState.NAVIGATING_TARGET
-            elif self.send_goal_future != None and self.sent_waypoint != None:
+            elif self.send_goal_future is not None and self.sent_waypoint is not None:
                 goal_result = self.send_goal_future.result()
                 if self.waypoint_rejected or self.waypoint_aborted:
                     # follow path failed, retry sending

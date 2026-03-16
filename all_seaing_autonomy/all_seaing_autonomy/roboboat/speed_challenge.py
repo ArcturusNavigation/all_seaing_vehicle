@@ -282,9 +282,8 @@ class SpeedChallenge(TaskServerBase):
             self.mark_unsuccessful()
 
     def identify_beacon(self):
-        robot_pos = np.array(self.robot_pos)
         for obstacle in self.obstacles:
-            if np.linalg.norm(robot_pos - ob_coords(obstacle)) > self.beacon_dist_thres:
+            if np.linalg.norm(self.robot_pos - ob_coords(obstacle)) > self.beacon_dist_thres:
                 continue
             # below might toggle some times but will hopefully settle before we start circling, it's fixed once we start circling
             if obstacle.label in self.red_beacon_labels:
@@ -320,7 +319,7 @@ class SpeedChallenge(TaskServerBase):
         '''
         self.get_logger().info("Probing for blue buoy")
         max_guide_d = self.get_parameter("probe_distance").value
-        current_guide_point = lambda: max_guide_d * self.buoy_direction + np.array(self.robot_pos)
+        current_guide_point = lambda: max_guide_d * self.buoy_direction + self.robot_pos
         self.guide_point = current_guide_point()
         self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {self.guide_point}.")
 
@@ -349,8 +348,7 @@ class SpeedChallenge(TaskServerBase):
         # but require the path to go around buoy
 
         t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
-        robot_pos = np.array(self.robot_pos)
-        robot_buoy_vector = self.blue_buoy_pos - robot_pos
+        robot_buoy_vector = self.blue_buoy_pos - self.robot_pos
         robot_buoy_dist = np.linalg.norm(robot_buoy_vector)
         self.buoy_direction = robot_buoy_vector / robot_buoy_dist
         first_dir = np.array([self.buoy_direction[1], -self.buoy_direction[0]]) * t_o
@@ -392,8 +390,7 @@ class SpeedChallenge(TaskServerBase):
         self.get_logger().info('LEFT FIRST' if self.left_first else 'RIGHT FIRST')
 
         t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
-        robot_pos = np.array(self.robot_pos)
-        robot_buoy_vector = self.blue_buoy_pos - robot_pos
+        robot_buoy_vector = self.blue_buoy_pos - self.robot_pos
         robot_buoy_dist = np.linalg.norm(robot_buoy_vector)
         self.buoy_direction = robot_buoy_vector / robot_buoy_dist
         first_dir = np.array([self.buoy_direction[1], -self.buoy_direction[0]]) * (t_o + self.t_o_eps)
@@ -415,10 +412,9 @@ class SpeedChallenge(TaskServerBase):
 
         in_circling = False # boolean flag for whether boat is circling, set to True when boat has turned at least 90 degrees
         def exit_angle_met():
-            cur_robot_dir = np.array(self.robot_dir)
             buoy_gate_vector = self.gate_wpt - self.blue_buoy_pos
             buoy_gate_dir = buoy_gate_vector / np.linalg.norm(buoy_gate_vector)
-            angle = math.atan2(cur_robot_dir[1], cur_robot_dir[0]) - math.atan2(buoy_gate_dir[1], buoy_gate_dir[0])
+            angle = math.atan2(self.robot_dir[1], self.robot_dir[0]) - math.atan2(buoy_gate_dir[1], buoy_gate_dir[0])
             if (angle < 0):
                 angle += 2*math.pi
             return (angle < self.exit_turn_eps) or (angle > 2*math.pi-self.exit_turn_eps)
@@ -435,7 +431,7 @@ class SpeedChallenge(TaskServerBase):
             self.send_vel_cmd(self.max_turn_vel[0], 0.0, (1.0 if self.left_first else -1.0)*pid_output)
             # get feedback
             self.blue_buoy_detected()
-            dist_to_buoy = np.linalg.norm(self.blue_buoy_pos - np.array(self.robot_pos))
+            dist_to_buoy = np.linalg.norm(self.blue_buoy_pos - self.robot_pos)
             dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
 
             # self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
@@ -484,15 +480,13 @@ class SpeedChallenge(TaskServerBase):
         '''
         # backup_buoy = None
         updated_pos = False
-        robot_pos = np.array(self.robot_pos)
-        robot_dir = np.array(self.robot_dir)
         for obstacle in self.obstacles:
             if obstacle.label in self.blue_labels:
-                if np.linalg.norm(robot_pos - ob_coords(obstacle)) > self.circling_buoy_dist_thres:
+                if np.linalg.norm(self.robot_pos - ob_coords(obstacle)) > self.circling_buoy_dist_thres:
                     continue
                 buoy_pos = ob_coords(obstacle)
-                buoy_dir = buoy_pos - robot_pos
-                dot_prod = buoy_dir @ robot_dir
+                buoy_dir = buoy_pos - self.robot_pos
+                dot_prod = buoy_dir @ self.robot_dir
                 # if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
                 #     backup_buoy = buoy_pos
                 if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (np.linalg.norm(self.blue_buoy_pos - buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
@@ -569,10 +563,9 @@ class SpeedChallenge(TaskServerBase):
         green_init, red_init = split_buoys(self.obstacles, self.green_labels, self.red_labels)
 
         # lambda function that filters the buoys that are in front of the robot
-        robot_pos = np.array(self.robot_pos)
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if (np.linalg.norm(robot_pos - ob_coords(ob)) < self.gate_dist_thres and (pointing_direction is None or (ob_coords(ob) - robot_pos) @ pointing_direction > 0))
+            if (np.linalg.norm(self.robot_pos - ob_coords(ob)) < self.gate_dist_thres and (pointing_direction is None or (ob_coords(ob) - self.robot_pos) @ pointing_direction > 0))
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)

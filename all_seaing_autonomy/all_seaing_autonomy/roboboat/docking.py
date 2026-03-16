@@ -325,8 +325,7 @@ class Docking(TaskServerBase):
                 return True
 
         # if same otherwise dock to closest
-        robot_pos = np.array(self.robot_pos)
-        if (np.linalg.norm(ref_dock_ctr - robot_pos) > np.linalg.norm(dock_ctr - robot_pos) + self.update_slot_dist_thres):
+        if (np.linalg.norm(ref_dock_ctr - self.robot_pos) > np.linalg.norm(dock_ctr - self.robot_pos) + self.update_slot_dist_thres):
             return True
         else:
             return False
@@ -434,7 +433,7 @@ class Docking(TaskServerBase):
                 self.picked_slot = True
                 if self.selected_slot is None:
                     self.updated_slot_pos = True
-                if (self.selected_slot is not None) and (self.noindicator_label[self.selected_slot.label] == self.noindicator_label[dock_label]) and (self.selected_slot.side == dock_side) and (self.norm(self.selected_slot.ctr, dock_ctr) < self.duplicate_dist):
+                if (self.selected_slot is not None) and (self.noindicator_label[self.selected_slot.label] == self.noindicator_label[dock_label]) and (self.selected_slot.side == dock_side) and (np.linalg.norm(self.selected_slot.ctr - dock_ctr) < self.duplicate_dist):
                     # same slot, update position & normal
                     self.selected_slot = DockSlot(dock_label, dock_ctr, dock_normal, dock_side)
                     self.updated_slot_pos = True
@@ -537,12 +536,10 @@ class Docking(TaskServerBase):
         slot_side = self.selected_slot.side
         
         perp = np.array([-slot_dir[1], slot_dir[0]])
-        robot_pos = np.array(self.robot_pos)
-        robot_dir = np.array(self.robot_dir)
         marker_arr.markers.append(VisualizationTools.visualize_line(slot_back_mid, perp, mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
 
-        if self.state == DockingState.DOCKING or np.linalg.norm(slot_back_mid - robot_pos) < self.navigation_dist_thres:
+        if self.state == DockingState.DOCKING or np.linalg.norm(slot_back_mid - self.robot_pos) < self.navigation_dist_thres:
             if self.state == DockingState.NAVIGATING_DOCK:
                 self.get_logger().info('CANCELLING NAVIGATION')
                 self.cancel_navigation()
@@ -557,8 +554,8 @@ class Docking(TaskServerBase):
                 self.reported_docking = True
 
             # go to that line and forward (negative error if boat left of line, positive if right)
-            offset = -(robot_pos - slot_back_mid) @ perp
-            approach_angle = angle_between(-slot_dir, robot_dir) # TODO Check sign
+            offset = -(self.robot_pos - slot_back_mid) @ perp
+            approach_angle = angle_between(-slot_dir, self.robot_dir) # TODO Check sign
 
             # dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
             # self.pid.update(offset + self.boat_angle_coeff*approach_angle, dt)            
@@ -569,7 +566,7 @@ class Docking(TaskServerBase):
             # control_msg.priority = 1
 
             # forward speed decreasing exponentially as we get closer
-            dist_diff = (robot_pos - slot_back_mid) @ slot_dir - self.dock_length/2.0 - self.docking_offset
+            dist_diff = (self.robot_pos - slot_back_mid) @ slot_dir - self.dock_length/2.0 - self.docking_offset
             # subtract half the dock length when further than the half the width sideways
             if abs(offset) > self.dock_width/2.0:
                 dist_diff -= self.dock_length/2.0
@@ -652,7 +649,7 @@ class Docking(TaskServerBase):
                 # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
                 self.send_waypoint_to_server(waypoint)
                 self.state = DockingState.NAVIGATING_DOCK
-            elif self.send_goal_future != None and self.sent_waypoint != None:
+            elif self.send_goal_future is not None and self.sent_waypoint is not None:
                 goal_result = self.send_goal_future.result()
                 if self.waypoint_rejected or self.waypoint_aborted:
                     # follow path failed, retry sending
