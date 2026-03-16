@@ -137,7 +137,6 @@ class MulticamDetectionMerge(Node):
             remove_current = False
             while end_ptr < start_ptr + len(pcls) and self.angle_diff_pcl(pcls[end_ptr % len(pcls)], pcls[start_ptr]) < self.angle_thres:
                 if self.pos_diff_pcl(pcls[end_ptr % len(pcls)], pcls[start_ptr]) < self.duplicate_thres:
-                    pcls.pop(end_ptr % len(pcls))
                     # self.get_logger().info(f'SIZES: {pcls[start_ptr].cloud.width}, {pcls[end_ptr % len(pcls)].cloud.width}')
                     if pcls[start_ptr].cloud.width > pcls[end_ptr % len(pcls)].cloud.width:
                         if end_ptr >= len(pcls):

@@ -161,7 +161,7 @@ def launch_setup(context, *args, **kwargs):
             {"max_inter_gate_dist": 30.0},
             {"turn_offset": 2.0},
             {"choose_every": 5},
-            {"probe_distance": 40},
+            {"probe_distance": 40.0},
             {"xy_threshold": 1.3},
             {"duplicate_dist": 3.0},
             {"init_gate_dist": 0.5},

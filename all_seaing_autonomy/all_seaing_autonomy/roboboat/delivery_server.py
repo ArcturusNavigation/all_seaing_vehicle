@@ -77,9 +77,6 @@ class DeliveryServer(ActionServerBase):
             .integer_value
         )
 
-        self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
-
         # --------------- PID CONTROLLERS ---------------#
 
         self.aim_pid = PIDController(*Kpid)
@@ -110,6 +107,9 @@ class DeliveryServer(ActionServerBase):
 
         self.switch_sub = self.create_subscription(Bool, "switch_status", self.switch_cb, 10)
 
+        self.declare_parameter("is_sim", False)
+        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
+        
         if not self.is_sim:
             self.command_adj_cli = self.create_client(CommandAdj, "command_adj")
             self.command_servo_cli = self.create_client(CommandServo, "command_servo")
