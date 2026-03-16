@@ -15,7 +15,6 @@ from all_seaing_interfaces.msg import Heartbeat
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header, ColorRGBA, String
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from ament_index_python.packages import get_package_share_directory
 import numpy as np
 import os
@@ -28,7 +27,7 @@ from action_msgs.msg import GoalStatus
 from dataclasses import dataclass
 import time
 
-from all_seaing_autonomy.buoy_utils import (InternalBuoyPair, ob_coords, midpoint_pair_dir, split_buoys, obs_to_pos_label)
+from all_seaing_autonomy.buoy_utils import (InternalBuoyPair, ob_coords, midpoint_pair_dir, split_buoys, obs_to_pos_label, buoy_pairs_to_markers, pair_to_pose)
 
 ###
 
@@ -265,7 +264,7 @@ class RunTasks(ActionServerBase):
         self.obstacles = msg.obstacles
 
         if self.gate_pair is None:
-            self.setup_buoys()
+            self.setup_entry_buoys()
 
     def report_shore_heartbeat(self):
         RAD_TO_DEG = 180.0 / math.pi
@@ -319,7 +318,8 @@ class RunTasks(ActionServerBase):
             self.cancel_current_task()
             self.find_task()
     
-    def setup_buoys(self):
+    # TODO add parameter in task server base version to be able to use it here
+    def setup_entry_buoys(self):
         """
         Runs when the first obstacle map is received, filters the buoys that are in front of
         the robot (x>0 in local coordinates) and finds (and stores) the closest green one and
@@ -371,64 +371,14 @@ class RunTasks(ActionServerBase):
         self.get_logger().info(f'FOUND STARTING GATE')
         self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
         self.gate_mid, self.gate_dir = midpoint_pair_dir(self.gate_pair, 0.0)
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(self.gate_mid), 0.0)]))
+        self.waypoint_marker_pub.publish(buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, pair_to_pose(self.gate_mid), 0.0)], self.red_left, self.global_frame_id))
         return True
-    
-    def pair_to_pose(self, pair):
-        return Pose(position=Point(x=pair[0], y=pair[1]))
-
-    def buoy_pairs_to_markers(self, buoy_pairs):
-        """
-        Create the markers from an array of buoy pairs to visualize them (and the respective waypoints) in RViz
-        """
-        marker_array = MarkerArray()
-        i = 0
-        for p_left, p_right, point, radius in buoy_pairs:
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.ARROW,
-                    pose=point,
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=2.0, y=0.15, z=0.15),
-                    color=ColorRGBA(a=1.0, b=1.0),
-                    id=(4 * i),
-                )
-            )
-            if self.red_left:
-                left_color = ColorRGBA(r=1.0, a=1.0)
-                right_color = ColorRGBA(g=1.0, a=1.0)
-            else:
-                left_color = ColorRGBA(g=1.0, a=1.0)
-                right_color = ColorRGBA(r=1.0, a=1.0)
-
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.SPHERE,
-                    pose=self.pair_to_pose(ob_coords(p_left)),
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=1.0, y=1.0, z=1.0),
-                    color=left_color,
-                    id=(4 * i) + 1,
-                )
-            )
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.SPHERE,
-                    pose=self.pair_to_pose(ob_coords(p_right)),
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=1.0, y=1.0, z=1.0),
-                    color=right_color,
-                    id=(4 * i) + 2,
-                )
-            )
-            i += 1
-        return marker_array
     
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
 
         if self.gate_pair is None:
-            self.setup_buoys()
+            self.setup_entry_buoys()
 
     def attempt_task(self, action_type, task_type, current_task, incr_on_success, incr_on_fail = None, location_name = None, restart_slam_options = None):
         self.current_task = current_task

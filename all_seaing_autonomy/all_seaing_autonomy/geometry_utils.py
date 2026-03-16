@@ -52,20 +52,3 @@ def fit_line(p1, p2):
     c = x1 * y2 - x2 * y1
     dist = abs(c) / math.sqrt(a**2 + b**2)
     return np.array([a, b, c]), dist
-
-
-def quaternion_from_euler(roll, pitch, yaw):
-    """Convert euler angles to quaternion [w, x, y, z]."""
-    cy = math.cos(yaw * 0.5)
-    sy = math.sin(yaw * 0.5)
-    cp = math.cos(pitch * 0.5)
-    sp = math.sin(pitch * 0.5)
-    cr = math.cos(roll * 0.5)
-    sr = math.sin(roll * 0.5)
-
-    w = cy * cp * cr + sy * sp * sr
-    x = cy * cp * sr - sy * sp * cr
-    y = sy * cp * sr + cy * sp * cr
-    z = sy * cp * cr - cy * sp * sr
-
-    return [w, x, y, z]

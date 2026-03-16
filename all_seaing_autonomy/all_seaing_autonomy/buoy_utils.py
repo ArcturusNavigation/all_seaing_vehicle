@@ -1,6 +1,10 @@
 import math
 import numpy as np
 from all_seaing_interfaces.msg import Obstacle
+from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
+from std_msgs.msg import Header, ColorRGBA
+from visualization_msgs.msg import Marker, MarkerArray
+from tf_transformations import quaternion_from_euler
 from all_seaing_autonomy.geometry_utils import ccw
 
 
@@ -37,6 +41,9 @@ def midpoint_pair_dir(pair, forward_dist):
     mid = (left_coords + right_coords) / 2
     diff = right_coords - left_coords
     n = np.linalg.norm(diff)
+    if n == 0:
+        # If buoys are at the same position, return mid with no direction
+        return mid, np.array([1.0, 0.0])  # arbitrary direction
     diff = diff / n
     perp = np.array([-diff[1], diff[0]])
     mid = mid + forward_dist * perp
@@ -168,3 +175,77 @@ def check_better_one_side(ref_buoy, old_buoy, new_buoy, better_angle_thres):
     old_angle = get_triangle_angle(ref_buoy, old_buoy, new_buoy)
     new_angle = get_triangle_angle(ref_buoy, new_buoy, old_buoy)
     return new_angle > (old_angle + better_angle_thres)
+
+def buoy_pairs_to_markers(buoy_pairs, red_left, global_frame_id="map"):
+        """
+        Create the markers from an array of buoy pairs to visualize them (and the respective waypoints) in RViz
+        """
+        marker_array = MarkerArray()
+        i = 0
+        for p_left, p_right, point, radius in buoy_pairs:
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.ARROW,
+                    pose=point,
+                    header=Header(frame_id=global_frame_id),
+                    scale=Vector3(x=2.0, y=0.15, z=0.15),
+                    color=ColorRGBA(a=1.0, b=1.0),
+                    id=(4 * i),
+                )
+            )
+            if red_left:
+                left_color = ColorRGBA(r=1.0, a=1.0)
+                right_color = ColorRGBA(g=1.0, a=1.0)
+            else:
+                left_color = ColorRGBA(g=1.0, a=1.0)
+                right_color = ColorRGBA(r=1.0, a=1.0)
+
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.SPHERE,
+                    pose=pair_to_pose(ob_coords(p_left)),
+                    header=Header(frame_id=global_frame_id),
+                    scale=Vector3(x=1.0, y=1.0, z=1.0),
+                    color=left_color,
+                    id=(4 * i) + 1,
+                )
+            )
+            marker_array.markers.append(
+                Marker(
+                    type=Marker.SPHERE,
+                    pose=pair_to_pose(ob_coords(p_right)),
+                    header=Header(frame_id=global_frame_id),
+                    scale=Vector3(x=1.0, y=1.0, z=1.0),
+                    color=right_color,
+                    id=(4 * i) + 2,
+                )
+            )
+            # marker_array.markers.append(
+            #     Marker(
+            #         type=Marker.CYLINDER,
+            #         pose=Pose(
+            #             position=Point(
+            #                 x=point.position.x,
+            #                 y=point.position.y,
+            #             )
+            #         ),
+            #         header=Header(frame_id=self.global_frame_id),
+            #         scale=Vector3(
+            #             x=radius, y=radius, z=1.0
+            #         ),
+            #         color=ColorRGBA(g=1.0, a=0.5),
+            #         id=(4 * i) + 3,
+            #     )
+            # )
+            i += 1
+        return marker_array
+
+def pair_to_pose(pair):
+    return Pose(position=Point(x=pair[0], y=pair[1]))
+
+def pair_angle_to_pose(pair, angle):
+    quat = quaternion_from_euler(0, 0, angle)
+    return Pose(
+        position=Point(x=pair[0], y=pair[1]),
+        orientation=Quaternion(x=quat[0], y=quat[1], z=quat[2], w=quat[3]),
+    )

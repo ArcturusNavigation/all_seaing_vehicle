@@ -607,7 +607,7 @@ def launch_setup(context, *args, **kwargs):
             {"color_label_mappings_file": color_label_mappings},
             {"robot_frame_id": "wamv/wamv/base_link"},
             {"search_task_radius": 50.0},
-            {"probe_distance": 30},
+            {"probe_distance": 30.0},
             # {"init_gate_dist": 5.0},
             # {"gate_dist_back": 5.0},
             {"gate_dist_thres": 50.0},

@@ -12,7 +12,8 @@ from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from all_seaing_common.task_server_base import TaskServerBase
 
 from all_seaing_common.report_pb2 import ObjectDetected, ObjectType, Color, TaskType, GatePass, GateType
-from all_seaing_autonomy.geometry_utils import ccw, quaternion_from_euler
+from tf_transformations import quaternion_from_euler
+from all_seaing_autonomy.geometry_utils import ccw
 from all_seaing_autonomy.buoy_utils import (InternalBuoyPair, ob_coords, get_closest_to, midpoint_pair_dir, split_buoys, obs_to_pos, obs_to_pos_label, filter_front_buoys, pick_buoy, replace_closest, buoy_pairs_distance, buoy_pairs_angle, get_acute_angle, get_triangle_angle, check_better_pair_angles, better_buoy_pair_transition, check_better_one_side)
 
 import os
@@ -41,34 +42,17 @@ class SpeedChallenge(TaskServerBase):
             ObstacleMap, "obstacle_map/global", self.map_cb, 10
         )
 
-        self.waypoint_marker_pub = self.create_publisher(
-            MarkerArray, "waypoint_markers", 10
-        )
-
-        self.declare_parameter("red_left", True)
-        self.red_left = self.get_parameter("red_left").get_parameter_value().bool_value
-
-        self.declare_parameter("gate_dist_thres", 40.0)
-        self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
-
         self.declare_parameter("beacon_dist_thres", 15.0)
         self.beacon_dist_thres = self.get_parameter("beacon_dist_thres").get_parameter_value().double_value
 
-        self.declare_parameter("circling_buoy_dist_thres", 40.0)
-        self.circling_buoy_dist_thres = self.get_parameter("circling_buoy_dist_thres").get_parameter_value().double_value
+        self.declare_parameter("probe_distance", 10.0)
+        self.probe_distance = self.get_parameter("probe_distance").get_parameter_value().double_value
 
-        self.declare_parameter("max_inter_gate_dist", 25.0)
-        self.max_inter_gate_dist = self.get_parameter("max_inter_gate_dist").get_parameter_value().double_value
-
-        self.declare_parameter("probe_distance", 10)
         self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
 
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
-
-        self.declare_parameter("inter_buoy_pair_dist", 1.0)
-        self.inter_buoy_pair_dist = self.get_parameter("inter_buoy_pair_dist").get_parameter_value().double_value
 
         self.declare_parameter("init_gate_dist", 1.0)
         self.init_gate_dist = self.get_parameter("init_gate_dist").get_parameter_value().double_value
@@ -76,31 +60,7 @@ class SpeedChallenge(TaskServerBase):
         self.declare_parameter("gate_dist_back", 1.0)
         self.forward_dist_back = self.get_parameter("gate_dist_back").get_parameter_value().double_value
 
-        self.declare_parameter("exit_turn_eps", 0.4) #roughly a bit less than pi/6 both ways
-        self.exit_turn_eps = self.get_parameter("exit_turn_eps").get_parameter_value().double_value
-
-        self.declare_parameter("t_o_eps", 0.5)
-        self.t_o_eps = self.get_parameter("t_o_eps").get_parameter_value().double_value
-
-        self.max_turn_vel = (
-            self.declare_parameter("max_turn_vel", [5.0, 0.0, 1.0])
-            .get_parameter_value()
-            .double_array_value
-        )
-        Turn_pid = (
-            self.declare_parameter("turn_pid", [1.5, 0.0, 0.0])
-            .get_parameter_value()
-            .double_array_value
-        )
-        self.turn_pid = PIDController(*Turn_pid)
-
-        self.declare_parameter("is_sim", False)
-        self.declare_parameter("turn_offset", 5.0)
-
-        self.blue_buoy_pos = np.array([0.0, 0.0])
-
         self.buoy_direction = np.array([0.0, 0.0])
-        self.buoy_found = False
         self.following_guide = False
         self.left_first = False # goes left of buoy first
         self.temp_left_first = self.left_first
@@ -178,37 +138,15 @@ class SpeedChallenge(TaskServerBase):
 
         self.latlng_origin = self.latlng_location_mappings[self.location]
 
-        self.gate_pair = None
         # self.first_setup = True
 
     def reset_challenge(self):
         '''
         Readies the server for the upcoming speed challenge.
         '''
-        self.buoy_found = False
+        self.circling_buoy_found = False
         self.following_guide = True
         self.moved_to_point = False
-
-    def pair_to_pose(self, pair):
-        return Pose(position=Point(x=pair[0], y=pair[1]))
-
-    def update_gate_wpt_pos(self, forward_dist = 0.0, tryhard=False):
-        # split the buoys into red and green
-        green_buoys, red_buoys = split_buoys(self.obstacles, self.green_labels, self.red_labels)
-        self.gate_pair.left, res_left_left = replace_closest(self.gate_pair.left, red_buoys if self.red_left else green_buoys, self.duplicate_dist)
-        self.gate_pair.right, res_right_right = replace_closest(self.gate_pair.right, green_buoys if self.red_left else red_buoys, self.duplicate_dist)
-        if tryhard:
-            _, res_left_right = replace_closest(self.gate_pair.left, green_buoys if self.red_left else red_buoys, self.duplicate_dist)
-            _, res_right_left = replace_closest(self.gate_pair.right, red_buoys if self.red_left else green_buoys, self.duplicate_dist)
-            # Check if there is not a buoy of the intended color in close distance and there is one from the other color, then remove the waypoint, it is false
-            if ((not res_left_left) and (res_left_right)) or ((not res_right_right) and (res_right_left)):
-                self.get_logger().info('WE ARE GOING TO A FAKE PAIR, FIND PATH AGAIN')
-                if not self.setup_buoys():
-                    return self.gate_wpt
-        self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
-        gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, forward_dist)
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(gate_wpt), 0.0)]))
-        return gate_wpt
 
     def should_accept_task(self, goal_request):
         if self.obstacles is None:
@@ -245,10 +183,12 @@ class SpeedChallenge(TaskServerBase):
             else:
                 self.mark_unsuccessful()
         elif self.state == SpeedChallengeState.CIRCLING:
-            action_result = self.smooth_circle_blue_buoy()
+            self.left_first = self.temp_left_first
+            self.get_logger().info('LEFT FIRST' if self.left_first else 'RIGHT FIRST')
+            action_result = self.smooth_circle_buoy(self.gate_wpt, self.adaptive_distance, self.duplicate_dist, self.gate_wpt, 1, self.left_first)
             self.state = SpeedChallengeState.RETURNING
         elif self.state == SpeedChallengeState.PROBING_BUOY:
-            action_result = self.probe_blue_buoy()
+            action_result = self.probe_buoy(self.buoy_direction, self.probe_distance, partial(self.buoy_detected, self.obstacles, self.blue_labels, self.duplicate_dist))
             self.state = SpeedChallengeState.CIRCLING
         elif self.state == SpeedChallengeState.GATES:
             self.gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, self.init_gate_dist)
@@ -256,7 +196,7 @@ class SpeedChallenge(TaskServerBase):
             self.get_logger().info('going behind the gate')
 
             self.move_to_point(self.gate_wpt, busy_wait=True,
-                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.init_gate_dist)))
+                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.obstacles, self.green_labels, self.red_labels, -self.init_gate_dist)))
 
             if self.goal_handle.is_cancel_requested:
                 self.mark_unsuccessful()
@@ -265,7 +205,7 @@ class SpeedChallenge(TaskServerBase):
             self.get_logger().info('going in front of the gate')
 
             self.move_to_point(self.gate_wpt, busy_wait=True,
-                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.init_gate_dist)))
+                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.obstacles, self.green_labels, self.red_labels, self.init_gate_dist)))
 
             if self.goal_handle.is_cancel_requested:
                 self.mark_unsuccessful()
@@ -312,138 +252,6 @@ class SpeedChallenge(TaskServerBase):
             return
         # self.identify_beacon()
 
-    def probe_blue_buoy(self):
-        '''
-        Function to find the blue buoy by moving near it (general direction).
-        Keeps on appending waypoints to the north/south until it finds
-        '''
-        self.get_logger().info("Probing for blue buoy")
-        max_guide_d = self.get_parameter("probe_distance").value
-        current_guide_point = lambda: max_guide_d * self.buoy_direction + self.robot_pos
-        self.guide_point = current_guide_point()
-        self.get_logger().info(f"Current position: {self.robot_pos}. Guide point: {self.guide_point}.")
-
-        # detection_success = self.move_to_point(self.guide_point, busy_wait=True,
-        #                                         goal_update_func=partial(self.update_point, "guide_point", current_guide_point),
-        #                                         exit_func=self.blue_buoy_detected)
-        detection_success = self.move_to_point(self.guide_point, busy_wait=True,
-                                                exit_func=partial(self.blue_buoy_detected, True))
-        if detection_success:
-            return Task.Result(success=True)
-        return Task.Result(success=False)
-
-    def circle_blue_buoy(self):
-        '''
-        Function to circle the blue buoy.
-        '''
-        self.get_logger().info("Circling blue buoy")
-        if not self.blue_buoy_detected():
-            self.get_logger().info("speed challenge probing exited without finding blue buoy")
-            return Task.Result(success=False)
-
-        self.left_first = self.temp_left_first
-
-        # circle the blue buoy like a baseball diamond
-        # a better way to do this might be to have the astar run to original cell,
-        # but require the path to go around buoy
-
-        t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
-        robot_buoy_vector = self.blue_buoy_pos - self.robot_pos
-        robot_buoy_dist = np.linalg.norm(robot_buoy_vector)
-        self.buoy_direction = robot_buoy_vector / robot_buoy_dist
-        first_dir = np.array([self.buoy_direction[1], -self.buoy_direction[0]]) * t_o
-        second_dir = self.buoy_direction * t_o
-        third_dir = -first_dir
-        if self.left_first:
-            first_dir, third_dir = third_dir, first_dir
-
-        first_base = self.blue_buoy_pos + first_dir
-        second_base = self.blue_buoy_pos + second_dir
-        third_base = self.blue_buoy_pos + third_dir
-
-        bases = [first_base, second_base, third_base]
-        dirs = [first_dir, second_dir, third_dir]
-        self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
-        self.get_logger().info(f"blue buoy pose: {self.blue_buoy_pos}")
-        self.get_logger().info(f"bases: {bases}")
-        for base, dir in zip(bases, dirs):
-            def update_current_point():
-                self.blue_buoy_detected()
-                return self.blue_buoy_pos + dir
-            self.base_point = base
-            self.move_to_point(self.base_point, busy_wait=True,
-                               goal_update_func=partial(self.update_point, "base_point", self.adaptive_distance, update_current_point) )
-            self.get_logger().info(f"moved to point = {self.moved_to_point}")
-
-        return Task.Result(success=True)
-
-    def smooth_circle_blue_buoy(self):
-        '''
-        Function to circle the blue buoy in a smooth fashion.
-        '''
-        self.get_logger().info("Circling blue buoy")
-        if not self.blue_buoy_detected():
-            self.get_logger().info("speed challenge probing exited without finding blue buoy")
-            return Task.Result(success=False)
-
-        self.left_first = self.temp_left_first
-        self.get_logger().info('LEFT FIRST' if self.left_first else 'RIGHT FIRST')
-
-        t_o = self.get_parameter("turn_offset").get_parameter_value().double_value
-        robot_buoy_vector = self.blue_buoy_pos - self.robot_pos
-        robot_buoy_dist = np.linalg.norm(robot_buoy_vector)
-        self.buoy_direction = robot_buoy_vector / robot_buoy_dist
-        first_dir = np.array([self.buoy_direction[1], -self.buoy_direction[0]]) * (t_o + self.t_o_eps)
-        if self.left_first:
-            first_dir = -first_dir
-
-        self.first_base = self.blue_buoy_pos + first_dir
-
-        self.get_logger().info(f"initial moved to points= {self.moved_to_point}")
-        self.get_logger().info(f"blue buoy pose: {self.blue_buoy_pos}")
-        self.get_logger().info(f"first base: {self.first_base}")
-
-        def update_first_base():
-            self.blue_buoy_detected()
-            return self.blue_buoy_pos + first_dir
-        self.move_to_point(self.first_base, busy_wait=True,
-                            goal_update_func=partial(self.update_point, "first_base", self.adaptive_distance, update_first_base) )
-        self.get_logger().info(f"moved to first base = {self.moved_to_point}")
-
-        in_circling = False # boolean flag for whether boat is circling, set to True when boat has turned at least 90 degrees
-        def exit_angle_met():
-            buoy_gate_vector = self.gate_wpt - self.blue_buoy_pos
-            buoy_gate_dir = buoy_gate_vector / np.linalg.norm(buoy_gate_vector)
-            angle = math.atan2(self.robot_dir[1], self.robot_dir[0]) - math.atan2(buoy_gate_dir[1], buoy_gate_dir[0])
-            if (angle < 0):
-                angle += 2*math.pi
-            return (angle < self.exit_turn_eps) or (angle > 2*math.pi-self.exit_turn_eps)
-
-        self.turn_pid.reset()
-        self.turn_pid.set_setpoint(t_o)
-        self.turn_pid.set_effort_max(self.max_turn_vel[2])
-        self.turn_pid.set_effort_min(-self.max_turn_vel[2])
-        self.prev_update_time = self.get_clock().now()
-        self.get_logger().info(f"Circling buoy via PID")
-        while (not in_circling) or (not exit_angle_met()):
-            pid_output = self.turn_pid.get_effort()
-            # send velocity commands
-            self.send_vel_cmd(self.max_turn_vel[0], 0.0, (1.0 if self.left_first else -1.0)*pid_output)
-            # get feedback
-            self.blue_buoy_detected()
-            dist_to_buoy = np.linalg.norm(self.blue_buoy_pos - self.robot_pos)
-            dt = (self.get_clock().now() - self.prev_update_time).nanoseconds / 1e9
-
-            # self.get_logger().info(f"PID values: set_point {t_o}, effort {pid_output:.3f}, sense value {dist_to_buoy:.3f}")
-            self.turn_pid.update(dist_to_buoy,dt)
-
-            # TODO: update in_Circling correctly (check 90 degrees)
-            in_circling = True
-            time.sleep(TIMER_PERIOD)
-        self.send_vel_cmd(0.0, 0.0, 0.0)
-        self.get_logger().info(f"Finished circling buoy")
-        return Task.Result(success=True)
-
     def return_to_start(self):
         '''
         After circling the buoy, return to the starting position.
@@ -467,164 +275,11 @@ class SpeedChallenge(TaskServerBase):
         self.get_logger().info('going back to the gate')
         self.gate_wpt, _ = midpoint_pair_dir(self.gate_pair, -self.forward_dist_back) # gate detected after probing or the one computed at the start
         self.move_to_point(self.gate_wpt, busy_wait=True,
-            goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.forward_dist_back)))
+            goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.obstacles, self.green_labels, self.red_labels, -self.forward_dist_back)))
         self.gate_wpt, _ = midpoint_pair_dir(self.gate_pair, self.forward_dist_back)
         self.move_to_point(self.gate_wpt, busy_wait=True,
-            goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.forward_dist_back)))
+            goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.obstacles, self.green_labels, self.red_labels, self.forward_dist_back)))
         return Task.Result(success=True)
-
-    def blue_buoy_detected(self, buoy_front=False):
-        '''
-        Check if the blue buoy for turning is detected (returns boolean).
-        Also sets the position of the blue buoy if it is found.
-        '''
-        # backup_buoy = None
-        updated_pos = False
-        for obstacle in self.obstacles:
-            if obstacle.label in self.blue_labels:
-                if np.linalg.norm(self.robot_pos - ob_coords(obstacle)) > self.circling_buoy_dist_thres:
-                    continue
-                buoy_pos = ob_coords(obstacle)
-                buoy_dir = buoy_pos - self.robot_pos
-                dot_prod = buoy_dir @ self.robot_dir
-                # if (backup_buoy is None) or (self.buoy_found and (self.norm(self.blue_buoy_pos, buoy_pos) < self.norm(self.blue_buoy_pos, backup_buoy))):
-                #     backup_buoy = buoy_pos
-                if ((not buoy_front) or (dot_prod > 0)) and ((not self.buoy_found) or (np.linalg.norm(self.blue_buoy_pos - buoy_pos) < self.duplicate_dist)): #check if buoy position is behind robot i.e. dot product is negative
-                    self.buoy_found = True
-                    updated_pos = True
-                    self.blue_buoy_pos = buoy_pos
-                    break
-        # if (not updated_pos) and (backup_buoy is not None):
-        #     self.get_logger().info('SWITCHING TO BACKUP BUOY')
-        #     self.blue_buoy_pos = backup_buoy
-        return self.buoy_found
-
-    def buoy_pairs_to_markers(self, buoy_pairs):
-        """
-        Create the markers from an array of buoy pairs to visualize them (and the respective waypoints) in RViz
-        """
-        marker_array = MarkerArray()
-        i = 0
-        for p_left, p_right, point, radius in buoy_pairs:
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.ARROW,
-                    pose=point,
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=2.0, y=0.15, z=0.15),
-                    color=ColorRGBA(a=1.0, b=1.0),
-                    id=(4 * i),
-                )
-            )
-            if self.red_left:
-                left_color = ColorRGBA(r=1.0, a=1.0)
-                right_color = ColorRGBA(g=1.0, a=1.0)
-            else:
-                left_color = ColorRGBA(g=1.0, a=1.0)
-                right_color = ColorRGBA(r=1.0, a=1.0)
-
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.SPHERE,
-                    pose=self.pair_to_pose(ob_coords(p_left)),
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=1.0, y=1.0, z=1.0),
-                    color=left_color,
-                    id=(4 * i) + 1,
-                )
-            )
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.SPHERE,
-                    pose=self.pair_to_pose(ob_coords(p_right)),
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=1.0, y=1.0, z=1.0),
-                    color=right_color,
-                    id=(4 * i) + 2,
-                )
-            )
-            i += 1
-        return marker_array
-
-
-    def setup_buoys(self, pointing_direction=None):
-        """
-        Runs when the first obstacle map is received, filters the buoys that are in front of
-        the robot (x>0 in local coordinates) and finds (and stores) the closest green one and
-        the closest red one, and because the robot is in the starting position these
-        are the front buoys of the robot starting box.
-        """
-        self.get_logger().debug("Setting up starting buoys!")
-        self.get_logger().debug(
-            f"list of obstacles: {obs_to_pos_label(self.obstacles)}"
-        )
-
-        # Split all the buoys into red and green
-        green_init, red_init = split_buoys(self.obstacles, self.green_labels, self.red_labels)
-
-        # lambda function that filters the buoys that are in front of the robot
-        obstacles_in_front = lambda obs: [
-            ob for ob in obs
-            if (np.linalg.norm(self.robot_pos - ob_coords(ob)) < self.gate_dist_thres and (pointing_direction is None or (ob_coords(ob) - self.robot_pos) @ pointing_direction > 0))
-        ]
-        # take the green and red buoys that are in front of the robot
-        green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
-        self.get_logger().debug(
-            f"initial red buoys: {[ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[ob_coords(buoy) for buoy in green_buoys]}"
-        )
-        if len(red_buoys) == 0 or len(green_buoys) == 0:
-            self.get_logger().debug("No starting buoy pairs!")
-            return False
-
-        # From the red buoys that are in front of the robot, take the one that is closest to it.
-        # And do the same for the green buoys.
-        # This pair is the front pair of the starting box of the robot.
-        # want to pick the pair that's far apart but has the closest midpoint
-        # if self.first_setup:
-        #     green_to = None
-        #     red_to = None
-        #     for red_b in red_buoys:
-        #         for green_b in green_buoys:
-        #             if self.norm(ob_coords(red_b), ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(ob_coords(red_b), ob_coords(green_b)) > self.max_inter_gate_dist:
-        #                 continue
-        #             elif (green_to is None) or (self.norm(self.midpoint(ob_coords(red_b, local=True), ob_coords(green_b, local=True))) < self.norm(self.midpoint(ob_coords(red_to, local=True), ob_coords(green_to, local=True)))):
-        #                 green_to = green_b
-        #                 red_to = red_b
-        #     if green_to is None:
-        #         return False
-        #     if self.ccw((0, 0), ob_coords(green_to, local=True), ob_coords(red_to, local=True)):
-        #         self.red_left = True
-        #         self.gate_pair = InternalBuoyPair(red_to, green_to)
-        #         self.get_logger().debug("RED BUOYS LEFT, GREEN BUOYS RIGHT")
-        #     else:
-        #         self.red_left = False
-        #         self.gate_pair = InternalBuoyPair(green_to, red_to)
-        #         self.get_logger().debug("GREEN BUOYS LEFT, RED BUOYS RIGHT")
-        #     self.first_setup = False
-        #     return True
-        # else:
-        green_to = None
-        red_to = None
-        for red_b in red_buoys:
-            for green_b in green_buoys:
-                pair_dist = np.linalg.norm(ob_coords(red_b) - ob_coords(green_b))
-                if pair_dist < self.inter_buoy_pair_dist or pair_dist > self.max_inter_gate_dist:
-                    continue
-                elif ((green_to is None) or (np.linalg.norm((ob_coords(red_b, local=True) + ob_coords(green_b, local=True)) / 2) < np.linalg.norm((ob_coords(red_to, local=True) + ob_coords(green_to, local=True)) / 2))):
-                    green_to = green_b
-                    red_to = red_b
-        if green_to is None:
-            return False
-        if self.red_left:
-            self.gate_pair = InternalBuoyPair(red_to, green_to)
-        else:
-            self.gate_pair = InternalBuoyPair(green_to, red_to)
-        self.get_logger().info(f'FOUND GATE')
-        self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
-        self.gate_mid, self.gate_dir = midpoint_pair_dir(self.gate_pair, 0.0)
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(self.gate_mid), 0.0)]))
-        return True
-
 
 
 def main(args=None):

@@ -133,8 +133,6 @@ class MechanismNavigation(TaskServerBase):
         self.ball_counter = 0
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
-        self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         self.declare_parameter(
             "shape_label_mappings_file",
@@ -408,12 +406,12 @@ class MechanismNavigation(TaskServerBase):
             # self.get_logger().info('STATIONKEEPING PID')
             self.state = DeliveryState.STATIONKEEPING
             # go to that line and forward (negative error if boat left of line, positive if right)
-            offset = -(robot_pos - target_back_mid) @ perp
-            approach_angle = angle_between(-target_dir, robot_dir) # TODO Check sign
-            angle_error = angle_between(target_back_mid - robot_pos, robot_dir)
+            offset = -(self.robot_pos - target_back_mid) @ perp
+            approach_angle = angle_between(-target_dir, self.robot_dir) # TODO Check sign
+            angle_error = angle_between(target_back_mid - self.robot_pos, self.robot_dir)
 
             # forward speed decreasing exponentially as we get closer
-            dist_diff = (robot_pos - target_back_mid) @ target_dir - self.wpt_banner_dist
+            dist_diff = (self.robot_pos - target_back_mid) @ target_dir - self.wpt_banner_dist
             # forward_speed = self.forward_speed*(1-np.exp(-dist_diff/self.slow_dist))
 
             # self.get_logger().info(f'side offset: {offset}')

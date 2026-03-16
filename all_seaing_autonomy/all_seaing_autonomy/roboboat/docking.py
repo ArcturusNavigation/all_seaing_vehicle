@@ -190,7 +190,6 @@ class Docking(TaskServerBase):
         self.prev_update_time = self.get_clock().now()
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
-        self.declare_parameter("is_sim", False)
 
         # for obstacle avoidance
         self.point_cloud_sub = self.create_subscription(
@@ -215,8 +214,6 @@ class Docking(TaskServerBase):
         self.picked_slot = False
 
         self.time_docked = -1
-
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         self.declare_parameter(
             "shape_label_mappings_file",

@@ -11,13 +11,14 @@ from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from all_seaing_common.task_server_base import TaskServerBase
 
 from all_seaing_common.report_pb2 import GatePass, GateType
-from all_seaing_autonomy.geometry_utils import ccw, quaternion_from_euler
+from tf_transformations import quaternion_from_euler
+from all_seaing_autonomy.geometry_utils import ccw
 from all_seaing_autonomy.buoy_utils import (
     InternalBuoyPair, ob_coords, get_closest_to, midpoint_pair_dir,
     split_buoys, obs_to_pos, obs_to_pos_label, filter_front_buoys,
     pick_buoy, replace_closest, buoy_pairs_distance, buoy_pairs_angle,
     get_acute_angle, get_triangle_angle, check_better_pair_angles,
-    better_buoy_pair_transition, check_better_one_side
+    better_buoy_pair_transition, check_better_one_side, buoy_pairs_to_markers, pair_to_pose
 )
 
 import os
@@ -43,39 +44,17 @@ class ReturnHome(TaskServerBase):
             ObstacleMap, "obstacle_map/global", self.map_cb, 10
         )
 
-        self.waypoint_marker_pub = self.create_publisher(
-            MarkerArray, "waypoint_markers", 10
-        )
-
-        self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
-
-        self.declare_parameter("red_left", False)
-        self.red_left = self.get_parameter("red_left").get_parameter_value().bool_value
-
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
 
         self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
 
-        self.declare_parameter("gate_dist_thres", 50.0)
-        self.gate_dist_thres = self.get_parameter("gate_dist_thres").get_parameter_value().double_value
-
-        self.declare_parameter("circling_buoy_dist_thres", 25.0)
-        self.circling_buoy_dist_thres = self.get_parameter("circling_buoy_dist_thres").get_parameter_value().double_value
-
-        self.declare_parameter("max_inter_gate_dist", 25.0)
-        self.max_inter_gate_dist = self.get_parameter("max_inter_gate_dist").get_parameter_value().double_value
-
         self.declare_parameter("max_gate_pair_dist", 25.0)
         self.max_gate_pair_dist = self.get_parameter("max_gate_pair_dist").get_parameter_value().double_value
 
         self.declare_parameter("buoy_pair_dist_thres", 1.0)
         self.buoy_pair_dist_thres = self.get_parameter("buoy_pair_dist_thres").get_parameter_value().double_value
-
-        self.declare_parameter("inter_buoy_pair_dist", 1.0)
-        self.inter_buoy_pair_dist = self.get_parameter("inter_buoy_pair_dist").get_parameter_value().double_value
 
         self.declare_parameter("better_angle_thres", 0.2)
         self.better_angle_thres = self.get_parameter("better_angle_thres").get_parameter_value().double_value
@@ -144,33 +123,10 @@ class ReturnHome(TaskServerBase):
 
         self.latlng_origin = self.latlng_location_mappings[self.location]
 
-        self.gate_pair = None
-
-    def pair_to_pose(self, pair):
-        return Pose(position=Point(x=pair[0], y=pair[1]))
-
-    def update_gate_wpt_pos(self, forward_dist = 0.0, tryhard=False):
-        # split the buoys into red and green
-        green_buoys, red_buoys = split_buoys(self.obstacles, self.green_labels, self.red_labels)
-        self.gate_pair.left, res_left_left = replace_closest(self.gate_pair.left, red_buoys if self.red_left else green_buoys, self.duplicate_dist)
-        self.gate_pair.right, res_right_right = replace_closest(self.gate_pair.right, green_buoys if self.red_left else red_buoys, self.duplicate_dist)
-        if tryhard:
-            _, res_left_right = replace_closest(self.gate_pair.left, green_buoys if self.red_left else red_buoys, self.duplicate_dist)
-            _, res_right_left = replace_closest(self.gate_pair.right, red_buoys if self.red_left else green_buoys, self.duplicate_dist)
-            # Check if there is not a buoy of the intended color in close distance and there is one from the other color, then remove the waypoint, it is false
-            if ((not res_left_left) and (res_left_right)) or ((not res_right_right) and (res_right_left)):
-                self.get_logger().info('WE ARE GOING TO A FAKE PAIR, FIND PATH AGAIN')
-                if not self.setup_buoys():
-                    return self.gate_wpt
-        self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
-        gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, forward_dist)
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(gate_wpt), 0.0)]))
-        return gate_wpt
-
     def should_accept_task(self, goal_request):
         if self.obstacles is None:
             return False
-        return self.setup_buoys()
+        return self.setup_buoys(None, visualize=True)
 
     def init_setup(self):
         self.get_logger().info("Setup buoys succeeded!")
@@ -195,120 +151,16 @@ class ReturnHome(TaskServerBase):
             self.gate_pair = self.new_gate_pair
             self.gate_wpt, _ = midpoint_pair_dir(self.gate_pair, -self.forward_dist_back)
             self.move_to_point(self.gate_wpt, busy_wait=True,
-                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, -self.forward_dist_back)))
+                goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.obstacles, self.green_labels, self.red_labels, self.duplicate_dist, -self.forward_dist_back)))
             self.new_gate_pair = None
             self.gate_wpt, _ = midpoint_pair_dir(self.gate_pair, self.gate_probe_dist)
             self.move_to_point(self.gate_wpt, busy_wait=True,
-                exit_func=partial(self.next_pair, self.gate_pair), goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.gate_probe_dist)))
-
+                exit_func=partial(self.next_pair, self.gate_pair), goal_update_func=partial(self.update_point, "gate_wpt", self.adaptive_distance, partial(self.update_gate_wpt_pos, self.obstacles, self.green_labels, self.red_labels, self.duplicate_dist, self.gate_probe_dist)))
         self.report_data(GatePass(
             type=GateType.GATE_EXIT,
             position=self.pos_to_latlng(self.latlng_origin, self.robot_pos)))
 
         return Task.Result(success=True)
-
-    def buoy_pairs_to_markers(self, buoy_pairs):
-        """
-        Create the markers from an array of buoy pairs to visualize them (and the respective waypoints) in RViz
-        """
-        marker_array = MarkerArray()
-        i = 0
-        for p_left, p_right, point, radius in buoy_pairs:
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.ARROW,
-                    pose=point,
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=2.0, y=0.15, z=0.15),
-                    color=ColorRGBA(a=1.0, b=1.0),
-                    id=(4 * i),
-                )
-            )
-            if self.red_left:
-                left_color = ColorRGBA(r=1.0, a=1.0)
-                right_color = ColorRGBA(g=1.0, a=1.0)
-            else:
-                left_color = ColorRGBA(g=1.0, a=1.0)
-                right_color = ColorRGBA(r=1.0, a=1.0)
-
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.SPHERE,
-                    pose=self.pair_to_pose(ob_coords(p_left)),
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=1.0, y=1.0, z=1.0),
-                    color=left_color,
-                    id=(4 * i) + 1,
-                )
-            )
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.SPHERE,
-                    pose=self.pair_to_pose(ob_coords(p_right)),
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=1.0, y=1.0, z=1.0),
-                    color=right_color,
-                    id=(4 * i) + 2,
-                )
-            )
-            i += 1
-        return marker_array
-
-
-    def setup_buoys(self, ref_pair = None):
-        """
-        Runs when the first obstacle map is received, filters the buoys that are in front of
-        the robot (x>0 in local coordinates) and finds (and stores) the closest green one and
-        the closest red one, and because the robot is in the starting position these
-        are the front buoys of the robot starting box.
-        """
-        self.get_logger().debug("Setting up starting buoys!")
-        self.get_logger().debug(
-            f"list of obstacles: {obs_to_pos_label(self.obstacles)}"
-        )
-
-        # Split all the buoys into red and green
-        green_init, red_init = split_buoys(self.obstacles, self.green_labels, self.red_labels)
-
-        # lambda function that filters the buoys that are in front of the robot
-        obstacles_in_front = lambda obs: [
-            ob for ob in obs
-            if np.linalg.norm(self.robot_pos - ob_coords(ob)) < self.gate_dist_thres
-        ]
-        # take the green and red buoys that are in front of the robot
-        green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
-        self.get_logger().debug(
-            f"initial red buoys: {[ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[ob_coords(buoy) for buoy in green_buoys]}"
-        )
-        if len(red_buoys) == 0 or len(green_buoys) == 0:
-            self.get_logger().debug("No starting buoy pairs!")
-            return False
-
-        # From the red buoys that are in front of the robot, take the one that is closest to it.
-        # And do the same for the green buoys.
-        # This pair is the front pair of the starting box of the robot.
-        # want to pick the pair that's far apart but has the closest midpoint
-        green_to = None
-        red_to = None
-        for red_b in red_buoys:
-            for green_b in green_buoys:
-                if np.linalg.norm(ob_coords(red_b) - ob_coords(green_b)) < self.inter_buoy_pair_dist or np.linalg.norm(ob_coords(red_b) - ob_coords(green_b)) > self.max_inter_gate_dist:
-                    continue
-                # elif ((green_to is None) or (np.linalg.norm((ob_coords(red_b, local=True) + ob_coords(green_b, local=True)) / 2) < np.linalg.norm((ob_coords(red_to, local=True) + ob_coords(green_to, local=True)) / 2))) and (self.red_left == ccw(np.array([0, 0]), ob_coords(green_b, local=True), ob_coords(red_b, local=True))):
-                elif ((green_to is None) or (np.linalg.norm((ob_coords(red_b, local=True) + ob_coords(green_b, local=True)) / 2) < np.linalg.norm((ob_coords(red_to, local=True) + ob_coords(green_to, local=True)) / 2))):
-                    green_to = green_b
-                    red_to = red_b
-        if green_to is None:
-            return False
-        if self.red_left:
-            self.gate_pair = InternalBuoyPair(red_to, green_to)
-        else:
-            self.gate_pair = InternalBuoyPair(green_to, red_to)
-        self.get_logger().info(f'FOUND GATE')
-        self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
-        self.gate_mid, self.gate_dir = midpoint_pair_dir(self.gate_pair, 0.0)
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(self.gate_mid), 0.0)]))
-        return True
 
     def next_pair(self, prev_pair):
         """

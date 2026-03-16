@@ -92,10 +92,6 @@ class SpeedChange(TaskServerBase):
         self.blue_pid = PIDController(*blue_pid_vals)
         self.blue_pid.set_effort_min(-self.max_yaw_rate)
         self.blue_pid.set_effort_max(self.max_yaw_rate)
-
-
-        self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
         
         # NOTE: in qualifying round we assume we enter from the correct direction.
 

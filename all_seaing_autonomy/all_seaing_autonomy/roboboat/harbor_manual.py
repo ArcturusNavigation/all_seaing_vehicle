@@ -26,14 +26,11 @@ class HarborAlert(TaskServerBase):
         self.declare_parameter("stationkeep_dist", 2.0)
         self.stationkeep_dist = self.get_parameter("stationkeep_dist").get_parameter_value().double_value
 
-        self.declare_parameter("probe_distance", 10)
         self.declare_parameter("adaptive_distance", 0.7)
         self.adaptive_distance = self.get_parameter("adaptive_distance").get_parameter_value().double_value
 
         self.declare_parameter("duplicate_dist", 0.5)
         self.duplicate_dist = self.get_parameter("duplicate_dist").get_parameter_value().double_value
-
-        self.declare_parameter("is_sim", False)
 
         self.dock_buoy_pos = None
         self.speed_buoy_pos = None
@@ -53,7 +50,6 @@ class HarborAlert(TaskServerBase):
 
         self.state = ReturnState.SETTING_UP_SPEED_POINT
 
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
         if self.is_sim: 
             self.get_logger().info("Running in simulation mode. Listening to joystick input.")
             self.keyboard_sub = self.create_subscription(
