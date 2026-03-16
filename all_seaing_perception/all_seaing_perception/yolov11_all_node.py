@@ -309,6 +309,8 @@ class YOLOv11Node(Node):
                         
                         if box_msg.label == self.beacon_label:
                             beacon_bboxes.append(box_msg)
+                    else:
+                        labeled_bounding_box_msgs.boxes.append(box_msg)
 
         # if self.filter_beacon_indicators:
         if not self.ignore_indicator_filters:
