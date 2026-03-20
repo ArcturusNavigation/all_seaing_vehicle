@@ -206,8 +206,8 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     m_prior_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_init_xy_noise, m_init_xy_noise, m_init_theta_noise));
     m_odom_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_imu_xy_noise, m_imu_xy_noise, m_imu_theta_noise));
     m_gps_compass_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_update_gps_xy_uncertainty, m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty));
-    m_object_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(m_range_std, m_bearing_std));
-    m_banner_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_banner_range_std, m_banner_bearing_std, m_banner_phi_std));
+    m_object_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(m_bearing_std, m_range_std));
+    m_banner_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_banner_bearing_std, m_banner_range_std, m_banner_phi_std));
 }
 
 void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Request> request,
