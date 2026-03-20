@@ -93,6 +93,7 @@ namespace all_seaing_perception {
         all_seaing_perception::Obstacle<PointT> obstacle;
         Eigen::Vector2f mean_pred;
         Eigen::Matrix2f cov;
+        gtsam::Key node_key;
 
         ObjectCloud(): obstacle(all_seaing_perception::Obstacle<PointT>(std_msgs::msg::Header(), std_msgs::msg::Header(), all_seaing_interfaces::msg::Obstacle())){
         
@@ -109,6 +110,7 @@ namespace all_seaing_perception {
         Eigen::Vector3f mean_pred;
         Eigen::Matrix3f cov;
         all_seaing_interfaces::msg::LabeledObjectPlane plane_msg;
+        gtsam::Key node_key;
 
         Banner();
         Banner(rclcpp::Time t, int l, all_seaing_interfaces::msg::LabeledObjectPlane msg);
@@ -122,29 +124,20 @@ namespace all_seaing_perception {
             bool include_theta=true, bool only_theta=false):
             gtsam::NoiseModelFactor1<gtsam::Pose2>(noise_model, key), mx_(x), my_(y), mtheta_(theta), incl_theta_(include_theta), only_theta_(only_theta) {}
         gtsam::Vector evaluateError(const gtsam::Pose2& pose, boost::optional<gtsam::Matrix&> H = boost::none) const {
-            gtsam::Vector error = gtsam::Vector3(pose.x() - mx_, pose.y() - my_, pose.theta() - mtheta_);
+            gtsam::Vector error = gtsam::Vector3(only_theta_? 0 : pose.x() - mx_, only_theta_? 0 : pose.y() - my_, incl_theta_? pose.theta() - mtheta_ : 0);
+            // Same dimensions for measurement & error regardless of have/no theta so that we can use the same noise model
             if (H) {
+                (*H) = gtsam::Matrix::Zero(3, 3);
                 if (incl_theta_) {
-                    if (only_theta_) {
-                        (*H) = gtsam::Matrix::Zero(1, 3);
-                        (*H)(0, 2) = 1.0;
-                    } else {
-                        (*H) = gtsam::Matrix::Identity(3, 3);
-                        (*H).block<2, 2>(0, 0) = pose.rotation().matrix();
-                    }
-                } else {
-                    (*H) = gtsam::Matrix::Zero(2, 3);
-                    (*H).block<2, 2>(0, 0) = pose.rotation().matrix();
+                    (*H)(2, 2) = 1; // exp map for theta is just addition of angles
+                }
+                if (!only_theta_) {
+                    (*H).block<2, 2>(0, 0) = pose.rotation().matrix(); // because of exp map
                 }
             }
-            if (only_theta_) {
-                return gtsam::Vector1(error(2));
-            } else if (!incl_theta_) {
-                return error.head<2>();
-            } else {
-                return error;
-            }
+            return error;
         }
+    };
 
     template<typename PointT>
     std::shared_ptr<std::shared_ptr<ObjectCloud<PointT>>> clone(typename std::shared_ptr<ObjectCloud<PointT>> orig);

@@ -218,6 +218,13 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     m_gps_based_dtheta = 0;
 
     m_obstacle_id = 0;
+
+    // Setting up the noise models for the factor graph
+    m_prior_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_init_xy_noise, m_init_xy_noise, m_init_theta_noise));
+    m_odom_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_imu_xy_noise, m_imu_xy_noise, m_imu_theta_noise));
+    m_gps_compass_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_update_gps_xy_uncertainty, m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty));
+    m_object_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(m_range_std, m_bearing_std));
+    m_banner_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_banner_range_std, m_banner_bearing_std, m_banner_phi_std));
 }
 
 void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Request> request,
@@ -228,21 +235,25 @@ void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::
     if (request->restart_position){
         RCLCPP_INFO(this->get_logger(), "RESTARTING SLAM POSITION");
         m_robot_pos_mean = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
-        Eigen::Matrix3f init_pose_noise{
-            {m_init_xy_noise*m_init_xy_noise, 0, 0},
-            {0, m_init_xy_noise*m_init_xy_noise, 0},
-            {0, 0, m_init_theta_noise*m_init_theta_noise},
-        };
-        m_robot_pos_cov = init_pose_noise;
+        m_robot_pos_cov = m_prior_noise->covariance();
+
+        // Reset iSAM2
+        // TODO marginalize & measure covariances between last pose & all obstacles & add respective range bearing measurements
+        m_isam2 = std::make_shared<gtsam::ISAM2>();
+        m_pose_keys.clear();
+        // TODO just add the last pose again as factor, same as first state, don't care about buoys for now
 
         m_gps_based_predicted = false;
         m_gps_based_dx = 0;
         m_gps_based_dy = 0;
         m_gps_based_dtheta = 0;
+        return;
     }
 
     if (request->restart_buoys){
         RCLCPP_INFO(this->get_logger(), "RESTARTING BUOYS");
+
+        // TODO remove buoy nodes & respective factors from iSAM2
 
         m_tracked_obstacles = std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>>();
         m_num_obj = 0;
@@ -250,6 +261,8 @@ void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::
 
     if (request->restart_banners){
         RCLCPP_INFO(this->get_logger(), "RESTARTING BANNERS");
+
+        // TODO remove banner nodes & respective factors from iSAM2
 
         m_tracked_banners = std::vector<std::shared_ptr<all_seaing_perception::Banner>>();
         m_num_banners = 0;
@@ -281,7 +294,7 @@ void FactorGraphSLAM::publish_slam(){
         t.header.frame_id = m_local_frame_id;
         t.child_frame_id = m_slam_frame_id;
         float inv_x, inv_y, inv_theta;
-        std::tie(inv_x, inv_y, inv_theta) = all_seaing_perception::compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0);
+        std::tie(inv_x, inv_y, inv_theta) = all_seaing_perception::compute_transform_from_to(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2), 0, 0, 0);
         t.transform.translation.x = inv_x;
         t.transform.translation.y = inv_y;
         t.transform.translation.z = -m_nav_z;
@@ -295,7 +308,7 @@ void FactorGraphSLAM::publish_slam(){
         t.child_frame_id = m_global_frame_id;
         double shift_x, shift_y, shift_theta;
         // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
-        std::tie(shift_x, shift_y, shift_theta) =all_seaing_perception::compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)),all_seaing_perception:: compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+        std::tie(shift_x, shift_y, shift_theta) =all_seaing_perception::compose_transforms(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2)),all_seaing_perception:: compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
         t.transform.translation.x = shift_x;
         t.transform.translation.y = shift_y;
         t.transform.translation.z = 0;
@@ -310,10 +323,10 @@ void FactorGraphSLAM::publish_slam(){
     nav_msgs::msg::Odometry odom_msg = m_last_odom_msg;
     // odom_msg.header.stamp = this->get_clock()->now();
     odom_msg.header.frame_id = m_slam_frame_id;
-    odom_msg.pose.pose.position.x = m_state(0);
-    odom_msg.pose.pose.position.y = m_state(1);
+    odom_msg.pose.pose.position.x = m_robot_pos_mean(0);
+    odom_msg.pose.pose.position.y = m_robot_pos_mean(1);
     tf2::Quaternion q;
-    q.setRPY(0, 0, m_state(2));
+    q.setRPY(0, 0, m_robot_pos_mean(2));
     odom_msg.pose.pose.orientation = tf2::toMsg(q);
 
     m_slam_pub->publish(odom_msg);
@@ -376,48 +389,23 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     if (m_first_state) {
         if (std::abs(m_nav_x) < 0.001 || std::abs(m_nav_y) < 0.001 || std::abs(m_nav_heading) < 0.001) return; // TF not initialized yet
         // initialize mean and cov robot pose
-        m_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
-        Eigen::Matrix3f init_pose_noise{
-            {m_init_xy_noise*m_init_xy_noise, 0, 0},
-            {0, m_init_xy_noise*m_init_xy_noise, 0},
-            {0, 0, m_init_theta_noise*m_init_xy_noise},
-        };
-        m_cov = init_pose_noise;
+        m_robot_pos_mean = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+        m_robot_pos_cov = m_prior_noise->covariance();
+
+        // initialize iSAM2 with the first pose prior
+        gtsam::NonlinearFactorGraph graph;
+        gtsam::Key first_pose_key = gtsam::Symbol('x', 0);
+        m_pose_keys.push_back(first_pose_key);
+        graph.add(gtsam::PriorFactor<gtsam::Pose2>(first_pose_key, gtsam::Pose2(m_nav_x, m_nav_y, m_nav_heading), m_prior_noise));
+        m_num_poses = 1;
+        gtsam::Values initialEstimate;
+        initialEstimate.insert(first_pose_key, gtsam::Pose2(m_nav_x, m_nav_y, m_nav_heading));
+        m_isam2->update(graph, initialEstimate);
+
         m_first_state = false;
         // m_last_odom_time = rclcpp::Time(msg.header.stamp);
         return;
     }
-
-    m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
-
-    Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, m_mat_size);
-    F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-
-    /*
-    IMU MOTION PREDICTION MODEL:
-    (x_old, y_old, theta_old) -> (x_old+cos(theta_old)*v_x*dt-sin(theta_old)*v_y*dt, y_old+sin(theta_old)*d_x*dt+cos(theta_old)*v_y*dt, theta_old+omega*dt)
-    mot_grad: rows -> components of final state (actually difference with old state), columns -> components of old state wrt to which the gradient is taken
-    */
-
-    // Eigen::Vector3f mot_const;
-    // Eigen::Matrix3f mot_grad;
-    // if (m_nav_omega < 0.001){
-    //     mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
-    //     // gradient - identity
-    //     mot_grad = Eigen::Matrix3f({
-    //         {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
-    //         {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
-    //         {0, 0, 0},
-    //     });
-    // }else{
-    //     mot_const = Eigen::Vector3f(((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy, ((-cos(m_state(2)+m_nav_omega*dt)+cos(m_state(2)))/m_nav_omega)*m_nav_vx+((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vy, m_nav_omega*dt);
-    //     // gradient - identity
-    //     mot_grad = Eigen::Matrix3f({
-    //         {0, 0, ((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vx+((-sin(m_state(2)+m_nav_omega*dt)+sin(m_state(2)))/m_nav_omega)*m_nav_vy},
-    //         {0, 0, ((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy},
-    //         {0, 0, 0},
-    //     });
-    // }
 
     double dx, dy, dtheta; // in the robot's frame
 
@@ -425,6 +413,7 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         std::tie(dx, dy, dtheta) = all_seaing_perception::compute_transform_from_to(m_last_odom_x, m_last_odom_y, m_last_odom_heading, m_odom_x, m_odom_y, m_odom_heading);
         if (m_gps_based_predicted){
             if (curr_odom_time > m_last_nav_time){
+                // TODO can change it to use compute_transform_from_to right away and nothing else (?)
                 std::tie(dx, dy, dtheta) = all_seaing_perception::compose_transforms(all_seaing_perception::compute_transform_from_to(m_gps_based_dx, m_gps_based_dy, m_gps_based_dtheta, 0, 0, 0), std::make_tuple(dx, dy, dtheta));
             }else{
                 // odometry is older, no need to use it
@@ -438,24 +427,10 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
             dt = std::max((curr_odom_time - m_last_nav_time).seconds(), (double)0);
         }
         if (m_nav_omega < 0.001){
-            // mot_const = Eigen::Vector3f(cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt, sin(m_state(2))*m_nav_vx*dt+cos(m_state(2))*m_nav_vy*dt, m_nav_omega*dt);
-            // // gradient - identity
-            // mot_grad = Eigen::Matrix3f({
-            //     {0, 0, -sin(m_state(2))*m_nav_vx*dt-cos(m_state(2))*m_nav_vy*dt},
-            //     {0, 0, cos(m_state(2))*m_nav_vx*dt-sin(m_state(2))*m_nav_vy*dt},
-            //     {0, 0, 0},
-            // });
             dx = m_nav_vx*dt;
             dy = m_nav_vy*dt;
             dtheta = m_nav_omega*dt;
         }else{
-            // mot_const = Eigen::Vector3f(((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy, ((-cos(m_state(2)+m_nav_omega*dt)+cos(m_state(2)))/m_nav_omega)*m_nav_vx+((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vy, m_nav_omega*dt);
-            // // gradient - identity
-            // mot_grad = Eigen::Matrix3f({
-            //     {0, 0, ((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vx+((-sin(m_state(2)+m_nav_omega*dt)+sin(m_state(2)))/m_nav_omega)*m_nav_vy},
-            //     {0, 0, ((sin(m_state(2)+m_nav_omega*dt)-sin(m_state(2)))/m_nav_omega)*m_nav_vx+((cos(m_state(2)+m_nav_omega*dt)-cos(m_state(2)))/m_nav_omega)*m_nav_vy},
-            //     {0, 0, 0},
-            // });
             dx = (sin(m_nav_omega*dt)/m_nav_omega)*m_nav_vx+((cos(m_nav_omega*dt)-1)/m_nav_omega)*m_nav_vy;
             dy = ((1-cos(m_nav_omega*dt))/m_nav_omega)*m_nav_vx+(sin(m_nav_omega*dt)/m_nav_omega)*m_nav_vy;
             dtheta = m_nav_omega*dt;
@@ -473,35 +448,22 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     m_last_odom_y = m_odom_y;
     m_last_odom_heading = m_odom_heading;
 
-    // independent of the motion model in between
-    Eigen::Vector3f mot_const = Eigen::Vector3f(cos(m_state(2))*dx-sin(m_state(2))*dy, sin(m_state(2))*dx+cos(m_state(2))*dy, dtheta);
-    // gradient - identity
-    Eigen::Matrix3f mot_grad = Eigen::Matrix3f({
-        {0, 0, -sin(m_state(2))*dx-cos(m_state(2))*dy},
-        {0, 0, cos(m_state(2))*dx-sin(m_state(2))*dy},
-        {0, 0, 0},
-    });
+    // add new pose to factor graph
+    gtsam::NonlinearFactorGraph graph;
+    gtsam::Key new_pose_key = gtsam::Symbol('x', m_num_poses++);
+    m_pose_keys.push_back(new_pose_key);
+    graph.add(gtsam::BetweenFactor<gtsam::Pose2>(m_pose_keys[m_num_poses-2], new_pose_key, gtsam::Pose2(dx, dy, dtheta), m_odom_noise));
+    gtsam::Values initialEstimate;
+    gtsam::Pose2 new_estimated_pose = gtsam::Pose2((gtsam::Vector)m_robot_pos_mean)*gtsam::Pose2(dx, dy, dtheta);
+    initialEstimate.insert(new_pose_key, new_estimated_pose);
+    m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
 
-    m_state += F.transpose() * mot_const;
-
-    Eigen::MatrixXf G = Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) +
-                        F.transpose() * mot_grad * F;
-    // add a consistent amount of noise based on how much the robot moved since the last time
-    // Eigen::Matrix3f motion_noise{
-    //     {m_xy_noise * abs(mot_const[0]), 0, 0},
-    //     {0, m_xy_noise * abs(mot_const[1]), 0},
-    //     {0, 0, m_theta_noise * abs(mot_const[2])},
-    // };
-    Eigen::Matrix3f motion_noise{
-        {m_imu_xy_noise, 0, 0},
-        {0, m_imu_xy_noise, 0},
-        {0, 0, m_imu_theta_noise},
-    };
-    m_cov = G * m_cov * G.transpose() + F.transpose() * ((dt*m_odom_refresh_rate)*motion_noise) * F; // variance is approximately proporational to the number of steps skipped, helps to correct w/ GPS when skipping too many points thus odometry more noisy
-    // m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
+    // get new pose estimate (mean & covariance) and update our current estimate
+    m_robot_pos_mean = m_isam2->calculateEstimate(new_pose_key);
+    m_robot_pos_cov = m_isam2->marginalCovariance(new_pose_key); // check if this is a slow operation, if so remove / only include in visualization every some steps
 
     // if (m_track_robot) {
-    //     m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(msg.header.stamp).seconds()));
+    //     m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(msg.header.stamp).seconds()));
     // }
     
     // // to see the robot position prediction mean & uncertainty
@@ -532,37 +494,19 @@ void FactorGraphSLAM::gps_based_pred(){
 
     std::tie(m_gps_based_dx, m_gps_based_dy, m_gps_based_dtheta) = all_seaing_perception::compose_transforms(std::make_tuple(m_gps_based_dx, m_gps_based_dy, m_gps_based_dtheta), std::make_tuple(dx, dy, dtheta));
 
-    // independent of the motion model in between
-    Eigen::Vector3f mot_const = Eigen::Vector3f(cos(m_state(2))*dx-sin(m_state(2))*dy, sin(m_state(2))*dx+cos(m_state(2))*dy, dtheta);
-    // gradient - identity
-    Eigen::Matrix3f mot_grad = Eigen::Matrix3f({
-        {0, 0, -sin(m_state(2))*dx-cos(m_state(2))*dy},
-        {0, 0, cos(m_state(2))*dx-sin(m_state(2))*dy},
-        {0, 0, 0},
-    });
+    // add new pose to factor graph
+    gtsam::NonlinearFactorGraph graph;
+    gtsam::Key new_pose_key = gtsam::Symbol('x', m_num_poses++);
+    m_pose_keys.push_back(new_pose_key);
+    graph.add(gtsam::BetweenFactor<gtsam::Pose2>(m_pose_keys[m_num_poses-2], new_pose_key, gtsam::Pose2(dx, dy, dtheta), m_odom_noise));
+    gtsam::Values initialEstimate;
+    gtsam::Pose2 new_estimated_pose = gtsam::Pose2((gtsam::Vector)m_robot_pos_mean)*gtsam::Pose2(dx, dy, dtheta);
+    initialEstimate.insert(new_pose_key, new_estimated_pose);
+    m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
 
-    m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
-    Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, m_mat_size);
-    F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-    
-    m_state += F.transpose() * mot_const;
-
-    Eigen::MatrixXf G = Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) +
-                        F.transpose() * mot_grad * F;
-    // add a consistent amount of noise based on how much the robot moved since the last time
-    // Eigen::Matrix3f motion_noise{
-    //     {m_xy_noise * abs(mot_const[0]), 0, 0},
-    //     {0, m_xy_noise * abs(mot_const[1]), 0},
-    //     {0, 0, m_theta_noise * abs(mot_const[2])},
-    // };
-    Eigen::Matrix3f motion_noise{
-        {m_imu_xy_noise, 0, 0},
-        {0, m_imu_xy_noise, 0},
-        {0, 0, m_imu_theta_noise},
-    };
-    // m_cov = G * m_cov * G.transpose() + F.transpose() * ((dt*m_odom_refresh_rate)*motion_noise) * F; // variance is approximately proporational to the number of steps skipped, helps to correct w/ GPS when skipping too many points thus odometry more noisy
-    m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
-
+    // get new pose estimate (mean & covariance) and update our current estimate
+    m_robot_pos_mean = m_isam2->calculateEstimate(new_pose_key);
+    m_robot_pos_cov = m_isam2->marginalCovariance(new_pose_key); // check if this is a slow operation, if so remove / only include in visualization every some steps
 
     m_gps_based_predicted = true;
 }
@@ -610,82 +554,18 @@ void FactorGraphSLAM::odom_callback() {
     
     m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
 
-    if (!m_imu_predict) {
+    if (m_gps_update){
+        // add GPS/compass factor to the last pose
+        gtsam::NonlinearFactorGraph graph;
+        graph.add(all_seaing_perception::UnaryPoseFactor(m_pose_keys.back(), m_nav_x, m_nav_y, m_nav_heading, m_gps_compass_noise, m_odom_include_theta, m_odom_include_only_theta));
+        m_isam2->update(graph); // this runs the iSAM2 optimization step
 
-        Eigen::MatrixXf F = Eigen::MatrixXf::Zero(3, m_mat_size);
-        F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-        
-        /*
-        GPS MOTION PREDICTION MODEL:
-        (x_old, y_old, theta_old) -> (x_old+v_comp_x*dt, y_old+v_comp_y*dt, theta_old+omega_comp*dt)
-        -->gradient is identity matrix (that way we keep the correlations with the objects, if we
-        set it to the new values it would be zero and delete them) remember that mot_grad is the
-        gradients minus the identity matrix, so with this model it is the zero matrix
-        */
-
-        Eigen::Vector3f mot_const = Eigen::Vector3f(m_nav_x - m_state[0], m_nav_y - m_state[1], m_nav_heading - m_state[2]);
-        Eigen::Matrix3f mot_grad = Eigen::Matrix3f::Zero();
-
-        m_state += F.transpose() * mot_const;
-        Eigen::MatrixXf G = Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) +
-                            F.transpose() * mot_grad * F;
-        // add a consistent amount of noise based on how much the robot moved since the last time
-        Eigen::Matrix3f motion_noise{
-            {(m_gps_xy_noise* abs(mot_const[0]))*(m_gps_xy_noise* abs(mot_const[0])), 0, 0},
-            {0, (m_gps_xy_noise * abs(mot_const[1]))*(m_gps_xy_noise* abs(mot_const[1])), 0},
-            {0, 0, (m_gps_theta_noise * abs(mot_const[2]))*(m_gps_theta_noise * abs(mot_const[2]))},
-        };
-        m_cov = G * m_cov * G.transpose() + F.transpose() * motion_noise * F;
-    }else if (m_gps_update){
-        if(m_include_odom_only_theta){
-            // Include only theta, since that's provided by the IMU compass and is accurate
-            float Q = m_update_odom_theta_uncertainty*m_update_odom_theta_uncertainty;
-            float th_actual = m_nav_heading;
-            float th_pred = m_state(2);
-            // gradient of measurement update model, identity since it's centered at the initial state
-            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(1, m_mat_size);
-            H(0,2) = 1;
-            Eigen::MatrixXf K = m_cov * H.transpose() / (m_cov(2,2) + Q);
-            th_actual = th_pred+all_seaing_perception::angle_to_pi_range(th_actual-th_pred);
-            m_state += K * (th_actual - th_pred);
-            m_cov =
-                (Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) - K * H) * m_cov;
-        }else if(!m_include_odom_theta){
-            // GPS measurement update model is just a gaussian centered at the predicted (x,y) position of the robot, with some noise
-            Eigen::Matrix2f Q{
-                {m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty, 0},
-                {0, m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty},
-            };
-            Eigen::Vector2f xy_actual(m_nav_x, m_nav_y);
-            Eigen::Vector2f xy_pred(m_state(0), m_state(1));
-            // gradient of measurement update model, identity since it's centered at the initial state
-            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(2, m_mat_size);
-            H.topLeftCorner(2, 2) = Eigen::Matrix2f::Identity();
-            Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
-            m_state += K * (xy_actual - xy_pred);
-            m_cov =
-                (Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) - K * H) * m_cov;   
-        }else{
-            // Include theta, since that's provided by the IMU compass usually
-            Eigen::Matrix3f Q{
-                {m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty, 0, 0},
-                {0, m_update_gps_xy_uncertainty*m_update_gps_xy_uncertainty, 0},
-                {0, 0, m_update_odom_theta_uncertainty*m_update_odom_theta_uncertainty},
-            };
-            Eigen::Vector3f xyth_actual(m_nav_x, m_nav_y, m_nav_heading);
-            Eigen::Vector3f xyth_pred(m_state(0), m_state(1), m_state(2));
-            // gradient of measurement update model, identity since it's centered at the initial state
-            Eigen::MatrixXf H = Eigen::MatrixXf::Zero(3, m_mat_size);
-            H.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-            Eigen::MatrixXf K = m_cov * H.transpose() * (H * m_cov * H.transpose() + Q).inverse();
-            xyth_actual(2) = xyth_pred(2)+all_seaing_perception::angle_to_pi_range(xyth_actual(2)-xyth_pred(2));
-            m_state += K * (xyth_actual - xyth_pred);
-            m_cov =
-                (Eigen::MatrixXf::Identity(m_mat_size, m_mat_size) - K * H) * m_cov;
-        }
+        // get new pose estimate (mean & covariance) and update our current estimate
+        m_robot_pos_mean = m_isam2->calculateEstimate(m_pose_keys.back());
+        m_robot_pos_cov = m_isam2->marginalCovariance(m_pose_keys.back()); // check if this is a slow operation, if so remove / only include in visualization every some steps
     }
 
-    m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(m_map_base_link_tf.header.stamp).seconds()));
+    m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(m_map_base_link_tf.header.stamp).seconds()));
 
     this->publish_maps();
 
@@ -722,7 +602,7 @@ T FactorGraphSLAM::convert_to_global(T point, bool untracked) {
         // point initially in map frame
         // want slam_map->map (then will compose it with map->point)
         // (slam_map->robot)@(robot->map) = (slam_map->robot)@inv(map->robot)
-        std::tuple<double, double, double> slam_to_map_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_state(0), m_state(1), m_state(2)),all_seaing_perception::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
+        std::tuple<double, double, double> slam_to_map_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2)),all_seaing_perception::compute_transform_from_to(m_nav_x, m_nav_y, m_nav_heading, 0, 0, 0));
         double th; //uselesss
         std::tie(act_point.x, act_point.y, th) =all_seaing_perception::compose_transforms(slam_to_map_transform, std::make_tuple(new_point.x, new_point.y, 0));
     }
@@ -737,7 +617,7 @@ T FactorGraphSLAM::convert_to_local(T point, bool untracked) {
         // point initially in slam_map frame
         // want map->slam_map (then will compose it with slam->point)
         // (map->robot)@(robot->slam_map) = (map->robot)@inv(slam_map->robot)
-        std::tuple<double, double, double> map_to_slam_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading),all_seaing_perception::compute_transform_from_to(m_state(0), m_state(1), m_state(2), 0, 0, 0));
+        std::tuple<double, double, double> map_to_slam_transform =all_seaing_perception::compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading),all_seaing_perception::compute_transform_from_to(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2), 0, 0, 0));
         double th; //uselesss
         std::tie(act_point.x, act_point.y, th) =all_seaing_perception::compose_transforms(map_to_slam_transform, std::make_tuple(new_point.x, new_point.y, 0));
     }
@@ -858,9 +738,9 @@ void FactorGraphSLAM::visualize_predictions() {
         angle_marker.pose.position.y = robot_mean(1);
         angle_marker.pose.position.z = 0;
         tf2::Quaternion angle_quat;
-        angle_quat.setRPY(0, 0, m_state(2));
+        angle_quat.setRPY(0, 0, m_robot_pos_mean(2));
         angle_marker.pose.orientation = tf2::toMsg(angle_quat);
-        angle_marker.scale.x = sqrt(m_cov(2, 2));
+        angle_marker.scale.x = sqrt(m_robot_pos_cov(2, 2));
         angle_marker.scale.y = 0.2;
         angle_marker.scale.z = 0.2;
         angle_marker.color.a = 1;
@@ -1370,7 +1250,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
 
     if (m_track_robot) {
         // make the trace only keep a # of points specified by a param
-        m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(m_local_header.stamp).seconds()));
+        m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(m_local_header.stamp).seconds()));
     }
 
     this->publish_maps();
@@ -1633,7 +1513,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
                 rclcpp::Time(m_local_header.stamp) -
                 m_tracked_banners[tracked_id]->last_dead +
                 m_tracked_banners[tracked_id]->time_dead;
-            pcl::PointXYZ p0 = m_track_robot ? pcl::PointXYZ(m_state(0), m_state(1), 0) : pcl::PointXYZ(m_nav_x, m_nav_y, 0);
+            pcl::PointXYZ p0 = m_track_robot ? pcl::PointXYZ(m_robot_pos_mean(0), m_robot_pos_mean(1), 0) : pcl::PointXYZ(m_nav_x, m_nav_y, 0);
             float dist = pcl::euclideanDistance(
                 p0,
                 pcl::PointXYZ(m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.x, 
@@ -1730,7 +1610,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
 
     if (m_track_robot) {
         // make the trace only keep a # of points specified by a param
-        m_trace.push_back(std::make_tuple(m_state(0), m_state(1), rclcpp::Time(m_local_header.stamp).seconds()));
+        m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(m_local_header.stamp).seconds()));
     }
 
     this->publish_maps();

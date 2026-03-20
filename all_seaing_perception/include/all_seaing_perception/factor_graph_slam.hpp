@@ -160,12 +160,12 @@ private:
     geometry_msgs::msg::TransformStamped m_base_link_map_tf, m_map_base_link_tf;
     rclcpp::TimerBase::SharedPtr odom_timer;
 
-    //SLAM matrices & variables
+    // SLAM parameters & variables
     float m_range_std, m_bearing_std, m_banner_range_std, m_banner_bearing_std, m_banner_phi_std, m_new_obj_slam_thres, m_new_banner_slam_thres;
     float m_gps_xy_noise, m_gps_theta_noise;
     float m_imu_xy_noise, m_imu_theta_noise;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
-    int m_num_obj, m_num_banners, m_mat_size;
+    int m_num_obj, m_num_banners, m_mat_size, m_num_poses;
     Eigen::Vector3f m_robot_pos_mean;//obstacle map
     Eigen::Matrix3f m_robot_pos_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
@@ -178,8 +178,19 @@ private:
     std::map<int, int> banner_label_to_number;
     std::map<int, bool> banner_label_indicator;
 
-    //Factor graph (GTSAM) variables
+    // Factor graph (GTSAM) variables
     std::shared_ptr<gtsam::ISAM2> m_isam2;
+    std::vector<gtsam::Key> m_pose_keys;
+
+    // Noise models
+    gtsam::noiseModel::Diagonal::shared_ptr m_prior_noise;
+    gtsam::noiseModel::Diagonal::shared_ptr m_odom_noise;
+    gtsam::noiseModel::Diagonal::shared_ptr m_gps_compass_noise;
+    gtsam::noiseModel::Diagonal::shared_ptr m_object_meas_noise;
+    gtsam::noiseModel::Diagonal::shared_ptr m_banner_meas_noise;
+    
+    // Symbol/key notation: poses are ('x', pose_index), obstacles are ('l', obstacle_id), banners are ('b', banner_id)
+    // All will be stored as well
 
     // SLAM restart service
     rclcpp::Service<all_seaing_interfaces::srv::RestartSLAM>::SharedPtr m_restart_service;
