@@ -74,10 +74,7 @@
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
-#include <gtsam/nonlinear/DoglegOptimizer.h>
 #include <gtsam/nonlinear/GaussNewtonOptimizer.h>
-#include <gtsam/nonlinear/NonlinearConjugateGradientOptimizer.h>
-#include <gtsam/slam/ProjectionFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/sam/BearingRangeFactor.h>
 
@@ -93,6 +90,8 @@ private:
     T convert_to_global(T point, bool untracked = false);
     template <typename T>
     T convert_to_local(T point, bool untracked = false);
+
+    void update_estimates();
 
     void update_maps();
 
@@ -116,7 +115,7 @@ private:
     double m_duplicate_thresh;
     double m_obstacle_drop_thresh, m_range_drop_thresh;
     double m_init_new_cov, m_banner_init_new_cov, m_banner_init_new_theta_cov, m_init_xy_noise, m_init_theta_noise;
-    bool m_track_robot, m_imu_predict, m_gps_update;
+    bool m_gps_update;
     double m_normalize_drop_dist;
     double m_odom_refresh_rate;
     bool m_is_sim;
@@ -127,7 +126,7 @@ private:
     double m_trace_time;
     bool m_include_unlabeled, m_drop_ignore_unlabeled;
     double m_unlabeled_assoc_threshold;
-    bool m_track_banners, m_banners_slam;
+    bool m_track_banners;
     bool m_diff_position_odom;
     int m_odom_queue_size;
     int m_detection_queue_size;
@@ -165,7 +164,7 @@ private:
     float m_gps_xy_noise, m_gps_theta_noise;
     float m_imu_xy_noise, m_imu_theta_noise;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
-    int m_num_obj, m_num_banners, m_mat_size, m_num_poses;
+    int m_num_obj, m_num_banners, m_num_poses;
     Eigen::Vector3f m_robot_pos_mean;//obstacle map
     Eigen::Matrix3f m_robot_pos_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
@@ -189,7 +188,7 @@ private:
     gtsam::noiseModel::Diagonal::shared_ptr m_object_meas_noise;
     gtsam::noiseModel::Diagonal::shared_ptr m_banner_meas_noise;
     
-    // Symbol/key notation: poses are ('x', pose_index), obstacles are ('l', obstacle_id), banners are ('b', banner_id)
+    // Symbol/key notation: poses are ('x', pose_index), landmarks are ('l', obstacle_id)
     // All will be stored as well
 
     // SLAM restart service
