@@ -166,8 +166,8 @@ private:
     float m_imu_xy_noise, m_imu_theta_noise;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
     int m_num_obj, m_num_banners, m_mat_size;
-    Eigen::VectorXf m_state;//obstacle map
-    Eigen::MatrixXf m_cov;//covariance matrix
+    Eigen::Vector3f m_robot_pos_mean;//obstacle map
+    Eigen::Matrix3f m_robot_pos_cov;//covariance matrix
     bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
     bool m_shouldnt_gps_pred;
     bool m_match_numbers_indicators;
@@ -177,6 +177,9 @@ private:
     std::map<int, std::string> banner_label_to_name;
     std::map<int, int> banner_label_to_number;
     std::map<int, bool> banner_label_indicator;
+
+    //Factor graph (GTSAM) variables
+    std::shared_ptr<gtsam::ISAM2> m_isam2;
 
     // SLAM restart service
     rclcpp::Service<all_seaing_interfaces::srv::RestartSLAM>::SharedPtr m_restart_service;

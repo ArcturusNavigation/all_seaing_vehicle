@@ -92,7 +92,7 @@ namespace all_seaing_perception {
         bool is_dead;
         all_seaing_perception::Obstacle<PointT> obstacle;
         Eigen::Vector2f mean_pred;
-        Eigen::Matrix2f cov; 
+        Eigen::Matrix2f cov;
 
         ObjectCloud(): obstacle(all_seaing_perception::Obstacle<PointT>(std_msgs::msg::Header(), std_msgs::msg::Header(), all_seaing_interfaces::msg::Obstacle())){
         
@@ -113,6 +113,38 @@ namespace all_seaing_perception {
         Banner();
         Banner(rclcpp::Time t, int l, all_seaing_interfaces::msg::LabeledObjectPlane msg);
     };
+
+    class UnaryPoseFactor : public gtsam::NoiseModelFactor1<gtsam::Pose2> {
+        double mx_, my_, mtheta_;
+        bool incl_theta_, only_theta_;
+    public:
+        UnaryPoseFactor(gtsam::Key key, double x, double y, double theta, const gtsam::SharedNoiseModel& noise_model, 
+            bool include_theta=true, bool only_theta=false):
+            gtsam::NoiseModelFactor1<gtsam::Pose2>(noise_model, key), mx_(x), my_(y), mtheta_(theta), incl_theta_(include_theta), only_theta_(only_theta) {}
+        gtsam::Vector evaluateError(const gtsam::Pose2& pose, boost::optional<gtsam::Matrix&> H = boost::none) const {
+            gtsam::Vector error = gtsam::Vector3(pose.x() - mx_, pose.y() - my_, pose.theta() - mtheta_);
+            if (H) {
+                if (incl_theta_) {
+                    if (only_theta_) {
+                        (*H) = gtsam::Matrix::Zero(1, 3);
+                        (*H)(0, 2) = 1.0;
+                    } else {
+                        (*H) = gtsam::Matrix::Identity(3, 3);
+                        (*H).block<2, 2>(0, 0) = pose.rotation().matrix();
+                    }
+                } else {
+                    (*H) = gtsam::Matrix::Zero(2, 3);
+                    (*H).block<2, 2>(0, 0) = pose.rotation().matrix();
+                }
+            }
+            if (only_theta_) {
+                return gtsam::Vector1(error(2));
+            } else if (!incl_theta_) {
+                return error.head<2>();
+            } else {
+                return error;
+            }
+        }
 
     template<typename PointT>
     std::shared_ptr<std::shared_ptr<ObjectCloud<PointT>>> clone(typename std::shared_ptr<ObjectCloud<PointT>> orig);
