@@ -91,8 +91,8 @@ namespace all_seaing_perception {
         rclcpp::Duration time_dead = rclcpp::Duration(0,0);
         bool is_dead;
         all_seaing_perception::Obstacle<PointT> obstacle;
-        Eigen::Vector2f mean_pred;
-        Eigen::Matrix2f cov;
+        Eigen::Vector2d mean_pred;
+        Eigen::Matrix2d cov;
         gtsam::Key node_key;
 
         ObjectCloud(): obstacle(all_seaing_perception::Obstacle<PointT>(std_msgs::msg::Header(), std_msgs::msg::Header(), all_seaing_interfaces::msg::Obstacle())){
@@ -107,8 +107,8 @@ namespace all_seaing_perception {
         rclcpp::Time last_dead;
         rclcpp::Duration time_dead = rclcpp::Duration(0,0);
         bool is_dead;
-        Eigen::Vector3f mean_pred;
-        Eigen::Matrix3f cov;
+        Eigen::Vector3d mean_pred;
+        Eigen::Matrix3d cov;
         all_seaing_interfaces::msg::LabeledObjectPlane plane_msg;
         gtsam::Key node_key;
 
@@ -139,10 +139,42 @@ namespace all_seaing_perception {
         }
     };
 
+    double Pose2Theta(const gtsam::Pose2& pose, gtsam::OptionalJacobian<1, 3> H) {
+    if (H) *H = (gtsam::Matrix13() << 0, 0, 1).finished();
+        return pose.theta();
+    }
+
+    double Rot2Theta(const gtsam::Rot2& rot, gtsam::OptionalJacobian<1, 1> H) {
+        if (H) *H = gtsam::Matrix11::Identity();
+        return rot.theta();
+    }
+
+    double BearingRangeRange(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br,
+                            gtsam::OptionalJacobian<1, 2> H) {
+        if (H) *H = (gtsam::Matrix12() << 0, 1).finished();
+        return br.range();
+    }
+
+    gtsam::Rot2 BearingRangeBearing(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br,
+                                    gtsam::OptionalJacobian<1, 2> H) {
+        if (H) *H = (gtsam::Matrix12() << 1, 0).finished();
+        return br.bearing();
+    }
+
+    gtsam::Vector3 makeVector3(double a, double b, double c,
+        gtsam::OptionalJacobian<3, 1> Ha,
+        gtsam::OptionalJacobian<3, 1> Hb,
+        gtsam::OptionalJacobian<3, 1> Hc) {
+        if (Ha) *Ha = (gtsam::Vector3() << 1, 0, 0).finished();
+        if (Hb) *Hb = (gtsam::Vector3() << 0, 1, 0).finished();
+        if (Hc) *Hc = (gtsam::Vector3() << 0, 0, 1).finished();
+        return gtsam::Vector3(a, b, c);
+    }
+
     class BearingRangePhiFactor : public gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2> {
     public:
         BearingRangePhiFactor(gtsam::Key key1, gtsam::Key key2, double bearing, double range, double phi, const gtsam::SharedNoiseModel& noise_model):
-            gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2>({key1, key2}, noise_model, gtsam::Vector3(bearing, range, phi)) {}
+            gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2>(key1, key2, noise_model, gtsam::Vector3(bearing, range, phi)) {}
         // gtsam::Vector evaluateError(const gtsam::Pose2& robot_pose, const gtsam::Pose2& banner_pose, boost::optional<gtsam::Matrix&> H_robot = boost::none, boost::optional<gtsam::Matrix&> H_banner = boost::none) const {
         //     double pred_bearing = gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::MeasureBearing(robot_pose, banner_pose).theta();
         //     double pred_range = gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::MeasureRange(robot_pose, banner_pose);
@@ -163,16 +195,17 @@ namespace all_seaing_perception {
         //     }
         //     return error;
         // }
-        gtsam::Expression<gtsam::Vector3> expression(gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2>::ArrayNKeys& keys) const override{
+        gtsam::Expression<gtsam::Vector3> expression(gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2>::ArrayNKeys& keys) const{
             gtsam::Expression<gtsam::Pose2> robot_pose(keys[0]);
             gtsam::Expression<gtsam::Pose2> banner_pose(keys[1]);
-            gtsam::Expression<gtsam::Rot2> pred_bearing(gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::MeasureBearing, robot_pose, banner_pose);
-            gtsam::Expression<double> pred_range(gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::MeasureRange, robot_pose, banner_pose);
-            gtsam::Expression<double> robot_theta(robot_pose, &gtsam::Pose2::theta);
-            gtsam::Expression<double> banner_theta(banner_pose, &gtsam::Pose2::theta);
-            gtsam::Expression<double> bearing_theta(pred_bearing, &gtsam::Rot2::theta);
+            gtsam::Expression<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>> pred_bearing_range(gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::Measure, robot_pose, banner_pose);
+            gtsam::Expression<gtsam::Rot2> pred_bearing(&BearingRangeBearing, pred_bearing_range);
+            gtsam::Expression<double> pred_range(&BearingRangeRange, pred_bearing_range);
+            gtsam::Expression<double> robot_theta(&Pose2Theta, robot_pose);
+            gtsam::Expression<double> banner_theta(&Pose2Theta, banner_pose);
+            gtsam::Expression<double> bearing_theta(&Rot2Theta, pred_bearing);
             gtsam::Expression<double> pred_phi = banner_theta - robot_theta;
-            return gtsam::Expression<gtsam::Vector3>(bearing_theta, pred_range, pred_phi);
+            return gtsam::Expression<gtsam::Vector3>(&makeVector3, bearing_theta, pred_range, pred_phi);
         }
     };
 

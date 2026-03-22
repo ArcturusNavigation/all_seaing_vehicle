@@ -217,7 +217,7 @@ void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::
 
     if (request->restart_position){
         RCLCPP_INFO(this->get_logger(), "RESTARTING SLAM POSITION");
-        m_robot_pos_mean = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+        m_robot_pos_mean = Eigen::Vector3d(m_nav_x, m_nav_y, m_nav_heading);
         m_robot_pos_cov = m_prior_noise->covariance();
 
         // Reset iSAM2
@@ -390,7 +390,7 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     if (m_first_state) {
         if (std::abs(m_nav_x) < 0.001 || std::abs(m_nav_y) < 0.001 || std::abs(m_nav_heading) < 0.001) return; // TF not initialized yet
         // initialize mean and cov robot pose
-        m_robot_pos_mean = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+        m_robot_pos_mean = Eigen::Vector3d(m_nav_x, m_nav_y, m_nav_heading);
         m_robot_pos_cov = m_prior_noise->covariance();
 
         // initialize iSAM2 with the first pose prior
@@ -460,8 +460,8 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
 
     // get new pose estimate (mean & covariance) and update our current estimate
-    m_robot_pos_mean = m_isam2->calculateEstimate(new_pose_key);
-    m_robot_pos_cov = m_isam2->marginalCovariance(new_pose_key); // check if this is a slow operation, if so remove / only include in visualization every some steps
+    m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(new_pose_key).cast<gtsam::Pose2>());
+    m_robot_pos_cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(new_pose_key); // check if this is a slow operation, if so remove / only include in visualization every some steps
 
     // if (m_track_robot) {
     //     m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(msg.header.stamp).seconds()));
@@ -506,8 +506,8 @@ void FactorGraphSLAM::gps_based_pred(){
     m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
 
     // get new pose estimate (mean & covariance) and update our current estimate
-    m_robot_pos_mean = m_isam2->calculateEstimate(new_pose_key);
-    m_robot_pos_cov = m_isam2->marginalCovariance(new_pose_key); // check if this is a slow operation, if so remove / only include in visualization every some steps
+    m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(new_pose_key).cast<gtsam::Pose2>());
+    m_robot_pos_cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(new_pose_key); // check if this is a slow operation, if so remove / only include in visualization every some steps
 
     m_gps_based_predicted = true;
 }
@@ -556,12 +556,12 @@ void FactorGraphSLAM::odom_callback() {
     if (m_gps_update){
         // add GPS/compass factor to the last pose
         gtsam::NonlinearFactorGraph graph;
-        graph.add(all_seaing_perception::UnaryPoseFactor(m_pose_keys.back(), m_nav_x, m_nav_y, m_nav_heading, m_gps_compass_noise, m_odom_include_theta, m_odom_include_only_theta));
+        graph.add(all_seaing_perception::UnaryPoseFactor(m_pose_keys.back(), m_nav_x, m_nav_y, m_nav_heading, m_gps_compass_noise, m_include_odom_theta, m_include_odom_only_theta));
         m_isam2->update(graph); // this runs the iSAM2 optimization step
 
         // get new pose estimate (mean & covariance) and update our current estimate
-        m_robot_pos_mean = m_isam2->calculateEstimate(m_pose_keys.back());
-        m_robot_pos_cov = m_isam2->marginalCovariance(m_pose_keys.back()); // check if this is a slow operation, if so remove / only include in visualization every some steps
+        m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(m_pose_keys.back()).cast<gtsam::Pose2>());
+        m_robot_pos_cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(m_pose_keys.back()); // check if this is a slow operation, if so remove / only include in visualization every some steps
     }
 
     m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(m_map_base_link_tf.header.stamp).seconds()));
@@ -633,16 +633,16 @@ T FactorGraphSLAM::convert_to_local(T point, bool untracked) {
 }
 
 void FactorGraphSLAM::update_estimates(){
-    m_robot_pos_mean = m_isam2->calculateEstimate(m_pose_keys.back());
-    m_robot_pos_cov = m_isam2->marginalCovariance(m_pose_keys.back());
+    m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(m_pose_keys.back()).cast<gtsam::Pose2>());
+    m_robot_pos_cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(m_pose_keys.back());
     for (size_t i = 0; i < m_tracked_obstacles.size(); i++) {
-        m_tracked_obstacles[i]->mean_pred = m_isam2->calculateEstimate(m_tracked_obstacles[i]->node_key);
-        m_tracked_obstacles[i]->cov = m_isam2->marginalCovariance(m_tracked_obstacles[i]->node_key);
+        m_tracked_obstacles[i]->mean_pred = (Eigen::Vector2d)((gtsam::Point2)m_isam2->calculateEstimate(m_tracked_obstacles[i]->node_key).cast<gtsam::Point2>());
+        m_tracked_obstacles[i]->cov = (Eigen::Matrix2d)m_isam2->marginalCovariance(m_tracked_obstacles[i]->node_key);
     }
     if (m_track_banners){
         for (size_t i = 0; i < m_tracked_banners.size(); i++) {
-            m_tracked_banners[i]->mean_pred = m_isam2->calculateEstimate(m_tracked_banners[i]->node_key);
-            m_tracked_banners[i]->cov = m_isam2->marginalCovariance(m_tracked_banners[i]->node_key);
+            m_tracked_banners[i]->mean_pred = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(m_tracked_banners[i]->node_key).cast<gtsam::Pose2>());
+            m_tracked_banners[i]->cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(m_tracked_banners[i]->node_key);
         }
     }
     // TODO update the trace with pose estimates from the factor graph (last same # of poses in the trace at the time) every once in a while
@@ -723,13 +723,13 @@ void FactorGraphSLAM::visualize_predictions() {
 
     visualization_msgs::msg::MarkerArray ellipse_arr;
     // robot pose prediction
-    Eigen::Vector2f robot_mean = m_robot_pos_mean.segment(0, 2);
-    Eigen::Matrix2f robot_cov = m_robot_pos_cov.block(0, 0, 2, 2);
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(robot_cov);
+    Eigen::Vector2d robot_mean = m_robot_pos_mean.segment(0, 2);
+    Eigen::Matrix2d robot_cov = m_robot_pos_cov.block(0, 0, 2, 2);
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigen_solver(robot_cov);
     double a_x = eigen_solver.eigenvalues()(0);
     double a_y = eigen_solver.eigenvalues()(1);
-    Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
-    Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
+    Eigen::Vector2d axis_x = eigen_solver.eigenvectors().col(0);
+    Eigen::Vector2d axis_y = eigen_solver.eigenvectors().col(1);
     tf2::Quaternion quat_rot;
     quat_rot.setRPY(0,0,std::atan2(axis_x(1), axis_x(0)));
     visualization_msgs::msg::Marker ellipse;
@@ -765,13 +765,13 @@ void FactorGraphSLAM::visualize_predictions() {
 
     // obstacle predictions
     for (int i = 0; i < m_num_obj; i++) {
-        Eigen::Vector2f obj_mean = m_tracked_obstacles[i]->mean_pred;
-        Eigen::Matrix2f obj_cov = m_tracked_obstacles[i]->cov;
-        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(obj_cov);
+        Eigen::Vector2d obj_mean = m_tracked_obstacles[i]->mean_pred;
+        Eigen::Matrix2d obj_cov = m_tracked_obstacles[i]->cov;
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigen_solver(obj_cov);
         double a_x = eigen_solver.eigenvalues()(0);
         double a_y = eigen_solver.eigenvalues()(1);
-        Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
-        Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
+        Eigen::Vector2d axis_x = eigen_solver.eigenvectors().col(0);
+        Eigen::Vector2d axis_y = eigen_solver.eigenvectors().col(1);
         tf2::Quaternion quat_rot;
         quat_rot.setRPY(0,0,std::atan2(axis_x(1), axis_x(0)));
         visualization_msgs::msg::Marker ellipse;
@@ -795,18 +795,18 @@ void FactorGraphSLAM::visualize_predictions() {
     if (m_track_banners){
         // banner visualization
         for (int i = 0; i < m_num_banners; i++){
-            Eigen::Vector2f obj_mean;
-            Eigen::Matrix2f obj_cov;
+            Eigen::Vector2d obj_mean;
+            Eigen::Matrix2d obj_cov;
             float theta, theta_cov;
             obj_mean = m_tracked_banners[i]->mean_pred.segment(0, 2);
             obj_cov = m_tracked_banners[i]->cov.block(0, 0, 2, 2);
             theta = m_tracked_banners[i]->mean_pred(2);
             theta_cov = m_tracked_banners[i]->cov(2,2);
-            Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eigen_solver(obj_cov);
+            Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigen_solver(obj_cov);
             double a_x = eigen_solver.eigenvalues()(0);
             double a_y = eigen_solver.eigenvalues()(1);
-            Eigen::Vector2f axis_x = eigen_solver.eigenvectors().col(0);
-            Eigen::Vector2f axis_y = eigen_solver.eigenvectors().col(1);
+            Eigen::Vector2d axis_x = eigen_solver.eigenvectors().col(0);
+            Eigen::Vector2d axis_y = eigen_solver.eigenvectors().col(1);
             tf2::Quaternion quat_rot;
             quat_rot.setRPY(0,0,std::atan2(axis_x(1), axis_x(0)));
             visualization_msgs::msg::Marker banner_ellipse;
@@ -932,7 +932,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
 
     // t1 = high_resolution_clock::now();
 
-    Eigen::Matrix<float, 2, 2> Q{
+    Eigen::Matrix<double, 2, 2> Q{
         {m_range_std*m_range_std, 0},
         {0, m_bearing_std*m_bearing_std},
     };
@@ -952,8 +952,8 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             all_seaing_perception::local_to_range_bearing_signature(det_obs->obstacle.get_local_point(), det_obs->label);
         p.push_back(std::vector<float>());
         v_meas.push_back(std::vector<float>());
-        Eigen::Vector2f z_pred;
-        Eigen::MatrixXf Psi;
+        Eigen::Vector2d z_pred;
+        Eigen::MatrixXd Psi;
         for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
             // if (m_track_robot) {
             //     float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
@@ -982,18 +982,18 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_nav_x;
             float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_nav_y;
             float q = d_x * d_x + d_y * d_y;
-            z_pred = Eigen::Vector2f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading));
+            z_pred = Eigen::Vector2d(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading));
 
-            Eigen::Matrix<float, 2, 2> h{
+            Eigen::Matrix<double, 2, 2> h{
                 {std::sqrt(q) * d_x, std::sqrt(q) * d_y},
                 {-d_y, d_x},
             };
             // Do not store vectors, since they don't compute covariance with other obstacles in
             // the same detection batch
-            Eigen::MatrixXf H = h / q;
+            Eigen::MatrixXd H = h / q;
             Psi = H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q;
 
-            Eigen::Vector2f z_actual(range, bearing);
+            Eigen::Vector2d z_actual(range, bearing);
 
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
             p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
@@ -1045,7 +1045,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
         int signature;
         std::tie(range, bearing, signature) = all_seaing_perception::local_to_range_bearing_signature(
             detected_obstacles[i]->obstacle.get_local_point(), detected_obstacles[i]->label);
-        Eigen::Vector2f z_actual(range, bearing);
+        Eigen::Vector2d z_actual(range, bearing);
 
         if (match[i] == -1) {
             if (detected_obstacles[i]->label == -1){
@@ -1061,8 +1061,8 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             gtsam::Key new_object_key;
             new_object_key = gtsam::Symbol('l', m_obstacle_id);
             m_tracked_obstacles.back()->node_key = new_object_key;
-            gtsam::Point2 new_obj_estimated_pos = Eigen::Vector2f(m_robot_pos_mean(0), m_robot_pos_mean(1)) +
-                range * Eigen::Vector2f(std::cos(bearing + m_robot_pos_mean(2)),
+            gtsam::Point2 new_obj_estimated_pos = Eigen::Vector2d(m_robot_pos_mean(0), m_robot_pos_mean(1)) +
+                range * Eigen::Vector2d(std::cos(bearing + m_robot_pos_mean(2)),
                                         std::sin(bearing + m_robot_pos_mean(2)));
             initialEstimate.insert(new_object_key, new_obj_estimated_pos);
         }
@@ -1256,7 +1256,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
         detected_banners.push_back(banner);
     }
 
-    Eigen::Matrix<float, 3, 3> Q{
+    Eigen::Matrix<double, 3, 3> Q{
         {m_banner_range_std*m_banner_range_std, 0, 0},
         {0, m_banner_bearing_std*m_banner_bearing_std, 0},
         {0, 0, m_banner_phi_std*m_banner_phi_std},
@@ -1276,8 +1276,8 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             all_seaing_perception::local_banner_to_range_bearing_signature(det_obs->plane_msg.normal_ctr, det_obs->label);
         p.push_back(std::vector<float>());
         v_meas.push_back(std::vector<float>());
-        Eigen::Vector3f z_pred;
-        Eigen::MatrixXf Psi;
+        Eigen::Vector3d z_pred;
+        Eigen::MatrixXd Psi;
         for (int tracked_id = 0; tracked_id < m_num_banners; tracked_id++) {
             // if (m_track_robot && m_banners_slam) {
             //     float d_x = m_state(3 + 2*m_num_obj + 3 * tracked_id) - m_state(0);
@@ -1309,19 +1309,19 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_nav_y;
             float d_theta = m_tracked_banners[tracked_id]->mean_pred[2] - m_nav_heading;
             float q = d_x * d_x + d_y * d_y;
-            z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::mod_2pi(d_theta));
+            z_pred = Eigen::Vector3d(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::mod_2pi(d_theta));
 
-            Eigen::Matrix<float, 3, 3> h{
+            Eigen::Matrix<double, 3, 3> h{
                 {std::sqrt(q) * d_x, std::sqrt(q) * d_y, 0},
                 {-d_y, d_x, 0},
                 {0, 0, q},
             };
             // Do not store vectors, since they don't compute covariance with other obstacles in
             // the same detection batch
-            Eigen::MatrixXf H = h / q;
+            Eigen::MatrixXd H = h / q;
             Psi = H * m_tracked_banners[tracked_id]->cov * H.transpose() + Q;
 
-            Eigen::Vector3f z_actual(range, bearing, phi);
+            Eigen::Vector3d z_actual(range, bearing, phi);
 
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
             z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
@@ -1348,7 +1348,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
         int signature;
         std::tie(range, bearing, phi, signature) =
             all_seaing_perception::local_banner_to_range_bearing_signature(detected_banners[i]->plane_msg.normal_ctr, detected_banners[i]->label);
-        Eigen::Vector3f z_actual(range, bearing, phi);
+        Eigen::Vector3d z_actual(range, bearing, phi);
         // if (match[i] != -1){
         //     float d_x = m_state(3 + 2*m_num_obj + 3 * match[i]) - m_state(0);
         //     float d_y = m_state(3 + 2*m_num_obj + 3 * match[i] + 1) - m_state(1);
@@ -1376,12 +1376,12 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             gtsam::Key new_banner_key;
             new_banner_key = gtsam::Symbol('l', m_obstacle_id);
             m_tracked_banners.back()->node_key = new_banner_key;
-            Eigen::Vector3f estimated_pose_vec(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2)) +
-                range * Eigen::Vector3f(std::cos(bearing + m_robot_pos_mean(2)),
+            Eigen::Vector3d estimated_pose_vec = Eigen::Vector3d(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2)) +
+                range * Eigen::Vector3d(std::cos(bearing + m_robot_pos_mean(2)),
                                         std::sin(bearing + m_robot_pos_mean(2)),
                                         0);
             estimated_pose_vec[0] = all_seaing_perception::mod_2pi(m_robot_pos_mean(2) + phi);
-            gtsam::Pose2 new_banner_estimated_pose = gtsam::Pose2((gtsam::Vector)estimated_pose_vec);
+            gtsam::Pose2 new_banner_estimated_pose = gtsam::Pose2((gtsam::Vector)estimated_pose_vec.cast<double>());
             initialEstimate.insert(new_banner_key, new_banner_estimated_pose);
         }
         int tracked_id = match[i] >= 0 ? match[i] : m_num_banners - 1;

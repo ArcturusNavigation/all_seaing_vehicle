@@ -63,6 +63,9 @@ def launch_setup(context, *args, **kwargs):
     ransac_params = os.path.join(
         bringup_prefix, "config", "perception", "ransac_params.yaml"
     )
+    slam_factor_graph_params = os.path.join(
+        bringup_prefix, "config", "slam", "slam_factor_graph.yaml"
+    )
 
     subprocess.run(["cp", "-r", os.path.join(bringup_prefix, "tile"), "/tmp"])
 
@@ -434,6 +437,19 @@ def launch_setup(context, *args, **kwargs):
             ("odometry/filtered", "odometry/integrated"),
         ],
         parameters=[slam_real_params],
+    )
+
+    slam_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="factor_graph_slam",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("detections", "obstacle_map/local"),
+            # ("odometry/filtered", "odometry/gps_sim"),
+            ("odometry/filtered", "odometry/integrated"),
+        ],
+        parameters=[slam_factor_graph_params],
     )
 
     rviz_node = launch_ros.actions.Node(
@@ -863,7 +879,8 @@ def launch_setup(context, *args, **kwargs):
         # multicam_detection_merge_node,
         ransac_node,
         odometry_publisher_node,
-        object_tracking_map_node,
+        # object_tracking_map_node,
+        slam_node,
         rviz_node,
         control_mux,
         a_star_server,
