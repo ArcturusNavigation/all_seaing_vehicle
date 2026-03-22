@@ -4,6 +4,7 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     // Initialize parameters
     this->declare_parameter<std::string>("global_frame_id", "map");
     this->declare_parameter<std::string>("slam_frame_id", "slam_map");
+    this->declare_parameter<std::string>("local_frame_id", "base_link");
     this->declare_parameter<double>("obstacle_drop_thresh", 1.0);
     this->declare_parameter<double>("range_uncertainty", 1.0);
     this->declare_parameter<double>("bearing_uncertainty", 1.0);
@@ -29,6 +30,7 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
     m_slam_frame_id = this->get_parameter("slam_frame_id").as_string();
+    m_local_frame_id = this->get_parameter("local_frame_id").as_string();
     m_obstacle_drop_thresh = this->get_parameter("obstacle_drop_thresh").as_double();
     m_range_std = this->get_parameter("range_uncertainty").as_double();
     m_bearing_std = this->get_parameter("bearing_uncertainty").as_double();
@@ -188,7 +190,6 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     }
 
     m_first_state = true;
-    m_got_local_frame = false;
     m_got_nav = false;
     m_got_odom = false;
     m_num_obj = 0;
@@ -208,6 +209,8 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     m_gps_compass_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_update_gps_xy_uncertainty, m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty));
     m_object_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(m_bearing_std, m_range_std));
     m_banner_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_banner_bearing_std, m_banner_range_std, m_banner_phi_std));
+
+    m_isam2 = std::make_shared<gtsam::ISAM2>();
 }
 
 void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Request> request,
@@ -403,6 +406,8 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         initialEstimate.insert(first_pose_key, gtsam::Pose2(m_nav_x, m_nav_y, m_nav_heading));
         m_isam2->update(graph, initialEstimate);
 
+        RCLCPP_INFO(this->get_logger(), "INITIALIZED FACTOR GRAPH");
+
         m_first_state = false;
         // m_last_odom_time = rclcpp::Time(msg.header.stamp);
         return;
@@ -459,9 +464,7 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     initialEstimate.insert(new_pose_key, new_estimated_pose);
     m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
 
-    // get new pose estimate (mean & covariance) and update our current estimate
-    m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(new_pose_key).cast<gtsam::Pose2>());
-    m_robot_pos_cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(new_pose_key); // check if this is a slow operation, if so remove / only include in visualization every some steps
+    this->update_estimates();
 
     // if (m_track_robot) {
     //     m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(msg.header.stamp).seconds()));
@@ -505,16 +508,10 @@ void FactorGraphSLAM::gps_based_pred(){
     initialEstimate.insert(new_pose_key, new_estimated_pose);
     m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
 
-    // get new pose estimate (mean & covariance) and update our current estimate
-    m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(new_pose_key).cast<gtsam::Pose2>());
-    m_robot_pos_cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(new_pose_key); // check if this is a slow operation, if so remove / only include in visualization every some steps
-
     m_gps_based_predicted = true;
 }
 
 void FactorGraphSLAM::odom_callback() {
-    if(!m_got_local_frame) return;
-
     //update odometry transforms
     //TODO: add a flag for each one that says if they succedeed, to know to continue or not
     m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
@@ -558,11 +555,9 @@ void FactorGraphSLAM::odom_callback() {
         gtsam::NonlinearFactorGraph graph;
         graph.add(all_seaing_perception::UnaryPoseFactor(m_pose_keys.back(), m_nav_x, m_nav_y, m_nav_heading, m_gps_compass_noise, m_include_odom_theta, m_include_odom_only_theta));
         m_isam2->update(graph); // this runs the iSAM2 optimization step
-
-        // get new pose estimate (mean & covariance) and update our current estimate
-        m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(m_pose_keys.back()).cast<gtsam::Pose2>());
-        m_robot_pos_cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(m_pose_keys.back()); // check if this is a slow operation, if so remove / only include in visualization every some steps
     }
+
+    this->update_estimates();
 
     m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(m_map_base_link_tf.header.stamp).seconds()));
 
@@ -573,7 +568,7 @@ void FactorGraphSLAM::odom_callback() {
     }
 
     if(m_got_nav && m_got_odom){
-        publish_slam();
+        this->publish_slam();
     }
 
     this->update_maps();
@@ -888,7 +883,6 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
     std_msgs::msg::Header m_global_untracked_header = m_global_header;
     m_global_untracked_header.frame_id = m_global_frame_id;
     m_local_frame_id = m_local_header.frame_id;
-    m_got_local_frame = true;
 
     // m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
     // m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
@@ -1078,6 +1072,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
         detected_obstacles[i]->last_dead = m_tracked_obstacles[tracked_id]->last_dead;
         detected_obstacles[i]->time_dead = m_tracked_obstacles[tracked_id]->time_dead;
         detected_obstacles[i]->is_dead = m_tracked_obstacles[tracked_id]->is_dead;
+        detected_obstacles[i]->node_key = m_tracked_obstacles[tracked_id]->node_key;
         m_tracked_obstacles[tracked_id] = detected_obstacles[i];
     }
 
@@ -1227,7 +1222,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
         this->visualize_predictions();
     }
     if(m_got_nav && m_got_odom){
-        publish_slam();
+        this->publish_slam();
     }
 }
 
@@ -1239,7 +1234,6 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
     std_msgs::msg::Header m_global_untracked_header = m_global_header;
     m_global_untracked_header.frame_id = m_global_frame_id;
     m_local_frame_id = m_local_header.frame_id;
-    m_got_local_frame = true;
 
     m_map_base_link_tf = all_seaing_perception::get_tf(m_tf_buffer, m_global_frame_id, m_local_frame_id);
     m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
@@ -1398,6 +1392,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
         detected_banners[i]->last_dead = m_tracked_banners[tracked_id]->last_dead;
         detected_banners[i]->time_dead = m_tracked_banners[tracked_id]->time_dead;
         detected_banners[i]->is_dead = m_tracked_banners[tracked_id]->is_dead;
+        detected_banners[i]->node_key = m_tracked_banners[tracked_id]->node_key;
         m_tracked_banners[tracked_id] = detected_banners[i];
     }
 
@@ -1526,7 +1521,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
         this->visualize_predictions();
     }
     if(m_got_nav && m_got_odom){
-        publish_slam();
+        this->publish_slam();
     }
 }
 

@@ -1,7 +1,8 @@
-object_tracking_map:
+factor_graph_slam:
   ros__parameters:
     global_frame_id: "odom"
     slam_frame_id: "map"
+    local_frame_id: "base_link"
     duplicate_thresh: 1.0
     obstacle_drop_thresh: 1000.0
     range_drop_thresh: 10.0

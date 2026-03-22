@@ -840,6 +840,17 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    wamv_base_link = launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--frame-id",
+            "wamv/wamv/base_link",
+            "--child-frame-id",
+            "base_link",
+        ],
+    )
+
     keyboard_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([driver_prefix, "/launch/keyboard.launch.py"]),
     )
@@ -906,6 +917,7 @@ def launch_setup(context, *args, **kwargs):
         # docking_fallback,
         rviz_waypoint_sender,
         # map_to_odom,
+        wamv_base_link,
         keyboard_ld,
         sim_ld,
         # perception_eval_node,
