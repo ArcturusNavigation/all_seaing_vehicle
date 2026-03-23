@@ -171,11 +171,11 @@ namespace all_seaing_perception {
         return gtsam::Vector3(a, b, c);
     }
 
-    class BearingRangePhiFactor : public gtsam::ExpressionFactorN<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2> {
+    class BearingRangePhiFactor : public gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2> {
     public:
         BearingRangePhiFactor(gtsam::Key key1, gtsam::Key key2, double bearing, double range, double phi, const gtsam::SharedNoiseModel& noise_model):
-            gtsam::ExpressionFactorN<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2>({{key1, key2}}, noise_model, gtsam::Vector3(bearing, range, phi)) {
-                this->initialize(expression({{key1, key2}}));
+            gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2>(key1, key2, noise_model, gtsam::Vector3(bearing, range, phi)) {
+                this->initialize(expression(key1, key2));
             }
         // gtsam::Vector evaluateError(const gtsam::Pose2& robot_pose, const gtsam::Pose2& banner_pose, boost::optional<gtsam::Matrix&> H_robot = boost::none, boost::optional<gtsam::Matrix&> H_banner = boost::none) const {
         //     double pred_bearing = gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::MeasureBearing(robot_pose, banner_pose).theta();
@@ -197,9 +197,9 @@ namespace all_seaing_perception {
         //     }
         //     return error;
         // }
-        gtsam::Expression<gtsam::Vector3> expression(const gtsam::ExpressionFactorN<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2>::ArrayNKeys& keys) const override{
-            gtsam::Expression<gtsam::Pose2> robot_pose(keys[0]);
-            gtsam::Expression<gtsam::Pose2> banner_pose(keys[1]);
+        gtsam::Expression<gtsam::Vector3> expression(gtsam::Key key1, gtsam::Key key2) const override{
+            gtsam::Expression<gtsam::Pose2> robot_pose(key1);
+            gtsam::Expression<gtsam::Pose2> banner_pose(key2);
             gtsam::Expression<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>> pred_bearing_range(gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::Measure, robot_pose, banner_pose);
             gtsam::Expression<gtsam::Rot2> pred_bearing(BearingRangeBearing, pred_bearing_range);
             gtsam::Expression<double> pred_range(BearingRangeRange, pred_bearing_range);
