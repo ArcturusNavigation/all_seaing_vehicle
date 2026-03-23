@@ -731,12 +731,14 @@ void FactorGraphSLAM::visualize_predictions() {
     Eigen::Vector2d axis_y = eigen_solver.eigenvectors().col(1);
     tf2::Quaternion quat_rot;
     quat_rot.setRPY(0,0,std::atan2(axis_x(1), axis_x(0)));
+    tf2::Quaternion angle_quat;
+    angle_quat.setRPY(0, 0, m_robot_pos_mean(2));
     visualization_msgs::msg::Marker ellipse;
     ellipse.type = visualization_msgs::msg::Marker::SPHERE;
     ellipse.pose.position.x = robot_mean(0);
     ellipse.pose.position.y = robot_mean(1);
     ellipse.pose.position.z = 0;
-    ellipse.pose.orientation = tf2::toMsg(quat_rot);
+    ellipse.pose.orientation = tf2::toMsg(quat_rot*angle_quat); // because covariances are in relative coordinates in GTSAM
     ellipse.scale.x = sqrt(a_x);
     ellipse.scale.y = sqrt(a_y);
     ellipse.scale.z = 0.5;
@@ -751,8 +753,6 @@ void FactorGraphSLAM::visualize_predictions() {
     angle_marker.pose.position.x = robot_mean(0);
     angle_marker.pose.position.y = robot_mean(1);
     angle_marker.pose.position.z = 0;
-    tf2::Quaternion angle_quat;
-    angle_quat.setRPY(0, 0, m_robot_pos_mean(2));
     angle_marker.pose.orientation = tf2::toMsg(angle_quat);
     angle_marker.scale.x = sqrt(m_robot_pos_cov(2, 2));
     angle_marker.scale.y = 0.2;
@@ -808,12 +808,14 @@ void FactorGraphSLAM::visualize_predictions() {
             Eigen::Vector2d axis_y = eigen_solver.eigenvectors().col(1);
             tf2::Quaternion quat_rot;
             quat_rot.setRPY(0,0,std::atan2(axis_x(1), axis_x(0)));
+            tf2::Quaternion angle_quat;
+            angle_quat.setRPY(0, 0, theta);
             visualization_msgs::msg::Marker banner_ellipse;
             banner_ellipse.type = visualization_msgs::msg::Marker::SPHERE;
             banner_ellipse.pose.position.x = obj_mean(0);
             banner_ellipse.pose.position.y = obj_mean(1);
             banner_ellipse.pose.position.z = 0;
-            banner_ellipse.pose.orientation = tf2::toMsg(quat_rot);
+            banner_ellipse.pose.orientation = tf2::toMsg(quat_rot*angle_quat); // because covariances are in relative coordinates in GTSAM
             banner_ellipse.scale.x = sqrt(a_x);
             banner_ellipse.scale.y = sqrt(a_y);
             banner_ellipse.scale.z = 0.5;
@@ -828,8 +830,6 @@ void FactorGraphSLAM::visualize_predictions() {
             banner_angle_marker.pose.position.x = obj_mean(0);
             banner_angle_marker.pose.position.y = obj_mean(1);
             banner_angle_marker.pose.position.z = 0;
-            tf2::Quaternion angle_quat;
-            angle_quat.setRPY(0, 0, theta);
             banner_angle_marker.pose.orientation = tf2::toMsg(angle_quat);
             banner_angle_marker.scale.x = sqrt(theta_cov);
             banner_angle_marker.scale.y = 0.2;
@@ -1043,8 +1043,6 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
         int signature;
         std::tie(range, bearing, signature) = all_seaing_perception::local_to_range_bearing_signature(
             detected_obstacles[i]->obstacle.get_local_point(), detected_obstacles[i]->label);
-        Eigen::Vector2d z_actual(range, bearing);
-
         if (match[i] == -1) {
             if (detected_obstacles[i]->label == -1){
                 // don't create new obstacles when they have no label
@@ -1316,7 +1314,10 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             // Do not store vectors, since they don't compute covariance with other obstacles in
             // the same detection batch
             Eigen::MatrixXd H = h / q;
-            Psi = H * m_tracked_banners[tracked_id]->cov * H.transpose() + Q;
+            Eigen::Matrix3d rot_mat = Eigen::AngleAxisd(m_tracked_banners[tracked_id]->mean_pred[2], Eigen::Vector3d::UnitZ()).matrix();
+            // convert covariances to global coordinate frame
+            Eigen::Matrix3d global_cov = rot_mat * m_tracked_banners[tracked_id]->cov * rot_mat.transpose();
+            Psi = H * global_cov * H.transpose() + Q;
 
             Eigen::Vector3d z_actual(range, bearing, phi);
 
@@ -1377,7 +1378,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
                 range * Eigen::Vector3d(std::cos(bearing + m_robot_pos_mean(2)),
                                         std::sin(bearing + m_robot_pos_mean(2)),
                                         0);
-            estimated_pose_vec[0] = all_seaing_perception::mod_2pi(m_robot_pos_mean(2) + phi);
+            estimated_pose_vec[2] = all_seaing_perception::mod_2pi(m_robot_pos_mean(2) + phi);
             gtsam::Pose2 new_banner_estimated_pose = gtsam::Pose2((gtsam::Vector)estimated_pose_vec.cast<double>());
             initialEstimate.insert(new_banner_key, new_banner_estimated_pose);
         }
