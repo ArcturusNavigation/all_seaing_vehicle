@@ -628,7 +628,9 @@ T FactorGraphSLAM::convert_to_local(T point, bool untracked) {
 }
 
 void FactorGraphSLAM::update_estimates(){
-    m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(m_pose_keys.back()).cast<gtsam::Pose2>());
+    gtsam::Pose2 robot_pose = m_isam2->calculateEstimate(m_pose_keys.back()).cast<gtsam::Pose2>();
+    m_robot_pos_mean = Eigen::Vector3d(robot_pose.x(), robot_pose.y(), robot_pose.theta());
+    // m_robot_pos_mean = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(m_pose_keys.back()).cast<gtsam::Pose2>());
     m_robot_pos_cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(m_pose_keys.back());
     for (size_t i = 0; i < m_tracked_obstacles.size(); i++) {
         m_tracked_obstacles[i]->mean_pred = (Eigen::Vector2d)((gtsam::Point2)m_isam2->calculateEstimate(m_tracked_obstacles[i]->node_key).cast<gtsam::Point2>());
@@ -636,7 +638,9 @@ void FactorGraphSLAM::update_estimates(){
     }
     if (m_track_banners){
         for (size_t i = 0; i < m_tracked_banners.size(); i++) {
-            m_tracked_banners[i]->mean_pred = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(m_tracked_banners[i]->node_key).cast<gtsam::Pose2>());
+            gtsam::Pose2 banner_pose = m_isam2->calculateEstimate(m_tracked_banners[i]->node_key).cast<gtsam::Pose2>();
+            m_tracked_banners[i]->mean_pred = Eigen::Vector3d(banner_pose.x(), banner_pose.y(), banner_pose.theta());
+            // m_tracked_banners[i]->mean_pred = (Eigen::Vector3d)gtsam::Pose2::Logmap(m_isam2->calculateEstimate(m_tracked_banners[i]->node_key).cast<gtsam::Pose2>());
             m_tracked_banners[i]->cov = (Eigen::Matrix3d)m_isam2->marginalCovariance(m_tracked_banners[i]->node_key);
         }
     }
@@ -973,10 +977,10 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             // & use the above formula to compute a more accurate Mahalanobis distance
             // TODO try to get the updated (based on the factor graph, not only the factor) noise model between the pose & the landmark from GTSAM
             // and also the error used in the BearingRange factor & use those to compute the Mahalanobis distance
-            float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_nav_x;
-            float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_nav_y;
+            float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_robot_pos_mean(0);
+            float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_robot_pos_mean(1);
             float q = d_x * d_x + d_y * d_y;
-            z_pred = Eigen::Vector2d(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading));
+            z_pred = Eigen::Vector2d(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_robot_pos_mean(2)));
 
             Eigen::Matrix<double, 2, 2> h{
                 {std::sqrt(q) * d_x, std::sqrt(q) * d_y},
@@ -1063,7 +1067,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
         int tracked_id = match[i] >= 0 ? match[i] : m_num_obj - 1;
 
         // add the range bearing factor
-        graph.add(gtsam::BearingRangeFactor<gtsam::Pose2, gtsam::Point2>(m_pose_keys.back(), m_tracked_obstacles[tracked_id]->node_key, bearing, range, m_object_meas_noise));
+        graph.add(gtsam::BearingRangeFactor<gtsam::Pose2, gtsam::Point2>(m_pose_keys.back(), m_tracked_obstacles[tracked_id]->node_key, gtsam::Rot2(bearing), range, m_object_meas_noise));
 
         // update data for matched obstacles (we'll update position after we update SLAM with all points)
         detected_obstacles[i]->obstacle.set_id(m_tracked_obstacles[tracked_id]->obstacle.get_id());
@@ -1299,12 +1303,11 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             // & use the above formula to compute a more accurate Mahalanobis distance
             // TODO try to get the updated (based on the factor graph, not only the factor) noise model between the pose & the landmark from GTSAM
             // and also the error used in the BearingRange factor & use those to compute the Mahalanobis distance
-            float d_x = m_tracked_banners[tracked_id]->mean_pred[0] - m_nav_x;
-            float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_nav_y;
-            float d_theta = m_tracked_banners[tracked_id]->mean_pred[2] - m_nav_heading;
+            float d_x = m_tracked_banners[tracked_id]->mean_pred[0] - m_robot_pos_mean(0);
+            float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_robot_pos_mean(1);
+            float d_theta = m_tracked_banners[tracked_id]->mean_pred[2] - m_robot_pos_mean(2);
             float q = d_x * d_x + d_y * d_y;
-            z_pred = Eigen::Vector3d(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::mod_2pi(d_theta));
-
+            z_pred = Eigen::Vector3d(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_robot_pos_mean(2)), all_seaing_perception::mod_2pi(d_theta));
             Eigen::Matrix<double, 3, 3> h{
                 {std::sqrt(q) * d_x, std::sqrt(q) * d_y, 0},
                 {-d_y, d_x, 0},
