@@ -1,0 +1,206 @@
+#ifndef ALL_SEAING_PERCEPTION__FACTOR_GRAPH_SLAM_HPP
+#define ALL_SEAING_PERCEPTION__FACTOR_GRAPH_SLAM_HPP
+
+#include <iostream>
+#include <fstream>
+#include "yaml-cpp/yaml.h"
+
+#include <vector>
+#include <tuple>
+#include <chrono>
+#include <math.h>
+#include <deque>
+#include <thread>
+#include <map>
+
+#include "rclcpp/rclcpp.hpp"
+
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/transform_broadcaster.h"
+
+#include "tf2/LinearMath/Matrix3x3.h"
+#include "tf2/LinearMath/Quaternion.h"
+
+#include "image_geometry/pinhole_camera_model.h"
+#include "message_filters/subscriber.h"
+
+#include "geometry_msgs/msg/transform_stamped.hpp"
+#include "geometry_msgs/msg/point.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
+#include "sensor_msgs/msg/image.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "builtin_interfaces/msg/time.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/header.hpp"
+#include "visualization_msgs/msg/marker.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
+
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/point_types_conversion.h>
+#include <pcl/common/distances.h>
+#include "pcl_conversions/pcl_conversions.h"
+
+#include "cv_bridge/cv_bridge.h"
+
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
+
+#include "tf2/exceptions.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+
+#include "all_seaing_interfaces/msg/labeled_object_point_cloud_array.hpp"
+#include "all_seaing_interfaces/msg/labeled_object_point_cloud.hpp"
+#include "all_seaing_interfaces/msg/labeled_object_plane_array.hpp"
+#include "all_seaing_interfaces/msg/labeled_object_plane.hpp"
+#include "all_seaing_interfaces/msg/obstacle_map.hpp"
+
+#include "all_seaing_perception/obstacle.hpp"
+#include "all_seaing_perception/factor_graph_utilities.hpp"
+#include "all_seaing_interfaces/srv/restart_slam.hpp"
+
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
+
+#include <Eigen/Dense>
+#include <Eigen/Eigenvalues>
+
+#include <gtsam/geometry/Point2.h>
+#include <gtsam/geometry/Pose2.h>
+#include <gtsam/inference/Symbol.h>
+#include <gtsam/nonlinear/ISAM2.h>
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/Values.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/nonlinear/GaussNewtonOptimizer.h>
+#include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/sam/BearingRangeFactor.h>
+
+class FactorGraphSLAM : public rclcpp::Node{
+private:
+    void object_track_map_publish(const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr &msg);
+    void odom_callback();
+    void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
+    void banners_cb(const all_seaing_interfaces::msg::LabeledObjectPlaneArray::ConstSharedPtr &msg);
+    void gps_based_pred();
+
+    template <typename T>
+    T convert_to_global(T point, bool untracked = false);
+    template <typename T>
+    T convert_to_local(T point, bool untracked = false);
+
+    void update_estimates();
+
+    void update_maps();
+
+    void publish_maps();
+
+    void visualize_predictions();
+    
+    void publish_slam();
+
+    void restart_slam(const std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Request> request,
+          std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Response> response);
+
+    // Member variables
+    std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>> m_tracked_obstacles;
+    std::vector<std::shared_ptr<all_seaing_perception::Banner>> m_tracked_banners;
+    std::string m_global_frame_id, m_local_frame_id, m_slam_frame_id;
+    std_msgs::msg::Header m_local_header;
+    std_msgs::msg::Header m_global_header, m_global_untracked_header;
+    int m_obstacle_id;
+    
+    double m_duplicate_thresh;
+    double m_obstacle_drop_thresh, m_range_drop_thresh;
+    double m_init_new_cov, m_banner_init_new_cov, m_banner_init_new_theta_cov, m_init_xy_noise, m_init_theta_noise;
+    bool m_gps_update;
+    double m_normalize_drop_dist;
+    double m_odom_refresh_rate;
+    bool m_is_sim;
+    bool m_direct_tf;
+    bool m_normalize_drop_thresh;
+    bool m_include_odom_theta, m_include_odom_only_theta;
+    std::string m_data_association_algo;
+    double m_trace_time;
+    bool m_include_unlabeled, m_drop_ignore_unlabeled;
+    double m_unlabeled_assoc_threshold;
+    bool m_track_banners;
+    bool m_diff_position_odom;
+    int m_odom_queue_size;
+    int m_detection_queue_size;
+    double m_odom_timeout, m_detection_timeout;
+    bool m_gps_based_predictions;
+
+    double m_nav_x, m_nav_y, m_nav_z, m_nav_heading, m_nav_omega, m_nav_vx, m_nav_vy, m_nav_vz;
+    rclcpp::Time m_last_odom_time, m_last_nav_time;
+    double m_odom_x, m_odom_y, m_odom_heading, m_last_odom_x, m_last_odom_y, m_last_odom_heading;
+    bool m_gps_based_predicted;
+    double m_gps_based_dx, m_gps_based_dy, m_gps_based_dtheta;
+    double m_last_nav_x, m_last_nav_y, m_last_nav_heading;
+    
+    std::deque<std::tuple<float, float, float>> m_trace; // (x,y,time)
+
+    // Publishers and subscribers
+    rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_tracked_map_pub;
+    rclcpp::Publisher<all_seaing_interfaces::msg::LabeledObjectPlaneArray>::SharedPtr m_tracked_banners_pub;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_map_cov_viz_pub;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr m_odom_sub;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr m_slam_pub;
+    rclcpp::Subscription<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_object_sub;
+    rclcpp::Subscription<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_unlabeled_sub;
+    rclcpp::Subscription<all_seaing_interfaces::msg::LabeledObjectPlaneArray>::SharedPtr m_banners_sub;
+
+    // Transform variables
+    std::shared_ptr<tf2_ros::TransformListener> m_tf_listener{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+    std::unique_ptr<tf2_ros::TransformBroadcaster> m_tf_broadcaster;
+    geometry_msgs::msg::TransformStamped m_base_link_map_tf, m_map_base_link_tf;
+    rclcpp::TimerBase::SharedPtr odom_timer;
+
+    // SLAM parameters & variables
+    float m_range_std, m_bearing_std, m_banner_range_std, m_banner_bearing_std, m_banner_phi_std, m_new_obj_slam_thres, m_new_banner_slam_thres;
+    float m_object_huber_thres, m_banner_huber_thres;
+    float m_object_assoc_dist_thres, m_banner_assoc_dist_thres;
+    float m_gps_xy_noise, m_gps_theta_noise;
+    float m_imu_xy_noise, m_imu_theta_noise;
+    float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
+    int m_num_obj, m_num_banners, m_num_poses;
+    Eigen::Vector3d m_robot_pos_mean;//obstacle map
+    Eigen::Matrix3d m_robot_pos_cov;//covariance matrix
+    bool m_first_state, m_got_local_frame, m_got_nav, m_got_odom, m_rotate_odom;
+    bool m_shouldnt_gps_pred;
+    bool m_match_numbers_indicators;
+    nav_msgs::msg::Odometry m_last_odom_msg;
+
+    std::map<std::string, int> banner_name_to_label;
+    std::map<int, std::string> banner_label_to_name;
+    std::map<int, int> banner_label_to_number;
+    std::map<int, bool> banner_label_indicator;
+
+    // Factor graph (GTSAM) variables
+    std::shared_ptr<gtsam::ISAM2> m_isam2;
+    std::vector<gtsam::Key> m_pose_keys;
+
+    // Noise models
+    gtsam::noiseModel::Diagonal::shared_ptr m_prior_noise;
+    gtsam::noiseModel::Diagonal::shared_ptr m_odom_noise;
+    gtsam::noiseModel::Diagonal::shared_ptr m_gps_compass_noise;
+    gtsam::noiseModel::Diagonal::shared_ptr m_object_meas_noise;
+    gtsam::noiseModel::Diagonal::shared_ptr m_banner_meas_noise;
+    gtsam::noiseModel::Robust::shared_ptr m_object_huber;
+    gtsam::noiseModel::Robust::shared_ptr m_banner_huber;
+    
+    // Symbol/key notation: poses are ('x', pose_index), landmarks are ('l', obstacle_id)
+    // All will be stored as well
+
+    // SLAM restart service
+    rclcpp::Service<all_seaing_interfaces::srv::RestartSLAM>::SharedPtr m_restart_service;
+
+public:
+    FactorGraphSLAM();
+    virtual ~FactorGraphSLAM();
+};
+
+#endif // ALL_SEAING_PERCEPTION__FACTOR_GRAPH_SLAM_HPP
