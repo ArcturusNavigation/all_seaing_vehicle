@@ -118,6 +118,10 @@ namespace all_seaing_perception {
         Banner(rclcpp::Time t, int l, all_seaing_interfaces::msg::LabeledObjectPlane msg);
     };
 
+    double mod_2pi(double angle);
+    double angle_to_pi_range(double angle);
+    double bidirectional_angle_to_pi_range(double angle);
+
     class UnaryPoseFactor : public gtsam::NoiseModelFactor1<gtsam::Pose2> {
         double mx_, my_, mtheta_;
         bool incl_theta_, only_theta_;
@@ -126,7 +130,7 @@ namespace all_seaing_perception {
             bool include_theta=true, bool only_theta=false):
             gtsam::NoiseModelFactor1<gtsam::Pose2>(noise_model, key), mx_(x), my_(y), mtheta_(theta), incl_theta_(include_theta), only_theta_(only_theta) {}
         gtsam::Vector evaluateError(const gtsam::Pose2& pose, boost::optional<gtsam::Matrix&> H = boost::none) const {
-            gtsam::Vector error = gtsam::Vector3(only_theta_? 0 : pose.x() - mx_, only_theta_? 0 : pose.y() - my_, incl_theta_? pose.theta() - mtheta_ : 0);
+            gtsam::Vector error = gtsam::Vector3(only_theta_? 0 : pose.x() - mx_, only_theta_? 0 : pose.y() - my_, incl_theta_? all_seaing_perception::angle_to_pi_range(pose.theta() - mtheta_) : 0);
             // Same dimensions for measurement & error regardless of have/no theta so that we can use the same noise model
             if (H) {
                 (*H) = gtsam::Matrix::Zero(3, 3);
@@ -248,10 +252,6 @@ namespace all_seaing_perception {
 
     template<typename PointT>
     std::vector<std::shared_ptr<ObjectCloud<PointT>>> clone(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> orig);
-
-    double mod_2pi(double angle);
-    double angle_to_pi_range(double angle);
-    double bidirectional_angle_to_pi_range(double angle);
 
     template<typename PointT>
     std::tuple<float, float, int> local_to_range_bearing_signature(PointT point, int label);

@@ -161,6 +161,8 @@ private:
 
     // SLAM parameters & variables
     float m_range_std, m_bearing_std, m_banner_range_std, m_banner_bearing_std, m_banner_phi_std, m_new_obj_slam_thres, m_new_banner_slam_thres;
+    float m_object_huber_thres, m_banner_huber_thres;
+    float m_object_assoc_dist_thres, m_banner_assoc_dist_thres;
     float m_gps_xy_noise, m_gps_theta_noise;
     float m_imu_xy_noise, m_imu_theta_noise;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
@@ -187,6 +189,8 @@ private:
     gtsam::noiseModel::Diagonal::shared_ptr m_gps_compass_noise;
     gtsam::noiseModel::Diagonal::shared_ptr m_object_meas_noise;
     gtsam::noiseModel::Diagonal::shared_ptr m_banner_meas_noise;
+    gtsam::noiseModel::Robust::shared_ptr m_object_huber;
+    gtsam::noiseModel::Robust::shared_ptr m_banner_huber;
     
     // Symbol/key notation: poses are ('x', pose_index), landmarks are ('l', obstacle_id)
     // All will be stored as well

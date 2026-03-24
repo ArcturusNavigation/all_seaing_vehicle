@@ -19,6 +19,10 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     this->declare_parameter<double>("update_odom_theta_uncertainty", 1.0);
     this->declare_parameter<double>("new_object_slam_threshold", 1.0);
     this->declare_parameter<double>("new_banner_slam_threshold", 1.0);
+    this->declare_parameter<double>("object_huber_threshold", 1.0);
+    this->declare_parameter<double>("banner_huber_threshold", 1.0);
+    this->declare_parameter<double>("object_assoc_distance_threshold", 1.0);
+    this->declare_parameter<double>("banner_assoc_distance_threshold", 1.0);
     this->declare_parameter<double>("init_xy_noise", 1.0);
     this->declare_parameter<double>("init_theta_noise", 1.0);
     this->declare_parameter<bool>("track_robot", true);
@@ -45,6 +49,10 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     m_update_odom_theta_uncertainty = this->get_parameter("update_odom_theta_uncertainty").as_double();
     m_new_obj_slam_thres = this->get_parameter("new_object_slam_threshold").as_double();
     m_new_banner_slam_thres = this->get_parameter("new_banner_slam_threshold").as_double();
+    m_object_huber_thres = this->get_parameter("object_huber_threshold").as_double();
+    m_banner_huber_thres = this->get_parameter("banner_huber_threshold").as_double();
+    m_object_assoc_dist_thres = this->get_parameter("object_assoc_distance_threshold").as_double();
+    m_banner_assoc_dist_thres = this->get_parameter("banner_assoc_distance_threshold").as_double();
     m_init_xy_noise = this->get_parameter("init_xy_noise").as_double();
     m_init_theta_noise = this->get_parameter("init_theta_noise").as_double();
     m_gps_update = this->get_parameter("gps_update").as_bool();
@@ -210,6 +218,10 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     m_object_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(m_bearing_std, m_range_std));
     m_banner_meas_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(m_banner_bearing_std, m_banner_range_std, m_banner_phi_std));
 
+    // TODO maybe include a Huber loss for the GPS? both to exclude noisy compass/laggy measurements & maybe handle drift, although that might require a different factor/variable that accounts for drift
+    m_object_huber = gtsam::noiseModel::Robust::Create(gtsam::noiseModel::mEstimator::Huber::Create(m_object_huber_thres), m_object_meas_noise);
+    m_banner_huber = gtsam::noiseModel::Robust::Create(gtsam::noiseModel::mEstimator::Huber::Create(m_banner_huber_thres), m_banner_meas_noise);
+    
     m_isam2 = std::make_shared<gtsam::ISAM2>();
 }
 
@@ -460,7 +472,7 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     m_pose_keys.push_back(new_pose_key);
     graph.add(gtsam::BetweenFactor<gtsam::Pose2>(m_pose_keys[m_num_poses-2], new_pose_key, gtsam::Pose2(dx, dy, dtheta), m_odom_noise));
     gtsam::Values initialEstimate;
-    gtsam::Pose2 new_estimated_pose = gtsam::Pose2((gtsam::Vector)m_robot_pos_mean)*gtsam::Pose2(dx, dy, dtheta);
+    gtsam::Pose2 new_estimated_pose = gtsam::Pose2(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2))*gtsam::Pose2(dx, dy, dtheta);
     initialEstimate.insert(new_pose_key, new_estimated_pose);
     m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
 
@@ -504,7 +516,7 @@ void FactorGraphSLAM::gps_based_pred(){
     m_pose_keys.push_back(new_pose_key);
     graph.add(gtsam::BetweenFactor<gtsam::Pose2>(m_pose_keys[m_num_poses-2], new_pose_key, gtsam::Pose2(dx, dy, dtheta), m_odom_noise));
     gtsam::Values initialEstimate;
-    gtsam::Pose2 new_estimated_pose = gtsam::Pose2((gtsam::Vector)m_robot_pos_mean)*gtsam::Pose2(dx, dy, dtheta);
+    gtsam::Pose2 new_estimated_pose = gtsam::Pose2(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2))*gtsam::Pose2(dx, dy, dtheta);
     initialEstimate.insert(new_pose_key, new_estimated_pose);
     m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
 
@@ -654,8 +666,8 @@ void FactorGraphSLAM::update_maps(){
     for (size_t i = 0; i < m_tracked_obstacles.size(); i++) {
         pcl::PointXYZHSV prev_glob_centr = m_tracked_obstacles[i]->obstacle.get_global_point();
         pcl::PointXYZHSV upd_glob_centr = prev_glob_centr;
-        upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred[0];
-        upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred[1];
+        upd_glob_centr.x = m_tracked_obstacles[i]->mean_pred(0);
+        upd_glob_centr.y = m_tracked_obstacles[i]->mean_pred(1);
         m_tracked_obstacles[i]->obstacle.global_transform(upd_glob_centr.x-prev_glob_centr.x, upd_glob_centr.y-prev_glob_centr.y, 0);
         double dx, dy, dtheta;
         std::tie(dx, dy, dtheta) = all_seaing_perception::compose_transforms(std::make_tuple(m_nav_x, m_nav_y, m_nav_heading),all_seaing_perception::compute_transform_from_to(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2), 0, 0, 0));
@@ -677,10 +689,10 @@ void FactorGraphSLAM::update_maps(){
 
     if (!m_track_banners) return;
     for (size_t i = 0; i < m_tracked_banners.size(); i++) {
-        m_tracked_banners[i]->plane_msg.normal_ctr.position.x = m_tracked_banners[i]->mean_pred[0];
-        m_tracked_banners[i]->plane_msg.normal_ctr.position.y = m_tracked_banners[i]->mean_pred[1];
+        m_tracked_banners[i]->plane_msg.normal_ctr.position.x = m_tracked_banners[i]->mean_pred(0);
+        m_tracked_banners[i]->plane_msg.normal_ctr.position.y = m_tracked_banners[i]->mean_pred(1);
         tf2::Quaternion q;
-        q.setRPY(0, 0, m_tracked_banners[i]->mean_pred[2]);
+        q.setRPY(0, 0, m_tracked_banners[i]->mean_pred(2));
         m_tracked_banners[i]->plane_msg.normal_ctr.orientation = tf2::toMsg(q);
     }
 }
@@ -977,8 +989,9 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             // & use the above formula to compute a more accurate Mahalanobis distance
             // TODO try to get the updated (based on the factor graph, not only the factor) noise model between the pose & the landmark from GTSAM
             // and also the error used in the BearingRange factor & use those to compute the Mahalanobis distance
-            float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_robot_pos_mean(0);
-            float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_robot_pos_mean(1);
+            // TODO maybe just use the projected global position of the measurement & the given covariance to compute the Mahalanobis distance
+            float d_x = m_tracked_obstacles[tracked_id]->mean_pred(0) - m_robot_pos_mean(0);
+            float d_y = m_tracked_obstacles[tracked_id]->mean_pred(1) - m_robot_pos_mean(1);
             float q = d_x * d_x + d_y * d_y;
             z_pred = Eigen::Vector2d(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_robot_pos_mean(2)));
 
@@ -994,9 +1007,14 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             Eigen::Vector2d z_actual(range, bearing);
 
             z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
-            p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
-                               (z_actual - z_pred));
+            float mahalanobis_dist = (z_actual - z_pred).transpose() * Psi.inverse() * (z_actual - z_pred);
+            p.back().push_back(mahalanobis_dist);
             v_meas.back().push_back(Psi.trace());
+            
+            // RCLCPP_INFO(this->get_logger(), "COV: %s", matrix_to_string(m_tracked_obstacles[tracked_id]->cov).c_str());
+            // RCLCPP_INFO(this->get_logger(), "PSI: %s", matrix_to_string(Psi).c_str());
+            // RCLCPP_INFO(this->get_logger(), "ERROR: %s", vector_to_string(z_actual - z_pred).c_str());
+            // RCLCPP_INFO(this->get_logger(), "Mahalanobis Distance: %lf", mahalanobis_dist);
         }
     }
 
@@ -1043,6 +1061,18 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
         int signature;
         std::tie(range, bearing, signature) = all_seaing_perception::local_to_range_bearing_signature(
             detected_obstacles[i]->obstacle.get_local_point(), detected_obstacles[i]->label);
+        Eigen::Vector2d projected_global = Eigen::Vector2d(m_robot_pos_mean(0), m_robot_pos_mean(1)) +
+            range * Eigen::Vector2d(std::cos(bearing + m_robot_pos_mean(2)),
+                                    std::sin(bearing + m_robot_pos_mean(2)));
+        if (match[i] != -1){
+            // TODO maybe switch to difference of measurements instead of difference of projected positions, to have different range & bearing thresholds
+            float d_x = m_tracked_obstacles[match[i]]->mean_pred(0) - projected_global(0);
+            float d_y = m_tracked_obstacles[match[i]]->mean_pred(1) - projected_global(1);
+            float dist = std::sqrt(d_x*d_x+d_y*d_y);
+            if (dist > m_object_assoc_dist_thres){
+                match[i] = -1;
+            }
+        }
         if (match[i] == -1) {
             if (detected_obstacles[i]->label == -1){
                 // don't create new obstacles when they have no label
@@ -1057,15 +1087,12 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             gtsam::Key new_object_key;
             new_object_key = gtsam::Symbol('l', m_obstacle_id);
             m_tracked_obstacles.back()->node_key = new_object_key;
-            gtsam::Point2 new_obj_estimated_pos = Eigen::Vector2d(m_robot_pos_mean(0), m_robot_pos_mean(1)) +
-                range * Eigen::Vector2d(std::cos(bearing + m_robot_pos_mean(2)),
-                                        std::sin(bearing + m_robot_pos_mean(2)));
-            initialEstimate.insert(new_object_key, new_obj_estimated_pos);
+            initialEstimate.insert(new_object_key, projected_global);
         }
         int tracked_id = match[i] >= 0 ? match[i] : m_num_obj - 1;
 
         // add the range bearing factor
-        graph.add(gtsam::BearingRangeFactor<gtsam::Pose2, gtsam::Point2>(m_pose_keys.back(), m_tracked_obstacles[tracked_id]->node_key, gtsam::Rot2(bearing), range, m_object_meas_noise));
+        graph.add(gtsam::BearingRangeFactor<gtsam::Pose2, gtsam::Point2>(m_pose_keys.back(), m_tracked_obstacles[tracked_id]->node_key, gtsam::Rot2(bearing), range, m_object_huber));
 
         // update data for matched obstacles (we'll update position after we update SLAM with all points)
         detected_obstacles[i]->obstacle.set_id(m_tracked_obstacles[tracked_id]->obstacle.get_id());
@@ -1301,9 +1328,10 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             // & use the above formula to compute a more accurate Mahalanobis distance
             // TODO try to get the updated (based on the factor graph, not only the factor) noise model between the pose & the landmark from GTSAM
             // and also the error used in the BearingRange factor & use those to compute the Mahalanobis distance
-            float d_x = m_tracked_banners[tracked_id]->mean_pred[0] - m_robot_pos_mean(0);
-            float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_robot_pos_mean(1);
-            float d_theta = m_tracked_banners[tracked_id]->mean_pred[2] - m_robot_pos_mean(2);
+            // TODO maybe just use the banner detection's coordinates in the robot's frame and the given covariance (which is in that frame) to compute the Mahalanobis distance
+            float d_x = m_tracked_banners[tracked_id]->mean_pred(0) - m_robot_pos_mean(0);
+            float d_y = m_tracked_banners[tracked_id]->mean_pred(1) - m_robot_pos_mean(1);
+            float d_theta = m_tracked_banners[tracked_id]->mean_pred(2) - m_robot_pos_mean(2);
             float q = d_x * d_x + d_y * d_y;
             z_pred = Eigen::Vector3d(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_robot_pos_mean(2)), all_seaing_perception::mod_2pi(d_theta));
             Eigen::Matrix<double, 3, 3> h{
@@ -1314,7 +1342,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             // Do not store vectors, since they don't compute covariance with other obstacles in
             // the same detection batch
             Eigen::MatrixXd H = h / q;
-            Eigen::Matrix3d rot_mat = Eigen::AngleAxisd(m_tracked_banners[tracked_id]->mean_pred[2], Eigen::Vector3d::UnitZ()).matrix();
+            Eigen::Matrix3d rot_mat = Eigen::AngleAxisd(m_tracked_banners[tracked_id]->mean_pred(2), Eigen::Vector3d::UnitZ()).matrix();
             // convert covariances to global coordinate frame
             Eigen::Matrix3d global_cov = rot_mat * m_tracked_banners[tracked_id]->cov * rot_mat.transpose();
             Psi = H * global_cov * H.transpose() + Q;
@@ -1346,20 +1374,23 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
         int signature;
         std::tie(range, bearing, phi, signature) =
             all_seaing_perception::local_banner_to_range_bearing_signature(detected_banners[i]->plane_msg.normal_ctr, detected_banners[i]->label);
-        Eigen::Vector3d z_actual(range, bearing, phi);
-        // if (match[i] != -1){
-        //     float d_x = m_state(3 + 2*m_num_obj + 3 * match[i]) - m_state(0);
-        //     float d_y = m_state(3 + 2*m_num_obj + 3 * match[i] + 1) - m_state(1);
-        //     float d_theta = m_state(3 + 2*m_num_obj + 3 * match[i] + 2) - m_state(2);
-        //     float q = d_x * d_x + d_y * d_y;
-        //     Eigen::Vector3f z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::angle_to_pi_range(d_theta));
-        //     RCLCPP_INFO(this->get_logger(), "BANNER ORIENTATION: %lf, ROBOT ORIENTATION: %lf", m_state(3 + 2*m_num_obj + 3 * match[i] + 2), m_state(2));
-        //     RCLCPP_INFO(this->get_logger(), "THETA ACTUAL: %lf, THETA PRED: %lf", z_actual(2), z_pred(2));
-        //     if (abs(all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2))) > ((float)M_PI/2)){
-        //         RCLCPP_INFO(this->get_logger(), "REJECTED");
-        //         match[i] = -1;
-        //     }
-        // }
+        
+        Eigen::Vector3d projected_global = Eigen::Vector3d(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2)) +
+            range * Eigen::Vector3d(std::cos(bearing + m_robot_pos_mean(2)),
+                                    std::sin(bearing + m_robot_pos_mean(2)),
+                                    0);
+        projected_global(2) = all_seaing_perception::mod_2pi(m_robot_pos_mean(2) + phi);
+
+        if (match[i] != -1){
+            // TODO maybe switch to difference of measurements instead of difference of projected positions, to have different range & bearing thresholds
+            float d_x = m_tracked_banners[match[i]]->mean_pred(0) - projected_global(0);
+            float d_y = m_tracked_banners[match[i]]->mean_pred(1) - projected_global(1);
+            float d_theta = std::abs(all_seaing_perception::angle_to_pi_range(projected_global(2)-m_robot_pos_mean(2)));
+            float dist = std::sqrt(d_x*d_x+d_y*d_y);
+            if (dist > m_banner_assoc_dist_thres || d_theta > ((float)M_PI/2)){
+                match[i] = -1;
+            }
+        }
         if (match[i] == -1) {
             if (detected_banners[i]->label == -1){
                 // don't create new obstacles when they have no label
@@ -1374,18 +1405,13 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             gtsam::Key new_banner_key;
             new_banner_key = gtsam::Symbol('l', m_obstacle_id);
             m_tracked_banners.back()->node_key = new_banner_key;
-            Eigen::Vector3d estimated_pose_vec = Eigen::Vector3d(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2)) +
-                range * Eigen::Vector3d(std::cos(bearing + m_robot_pos_mean(2)),
-                                        std::sin(bearing + m_robot_pos_mean(2)),
-                                        0);
-            estimated_pose_vec[2] = all_seaing_perception::mod_2pi(m_robot_pos_mean(2) + phi);
-            gtsam::Pose2 new_banner_estimated_pose = gtsam::Pose2((gtsam::Vector)estimated_pose_vec);
-            initialEstimate.insert(new_banner_key, new_banner_estimated_pose);
+           
+            initialEstimate.insert(new_banner_key, gtsam::Pose2(projected_global(0), projected_global(1), projected_global(2)));
         }
         int tracked_id = match[i] >= 0 ? match[i] : m_num_banners - 1;
 
         // add the range bearing factor
-        graph.add(all_seaing_perception::BearingRangePhiFactor(m_pose_keys.back(), m_tracked_banners[tracked_id]->node_key, bearing, range, phi, m_banner_meas_noise));
+        graph.add(all_seaing_perception::BearingRangePhiFactor(m_pose_keys.back(), m_tracked_banners[tracked_id]->node_key, bearing, range, phi, m_banner_huber));
 
         // update data for matched obstacles (we'll update position after we update SLAM with all points)
         if (banner_label_indicator.count(detected_banners[i]->label) && (!banner_label_indicator[detected_banners[i]->label])){
