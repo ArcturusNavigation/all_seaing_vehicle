@@ -56,7 +56,7 @@ ament_auto_add_executable(
     factor_graph_slam
     ${PROJECT_NAME}/factor_graph_slam.cpp
     ${PROJECT_NAME}/obstacle.cpp
-    ${PROJECT_NAME}/object_tracking_shared.cpp
+    ${PROJECT_NAME}/factor_graph_utilities.cpp
     ${PROJECT_NAME}/perception_utilities.cpp
     ${PROJECT_NAME}/Hungarian.cpp
 )

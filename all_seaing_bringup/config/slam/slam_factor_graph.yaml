@@ -8,11 +8,11 @@ factor_graph_slam:
     range_drop_thresh: 10.0
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False
-    range_uncertainty: 1.5
-    bearing_uncertainty: 0.5
+    range_uncertainty: 15.0
+    bearing_uncertainty: 5.0
     banner_range_uncertainty: 15.0
-    banner_bearing_uncertainty: 0.5
-    banner_orientation_uncertainty: 1.5
+    banner_bearing_uncertainty: 5.0
+    banner_orientation_uncertainty: 15.0
     motion_imu_xy_noise: 1.5
     motion_imu_theta_noise: 1.0 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 30.0 # beware, was 10 before but changed it to 30 bc that's mavros publish rate, change it back if issues
@@ -21,8 +21,8 @@ factor_graph_slam:
     include_odom_only_theta: False
     rotate_odom: False
     update_odom_theta_uncertainty: 10.0
-    new_object_slam_threshold: 1.0
-    new_banner_slam_threshold: 2.0 # all banners have different labels on them, and the ones that have the same (boats to shoot) are very far away, but there is the chance for YOLO misdetections
+    new_object_slam_threshold: 0.1
+    new_banner_slam_threshold: 0.2 # all banners have different labels on them, and the ones that have the same (boats to shoot) are very far away, but there is the chance for YOLO misdetections
     object_huber_threshold: 0.1
     banner_huber_threshold: 0.1
     object_assoc_distance_threshold: 500.0 # can put like 2.5 if we want to actually use it
@@ -36,12 +36,13 @@ factor_graph_slam:
     data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0
     include_unlabeled: True
-    unlabeled_association_threshold: 0.5
+    unlabeled_association_threshold: 0.05
     diff_position_odom: True
     odom_queue_size: 1 # can even increase to 30 or 50 since those are processed quickly and it's important to keep a lot of them so that we at least have the latest odometry (and it hasn't been dropped from the queue) before applying the sensor data
     # actually better to decrease (put it to 1) to increase speed of processing if detections slow the whole thing down, then we guarantee we are processing the last message & not holding onto previous ones
     detection_queue_size: 15 # decrease it if all odom messages before next detection are getting dropped from queue before we finish processing the current detection, or if the messages in the beginning of the queue are too old
-    odom_detection_timeout: 0.7
+    odom_timeout: 0.7
+    detection_timeout: 0.7
     gps_based_predictions: True
     # the way it's currently done, it's best to either have gps_based_predictions or diff_position_odom to be True, not both of them (diff_position_odom is basically useless if the gps callback is faster than the odometry one and gps_based_predictions is True)
     match_numbers_indicators: True

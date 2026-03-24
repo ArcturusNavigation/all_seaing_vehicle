@@ -146,39 +146,39 @@ namespace all_seaing_perception {
     };
 
     // TODO check that the jacobians are correct and there's no issue bc of the exp map
-    double Pose2Theta(const gtsam::Pose2& pose, gtsam::OptionalJacobian<1, 3> H) {
+    inline double Pose2Theta(const gtsam::Pose2& pose, gtsam::OptionalJacobian<1, 3> H) {
     if (H) *H = (gtsam::Matrix13() << 0, 0, 1).finished();
         return pose.theta();
     }
 
-    gtsam::Rot2 Pose2Rot(const gtsam::Pose2& pose, gtsam::OptionalJacobian<1, 3> H) {
+    inline gtsam::Rot2 Pose2Rot(const gtsam::Pose2& pose, gtsam::OptionalJacobian<1, 3> H) {
     if (H) *H = (gtsam::Matrix13() << 0, 0, 1).finished();
         return pose.rotation();
     }
 
-    double Rot2Theta(const gtsam::Rot2& rot, gtsam::OptionalJacobian<1, 1> H) {
+    inline double Rot2Theta(const gtsam::Rot2& rot, gtsam::OptionalJacobian<1, 1> H) {
         if (H) *H = gtsam::Matrix11::Identity();
         return rot.theta();
     }
 
-    gtsam::Rot2 Theta2Rot(const double& theta, gtsam::OptionalJacobian<1, 1> H) {
+    inline gtsam::Rot2 Theta2Rot(const double& theta, gtsam::OptionalJacobian<1, 1> H) {
         if (H) *H = gtsam::Matrix11::Identity();
         return gtsam::Rot2(theta);
     }
 
-    double BearingRangeRange(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br,
+    inline double BearingRangeRange(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br,
                             gtsam::OptionalJacobian<1, 2> H) {
         if (H) *H = (gtsam::Matrix12() << 0, 1).finished();
         return br.range();
     }
 
-    gtsam::Rot2 BearingRangeBearing(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br,
+    inline gtsam::Rot2 BearingRangeBearing(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br,
                                     gtsam::OptionalJacobian<1, 2> H) {
         if (H) *H = (gtsam::Matrix12() << 1, 0).finished();
         return br.bearing();
     }
 
-    gtsam::Vector3 makeVector3(double a, double b, double c,
+    inline gtsam::Vector3 makeVector3(double a, double b, double c,
         gtsam::OptionalJacobian<3, 1> Ha,
         gtsam::OptionalJacobian<3, 1> Hb,
         gtsam::OptionalJacobian<3, 1> Hc) {
@@ -233,7 +233,7 @@ namespace all_seaing_perception {
         }
     };
 
-    BearingRangePhi makeBearingRangePhi(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br, const gtsam::Rot2& phi,
+    inline BearingRangePhi makeBearingRangePhi(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br, const gtsam::Rot2& phi,
           gtsam::OptionalJacobian<3, 2> Hbr = {},
           gtsam::OptionalJacobian<3, 1> Hphi = {}) {
         if (Hbr) {

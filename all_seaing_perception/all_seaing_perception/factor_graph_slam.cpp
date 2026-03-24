@@ -112,8 +112,11 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     this->declare_parameter<int>("detection_queue_size", 10);
     m_detection_queue_size = this->get_parameter("detection_queue_size").as_int();
 
-    this->declare_parameter<double>("odom_detection_timeout", 0.1);
-    m_odom_detection_timeout = this->get_parameter("odom_detection_timeout").as_double();
+    this->declare_parameter<double>("odom_timeout", 0.1);
+    m_odom_timeout = this->get_parameter("odom_timeout").as_double();
+
+    this->declare_parameter<double>("detection_timeout", 0.1);
+    m_detection_timeout = this->get_parameter("detection_timeout").as_double();
 
     this->declare_parameter<bool>("gps_based_predictions", true);
     m_gps_based_predictions = this->get_parameter("gps_based_predictions").as_bool();
@@ -374,7 +377,7 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
 
     rclcpp::Time curr_odom_time = rclcpp::Time(msg.header.stamp);
 
-    if (!m_got_nav || std::abs((curr_odom_time-m_last_nav_time).seconds()) > m_odom_detection_timeout) return; // make odometry catch up to GPS/current time
+    if (!m_got_nav || std::abs((curr_odom_time-m_last_nav_time).seconds()) > m_odom_timeout) return; // make odometry catch up to GPS/current time
 
     m_last_odom_msg = msg;
 
@@ -394,7 +397,7 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     }
 
     // if previous odometry was too old wrt current nav time we've already updated based on gps
-    if(m_gps_based_predictions && (std::abs((m_last_odom_time-m_last_nav_time).seconds()) > m_odom_detection_timeout)){
+    if(m_gps_based_predictions && (std::abs((m_last_odom_time-m_last_nav_time).seconds()) > m_odom_timeout)){
         m_last_odom_time = curr_odom_time;
         return;
     }
@@ -909,7 +912,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
 
     // if (m_track_robot && (std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()) > m_odom_detection_timeout)) return;
 
-    if (m_gps_update && std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_nav_time).seconds()) > m_odom_detection_timeout) return; // make detections catch up to GPS/current time
+    if (m_gps_update && std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_nav_time).seconds()) > m_detection_timeout) return; // make detections catch up to GPS/current time
 
     this->odom_callback(); //catch up to current position before applying sensor data
 
@@ -1269,7 +1272,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
 
     if(m_first_state) return;
 
-    if (m_gps_update && std::abs((rclcpp::Time(msg->header.stamp)-m_last_nav_time).seconds()) > m_odom_detection_timeout) return; // make detections catch up to GPS/current time
+    if (m_gps_update && std::abs((rclcpp::Time(msg->header.stamp)-m_last_nav_time).seconds()) > m_detection_timeout) return; // make detections catch up to GPS/current time
 
     this->odom_callback(); //catch up to current position before applying sensor data
 
