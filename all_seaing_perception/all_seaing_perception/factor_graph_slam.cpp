@@ -1379,7 +1379,7 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
                                         std::sin(bearing + m_robot_pos_mean(2)),
                                         0);
             estimated_pose_vec[2] = all_seaing_perception::mod_2pi(m_robot_pos_mean(2) + phi);
-            gtsam::Pose2 new_banner_estimated_pose = gtsam::Pose2((gtsam::Vector)estimated_pose_vec.cast<double>());
+            gtsam::Pose2 new_banner_estimated_pose = gtsam::Pose2((gtsam::Vector)estimated_pose_vec);
             initialEstimate.insert(new_banner_key, new_banner_estimated_pose);
         }
         int tracked_id = match[i] >= 0 ? match[i] : m_num_banners - 1;

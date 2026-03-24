@@ -80,6 +80,8 @@
 #include <gtsam/slam/ProjectionFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/sam/BearingRangeFactor.h>
+#include <gtsam/base/ProductLieGroup.h>
+#include <gtsam/nonlinear/expressions.h>
 
 namespace all_seaing_perception {
     //custom struct to also keep the points themselves with the obstacle (Obstacle doesn't do that and don't want to mess with it)    
@@ -139,14 +141,25 @@ namespace all_seaing_perception {
         }
     };
 
+    // TODO check that the jacobians are correct and there's no issue bc of the exp map
     double Pose2Theta(const gtsam::Pose2& pose, gtsam::OptionalJacobian<1, 3> H) {
     if (H) *H = (gtsam::Matrix13() << 0, 0, 1).finished();
         return pose.theta();
     }
 
+    gtsam::Rot2 Pose2Rot(const gtsam::Pose2& pose, gtsam::OptionalJacobian<1, 3> H) {
+    if (H) *H = (gtsam::Matrix13() << 0, 0, 1).finished();
+        return pose.rotation();
+    }
+
     double Rot2Theta(const gtsam::Rot2& rot, gtsam::OptionalJacobian<1, 1> H) {
         if (H) *H = gtsam::Matrix11::Identity();
         return rot.theta();
+    }
+
+    gtsam::Rot2 Theta2Rot(const double& theta, gtsam::OptionalJacobian<1, 1> H) {
+        if (H) *H = gtsam::Matrix11::Identity();
+        return gtsam::Rot2(theta);
     }
 
     double BearingRangeRange(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br,
@@ -171,47 +184,64 @@ namespace all_seaing_perception {
         return gtsam::Vector3(a, b, c);
     }
 
-    class BearingRangePhiFactor : public gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2> {
+    // need to define a manifold in order to use it in an expression factor
+    struct BearingRangePhi{
+    private:
+        gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2> br_;
+        gtsam::Rot2 phi_;
+
     public:
-        BearingRangePhiFactor(gtsam::Key key1, gtsam::Key key2, double bearing, double range, double phi, const gtsam::SharedNoiseModel& noise_model):
-            gtsam::ExpressionFactor2<gtsam::Vector3, gtsam::Pose2, gtsam::Pose2>(key1, key2, noise_model, gtsam::Vector3(bearing, range, phi)) {
-                this->initialize(expression(key1, key2));
-            }
-        // gtsam::Vector evaluateError(const gtsam::Pose2& robot_pose, const gtsam::Pose2& banner_pose, boost::optional<gtsam::Matrix&> H_robot = boost::none, boost::optional<gtsam::Matrix&> H_banner = boost::none) const {
-        //     double pred_bearing = gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::MeasureBearing(robot_pose, banner_pose).theta();
-        //     double pred_range = gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::MeasureRange(robot_pose, banner_pose);
-        //     double dx = banner_pose.x() - robot_pose.x();
-        //     double dy = banner_pose.y() - robot_pose.y();
-        //     double dtheta = banner_pose.theta() - robot_pose.theta();
-        //     gtsam::Vector error = gtsam::Vector3(pred_bearing, pred_range, dtheta) - gtsam::Vector3(mbearing_, mrange_, mphi_);
-        //     if (H_robot) {
-        //         (*H_robot) = gtsam::Matrix::Zero(3, 3);
-        //         (*H_robot)(0, 2) = -1;
-        //         (*H_robot)(1, 0) = ()/pred_range
-        //         (*H_robot)(2,2) = -1;
-        //     }
-        //     if (H_banner) {
-        //         (*H_banner) = gtsam::Matrix::Zero(3, 3);
-        //         (*H_robot)(0, 2) = 1;
-        //         (*H_banner).block<2, 2>(0, 0) = -robot_pose.rotation().matrix(); // because of exp map
-        //     }
-        //     return error;
-        // }
-        gtsam::Expression<gtsam::Vector3> expression(gtsam::Key key1, gtsam::Key key2) const override{
-            gtsam::Expression<gtsam::Pose2> robot_pose(key1);
-            gtsam::Expression<gtsam::Pose2> banner_pose(key2);
-            gtsam::Expression<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>> pred_bearing_range(gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::Measure, robot_pose, banner_pose);
-            gtsam::Expression<gtsam::Rot2> pred_bearing(BearingRangeBearing, pred_bearing_range);
-            gtsam::Expression<double> pred_range(BearingRangeRange, pred_bearing_range);
-            gtsam::Expression<double> robot_theta(Pose2Theta, robot_pose);
-            gtsam::Expression<double> banner_theta(Pose2Theta, banner_pose);
-            gtsam::Expression<double> bearing_theta(Rot2Theta, pred_bearing);
-            gtsam::Expression<double> pred_phi = banner_theta - robot_theta;
-            // TODO change to use a combination of Rot2 and double for both the measurement and the expression
-            // to not have issues with angle jumps, Rot2 automatically handles those by converting to local frame
-            return gtsam::Expression<gtsam::Vector3>(makeVector3, bearing_theta, pred_range, pred_phi);
+        constexpr static const size_t dimension = 3;
+
+        BearingRangePhi() {}
+        BearingRangePhi(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br, const gtsam::Rot2& phi): br_(br), phi_(phi) {}
+
+        void print(const std::string& str = "") const {
+            std::cout << str;
+            gtsam::traits<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>>::Print(br_, "bearing-range ");
+            gtsam::traits<gtsam::Rot2>::Print(phi_, "phi ");
+        }
+
+        bool equals(const BearingRangePhi& m2, double tol = 1e-8) const {
+            return gtsam::traits<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>>::Equals(br_, m2.br_, tol) &&
+                gtsam::traits<gtsam::Rot2>::Equals(phi_, m2.phi_, tol);
+        }
+
+        inline static size_t Dim() { return 3; }
+        inline size_t dim() const { return 3; }
+
+        typedef Eigen::Matrix<double, 3, 1> TangentVector;
+        typedef gtsam::OptionalJacobian<3, 3> ChartJacobian;
+
+        BearingRangePhi retract(const TangentVector& xi) const {
+            gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2> m1 = gtsam::traits<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>>::Retract(br_, xi.head<2>());
+            gtsam::Rot2 m2 = gtsam::traits<gtsam::Rot2>::Retract(phi_, xi.tail<1>());
+            return BearingRangePhi(m1, m2);
+        }
+
+        TangentVector localCoordinates(const BearingRangePhi& other) const {
+            gtsam::traits<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>>::TangentVector v1 = gtsam::traits<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>>::Local(br_, other.br_);
+            gtsam::traits<gtsam::Rot2>::TangentVector v2 = gtsam::traits<gtsam::Rot2>::Local(phi_, other.phi_);
+            TangentVector v;
+            v.head<2>() = v1;
+            v.tail<1>() = v2;
+            return v;
         }
     };
+
+    BearingRangePhi makeBearingRangePhi(const gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>& br, const gtsam::Rot2& phi,
+          gtsam::OptionalJacobian<3, 2> Hbr = {},
+          gtsam::OptionalJacobian<3, 1> Hphi = {}) {
+        if (Hbr) {
+            Hbr->setZero();
+            Hbr->block<2, 2>(0, 0).setIdentity();
+        }
+        if (Hphi) {
+            Hphi->setZero();
+            Hphi->block<1, 1>(2, 0).setIdentity();
+        }
+        return BearingRangePhi(br, phi);
+    }
 
     template<typename PointT>
     std::shared_ptr<std::shared_ptr<ObjectCloud<PointT>>> clone(typename std::shared_ptr<ObjectCloud<PointT>> orig);
@@ -271,5 +301,31 @@ namespace all_seaing_perception {
         std::map<int, int> banner_label_number = std::map<int,int>());
 
 } // namespace all_seaing_perception
+
+namespace gtsam{
+    template <>
+    struct traits<all_seaing_perception::BearingRangePhi>
+        : Testable<all_seaing_perception::BearingRangePhi>,
+        internal::ManifoldTraits<all_seaing_perception::BearingRangePhi> {};
+}
+
+namespace all_seaing_perception{
+    class BearingRangePhiFactor : public gtsam::ExpressionFactor2<BearingRangePhi, gtsam::Pose2, gtsam::Pose2> {
+    public:
+        BearingRangePhiFactor(gtsam::Key key1, gtsam::Key key2, double bearing, double range, double phi, const gtsam::SharedNoiseModel& noise_model):
+            gtsam::ExpressionFactor2<BearingRangePhi, gtsam::Pose2, gtsam::Pose2>(key1, key2, noise_model, BearingRangePhi(gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>(gtsam::Rot2(bearing), range), gtsam::Rot2(phi))) {
+                this->initialize(expression(key1, key2));
+            }
+        gtsam::Expression<BearingRangePhi> expression(gtsam::Key key1, gtsam::Key key2) const override{
+            gtsam::Expression<gtsam::Pose2> robot_pose(key1);
+            gtsam::Expression<gtsam::Pose2> banner_pose(key2);
+            gtsam::Expression<gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>> pred_bearing_range(gtsam::BearingRange<gtsam::Pose2, gtsam::Pose2>::Measure, robot_pose, banner_pose);
+            gtsam::Expression<gtsam::Pose2> relative_pose = gtsam::between(robot_pose, banner_pose);
+            gtsam::Expression<gtsam::Rot2> pred_phi(Pose2Rot, relative_pose);
+            return gtsam::Expression<BearingRangePhi>(makeBearingRangePhi, pred_bearing_range, pred_phi);
+        }
+    };
+}
+
 
 #endif // ALL_SEAING_PERCEPTION__FACTOR_GRAPH_UTILITIES_HPP
