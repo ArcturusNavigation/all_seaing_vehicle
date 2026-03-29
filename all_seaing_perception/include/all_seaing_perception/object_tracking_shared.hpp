@@ -123,40 +123,6 @@ namespace all_seaing_perception {
     std::tuple<double, double, double> compose_transforms(std::tuple<double, double, double> t1, std::tuple<double, double, double> t2);
     std::tuple<double, double, double> apply_transform_from_to(double x, double y, double theta, double from_x, double from_y, double from_theta, double to_x, double to_y, double to_theta);
 
-    // Returns the matchings from detections to map and the sets of indices of chosen tracked and detected obstacles
-    template<typename PointT>
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
-        typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
-        std::vector<std::vector<float>> p, float new_obj_thres);
-    template<typename PointT>
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_indiv_var_data_association(std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
-        std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
-        std::vector<std::vector<float>> p, std::vector<float> v_indiv, float new_obj_thres);
-    template<typename PointT>
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_meas_var_data_association(std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
-        std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
-        std::vector<std::vector<float>> p, std::vector<std::vector<float>> v_meas, float new_obj_thres);
-    template<typename PointT>
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> indiv_greedy_data_association(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
-        typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
-        std::vector<std::vector<float>> p, float new_obj_thres);
-    template<typename PointT>
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> linear_sum_assignment_data_association(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
-        typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
-        std::vector<std::vector<float>> p, float new_obj_thres, bool sqrt=false);
-
-    // Similar to the greedy_data_association function but returning the computed weight as well
-    template<typename PointT>
-    std::tuple<float, std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_data_association_probs(typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> tracked_obstacles,
-        typename std::vector<std::shared_ptr<ObjectCloud<PointT>>> detected_obstacles,
-        std::vector<std::vector<float>> p, std::vector<std::vector<float>> probs, float new_obj_thres);
-
-    // for banners
-    std::tuple<std::vector<int>, std::unordered_set<int>, std::unordered_set<int>> greedy_banner_data_association(std::vector<std::shared_ptr<Banner>> tracked_obstacles,
-        std::vector<std::shared_ptr<Banner>> detected_obstacles,
-        std::vector<std::vector<float>> p, float new_obj_thres,
-        std::map<int, int> banner_label_number = std::map<int,int>());
-
 } // namespace all_seaing_perception
 
 #endif // ALL_SEAING_PERCEPTION__OBJECT_TRACKING_SHARED_HPP

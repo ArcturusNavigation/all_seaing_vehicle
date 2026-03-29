@@ -1143,108 +1143,51 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
 
-    // t1 = high_resolution_clock::now();
-
+    // Set range-bearing measurements on detected objects for data association
     Eigen::Matrix<float, 2, 2> Q{
         {m_range_std*m_range_std, 0},
         {0, m_bearing_std*m_bearing_std},
     };
-    std::vector<std::vector<float>> p;
-    std::vector<float> v_indiv;
-    std::vector<std::vector<float>> v_meas;
-    for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
-        if(m_track_robot){
-            v_indiv.push_back(m_cov(3 + 2 * tracked_id, 3 + 2 * tracked_id)+m_cov(3 + 2 * tracked_id+1, 3 + 2 * tracked_id+1));
-        }else{
-            v_indiv.push_back(m_tracked_obstacles[tracked_id]->cov(0,0)+m_tracked_obstacles[tracked_id]->cov(1,1));
-        }
-    }
     m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
-    for (std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>> det_obs : detected_obstacles) {
-        float range, bearing;
-        int signature;
-        std::tie(range, bearing, signature) =
+    for (auto& det_obs : detected_obstacles) {
+        auto [range, bearing, signature] =
             all_seaing_perception::local_to_range_bearing_signature(det_obs->obstacle.get_local_point(), det_obs->label);
-        p.push_back(std::vector<float>());
-        v_meas.push_back(std::vector<float>());
-        Eigen::Vector2f z_pred;
-        Eigen::MatrixXf Psi;
-        for (int tracked_id = 0; tracked_id < m_num_obj; tracked_id++) {
-            if (m_track_robot) {
-                float d_x = m_state(3 + 2 * tracked_id) - m_state(0);
-                float d_y = m_state(3 + 2 * tracked_id + 1) - m_state(1);
-                float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector2f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)));
-                Eigen::MatrixXf F = Eigen::MatrixXf::Zero(5, m_mat_size);
-                F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-                F.block(3, 3 + 2 * tracked_id, 2, 2) = Eigen::Matrix2f::Identity();
-                Eigen::Matrix<float, 2, 5> h{
-                    {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
-                     std::sqrt(q) * d_y},
-                    {d_y, -d_x, -q, -d_y, d_x},
-                };
-                // Do not store vectors, since they don't compute covariance with other obstacles in
-                // the same detection batch
-                Eigen::MatrixXf H = h * F / q;
-
-                Psi = H * m_cov * H.transpose() + Q;
-            } else {
-                float d_x = m_tracked_obstacles[tracked_id]->mean_pred[0] - m_nav_x;
-                float d_y = m_tracked_obstacles[tracked_id]->mean_pred[1] - m_nav_y;
-                float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector2f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading));
-
-                Eigen::Matrix<float, 2, 2> h{
-                    {std::sqrt(q) * d_x, std::sqrt(q) * d_y},
-                    {-d_y, d_x},
-                };
-                // Do not store vectors, since they don't compute covariance with other obstacles in
-                // the same detection batch
-                Eigen::MatrixXf H = h / q;
-                Psi = H * m_tracked_obstacles[tracked_id]->cov * H.transpose() + Q;
-            }
-
-            Eigen::Vector2f z_actual(range, bearing);
-
-            z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
-            p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
-                               (z_actual - z_pred));
-            v_meas.back().push_back(Psi.trace());
-        }
+        det_obs->mean_pred = Eigen::Vector2f(range, bearing);
     }
 
-    // t2 = high_resolution_clock::now();
-
-    // ms_double = t2 - t1;
-    
-    // RCLCPP_INFO(this->get_logger(), "UNKNOWN ASSOCIATIONS: %lfms", ms_double.count()); // TODO OPTIMIZE, IT'S TAKING MUCH LONGER THAN THE OTHER STUFF
-
-    // t1 = high_resolution_clock::now();
-
-    std::vector<int> match;
-    std::unordered_set<int> chosen_detected, chosen_tracked;
+    // Build association context
+    all_seaing_perception::data_association::AssociationContext ctx;
+    ctx.robot_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+    ctx.meas_noise_cov = Q;
     double assoc_threshold = msg->is_labeled?m_new_obj_slam_thres:m_unlabeled_assoc_threshold;
-    if (m_data_association_algo == "greedy_exclusive"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
-    }else if (m_data_association_algo == "greedy_individual"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::indiv_greedy_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
-    }else if (m_data_association_algo == "greedy_exclusive_indiv_var"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_indiv_var_data_association(m_tracked_obstacles, detected_obstacles, p, v_indiv, assoc_threshold);
-    }else if (m_data_association_algo == "greedy_exclusive_measurement_var"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_meas_var_data_association(m_tracked_obstacles, detected_obstacles, p, v_meas, assoc_threshold);
-    }else if (m_data_association_algo == "linear_sum_assignment"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
-    }else if (m_data_association_algo == "linear_sum_assignment_sqrt"){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::linear_sum_assignment_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold, true);
-    }else{
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_data_association(m_tracked_obstacles, detected_obstacles, p, assoc_threshold);
+    ctx.threshold = assoc_threshold;
+    ctx.state_start_offset = 3;
+    if (m_track_robot) {
+        ctx.full_state = &m_state;
+        ctx.full_cov = &m_cov;
+        ctx.mat_size = m_mat_size;
     }
 
-    // t2 = high_resolution_clock::now();
-
-    // ms_double = t2 - t1;
-    
-    // RCLCPP_INFO(this->get_logger(), "ASSOCIATIONS: %lfms", ms_double.count());
+    // Dispatch association algorithm
+    all_seaing_perception::data_association::AssociationResult assoc_result;
+    if (m_data_association_algo == "greedy_exclusive") {
+        assoc_result = all_seaing_perception::data_association::greedy_associate(m_tracked_obstacles, detected_obstacles, ctx);
+    } else if (m_data_association_algo == "greedy_individual") {
+        assoc_result = all_seaing_perception::data_association::indiv_greedy_associate(m_tracked_obstacles, detected_obstacles, ctx);
+    } else if (m_data_association_algo == "greedy_exclusive_indiv_var") {
+        assoc_result = all_seaing_perception::data_association::greedy_indiv_var_associate(m_tracked_obstacles, detected_obstacles, ctx);
+    } else if (m_data_association_algo == "greedy_exclusive_measurement_var") {
+        assoc_result = all_seaing_perception::data_association::greedy_meas_var_associate(m_tracked_obstacles, detected_obstacles, ctx);
+    } else if (m_data_association_algo == "linear_sum_assignment") {
+        assoc_result = all_seaing_perception::data_association::linear_sum_assignment_associate(m_tracked_obstacles, detected_obstacles, ctx);
+    } else if (m_data_association_algo == "linear_sum_assignment_sqrt") {
+        assoc_result = all_seaing_perception::data_association::linear_sum_assignment_associate(m_tracked_obstacles, detected_obstacles, ctx, true);
+    } else {
+        assoc_result = all_seaing_perception::data_association::greedy_associate(m_tracked_obstacles, detected_obstacles, ctx);
+    }
+    std::vector<int> match = assoc_result.match;
+    std::unordered_set<int> chosen_detected = assoc_result.chosen_detected;
+    std::unordered_set<int> chosen_tracked = assoc_result.chosen_tracked;
 
     // t1 = high_resolution_clock::now();
 
@@ -1550,89 +1493,39 @@ void ObjectTrackingMap::banners_cb(const all_seaing_interfaces::msg::LabeledObje
 
     // EKF SLAM ("Probabilistic Robotics", Seb. Thrun, inspired implementation)
 
+    // Set range-bearing-phi measurements on detected banners for data association
     Eigen::Matrix<float, 3, 3> Q{
         {m_banner_range_std*m_banner_range_std, 0, 0},
         {0, m_banner_bearing_std*m_banner_bearing_std, 0},
         {0, 0, m_banner_phi_std*m_banner_phi_std},
     };
-    std::vector<std::vector<float>> p;
-    std::vector<float> v_indiv;
-    std::vector<std::vector<float>> v_meas;
-    for (int tracked_id = 0; tracked_id < m_num_banners; tracked_id++) {
-        if(!m_track_robot || !m_banners_slam){
-            v_indiv.push_back(m_tracked_banners[tracked_id]->cov(0,0)+m_tracked_banners[tracked_id]->cov(1,1)+m_tracked_banners[tracked_id]->cov(2,2));
-        }else{
-            v_indiv.push_back(m_cov(3 + 2 * m_num_obj + 3*tracked_id, 3 + 2 * m_num_obj + 3*tracked_id)+m_cov(3 + 2 * m_num_obj + 3*tracked_id + 1, 3 + 2 * m_num_obj + 3*tracked_id + 1)+m_cov(3 + 2 * m_num_obj + 3*tracked_id + 2, 3 + 2 * m_num_obj + 3*tracked_id + 2));
-        }
-    }
-
     m_mat_size = (m_track_banners && m_banners_slam)? (3 + 2 * m_num_obj + 3 * m_num_banners) : (3 + 2 * m_num_obj);
-    for (std::shared_ptr<all_seaing_perception::Banner> det_obs : detected_banners) {
-        float range, bearing, phi;
-        int signature;
-        std::tie(range, bearing, phi, signature) =
+    for (auto& det_obs : detected_banners) {
+        auto [range, bearing, phi, signature] =
             all_seaing_perception::local_banner_to_range_bearing_signature(det_obs->plane_msg.normal_ctr, det_obs->label);
-        p.push_back(std::vector<float>());
-        v_meas.push_back(std::vector<float>());
-        Eigen::Vector3f z_pred;
-        Eigen::MatrixXf Psi;
-        for (int tracked_id = 0; tracked_id < m_num_banners; tracked_id++) {
-            if (m_track_robot && m_banners_slam) {
-                float d_x = m_state(3 + 2*m_num_obj + 3 * tracked_id) - m_state(0);
-                float d_y = m_state(3 + 2*m_num_obj + 3 * tracked_id + 1) - m_state(1);
-                float d_theta = m_state(3 + 2*m_num_obj + 3 * tracked_id + 2) - m_state(2);
-                float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_state(2)), all_seaing_perception::mod_2pi(d_theta));
-                Eigen::MatrixXf F = Eigen::MatrixXf::Zero(6, m_mat_size);
-                F.topLeftCorner(3, 3) = Eigen::Matrix3f::Identity();
-                F.block(3, 3 + 2*m_num_obj + 3 * tracked_id, 3, 3) = Eigen::Matrix3f::Identity();
-                Eigen::Matrix<float, 3, 6> h{
-                    {-std::sqrt(q) * d_x, -std::sqrt(q) * d_y, 0, std::sqrt(q) * d_x,
-                     std::sqrt(q) * d_y, 0},
-                    {d_y, -d_x, -q, -d_y, d_x, 0},
-                    {0, 0, -q, 0, 0, q},
-                };
-                // Do not store vectors, since they don't compute covariance with other obstacles in
-                // the same detection batch
-                Eigen::MatrixXf H = h * F / q;
-
-                Psi = H * m_cov * H.transpose() + Q;
-            } else {
-                float d_x = m_tracked_banners[tracked_id]->mean_pred[0] - m_nav_x;
-                float d_y = m_tracked_banners[tracked_id]->mean_pred[1] - m_nav_y;
-                float d_theta = m_tracked_banners[tracked_id]->mean_pred[2] - m_nav_heading;
-                float q = d_x * d_x + d_y * d_y;
-                z_pred = Eigen::Vector3f(std::sqrt(q), all_seaing_perception::mod_2pi(std::atan2(d_y, d_x) - m_nav_heading), all_seaing_perception::mod_2pi(d_theta));
-
-                Eigen::Matrix<float, 3, 3> h{
-                    {std::sqrt(q) * d_x, std::sqrt(q) * d_y, 0},
-                    {-d_y, d_x, 0},
-                    {0, 0, q},
-                };
-                // Do not store vectors, since they don't compute covariance with other obstacles in
-                // the same detection batch
-                Eigen::MatrixXf H = h / q;
-                Psi = H * m_tracked_banners[tracked_id]->cov * H.transpose() + Q;
-            }
-
-            Eigen::Vector3f z_actual(range, bearing, phi);
-
-            z_actual(1) = z_pred(1)+all_seaing_perception::angle_to_pi_range(z_actual(1)-z_pred(1));
-            z_actual(2) = z_pred(2)+all_seaing_perception::angle_to_pi_range(z_actual(2)-z_pred(2));
-            p.back().push_back((z_actual - z_pred).transpose() * Psi.inverse() *
-                               (z_actual - z_pred));
-            v_meas.back().push_back(Psi.trace());
-        }
+        det_obs->mean_pred = Eigen::Vector3f(range, bearing, phi);
     }
 
-    std::vector<int> match;
-    std::unordered_set<int> chosen_detected, chosen_tracked;
-    double assoc_threshold = m_new_banner_slam_thres;
-    if (m_match_numbers_indicators){
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_banner_data_association(m_tracked_banners, detected_banners, p, assoc_threshold, banner_label_to_number);
-    }else{
-        std::tie(match, chosen_detected, chosen_tracked) = all_seaing_perception::greedy_banner_data_association(m_tracked_banners, detected_banners, p, assoc_threshold);
+    // Build banner association context
+    all_seaing_perception::data_association::AssociationContext banner_ctx;
+    banner_ctx.robot_state = Eigen::Vector3f(m_nav_x, m_nav_y, m_nav_heading);
+    banner_ctx.meas_noise_cov = Q;
+    banner_ctx.threshold = m_new_banner_slam_thres;
+    banner_ctx.state_start_offset = 3 + 2 * m_num_obj;
+    if (m_track_robot && m_banners_slam) {
+        banner_ctx.full_state = &m_state;
+        banner_ctx.full_cov = &m_cov;
+        banner_ctx.mat_size = m_mat_size;
     }
+    if (m_match_numbers_indicators) {
+        banner_ctx.label_number_map = &banner_label_to_number;
+    }
+
+    auto banner_assoc_result = all_seaing_perception::data_association::greedy_associate(
+        m_tracked_banners, detected_banners, banner_ctx);
+    std::vector<int> match = banner_assoc_result.match;
+    std::unordered_set<int> chosen_detected = banner_assoc_result.chosen_detected;
+    std::unordered_set<int> chosen_tracked = banner_assoc_result.chosen_tracked;
     
     // Update vectors, now with known correspondence
     for (size_t i = 0; i < detected_banners.size(); i++) {
