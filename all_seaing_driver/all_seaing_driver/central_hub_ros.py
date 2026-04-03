@@ -12,8 +12,9 @@ class CentralHubROS(Node):
     def __init__(self):
         super().__init__("central_hub_ros")
 
+        # WARNING: value overwritten by vehicle.launch.py!
         port = self.declare_parameter(
-            "port", "/dev/ttyACM0").get_parameter_value().string_value
+            "port", "/dev/serial/by-id/usb-STMicroelectronics_GENERIC_F072CBUX_CDC_in_FS_Mode_205034625347-if00").get_parameter_value().string_value
     
         self.low_battery_threshold = self.declare_parameter(
             "low_battery_threshold", 2200.0
@@ -154,7 +155,7 @@ class CentralHubROS(Node):
             #     self.get_logger().warn("Invalid servo port addressed")
             #     response.success = False
             #     return response
-        response.success = False
+        response.success = True
         return response
 
     def estop_cb(self, _, response):

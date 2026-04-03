@@ -11,9 +11,6 @@ class TaskInitServer(TaskServerBase):
     def __init__(self):
         super().__init__(server_name = "task_init_server", action_name = "task_init", search_action_name = "search_taskinit")
 
-        self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
-
         self.keyboard_sub = None
         if self.is_sim: 
             self.get_logger().info("Running in simulation mode. Listening to joystick input.")

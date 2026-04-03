@@ -31,10 +31,6 @@ def launch_setup(context, *args, **kwargs):
         bringup_prefix, "config", "perception", "inc_color_buoy_label_mappings.yaml"
     )
 
-    inc_color_beacon_label_mappings = os.path.join(
-        bringup_prefix, "config", "perception", "inc_color_beacon_label_mappings.yaml"
-    )
-
     inc_color_all_label_mappings = os.path.join(
         bringup_prefix, "config", "perception", "inc_color_all_label_mappings.yaml"
     )
@@ -103,7 +99,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
             # {"confs": [0.3, 0.1]},
-            {"confs": [0.3, 0.1, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -130,7 +126,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
             # {"confs": [0.3, 0.1]},
-            {"confs": [0.3, 0.1, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -158,7 +154,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
             # {"confs": [0.3, 0.1]},
-            {"confs": [0.3, 0.1, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -176,12 +172,14 @@ def launch_setup(context, *args, **kwargs):
 
     shape_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
-        executable="yolov8_node.py",
+        executable="yolov11_all_node.py",
         parameters=[
-            {"model": "roboboat_shape_2025"},
-            {"label_config": "shape_label_mappings"},
-            {"conf": 0.4},
+            {"model": ["roboboat_shape_2025"]},
+            {"label_config": ["shape_label_mappings"]},
+            {"label_offsets": [0]},
+            {"confs": [0.1]},
             {"use_color_names": False},
+            {"ignore_indicator_filters": True},
         ],
         remappings=[
             ("image", "turret_image"),
@@ -206,7 +204,6 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 20.0},
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
-            # {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
@@ -237,7 +234,6 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 20.0},
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
-            # {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
@@ -267,7 +263,6 @@ def launch_setup(context, *args, **kwargs):
             {"base_link_frame": "base_link"},
             {"bbox_object_margin": 20.0},
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
-            # {"color_label_mappings_file": inc_color_beacon_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
             {"obstacle_size_max": 1000},
@@ -381,10 +376,10 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"timer_period": 0.4},
-            {"grid_dim": [800, 800]},
+            {"grid_dim": [2000, 2000]},
             {"default_range": 60},
             {"grid_resolution": 0.1},
-            {"inflate_dist": 1.0},
+            {"inflate_dist": 0.0},
             {"inv_decay_rate": 1.2},
             {"default_lidar_range": 40.0},
             {"dynamic_origin": True},

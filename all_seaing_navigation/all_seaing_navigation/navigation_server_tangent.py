@@ -2,12 +2,12 @@
 import rclpy
 from rclpy.action import ActionClient, ActionServer
 from rclpy.executors import MultiThreadedExecutor
+import numpy as np
 
 from all_seaing_common.action_server_base import ActionServerBase
 from all_seaing_controller.pid_controller import CircularPID, PIDController
 from all_seaing_interfaces.action import Waypoint, FollowPath
 from all_seaing_navigation.planner_executor import PlannerExecutor
-from all_seaing_interfaces.msg import ControlOption
 from all_seaing_interfaces.msg import ControlOption
 from sensor_msgs.msg import PointCloud2
 from rclpy.qos import qos_profile_sensor_data
@@ -103,6 +103,24 @@ class NavigationTangentServer(ActionServerBase):
 
         self.vel_marker_scale = (
             self.declare_parameter("vel_marker_scale", 1.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.fallback_seg_complete_threshold = ( # Number of meters away from next navigation point at which we should forcefully switch to next point
+            self.declare_parameter("fallback_seg_complete_threshold", 0.05)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.fallback_brute_return_threshold = ( # Number of meters away from current segment at which we should just brute force to return to path
+            self.declare_parameter("fallback_brute_return_threshold", 5.0)
+            .get_parameter_value()
+            .double_value
+        )
+
+        self.pred_scale = ( # Scale weight of c in target point prediction (more aggresively shortcuts / linearizes path)
+            self.declare_parameter("pred_scale", 0.01) # Some pred scale is recommended to deal with right angles
             .get_parameter_value()
             .double_value
         )
@@ -228,35 +246,35 @@ class NavigationTangentServer(ActionServerBase):
             id=id,
         )
 
-    def dot_3(self, a, b, c):
-        return (b[0] - a[0]) * (c[0] - a[0]) + (b[1] - a[1]) * (c[1] - a[1])
-    
     def point_segment_scale(self, a, b, c):
-        dot_prod = self.dot_3(a, b, c)
-        return dot_prod / ((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]))
+        ab = b - a
+        denom = ab @ ab
+        if denom == 0:
+            return 0.0
+        return (ab @ (c - a)) / denom
 
-    def point_to_segment(self, a, b, c): # point c to segment a-b
-        dot_prod = self.dot_3(a, b, c)
-        ds_scale = dot_prod / ((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]))
+    def point_to_point_dist_less_than(self, a, b, x):
+        return np.linalg.norm(a-b) < x
+    
+    def proj_vector(self, a, b, c):  # point c to line a-b
+        assert (not np.allclose(a, b)), "Cannot project onto a zero-length line"
+        return (b-a) @ (c-a) / ((b-a) @ (b-a)) * (b-a) - (c-a)
+
+    def point_to_segment(self, a, b, c):  # point c to segment a-b
+        ab = b - a
+        denom = ab @ ab
+        if denom == 0:
+            return np.linalg.norm(c - a)
+        ds_scale = ((c - a) @ ab) / denom
         if ds_scale < 0 or ds_scale > 1:
-            return math.sqrt(min((c[0] - a[0]) * (c[0] - a[0]) + (c[1] - a[1]) * (c[1] - a[1]), (c[0] - b[0]) * (c[0] - b[0]) + (c[1] - b[1]) * (c[1] - b[1])))
-        else:
-            return math.sqrt((c[0] - a[0]) * (c[0] - a[0]) + (c[1] - a[1]) * (c[1] - a[1]) - ds_scale * dot_prod)
-
-    def proj_vector(self, a, b, c): # point c to line a-b
-        dot_prod = self.dot_3(a, b, c)
-        sca = dot_prod / ((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]))
-        foot = (a[0] + sca * (b[0] - a[0]), a[1] + sca * (b[1] - a[1]))
-        return (foot[0] - c[0], foot[1] - c[1])
+            return min(np.linalg.norm(c - a), np.linalg.norm(c - b))
+        return np.linalg.norm(self.proj_vector(a, b, c))
 
     def global_to_robot(self, target, robot):
-        rel_pos = (target[0] - robot[0], target[1] - robot[1])
-        conv_pos = (rel_pos[0] * math.cos(robot[2]) + rel_pos[1] * math.sin(robot[2]), -rel_pos[0] * math.sin(robot[2]) + rel_pos[1] * math.cos(robot[2]))
-        return (conv_pos[0], conv_pos[1], target[2]-robot[2])
+        rel_pos = target[:2] - robot[:2]
+        conv_pos = np.array([rel_pos[0] * math.cos(robot[2]) + rel_pos[1] * math.sin(robot[2]), -rel_pos[0] * math.sin(robot[2]) + rel_pos[1] * math.cos(robot[2])])
+        return np.array([conv_pos[0], conv_pos[1], target[2] - robot[2]])
 
-    def norm(self, x):
-        return math.sqrt(x[0]**2+x[1]**2)
-    
     def visualize_waypoint(self, x, y):
         marker_msg = Marker()
         marker_msg.header.frame_id = self.global_frame_id
@@ -279,46 +297,58 @@ class NavigationTangentServer(ActionServerBase):
         nav_x, nav_y, nav_theta = self.get_robot_pose()
         assert self.cur_seg != None
 
+        target_pos = np.array([0.0, 0.0])
+        target_theta = None
+
+        # Initial safe pass, there was some old suspicious logic that I'm fairly certain is wrong if it ever gets triggered
+        # I assume it was added for a reason, so I did a version of the logic that is correct
+
         if self.cur_seg + 1 >= len(self.path.poses):
-            return
-
-        target_pos = (0, 0)
-
-        a = (self.path.poses[self.cur_seg].position.x, self.path.poses[self.cur_seg].position.y)
-        b = (self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y)
-        while self.cur_seg + 2 < len(self.path.poses):
-            c = (self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y)
-            if b == c:
-                continue
-            if a == b or self.point_to_segment(a, b, (nav_x, nav_y)) - 1e-9 > self.point_to_segment(b, c, (nav_x, nav_y)):
-                self.cur_seg += 1
-                a = b
-                b = c
-            else:
-                break
-
-        if a == b:
-            return
-
-        if self.cur_seg + 2 == len(self.path.poses):
-            target_pos = b
+            target_pos = np.array([self.path.poses[-1].position.x, self.path.poses[-1].position.y])
+            target_theta = math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
+        elif not self.point_to_point_dist_less_than(np.array([nav_x, nav_y]), np.array([self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y]), self.fallback_brute_return_threshold): # Fallback if we get too far away from the path
+            target_pos = np.array([self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y])
+            target_theta = math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
         else:
-            cor_off = self.proj_vector(a, b, (nav_x, nav_y)) # the perpendicular vector from robot pos to the line
+            a = np.array([self.path.poses[self.cur_seg].position.x, self.path.poses[self.cur_seg].position.y])
+            b = np.array([self.path.poses[self.cur_seg + 1].position.x, self.path.poses[self.cur_seg + 1].position.y])
+            while self.cur_seg + 2 < len(self.path.poses):
+                c = np.array([self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y])
+                dist_to_next = self.point_to_segment(b, c, np.array([nav_x, nav_y])) if not np.allclose(b, c) else np.linalg.norm(np.array([nav_x-b[0], nav_y-b[1]]))
+                # assert b != c # replacement of old if statement, if it evaluated to true you would just die
+                if np.allclose(a, b) or self.point_to_segment(a, b, np.array([nav_x, nav_y])) - 1e-9 > dist_to_next or self.point_to_point_dist_less_than(np.array([nav_x, nav_y]), b, self.fallback_seg_complete_threshold):
+                    self.cur_seg += 1
+                    a = b
+                    b = c
+                else:
+                    break
 
-            ds_scale = self.point_segment_scale(a, b, (nav_x, nav_y))
+            if np.allclose(a, b) or self.cur_seg + 2 >= len(self.path.poses):
+                target_pos = b
+            else:
+                cor_off = self.proj_vector(a, b, np.array([nav_x, nav_y])) # the perpendicular vector from robot pos to the line
 
-            if ds_scale < 0: # before a
-                cor_off = (a[0]-nav_x, a[1]-nav_y)
-            elif ds_scale > 1: # after b, shouldn't really happen bc we are considering the closest segment
-                cor_off = (b[0]-nav_x, b[1]-nav_y)
+                ds_scale = self.point_segment_scale(a, b, np.array([nav_x, nav_y]))
 
-            for_sca = self.forward_dist / self.norm((b[0] - a[0], b[1] - a[1]))
-            for_off = ((b[0] - a[0]) * for_sca, (b[1] - a[1]) * for_sca) # the tangent vector of the line
+                for_sca = self.forward_dist / np.linalg.norm(b - a)
+                for_off = (b - a) * for_sca  # the tangent vector of the line
 
-            target_pos = (nav_x + cor_off[0] + for_off[0], nav_y + cor_off[1] + for_off[1])
+                if ds_scale < 0: # before a
+                    cor_off = a - np.array([nav_x, nav_y])
+                elif ds_scale > 1: # after b, shouldn't really happen bc we are considering the closest segment
+                    self.get_logger().info(f"Nav server after b flag, ds_scale {ds_scale}, is this a problem?")
+                    cor_off = b - np.array([nav_x, nav_y])
+
+                target_pos = np.array([nav_x, nav_y]) + cor_off + for_off
+                target_pos = target_pos * (1 - self.pred_scale) + np.array([self.path.poses[self.cur_seg + 2].position.x, self.path.poses[self.cur_seg + 2].position.y]) * self.pred_scale
+            
+            # Prod
+            target_theta = math.atan2(b[1]-a[1], b[0]-a[0]) if not np.allclose(a, b) else math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
+            # Experimental version, needs to be tested, should increase speed and minimize strafing - useful when strafing is shit
+            # target_theta = math.atan2(target_pos[1] - nav_y, target_pos[0] - nav_x)
 
         self.visualize_waypoint(target_pos[0], target_pos[1])
-        target_robot_frame = self.global_to_robot((target_pos[0], target_pos[1], math.atan2(b[1]-a[1], b[0]-a[0])), (nav_x, nav_y, nav_theta))
+        target_robot_frame = self.global_to_robot(np.array([target_pos[0], target_pos[1], target_theta]), np.array([nav_x, nav_y, nav_theta]))
         self.set_pid_setpoints(*target_robot_frame)
         self.update_pid(0, 0, 0)
 
@@ -364,10 +394,11 @@ class NavigationTangentServer(ActionServerBase):
 
     def get_closest_seg(self, nav_x, nav_y):
         opt = (1000000, 0)
+        nav_pt = np.array([nav_x, nav_y])
         for i in range(0, len(self.path.poses) - 1):
-            a = (self.path.poses[i].position.x, self.path.poses[i].position.y)
-            b = (self.path.poses[i + 1].position.x, self.path.poses[i + 1].position.y)
-            opt = min(opt, (self.point_to_segment(a, b, (nav_x, nav_y)), i))
+            a = np.array([self.path.poses[i].position.x, self.path.poses[i].position.y])
+            b = np.array([self.path.poses[i + 1].position.x, self.path.poses[i + 1].position.y])
+            opt = min(opt, (self.point_to_segment(a, b, nav_pt), i))
         return opt[1]
 
 
@@ -385,6 +416,7 @@ class NavigationTangentServer(ActionServerBase):
 
         # Generate path using requested planner
         self.path = self.generate_path(goal_handle, nav_x, nav_y)
+
         if not self.path.poses:
             self.get_logger().info("No valid path found. Aborting path following.")
             goal_handle.abort()

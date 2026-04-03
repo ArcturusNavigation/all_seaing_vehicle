@@ -2,6 +2,7 @@ from abc import ABC
 import rclpy
 from rclpy.action import CancelResponse
 from rclpy.node import Node
+import numpy as np
 
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
@@ -110,18 +111,18 @@ class ActionServerBase(ABC, Node):
     @property
     def robot_pos(self):
         '''
-        Gets the robot position as a tuple (x,y)
+        Gets the robot position as a numpy array [x,y]
         '''
         position = self.get_robot_pose()[0:2]
-        return (float(position[0]), float(position[1]))
+        return np.array([float(position[0]), float(position[1])])
 
     @property
     def robot_dir(self):
         '''
-        Gets the robot direction as a tuple, containing the unit vector in the same direction as heading
+        Gets the robot direction as a numpy array, containing the unit vector in the same direction as heading
         '''
         heading = self.get_robot_pose()[2]
-        return (cos(heading), sin(heading))
+        return np.array([cos(heading), sin(heading)])
 
     def get_robot_pose(self):
         """

@@ -234,13 +234,14 @@ def launch_setup(context, *args, **kwargs):
 
     buoy_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
-        executable="yolov8_node.py",
+        executable="yolov11_all_node.py",
         parameters=[
-            {"model": "best"},
-            # {"model": "roboboat_shape_2025"},
+            {"model": ["best"]},
+            # {"model": ["roboboat_shape_2025"]},
             {"label_config": "buoy_label_mappings"},
             # {"label_config": "shape_label_mappings"},
-            {"conf": 0.6},
+            {"confs": [0.6]},
+            {"ignore_indicator_filters": True},
             {"use_color_names": False},
         ],
         remappings=[

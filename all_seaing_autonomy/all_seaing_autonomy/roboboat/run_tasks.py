@@ -15,8 +15,8 @@ from all_seaing_interfaces.msg import Heartbeat
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header, ColorRGBA, String
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Point, Pose, Vector3, Quaternion
 from ament_index_python.packages import get_package_share_directory
+import numpy as np
 import os
 import yaml
 import math
@@ -26,6 +26,8 @@ from sensor_msgs.msg import Joy
 from action_msgs.msg import GoalStatus
 from dataclasses import dataclass
 import time
+
+from all_seaing_autonomy.buoy_utils import (InternalBuoyPair, ob_coords, midpoint_pair_dir, split_buoys, obs_to_pos_label, buoy_pairs_to_markers, pair_to_pose)
 
 ###
 
@@ -37,18 +39,6 @@ import time
 class ReferenceInt:
     def __init__(self, val: int):
         self.val = val
-
-class InternalBuoyPair:
-    def __init__(self, left_buoy=None, right_buoy=None):
-        if left_buoy is None:
-            self.left = Obstacle()
-        else:
-            self.left = left_buoy
-
-        if right_buoy is None:
-            self.right = Obstacle()
-        else:
-            self.right = right_buoy
 
 class ActionType(Enum):
     TASK = 1
@@ -67,18 +57,23 @@ class RunTasks(ActionServerBase):
             ActionClient(self, Task, "task_init")
         ]
         self.task_list = [
+            # HARBOR ALERT MANUAL WAYPOINT
+            # FIRST SPEED WAYPOINT THEN DOCKING WAYPOINT
+            # [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
+            # [ActionType.TASK, TaskType.TASK_UNKNOWN, ActionClient(self, Task, "harbor_alert"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(False, False, False)],
+
             # ENTRY GATES
             # [ActionType.SEARCH, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Search, "search_entry"), ReferenceInt(0), ReferenceInt(0), "entry"],
-            [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
+            # [ActionType.TASK, TaskType.TASK_ENTRY_EXIT, ActionClient(self, Task, "entry_gates"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions()],
 
             # FOLLOW PATH
-            [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
+            # [ActionType.SEARCH, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Search, "search_followpath"), ReferenceInt(0), ReferenceInt(0), "follow_path"],
             [ActionType.TASK, TaskType.TASK_NAV_CHANNEL, ActionClient(self, Task, "follow_buoy_path"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
 
             # SPEED CHALLENGE
             # [ActionType.SEARCH, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Search, "search_speed"), ReferenceInt(0), ReferenceInt(0), "speed_challenge"],
             # [ActionType.TASK, TaskType.TASK_SPEED_CHALLENGE, ActionClient(self, Task, "speed_challenge"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
-
+            
             # DOCKING
             # [ActionType.SEARCH, TaskType.TASK_DOCKING, ActionClient(self, Search, "search_docking"), ReferenceInt(0), ReferenceInt(0), "docking"],
             # [ActionType.TASK, TaskType.TASK_DOCKING, ActionClient(self, Task, "docking"), ReferenceInt(0), ReferenceInt(0), None, RestartSLAMOptions(True, True, False)],
@@ -106,8 +101,8 @@ class RunTasks(ActionServerBase):
 
         self.harbor_alert_tasks = [
             # HARBOR ALERT
-            [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
-            [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(True, True, False)],
+            # [ActionType.SEARCH, ActionClient(self, Search, "search_harbor_alert"), "harbor_sprint", "harbor_marina"],
+            # [ActionType.TASK, ActionClient(self, Task, "harbor_alert"), RestartSLAMOptions(False, False, False)],
         ]
 
         self.current_task = None
@@ -177,11 +172,11 @@ class RunTasks(ActionServerBase):
         else:
             # self.green_labels.add(11) # just to use old rosbags
             # self.red_labels.add(17) # just to use old rosbags
-            self.green_labels.add(label_mappings["green_buoy"])
-            self.green_labels.add(label_mappings["green_circle"])
+            # self.green_labels.add(label_mappings["green_buoy"])
+            # self.green_labels.add(label_mappings["green_circle"])
             self.green_labels.add(label_mappings["green_pole_buoy"])
-            self.red_labels.add(label_mappings["red_buoy"])
-            self.red_labels.add(label_mappings["red_circle"])
+            # self.red_labels.add(label_mappings["red_buoy"])
+            # self.red_labels.add(label_mappings["red_circle"])
             self.red_labels.add(label_mappings["red_pole_buoy"])
             # self.red_labels.add(label_mappings["yellow_buoy"])
             # self.red_labels.add(label_mappings["yellow_racquet_ball"])
@@ -222,16 +217,16 @@ class RunTasks(ActionServerBase):
         # harbor alert
 
         self.keyboard_sub = None
-        # if self.is_sim: 
-        #     self.get_logger().info("Running in simulation mode. Listening to joystick input.")
-        #     self.keyboard_sub = self.create_subscription(
-        #         Joy, "/joy", self.sim_keyboard_callback, 10
-        #     )
-        # else: 
-        self.get_logger().info("Running in real mode. Listening to keyboard input.")
-        self.keyboard_sub = self.create_subscription(
-            String, "/harbor_detect", self.real_harbor_callback, 10
-        )
+        if self.is_sim: 
+            self.get_logger().info("Running in simulation mode. Listening to joystick input.")
+            self.keyboard_sub = self.create_subscription(
+                Joy, "/joy", self.sim_keyboard_callback, 10
+            )
+        else: 
+            self.get_logger().info("Running in real mode. Listening to keyboard input.")
+            self.keyboard_sub = self.create_subscription(
+                String, "/harbor_detect", self.real_harbor_callback, 10
+            )
         self.harbor_alerted = False
         self.harbor_index = 0
         self.cancelled_task_harbor = True
@@ -253,7 +248,7 @@ class RunTasks(ActionServerBase):
         self.restart_slam_options = None
 
     def odom_cb(self, msg):
-        self.vel = self.norm((msg.twist.twist.linear.x, msg.twist.twist.linear.y))
+        self.vel = np.linalg.norm([msg.twist.twist.linear.x, msg.twist.twist.linear.y])
 
     def receive_heartbeat(self, msg):
         self.heartbeat_msg = msg
@@ -269,7 +264,7 @@ class RunTasks(ActionServerBase):
         self.obstacles = msg.obstacles
 
         if self.gate_pair is None:
-            self.setup_buoys()
+            self.setup_entry_buoys()
 
     def report_shore_heartbeat(self):
         RAD_TO_DEG = 180.0 / math.pi
@@ -298,6 +293,8 @@ class RunTasks(ActionServerBase):
         if self.harbor_alerted:
             return
         freq, type = msg.data.split("_")
+        allowed = [600, 800, 1000]
+        freq = min(allowed, key=lambda x: abs(x - freq))
         if type == "single":
             self.get_logger().info(f'HARBOR ALERTED SINGLE AT {freq}HZ')
             self.harbor_alerted = True
@@ -321,64 +318,8 @@ class RunTasks(ActionServerBase):
             self.cancel_current_task()
             self.find_task()
     
-    def split_buoys(self, obstacles):
-        """
-        Splits the buoys into red and green based on their labels in the obstacle map
-        """
-        green_bouy_points = []
-        red_bouy_points = []
-        for obstacle in obstacles:
-            if obstacle.label in self.green_labels:
-                green_bouy_points.append(obstacle)
-            elif obstacle.label in self.red_labels:
-                red_bouy_points.append(obstacle)
-        return green_bouy_points, red_bouy_points
-
-    def norm_squared(self, vec, ref=(0, 0)):
-        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
-
-    def norm(self, vec, ref=(0, 0)):
-        return math.sqrt(self.norm_squared(vec, ref))
-    
-    def dot(self, vec1, vec2):
-        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
-    
-    def difference(self, pt1, pt2):
-        """
-        pt2 - pt1
-        """
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return (x2-x1, y2-y1)
-
-    def ob_coords(self, buoy, local=False):
-        if local:
-            return (buoy.local_point.point.x, buoy.local_point.point.y)
-        else:
-            return (buoy.global_point.point.x, buoy.global_point.point.y)
-        
-    def midpoint(self, vec1, vec2):
-        return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
-    
-    def obs_to_pos_label(self, obs):
-        return [self.ob_coords(ob, local=False) + (ob.label,) for ob in obs]
-    
-    def midpoint_pair_dir(self, pair, forward_dist):
-        left_coords = self.ob_coords(pair.left)
-        right_coords = self.ob_coords(pair.right)
-        midpoint = self.midpoint(left_coords, right_coords)
-        
-        scale = forward_dist
-        dy = right_coords[1] - left_coords[1]
-        dx = right_coords[0] - left_coords[0]
-        norm = math.sqrt(dx**2 + dy**2)
-        dx /= norm
-        dy /= norm
-        midpoint = (midpoint[0] - scale*dy, midpoint[1] + scale*dx)
-
-        return midpoint, (-dy, dx)
-
-    def setup_buoys(self):
+    # TODO add parameter in task server base version to be able to use it here
+    def setup_entry_buoys(self):
         """
         Runs when the first obstacle map is received, filters the buoys that are in front of
         the robot (x>0 in local coordinates) and finds (and stores) the closest green one and
@@ -387,21 +328,21 @@ class RunTasks(ActionServerBase):
         """
         self.get_logger().debug("Setting up starting buoys!")
         self.get_logger().debug(
-            f"list of obstacles: {self.obs_to_pos_label(self.obstacles)}"
+            f"list of obstacles: {obs_to_pos_label(self.obstacles)}"
         )
 
         # Split all the buoys into red and green
-        green_init, red_init = self.split_buoys(self.obstacles)
+        green_init, red_init = split_buoys(self.obstacles, self.green_labels, self.red_labels)
 
         # lambda function that filters the buoys that are in front of the robot
         obstacles_in_front = lambda obs: [
             ob for ob in obs
-            if ob.local_point.point.x > 0 and self.norm(self.robot_pos, self.ob_coords(ob)) < self.gate_dist_thres        
+            if ob.local_point.point.x > 0 and np.linalg.norm(self.robot_pos - ob_coords(ob)) < self.gate_dist_thres
         ]
         # take the green and red buoys that are in front of the robot
         green_buoys, red_buoys = obstacles_in_front(green_init), obstacles_in_front(red_init)
         self.get_logger().debug(
-            f"initial red buoys: {[self.ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[self.ob_coords(buoy) for buoy in green_buoys]}"
+            f"initial red buoys: {[ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[ob_coords(buoy) for buoy in green_buoys]}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
             self.get_logger().debug("No starting buoy pairs!")
@@ -415,10 +356,10 @@ class RunTasks(ActionServerBase):
         red_to = None
         for red_b in red_buoys:
             for green_b in green_buoys:
-                if self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) < self.inter_buoy_pair_dist or self.norm(self.ob_coords(red_b), self.ob_coords(green_b)) > self.max_inter_gate_dist:
+                pair_dist = np.linalg.norm(ob_coords(red_b) - ob_coords(green_b))
+                if pair_dist < self.inter_buoy_pair_dist or pair_dist > self.max_inter_gate_dist:
                     continue
-                # elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))) and (self.red_left == self.ccw((0, 0), self.ob_coords(green_b, local=True), self.ob_coords(red_b, local=True))):
-                elif ((green_to is None) or (self.norm(self.midpoint(self.ob_coords(red_b, local=True), self.ob_coords(green_b, local=True))) < self.norm(self.midpoint(self.ob_coords(red_to, local=True), self.ob_coords(green_to, local=True))))):
+                elif ((green_to is None) or (np.linalg.norm((ob_coords(red_b, local=True) + ob_coords(green_b, local=True)) / 2) < np.linalg.norm((ob_coords(red_to, local=True) + ob_coords(green_to, local=True)) / 2))):
                     green_to = green_b
                     red_to = red_b
         if green_to is None:
@@ -429,65 +370,15 @@ class RunTasks(ActionServerBase):
             self.gate_pair = InternalBuoyPair(green_to, red_to)
         self.get_logger().info(f'FOUND STARTING GATE')
         self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))
-        self.gate_mid, self.gate_dir = self.midpoint_pair_dir(self.gate_pair, 0.0)
-        self.waypoint_marker_pub.publish(self.buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, self.pair_to_pose(self.gate_mid), 0.0)]))
+        self.gate_mid, self.gate_dir = midpoint_pair_dir(self.gate_pair, 0.0)
+        self.waypoint_marker_pub.publish(buoy_pairs_to_markers([(self.gate_pair.left, self.gate_pair.right, pair_to_pose(self.gate_mid), 0.0)], self.red_left, self.global_frame_id))
         return True
-    
-    def pair_to_pose(self, pair):
-        return Pose(position=Point(x=pair[0], y=pair[1]))
-
-    def buoy_pairs_to_markers(self, buoy_pairs):
-        """
-        Create the markers from an array of buoy pairs to visualize them (and the respective waypoints) in RViz
-        """
-        marker_array = MarkerArray()
-        i = 0
-        for p_left, p_right, point, radius in buoy_pairs:
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.ARROW,
-                    pose=point,
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=2.0, y=0.15, z=0.15),
-                    color=ColorRGBA(a=1.0, b=1.0),
-                    id=(4 * i),
-                )
-            )
-            if self.red_left:
-                left_color = ColorRGBA(r=1.0, a=1.0)
-                right_color = ColorRGBA(g=1.0, a=1.0)
-            else:
-                left_color = ColorRGBA(g=1.0, a=1.0)
-                right_color = ColorRGBA(r=1.0, a=1.0)
-
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(p_left)),
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=1.0, y=1.0, z=1.0),
-                    color=left_color,
-                    id=(4 * i) + 1,
-                )
-            )
-            marker_array.markers.append(
-                Marker(
-                    type=Marker.SPHERE,
-                    pose=self.pair_to_pose(self.ob_coords(p_right)),
-                    header=Header(frame_id=self.global_frame_id),
-                    scale=Vector3(x=1.0, y=1.0, z=1.0),
-                    color=right_color,
-                    id=(4 * i) + 2,
-                )
-            )
-            i += 1
-        return marker_array
     
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
 
         if self.gate_pair is None:
-            self.setup_buoys()
+            self.setup_entry_buoys()
 
     def attempt_task(self, action_type, task_type, current_task, incr_on_success, incr_on_fail = None, location_name = None, restart_slam_options = None):
         self.current_task = current_task
@@ -559,8 +450,8 @@ class RunTasks(ActionServerBase):
             self.attempt_task(self.term_tasks[self.next_term_index.val][0], TaskType.TASK_NONE, self.term_tasks[self.next_term_index.val][1], self.next_term_index, None, self.term_tasks[self.next_term_index.val][2] if self.term_tasks[self.next_term_index.val][0] == ActionType.SEARCH else None)
             return
         
-        self.get_logger().info("All tasks completed. Shutting down node.")
-        self.destroy_node()
+        # self.get_logger().info("All tasks completed. Shutting down node.")
+        # self.destroy_node()
         return
 
     def feedback_callback(self, feedback_msg):

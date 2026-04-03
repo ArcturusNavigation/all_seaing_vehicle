@@ -31,20 +31,24 @@ class WebcamPublisher(Node):
                     self.get_logger().info(f'camera name: {camera_name}')
                     if camera_name == DESIRED_CAMERA_NAME:
                         self.get_logger().info(f'desired camera')
-                        try:
-                            with open(os.path.join('/sys/class/video4linux/', camera, 'index'), 'r') as fs:
-                                video_index = int(fs.readline().strip())
-                                self.get_logger().info(f'video index: {video_index}')
-                                break
-                        except:
-                            pass
+                        video_index = int(camera[-1])
+                        self.get_logger().info(f'video index: {video_index}')
+                        break
+                        # try:
+                        #     with open(os.path.join('/sys/class/video4linux/', camera, 'index'), 'r') as fs:
+                        #         video_index = int(fs.readline().strip())
+                        #         self.get_logger().info(f'video index: {video_index}')
+                        #         break
+                        # except:
+                        #     pass
             except:
                 pass
 
         if video_index != -1:
             self.cap = cv2.VideoCapture(video_index)
+            self.get_logger().info(f'webcam publisher found camera')
         else:
-            self.destroy_node()
+            rclpy.shutdown()
 
     def publish_webcam_image(self):
         ret, frame = self.cap.read()

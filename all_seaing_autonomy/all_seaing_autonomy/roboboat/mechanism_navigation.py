@@ -21,6 +21,7 @@ from all_seaing_common.report_pb2 import ObjectDetected, ObjectType, Color, Task
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 from all_seaing_autonomy.roboboat.visualization_tools import VisualizationTools
+from all_seaing_autonomy.geometry_utils import angle_between
 
 from dataclasses import dataclass
 
@@ -132,8 +133,6 @@ class MechanismNavigation(TaskServerBase):
         self.ball_counter = 0
 
         bringup_prefix = get_package_share_directory("all_seaing_bringup")
-        self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
 
         self.declare_parameter(
             "shape_label_mappings_file",
@@ -153,7 +152,9 @@ class MechanismNavigation(TaskServerBase):
             self.ball_labels = [self.label_mappings[name] for name in ["red_circle", "red_cross", "red_triangle", "red_square"]]
         else:
             self.water_labels = [self.label_mappings[name] for name in ["black_triangle"]]
-            self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+            # self.water_labels = []
+            # self.ball_labels = [self.label_mappings[name] for name in ["black_cross"]]
+            self.ball_labels = []
         
         self.declare_parameter(
             "latlng_locations_file",
@@ -191,9 +192,9 @@ class MechanismNavigation(TaskServerBase):
         self.finished_shooting = False
 
     def ctr_normal(self, plane: LabeledObjectPlane):
-        center_pt = (plane.normal_ctr.position.x, plane.normal_ctr.position.y)
+        center_pt = np.array([plane.normal_ctr.position.x, plane.normal_ctr.position.y])
         _,_,theta = euler_from_quaternion([plane.normal_ctr.orientation.x, plane.normal_ctr.orientation.y, plane.normal_ctr.orientation.z, plane.normal_ctr.orientation.w])
-        return (center_pt, (np.cos(theta), np.sin(theta)))
+        return (center_pt, np.array([np.cos(theta), np.sin(theta)]))
 
     def banner_coords(self, banner: LabeledObjectPlane):
         return self.ctr_normal(banner)[0]
@@ -208,7 +209,7 @@ class MechanismNavigation(TaskServerBase):
                 new_banner = True
                 tracked_banner: LabeledObjectPlane
                 for tracked_banner in self.tracked_targets:
-                    if self.norm(self.banner_coords(tracked_banner), self.banner_coords(banner)) < self.duplicate_dist:
+                    if np.linalg.norm(self.banner_coords(tracked_banner) - self.banner_coords(banner)) < self.duplicate_dist:
                         new_banner = False
                         break
                 if new_banner:
@@ -274,7 +275,7 @@ class MechanismNavigation(TaskServerBase):
                 # check if we already shot it
                 shot = False
                 for shot_target_type, (shot_target_ctr, shot_target_normal) in self.shot_targets:
-                    if self.norm(shot_target_ctr, target_ctr) < self.duplicate_dist:
+                    if np.linalg.norm(shot_target_ctr - target_ctr) < self.duplicate_dist:
                         shot = True
                 if shot:
                     continue
@@ -282,11 +283,11 @@ class MechanismNavigation(TaskServerBase):
                 self.picked_target = True
                 if self.selected_target is None:
                     self.updated_target_pos = True
-                if (self.selected_target is not None) and (self.norm(self.selected_target[1][0], target_ctr) < self.duplicate_dist):
+                if (self.selected_target is not None) and (np.linalg.norm(self.selected_target[1][0] - target_ctr) < self.duplicate_dist):
                     # same target, update position & normal
                     self.selected_target = (target_type, (target_ctr, target_normal))
                     self.updated_target_pos = True
-                if (self.selected_target is None) or (self.norm(self.selected_target[1][0], self.robot_pos) > self.norm(target_ctr, self.robot_pos) + self.update_target_dist_thres):
+                if (self.selected_target is None) or (np.linalg.norm(self.selected_target[1][0] - self.robot_pos) > np.linalg.norm(target_ctr - self.robot_pos) + self.update_target_dist_thres):
                     self.state = DeliveryState.NEW_NAVIGATION
                     # found a new one closer
                     self.selected_target = (target_type, (target_ctr, target_normal))
@@ -327,59 +328,6 @@ class MechanismNavigation(TaskServerBase):
         x, y = point
         (a, b, c), _ = wall_params
         return (a*x+b+y)/math.sqrt(a**2+b**2)
-    
-    def dot(self, vec1, vec2):
-        return vec1[0]*vec2[0]+vec1[1]*vec2[1]
-
-    def midpoint(self, pt1, pt2):
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return ((x1+x2)/2.0, (y1+y2)/2.0)
-
-    def difference(self, pt1, pt2):
-        """
-        pt2 - pt1
-        """
-        x1, y1 = pt1
-        x2, y2 = pt2
-        return (x2-x1, y2-y1)
-    
-    def norm_squared(self, vec, ref=(0, 0)):
-        return (vec[0] - ref[0])**2 + (vec[1]-ref[1])**2
-
-    def norm(self, vec, ref=(0, 0)):
-        return math.sqrt(self.norm_squared(vec, ref))
-    
-    def perp_vec(self, vec):
-        return (-vec[1], vec[0])
-    
-    # def angle_vec(self, vec1, vec2):
-    #     return math.acos(self.dot(vec1, vec2)/(self.norm(vec1)*self.norm(vec2))) 
-    
-    def negative(self, vec):
-        return (-vec[0], -vec[1])
-    
-    def sum(self, vec1, vec2):
-        return (vec1[0]+vec2[0], vec1[1]+vec2[1])
-    
-    def scalar_prod(self, vec, scalar):
-        return (scalar*vec[0], scalar*vec[1])
-    
-    def cross(self, vec1, vec2):
-        return vec1[0]*vec2[1]-vec1[1]*vec2[0]
-
-    def angle_vec(self, vec1, vec2):
-        return math.atan2(self.cross(vec1, vec2)/(self.norm(vec1)*self.norm(vec2)), self.dot(vec1, vec2)/(self.norm(vec1)*self.norm(vec2))) 
-
-    def angle_segments(self, p1, p2):
-        p1left, p1right = p1
-        p2left, p2right = p2
-        return self.angle_vec(self.difference(p1left, p1right), self.difference(p2left, p2right))
-    
-    def fit_pair(self, point_pair):
-        (x1,y1), (x2,y2) = point_pair
-        # (y-y1)(x2-x1) = (y2-y1)*(x-x1) -> y(x2-x1)+x(y1-y2)+x1(y2-y1)+y1(x1-x2) = 0 -> y(x2-x1)+x(y1-y2)+x1y2-x2y1
-        return (y1-y2, x2-x1, x1*y2-x2*y1), abs(x1*y2-x2*y1)/math.sqrt((y1-y2)**2+(x2-x1)**2)
     
     def set_pid_setpoints(self, x, y, theta):
         self.x_pid.set_setpoint(x)
@@ -447,22 +395,23 @@ class MechanismNavigation(TaskServerBase):
         target_back_mid = self.selected_target[1][0]
         target_dir = self.selected_target[1][1]
         
-        marker_arr.markers.append(VisualizationTools.visualize_line(target_back_mid, self.perp_vec(target_dir), mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
+        perp = np.array([-target_dir[1], target_dir[0]])
+        marker_arr.markers.append(VisualizationTools.visualize_line(target_back_mid, perp, mark_id, (0.0, 0.0, 1.0), self.robot_frame_id))
         mark_id = mark_id + 1
 
-        if self.state == DeliveryState.STATIONKEEPING or self.norm(target_back_mid, self.robot_pos) < self.navigation_dist_thres or self.time_started_shooting != -1 or self.finished_shooting:
+        if self.state == DeliveryState.STATIONKEEPING or np.linalg.norm(target_back_mid - self.robot_pos) < self.navigation_dist_thres or self.time_started_shooting != -1 or self.finished_shooting:
             if self.state == DeliveryState.NAVIGATING_TARGET:
                 self.get_logger().info('CANCELLING NAVIGATION')
                 self.cancel_navigation()
             # self.get_logger().info('STATIONKEEPING PID')
             self.state = DeliveryState.STATIONKEEPING
             # go to that line and forward (negative error if boat left of line, positive if right)
-            offset = -self.dot(self.difference(target_back_mid, self.robot_pos), self.perp_vec(target_dir))
-            approach_angle = self.angle_vec(self.negative(target_dir), self.robot_dir) # TODO Check sign
-            angle_error = self.angle_vec(self.difference(self.robot_pos, target_back_mid), self.robot_dir)
+            offset = -(self.robot_pos - target_back_mid) @ perp
+            approach_angle = angle_between(-target_dir, self.robot_dir) # TODO Check sign
+            angle_error = angle_between(target_back_mid - self.robot_pos, self.robot_dir)
 
             # forward speed decreasing exponentially as we get closer
-            dist_diff = self.dot(self.difference(target_back_mid, self.robot_pos), target_dir) - self.wpt_banner_dist
+            dist_diff = (self.robot_pos - target_back_mid) @ target_dir - self.wpt_banner_dist
             # forward_speed = self.forward_speed*(1-np.exp(-dist_diff/self.slow_dist))
 
             # self.get_logger().info(f'side offset: {offset}')
@@ -501,7 +450,7 @@ class MechanismNavigation(TaskServerBase):
                     return
                 # elif (time.time() - self.time_started_shooting > 5):
                 # elif self.finished_shooting:
-                elif self.finished_shooting or (time.time() - self.time_started_shooting > 10):
+                elif self.finished_shooting:
                     self.get_logger().info(f'SHOT {self.selected_target[0]}, TIME: {time.time()}')
                     # move on
                     self.shot_targets.append(self.selected_target)
@@ -539,13 +488,13 @@ class MechanismNavigation(TaskServerBase):
             self.send_vel_cmd(x_vel, y_vel, theta_output)
             self.controller_marker_pub.publish(marker_array)
         else:
-            waypoint = self.sum(target_back_mid, self.scalar_prod(target_dir, self.wpt_banner_dist))
-            if self.state == DeliveryState.NEW_NAVIGATION or ((self.sent_waypoint is not None) and (self.norm(waypoint, self.sent_waypoint) > self.adapt_dist)):
+            waypoint = target_back_mid + target_dir * self.wpt_banner_dist
+            if self.state == DeliveryState.NEW_NAVIGATION or ((self.sent_waypoint is not None) and (np.linalg.norm(waypoint - np.array(self.sent_waypoint)) > self.adapt_dist)):
                 self.get_logger().info('SENDING WAYPOINT')
                 # self.get_logger().info(f'passed: {passed_previous}, first passed: {passed_previous}, first buoy pair: {self.first_buoy_pair}, changed pair to: {changed_pair_to}, adapt waypoint: {adapt_waypoint}')
                 self.send_waypoint_to_server(waypoint)
                 self.state = DeliveryState.NAVIGATING_TARGET
-            elif self.send_goal_future != None and self.sent_waypoint != None:
+            elif self.send_goal_future is not None and self.sent_waypoint is not None:
                 goal_result = self.send_goal_future.result()
                 if self.waypoint_rejected or self.waypoint_aborted:
                     # follow path failed, retry sending

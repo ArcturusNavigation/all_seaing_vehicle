@@ -92,10 +92,6 @@ class SpeedChange(TaskServerBase):
         self.blue_pid = PIDController(*blue_pid_vals)
         self.blue_pid.set_effort_min(-self.max_yaw_rate)
         self.blue_pid.set_effort_max(self.max_yaw_rate)
-
-
-        self.declare_parameter("is_sim", False)
-        self.is_sim = self.get_parameter("is_sim").get_parameter_value().bool_value
         
         # NOTE: in qualifying round we assume we enter from the correct direction.
 
@@ -203,9 +199,9 @@ class SpeedChange(TaskServerBase):
             # self.get_logger().info(f"{self.get_yaw()}, {self.starting_yaw}")
 
             if yaw_diff > math.pi:
-                yaw_diff -= math.pi
+                yaw_diff -= 2*math.pi
             elif yaw_diff < -math.pi:
-                yaw_diff += math.pi
+                yaw_diff += 2*math.pi
             if (abs(yaw_diff) > math.pi * (16/17)):
                 self.current_loop_index += 1
         
@@ -245,7 +241,7 @@ class SpeedChange(TaskServerBase):
                 return
 
     def redgreen_trigger(self):
-        if self.get_clock().now().nanoseconds/1e9 - self.timer1 != 6.0:
+        if self.get_clock().now().nanoseconds/1e9 - self.timer1 < 6.0:
             return
         for box in self.bboxes:
             if box.label in self.red_labels:
