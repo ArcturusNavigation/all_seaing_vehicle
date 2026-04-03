@@ -4,7 +4,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 
 from all_seaing_interfaces.action import FollowPath, Task, Waypoint, Search
-from all_seaing_interfaces.msg import ControlOption
+from all_seaing_interfaces.msg import ControlOption, ContinuousWaypoint, WaypointStatus
 from all_seaing_common.action_server_base import ActionServerBase
 from action_msgs.msg import GoalStatus
 
@@ -41,6 +41,16 @@ class TaskServerBase(ActionServerBase):
 
         self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
+
+        # Continuous waypoint interface
+        self.continuous_waypoint_pub = self.create_publisher(
+            ContinuousWaypoint, "continuous_waypoint", 10
+        )
+        self.waypoint_status = None
+        self.waypoint_status_sub = self.create_subscription(
+            WaypointStatus, "waypoint_status", self._waypoint_status_cb, 10
+        )
+
         self.control_pub = self.create_publisher(
             ControlOption, 
             "control_options", 
@@ -62,8 +72,12 @@ class TaskServerBase(ActionServerBase):
         self.declare_parameter("planner", "astar")
 
         self.declare_parameter("bypass_planner", False)
+        self.declare_parameter("use_continuous_nav", False)
+        self.declare_parameter("default_forward_speed", 2.0)
 
         self.bypass_planner = self.get_parameter("bypass_planner").get_parameter_value().bool_value
+        self.use_continuous_nav = self.get_parameter("use_continuous_nav").get_parameter_value().bool_value
+        self.default_forward_speed = self.get_parameter("default_forward_speed").get_parameter_value().double_value
 
         self.declare_parameter("search_task_radius", 50.0)
         self.search_task_radius = self.get_parameter("search_task_radius").get_parameter_value().double_value
@@ -349,10 +363,37 @@ class TaskServerBase(ActionServerBase):
                 time.sleep(self.timer_period)
         return False
 
+    def _waypoint_status_cb(self, msg: WaypointStatus):
+        self.waypoint_status = msg
+
+    def move_to_waypoint_continuous(self, point, forward_speed=None, avoid_obs=True):
+        """Publish a continuous waypoint update (non-blocking, updatable)."""
+        self.waypoint_status = None
+        msg = ContinuousWaypoint()
+        msg.x = point[0]
+        msg.y = point[1]
+        msg.forward_speed = forward_speed if forward_speed is not None else self.default_forward_speed
+        msg.avoid_obs = avoid_obs
+        self.continuous_waypoint_pub.publish(msg)
+
+    def wait_for_waypoint_crossed(self, exit_func=None):
+        """Busy-wait until the continuous waypoint is crossed. Returns True if exit_func triggered."""
+        while rclpy.ok():
+            if self.waypoint_status is not None and self.waypoint_status.waypoint_reached:
+                return False
+            if exit_func is not None and exit_func():
+                return True
+            if self.goal_handle.is_cancel_requested:
+                return False
+            time.sleep(self.timer_period)
+        return False
+
     def send_waypoint_to_server(self, waypoint, is_stationary=False):
         self.sent_waypoint = waypoint
 
-        if not self.bypass_planner:
+        if self.use_continuous_nav:
+            self.move_to_waypoint_continuous(waypoint)
+        elif not self.bypass_planner:
             self.move_to_point(waypoint, is_stationary=is_stationary)
         else:
             self.move_to_waypoint(waypoint, is_stationary=is_stationary)

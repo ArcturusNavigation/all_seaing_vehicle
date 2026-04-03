@@ -1,0 +1,2 @@
+bool waypoint_reached
+float64 distance_to_waypoint
