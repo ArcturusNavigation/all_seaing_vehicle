@@ -182,6 +182,7 @@ private:
     // Factor graph (GTSAM) variables
     std::shared_ptr<gtsam::ISAM2> m_isam2;
     std::vector<gtsam::Key> m_pose_keys;
+    std::vector<rclcpp::Time> m_timestamps;
 
     // Noise models
     gtsam::noiseModel::Diagonal::shared_ptr m_prior_noise;

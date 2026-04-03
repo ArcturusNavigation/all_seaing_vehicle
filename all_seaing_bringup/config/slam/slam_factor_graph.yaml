@@ -42,7 +42,7 @@ factor_graph_slam:
     # actually better to decrease (put it to 1) to increase speed of processing if detections slow the whole thing down, then we guarantee we are processing the last message & not holding onto previous ones
     detection_queue_size: 15 # decrease it if all odom messages before next detection are getting dropped from queue before we finish processing the current detection, or if the messages in the beginning of the queue are too old
     odom_timeout: 0.7
-    detection_timeout: 0.7
+    detection_timeout: 5.0
     gps_based_predictions: True
     # the way it's currently done, it's best to either have gps_based_predictions or diff_position_odom to be True, not both of them (diff_position_odom is basically useless if the gps callback is faster than the odometry one and gps_based_predictions is True)
     match_numbers_indicators: True

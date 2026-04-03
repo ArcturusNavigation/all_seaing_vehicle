@@ -242,11 +242,13 @@ void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::
         // TODO marginalize & measure covariances between last pose & all obstacles & add respective range bearing measurements?
         m_isam2 = std::make_shared<gtsam::ISAM2>();
         m_pose_keys.clear();
+        m_timestamps.clear();
 
         // initialize iSAM2 with the first pose prior
         gtsam::NonlinearFactorGraph graph;
         gtsam::Key first_pose_key = gtsam::Symbol('x', 0);
         m_pose_keys.push_back(first_pose_key);
+        m_timestamps.push_back(m_last_nav_time);
         graph.add(gtsam::PriorFactor<gtsam::Pose2>(first_pose_key, gtsam::Pose2(m_nav_x, m_nav_y, m_nav_heading), m_prior_noise));
         m_num_poses = 1;
         gtsam::Values initialEstimate;
@@ -415,6 +417,7 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
         gtsam::NonlinearFactorGraph graph;
         gtsam::Key first_pose_key = gtsam::Symbol('x', 0);
         m_pose_keys.push_back(first_pose_key);
+        m_timestamps.push_back(std::max(m_last_odom_time, m_last_nav_time));
         graph.add(gtsam::PriorFactor<gtsam::Pose2>(first_pose_key, gtsam::Pose2(m_nav_x, m_nav_y, m_nav_heading), m_prior_noise));
         m_num_poses = 1;
         gtsam::Values initialEstimate;
@@ -473,6 +476,7 @@ void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
     gtsam::NonlinearFactorGraph graph;
     gtsam::Key new_pose_key = gtsam::Symbol('x', m_num_poses++);
     m_pose_keys.push_back(new_pose_key);
+    m_timestamps.push_back(std::max(m_last_odom_time, m_last_nav_time));
     graph.add(gtsam::BetweenFactor<gtsam::Pose2>(m_pose_keys[m_num_poses-2], new_pose_key, gtsam::Pose2(dx, dy, dtheta), m_odom_noise));
     gtsam::Values initialEstimate;
     gtsam::Pose2 new_estimated_pose = gtsam::Pose2(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2))*gtsam::Pose2(dx, dy, dtheta);
@@ -517,6 +521,7 @@ void FactorGraphSLAM::gps_based_pred(){
     gtsam::NonlinearFactorGraph graph;
     gtsam::Key new_pose_key = gtsam::Symbol('x', m_num_poses++);
     m_pose_keys.push_back(new_pose_key);
+    m_timestamps.push_back(std::max(m_last_odom_time, m_last_nav_time));
     graph.add(gtsam::BetweenFactor<gtsam::Pose2>(m_pose_keys[m_num_poses-2], new_pose_key, gtsam::Pose2(dx, dy, dtheta), m_odom_noise));
     gtsam::Values initialEstimate;
     gtsam::Pose2 new_estimated_pose = gtsam::Pose2(m_robot_pos_mean(0), m_robot_pos_mean(1), m_robot_pos_mean(2))*gtsam::Pose2(dx, dy, dtheta);
@@ -1094,8 +1099,10 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
         }
         int tracked_id = match[i] >= 0 ? match[i] : m_num_obj - 1;
 
-        // add the range bearing factor
-        graph.add(gtsam::BearingRangeFactor<gtsam::Pose2, gtsam::Point2>(m_pose_keys.back(), m_tracked_obstacles[tracked_id]->node_key, gtsam::Rot2(bearing), range, m_object_huber));
+        // add the range bearing factor to closest pose
+        int closest_pose_index = std::min((int)(std::lower_bound(m_timestamps.begin()+std::max((int)m_timestamps.size()-900,0), m_timestamps.end(), rclcpp::Time(msg->local_header.stamp))-m_timestamps.begin()), (int)m_timestamps.size()-1);
+        graph.add(gtsam::BearingRangeFactor<gtsam::Pose2, gtsam::Point2>(m_pose_keys[closest_pose_index], 
+            m_tracked_obstacles[tracked_id]->node_key, gtsam::Rot2(bearing), range, m_object_huber));
 
         // update data for matched obstacles (we'll update position after we update SLAM with all points)
         detected_obstacles[i]->obstacle.set_id(m_tracked_obstacles[tracked_id]->obstacle.get_id());
@@ -1413,8 +1420,10 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
         }
         int tracked_id = match[i] >= 0 ? match[i] : m_num_banners - 1;
 
-        // add the range bearing factor
-        graph.add(all_seaing_perception::BearingRangePhiFactor(m_pose_keys.back(), m_tracked_banners[tracked_id]->node_key, bearing, range, phi, m_banner_huber));
+        // add the range bearing factor to closest pose
+        int closest_pose_index = std::min((int)(std::lower_bound(m_timestamps.begin()+std::max((int)m_timestamps.size()-900,0), m_timestamps.end(), rclcpp::Time(msg->header.stamp))-m_timestamps.begin()), (int)m_timestamps.size()-1);
+        graph.add(all_seaing_perception::BearingRangePhiFactor(m_pose_keys[closest_pose_index],
+            m_tracked_banners[tracked_id]->node_key, bearing, range, phi, m_banner_huber));
 
         // update data for matched obstacles (we'll update position after we update SLAM with all points)
         if (banner_label_indicator.count(detected_banners[i]->label) && (!banner_label_indicator[detected_banners[i]->label])){
