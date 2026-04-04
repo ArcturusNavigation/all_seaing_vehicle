@@ -37,9 +37,16 @@ AssociationResult clipper_associate(
             return (x.tracked_id == y.tracked_id && x.detected_id == y.detected_id);
 
         Eigen::Vector2f x_track = tracked[x.tracked_id]->mean_pred.template head<2>();
-        Eigen::Vector2f x_detect = detected[x.detected_id]->mean_pred.template head<2>();
         Eigen::Vector2f y_track = tracked[y.tracked_id]->mean_pred.template head<2>();
-        Eigen::Vector2f y_detect = detected[y.detected_id]->mean_pred.template head<2>();
+
+        // Convert detected (range, bearing) to local (x, y) for distance comparison
+        auto rb_to_xy = [](const auto& det) -> Eigen::Vector2f {
+            float r = det->mean_pred[0];
+            float b = det->mean_pred[1];
+            return Eigen::Vector2f(r * std::cos(b), r * std::sin(b));
+        };
+        Eigen::Vector2f x_detect = rb_to_xy(detected[x.detected_id]);
+        Eigen::Vector2f y_detect = rb_to_xy(detected[y.detected_id]);
 
         FloatT d_track = (x_track - y_track).template cast<FloatT>().norm();
         FloatT d_detect = (x_detect - y_detect).template cast<FloatT>().norm();
@@ -136,7 +143,7 @@ AssociationResult clipper_associate(
 
             new_u = new_u.cwiseMax(0.0);
             FloatT mag = new_u.norm();
-            mag = std::max(mag, 1.0); // not sure if this is right, but it makes sense to me, don't inflate associations if there are none
+            if (mag < 1e-12) break;  // all entries zeroed out, no valid associations
             new_u /= mag;
 
             if ((new_u - u).norm() < u_converge_thresh) {
