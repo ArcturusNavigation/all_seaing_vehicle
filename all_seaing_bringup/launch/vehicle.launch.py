@@ -10,6 +10,7 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_xml.launch_description_sources import XMLLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 import launch_ros
 from launch_ros.actions import SetRemap
@@ -26,6 +27,7 @@ def launch_setup(context, *args, **kwargs):
     description_prefix = get_package_share_directory("all_seaing_description")
     driver_prefix = get_package_share_directory("all_seaing_driver")
     perception_prefix = get_package_share_directory("all_seaing_perception")
+    foxglove_prefix = get_package_share_directory("foxglove_bridge")
 
     robot_urdf_file = os.path.join(
         description_prefix, "urdf", "fish_and_chips", "robot.urdf.xacro"
@@ -390,6 +392,15 @@ def launch_setup(context, *args, **kwargs):
         ),
     )
 
+    foxglove_ld = IncludeLaunchDescription(
+        XMLLaunchDescriptionSource(
+            os.path.join(foxglove_prefix, "launch", "foxglove_bridge_launch.xml")
+        ),
+        launch_arguments={
+            "port": "8765",
+        }.items(),
+    )
+
     perception_ld = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
@@ -445,6 +456,7 @@ def launch_setup(context, *args, **kwargs):
         pcl_to_scan_node,
         rf2o_node,
         ekf_node_rf2o,
+        foxglove_ld,
         # perception_ld,
         # tasks_ld,
     ]
