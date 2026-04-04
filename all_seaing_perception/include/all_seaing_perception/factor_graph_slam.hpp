@@ -73,8 +73,6 @@
 #include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
-#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
-#include <gtsam/nonlinear/GaussNewtonOptimizer.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/sam/BearingRangeFactor.h>
 
@@ -85,6 +83,7 @@ private:
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);
     void banners_cb(const all_seaing_interfaces::msg::LabeledObjectPlaneArray::ConstSharedPtr &msg);
     void gps_based_pred();
+    void remove_nodes(const gtsam::KeyVector& keys);
 
     template <typename T>
     T convert_to_global(T point, bool untracked = false);

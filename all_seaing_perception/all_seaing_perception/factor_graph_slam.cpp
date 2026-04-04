@@ -238,42 +238,59 @@ void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::
         m_robot_pos_mean = Eigen::Vector3d(m_nav_x, m_nav_y, m_nav_heading);
         m_robot_pos_cov = m_prior_noise->covariance();
 
-        // Reset iSAM2
-        // TODO marginalize & measure covariances between last pose & all obstacles & add respective range bearing measurements?
+        // Reset iSAM2 completely — marginalizeLeaves cannot remove poses after
+        // landmark marginalization introduces fill-in factors between them
         m_isam2 = std::make_shared<gtsam::ISAM2>();
         m_pose_keys.clear();
         m_timestamps.clear();
 
-        // initialize iSAM2 with the first pose prior
+        // Initialize iSAM2 with the first pose prior + surviving landmarks
         gtsam::NonlinearFactorGraph graph;
+        gtsam::Values initialEstimate;
+
         gtsam::Key first_pose_key = gtsam::Symbol('x', 0);
         m_pose_keys.push_back(first_pose_key);
         m_timestamps.push_back(m_last_nav_time);
         graph.add(gtsam::PriorFactor<gtsam::Pose2>(first_pose_key, gtsam::Pose2(m_nav_x, m_nav_y, m_nav_heading), m_prior_noise));
         m_num_poses = 1;
-        gtsam::Values initialEstimate;
         initialEstimate.insert(first_pose_key, gtsam::Pose2(m_nav_x, m_nav_y, m_nav_heading));
+
+        if (!request->restart_buoys) {
+            for (auto& obs : m_tracked_obstacles) {
+                auto noise = gtsam::noiseModel::Gaussian::Covariance(obs->cov);
+                gtsam::Point2 est(obs->mean_pred(0), obs->mean_pred(1));
+                graph.add(gtsam::PriorFactor<gtsam::Point2>(obs->node_key, est, noise));
+                initialEstimate.insert(obs->node_key, est);
+            }
+        }
+
+        if (!request->restart_banners) {
+            for (auto& obs : m_tracked_banners) {
+                auto noise = gtsam::noiseModel::Gaussian::Covariance(obs->cov);
+                gtsam::Pose2 est(obs->mean_pred(0), obs->mean_pred(1), obs->mean_pred(2));
+                graph.add(gtsam::PriorFactor<gtsam::Pose2>(obs->node_key, est, noise));
+                initialEstimate.insert(obs->node_key, est);
+            }
+        }
+
         m_isam2->update(graph, initialEstimate);
-
-        // TODO change to not remove everything
-        m_tracked_obstacles = std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>>();
-        m_num_obj = 0;
-
-        m_tracked_banners = std::vector<std::shared_ptr<all_seaing_perception::Banner>>();
-        m_num_banners = 0;
 
         m_gps_based_predicted = false;
         m_gps_based_dx = 0;
         m_gps_based_dy = 0;
         m_gps_based_dtheta = 0;
-        return;
     }
 
     if (request->restart_buoys){
         RCLCPP_INFO(this->get_logger(), "RESTARTING BUOYS");
 
-        // TODO remove buoy nodes & respective factors from iSAM2
-        // need to variable eliminate or only keep last pose & banners similar to how it would be done for resetting positions
+        if (!request->restart_position) {
+            gtsam::KeyVector keys_to_remove = gtsam::KeyVector();
+            for (auto obs : m_tracked_obstacles){
+                keys_to_remove.push_back(obs->node_key);
+            }
+            this->remove_nodes(keys_to_remove);
+        }
 
         m_tracked_obstacles = std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>>();
         m_num_obj = 0;
@@ -282,8 +299,13 @@ void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::
     if (request->restart_banners){
         RCLCPP_INFO(this->get_logger(), "RESTARTING BANNERS");
 
-        // TODO remove banner nodes & respective factors from iSAM2
-        // need to variable eliminate or only keep last pose & buoys similar to how it would be done for resetting positions
+        if (!request->restart_position) {
+            gtsam::KeyVector keys_to_remove = gtsam::KeyVector();
+            for (auto obs : m_tracked_banners){
+                keys_to_remove.push_back(obs->node_key);
+            }
+            this->remove_nodes(keys_to_remove);
+        }
 
         m_tracked_banners = std::vector<std::shared_ptr<all_seaing_perception::Banner>>();
         m_num_banners = 0;
@@ -351,6 +373,55 @@ void FactorGraphSLAM::publish_slam(){
     odom_msg.pose.pose.orientation = tf2::toMsg(q);
 
     m_slam_pub->publish(odom_msg);
+}
+
+// copied from https://github.com/borglab/gtsam/blob/release/4.2/gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.cpp
+void recursiveMarkAffectedKeys(const gtsam::Key& key,
+    const gtsam::ISAM2Clique::shared_ptr& clique, std::set<gtsam::Key>& additionalKeys) {
+
+  // Check if the separator keys of the current clique contain the specified key
+  if (std::find(clique->conditional()->beginParents(),
+      clique->conditional()->endParents(), key)
+      != clique->conditional()->endParents()) {
+
+    // Mark the frontal keys of the current clique
+    for(gtsam::Key i: clique->conditional()->frontals()) {
+      additionalKeys.insert(i);
+    }
+
+    // Recursively mark all of the children
+    for(const gtsam::ISAM2Clique::shared_ptr& child: clique->children) {
+      recursiveMarkAffectedKeys(key, child, additionalKeys);
+    }
+  }
+  // If the key was not found in the separator/parents, then none of its children can have it either
+}
+
+// mostly from IncrementalFixedLagSmoother.cpp in GTSAM
+void FactorGraphSLAM::remove_nodes(const gtsam::KeyVector& keys){
+    boost::optional<gtsam::FastMap<gtsam::Key, int>> constrainedKeys = gtsam::FastMap<gtsam::Key, int>();
+    for (gtsam::Key other_key: m_isam2->getFactorsUnsafe().keys()){// might be extremely slow
+        constrainedKeys->operator[](other_key) = 1;
+    }
+    for (gtsam::Key key : keys){
+        constrainedKeys->operator[](key) = 0; // putting the keys we want to marginalize out to have order 0 (before the rest) in the Bayes tree so that we can marginalize them
+    }
+
+    std::set<gtsam::Key> additionalKeys;
+    for(gtsam::Key key: keys) {
+        gtsam::ISAM2Clique::shared_ptr clique = m_isam2->operator[](key);
+        for(const gtsam::ISAM2Clique::shared_ptr& child: clique->children) {
+        recursiveMarkAffectedKeys(key, child, additionalKeys);
+        }
+    }
+    gtsam::KeyList additionalMarkedKeys(additionalKeys.begin(), additionalKeys.end());
+
+    m_isam2->update(gtsam::NonlinearFactorGraph(), gtsam::Values(), gtsam::FactorIndices(), constrainedKeys, boost::none, additionalMarkedKeys);
+
+    if (keys.size() > 0) {
+        gtsam::FastList<gtsam::Key> leafKeys(keys.begin(), keys.end());
+        m_isam2->marginalizeLeaves(leafKeys);
+    }
 }
 
 void FactorGraphSLAM::odom_msg_callback(const nav_msgs::msg::Odometry &msg){
@@ -1240,8 +1311,11 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             new_obj.push_back(m_tracked_obstacles[i]);
         }
         
-        // can't remove from GTSAM factor graph because it affects the belief
-        // TODO apply variable elimination (marginalize then remove from the graph), see how to do it in GTSAM
+        gtsam::KeyVector keys_to_remove = gtsam::KeyVector();
+        for (int i : to_remove){
+            keys_to_remove.push_back(m_tracked_obstacles[i]->node_key);
+        }
+        this->remove_nodes(keys_to_remove);
 
         m_tracked_obstacles = new_obj;
         m_num_obj = to_keep.size();
@@ -1548,8 +1622,11 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             new_obj.push_back(m_tracked_banners[i]);
         }
 
-        // can't remove from GTSAM factor graph because it affects the belief
-        // TODO apply variable elimination (marginalize then remove from the graph), see how to do it in GTSAM
+        gtsam::KeyVector keys_to_remove = gtsam::KeyVector();
+        for (int i : to_remove){
+            keys_to_remove.push_back(m_tracked_banners[i]->node_key);
+        }
+        this->remove_nodes(keys_to_remove);
 
         m_tracked_banners = new_obj;
         m_num_banners = to_keep.size();
