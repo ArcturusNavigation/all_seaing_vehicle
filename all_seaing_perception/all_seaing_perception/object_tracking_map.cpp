@@ -1182,6 +1182,12 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         assoc_result = all_seaing_perception::data_association::linear_sum_assignment_associate(m_tracked_obstacles, detected_obstacles, ctx);
     } else if (m_data_association_algo == "linear_sum_assignment_sqrt") {
         assoc_result = all_seaing_perception::data_association::linear_sum_assignment_associate(m_tracked_obstacles, detected_obstacles, ctx, true);
+    } else if (m_data_association_algo == "clipper") {
+        if (m_tracked_obstacles.size() <= 1 || detected_obstacles.size() <= 1) {
+            assoc_result = all_seaing_perception::data_association::greedy_associate(m_tracked_obstacles, detected_obstacles, ctx);
+        } else {
+            assoc_result = all_seaing_perception::data_association::clipper_associate(m_tracked_obstacles, detected_obstacles, ctx);
+        }
     } else {
         assoc_result = all_seaing_perception::data_association::greedy_associate(m_tracked_obstacles, detected_obstacles, ctx);
     }

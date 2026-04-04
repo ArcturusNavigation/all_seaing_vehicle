@@ -67,6 +67,7 @@
 #include "all_seaing_perception/data_association/association/greedy_meas_var.hpp"
 #include "all_seaing_perception/data_association/association/greedy_probs.hpp"
 #include "all_seaing_perception/data_association/association/indiv_greedy.hpp"
+#include "all_seaing_perception/data_association/association/clipper.hpp"
 #include "all_seaing_perception/data_association/association/linear_sum_assignment.hpp"
 
 #include <opencv2/opencv.hpp>

@@ -30,8 +30,8 @@ AssociationResult clipper_associate(
     };
 
     // TODO: I stole this from ROMAN, test to see if other cost functions work ok
-    const FloatT ROMAN_COST_STDDEV = 0.2;
-    const FloatT ROMAN_DIST_THRESH = 0.5;
+    const FloatT ROMAN_COST_STDDEV = 1.0;
+    const FloatT ROMAN_DIST_THRESH = 2.0;
     auto roman_cost = [&](const Candidate& x, const Candidate& y) -> FloatT {
         if (x.tracked_id == y.tracked_id || x.detected_id == y.detected_id)
             return (x.tracked_id == y.tracked_id && x.detected_id == y.detected_id);
@@ -77,11 +77,12 @@ AssociationResult clipper_associate(
 
     const FloatT d_grow = 1.02;
     const FloatT d_min = 0.01;
-    const FloatT alpha_min = 1e-7;
+    const FloatT alpha_min = 1e-5;
     const FloatT alpha_decay = 0.9;
     const FloatT u_converge_thresh = 0.001;
     const FloatT ARMIJO_COEF = 0.001;
-    const FloatT MIN_ORTH_GRAD_MAG = 1e-12;
+    const FloatT MIN_ORTH_GRAD_MAG = 1e-6;
+    const FloatT SELECT_MAX_RATIO = 0.5; // what fraction of max value you have to be to be selected
 
     Eigen::VectorXd u = Eigen::VectorXd::Constant(n, 1.0 / std::sqrt(static_cast<FloatT>(n)));
 
@@ -154,15 +155,13 @@ AssociationResult clipper_associate(
         d = d_new;
     }
 
-    // Round u to select associations: pick entries above half the max value,
-    // resolving conflicts greedily by descending u value
     std::vector<int> indices(n);
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(),
               [&u](int a, int b) { return u(a) > u(b); });
 
     FloatT u_max = u(indices[0]);
-    FloatT select_thresh = 0.5 * u_max;
+    FloatT select_thresh = SELECT_MAX_RATIO * u_max;
 
     std::unordered_set<int> used_tracked, used_detected;
     for (int idx : indices) {
