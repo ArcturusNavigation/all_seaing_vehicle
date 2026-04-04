@@ -408,6 +408,23 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    navigation_server_continuous = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server_continuous.py",
+        parameters=[
+            {"global_frame_id": "map"},
+            {"robot_frame_id": "base_link"},
+            {"default_forward_speed": 1.5},
+            {"Kpid_theta": [0.6, 0.0, 0.1]},
+            {"max_vel": [3.5, 1.0, 0.3]},
+            {"avoid_max_dist": 4.0},
+            {"avoid_vel_coeff": 2.0},
+            {"rot_avoid_vel_coeff": 7.0},
+            {"avoid_rot_vel_mag": False},
+        ],
+        output="screen",
+    )
+
     task_init_server = launch_ros.actions.Node(
         package="all_seaing_autonomy",
         executable="task_init.py",
@@ -457,8 +474,9 @@ def launch_setup(context, *args, **kwargs):
         a_star_server,
         controller_server,
         # navigation_server,
-        navigation_server_tangent,
+        # navigation_server_tangent,
         # navigation_server_nomap,
+        navigation_server_continuous,
         rviz_waypoint_sender,
         run_tasks,
         task_init_server, 

@@ -26,6 +26,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/LabeledObjectPlane.msg"
     "msg/LabeledObjectPlaneArray.msg"
     "msg/KeyboardButton.msg"
+    "msg/ContinuousWaypoint.msg"
+    "msg/WaypointStatus.msg"
     "srv/CommandAdj.srv"
     "srv/CommandFan.srv"
     "srv/CommandServo.srv"

@@ -515,6 +515,23 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    navigation_server_continuous = launch_ros.actions.Node(
+        package="all_seaing_navigation",
+        executable="navigation_server_continuous.py",
+        parameters=[
+            {"global_frame_id": "map"},
+            {"robot_frame_id": "wamv/wamv/base_link"},
+            {"default_forward_speed": 2.0},
+            {"Kpid_theta": [3.0, 0.0, 0.0]},
+            {"max_vel": [5.0, 3.0, 1.5]},
+            {"avoid_max_dist": 15.0},
+            {"avoid_vel_coeff": 3.0},
+            {"rot_avoid_vel_coeff": 3.0},
+            {"avoid_rot_vel_mag": True},
+        ],
+        output="screen",
+    )
+
     grid_map_generator = launch_ros.actions.Node(
         package="all_seaing_navigation",
         executable="grid_map_generator.py",
@@ -807,7 +824,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": 3.0},
+            {"xy_threshold": 5.0},
             {"theta_threshold": 180.0},
             {"use_waypoint_client": use_waypoint_client},
         ],
@@ -869,7 +886,8 @@ def launch_setup(context, *args, **kwargs):
         a_star_server,
         # navigation_server,
         # navigation_server_nomap,
-        navigation_server_tangent,
+        # navigation_server_tangent,
+        navigation_server_continuous,
         grid_map_generator,
         onshore_node,
         heartbeat_reporter,

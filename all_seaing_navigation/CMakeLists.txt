@@ -25,6 +25,7 @@ install(PROGRAMS
     ${PROJECT_NAME}/navigation_server.py
     ${PROJECT_NAME}/navigation_server_nomap.py
     ${PROJECT_NAME}/navigation_server_tangent.py
+    ${PROJECT_NAME}/navigation_server_continuous.py
     ${PROJECT_NAME}/rviz_waypoint_sender.py
     DESTINATION lib/${PROJECT_NAME}
 )
