@@ -59,6 +59,9 @@ def launch_setup(context, *args, **kwargs):
     locations_file = os.path.join(
         bringup_prefix, "config", "localization", "locations.yaml"
     )
+    slam_factor_graph_params = os.path.join(
+        bringup_prefix, "config", "slam", "slam_factor_graph.yaml"
+    )
 
     with open(locations_file, "r") as f:
         locations = yaml.safe_load(f)
@@ -175,7 +178,7 @@ def launch_setup(context, *args, **kwargs):
         executable="yolov11_all_node.py",
         parameters=[
             {"model": ["roboboat_shape_2025"]},
-            {"label_config": ["shape_label_mappings"]},
+            {"label_config": "shape_label_mappings"},
             {"label_offsets": [0]},
             {"confs": [0.1]},
             {"use_color_names": False},
@@ -416,6 +419,12 @@ def launch_setup(context, *args, **kwargs):
             param_rewrites=param_substitutions,
             convert_types=True)
 
+    configured_slam_params = RewrittenYaml(
+            source_file=slam_factor_graph_params,
+            root_key='',
+            param_rewrites=param_substitutions,
+            convert_types=True)
+
     object_tracking_map_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="object_tracking_map",
@@ -428,6 +437,19 @@ def launch_setup(context, *args, **kwargs):
             # ("odometry/filtered", "odometry/integrated"),
         ],
         parameters=[configured_params]
+    )
+
+    slam_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="factor_graph_slam",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            ("detections", "obstacle_map/local"),
+            # ("odometry/filtered", "odometry/gps_sim"),
+            ("odometry/filtered", "odometry/integrated"),
+        ],
+        parameters=[configured_slam_params],
     )
 
     static_transforms_ld = IncludeLaunchDescription(
@@ -466,7 +488,8 @@ def launch_setup(context, *args, **kwargs):
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         grid_map_generator,
-        object_tracking_map_node,
+        # object_tracking_map_node,
+        slam_node,
         # static_transforms_ld,
         map_to_odom,
     ]
@@ -475,7 +498,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             # DeclareLaunchArgument('use_sim_time', default_value='true'),
-            DeclareLaunchArgument("location", default_value="nbpark"),
+            DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("use_slam", default_value='true'),
             DeclareLaunchArgument("use_gps", default_value='true'),
             DeclareLaunchArgument("track_banners", default_value='true'),

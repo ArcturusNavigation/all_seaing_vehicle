@@ -499,7 +499,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="nbpark"),
+            DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument("target_freq", default_value="600.0"),
             DeclareLaunchArgument(
                 "use_waypoint_client", default_value="false", choices=["true", "false"]

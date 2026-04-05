@@ -223,7 +223,7 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="rover_custom_controller.py",
         parameters=[
-            {"joy_x_scale": -3.0},
+            {"joy_x_scale": -1.5},
             {"joy_ang_scale": 0.3},
         ],
         condition=IfCondition(
@@ -465,7 +465,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("location", default_value="nbpark"),
+            DeclareLaunchArgument("location", default_value="pavillion"),
             DeclareLaunchArgument(
                 "comms", default_value="custom", choices=["wifi", "lora", "custom"]
             ),
