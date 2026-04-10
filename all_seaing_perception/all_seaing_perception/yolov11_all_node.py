@@ -21,6 +21,7 @@ import torch
 import yaml
 import copy
 import itertools
+import time
 
 class Rectangle:
     # Code from StackOverflow: https://stackoverflow.com/questions/25068538/intersection-and-difference-of-two-rectangles/25068722#25068722
@@ -218,6 +219,8 @@ class YOLOv11Node(Node):
 
     def image_cb(self, msg: Image) -> None:
 
+        # start_time = time.time()
+
         # Convert image to cv_image
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
         annotator = Annotator(cv_image, 2, 2, "Arial.ttf", False)
@@ -231,6 +234,7 @@ class YOLOv11Node(Node):
         labeled_bounding_box_msgs.header = msg.header
 
         for model, offset, conf in self.models:
+            # yolo_start_time = time.time()
             pred_results = model.predict(
                 source=cv_image,
                 verbose=False,
@@ -240,6 +244,9 @@ class YOLOv11Node(Node):
             )
 
             results: Results = pred_results[0].cpu()
+
+            # yolo_end_time = time.time()
+            # self.get_logger().info(f'yolo runtime: {yolo_end_time - yolo_start_time}')
 
             for box_data in results.boxes:
 
@@ -311,6 +318,8 @@ class YOLOv11Node(Node):
                             beacon_bboxes.append(box_msg)
                     else:
                         labeled_bounding_box_msgs.boxes.append(box_msg)
+        
+        # processing_start_time = time.time()
 
         # if self.filter_beacon_indicators:
         if not self.ignore_indicator_filters:
@@ -354,6 +363,12 @@ class YOLOv11Node(Node):
                                 # self.get_logger().info(f'MATCHED W/ RATIO: {ratio}')
                 labeled_bounding_box_msgs.boxes.append(new_number)
 
+        # end_time = time.time()
+        # self.get_logger().info(f'image yolo processing time: {end_time - start_time}')
+        
+        # processing_end_time = time.time()
+        # self.get_logger().info(f'processing time: {processing_end_time - processing_start_time}')
+
         # Publish detections
         self._pub.publish(labeled_bounding_box_msgs)
 
@@ -361,6 +376,9 @@ class YOLOv11Node(Node):
         annotated_frame = annotator.result()  
         annotated_image_msg = self.cv_bridge.cv2_to_imgmsg(annotated_frame, encoding="bgr8")
         self._image_pub.publish(annotated_image_msg)  # Publish annotated image
+
+        # end_time = time.time()
+        # self.get_logger().info(f'image yolo processing time: {end_time - start_time}')
 
 
 def main():

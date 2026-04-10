@@ -83,19 +83,25 @@ def launch_setup(context, *args, **kwargs):
         parameters=[robot_localization_params]
     )
 
-    buoy_yolo_node = launch_ros.actions.Node(
+    all_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov11_all_node.py",
         parameters=[
-            {"model": ["best"]},
-            # {"model": ["roboboat_shape_2025"]},
-            # {"model": ["beacons_best"]},
-            {"label_config": "buoy_label_mappings"},
-            # {"label_config": "shape_label_mappings"},
+            # {"models": ["best", "beacons_numbers_best"]},
+            {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"label_offsets": [0, 24]},
+            {"label_offsets": [0, 24, 27]},
+            # {"label_config": "buoy_label_mappings"},
             # {"label_config": "beacon_label_mappings"},
-            {"confs": [0.6]},
-            {"ignore_indicator_filters": True},
+            {"label_config": "all_label_mappings"},
+            # {"confs": [0.3, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
+            {"filter_beacon_indicators": True},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+            {"match_indicators_banners": True},
+            {"indicator_banner_px_dist": 0},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
@@ -103,16 +109,26 @@ def launch_setup(context, *args, **kwargs):
         ],
         output="screen",
     )
-
-    buoy_yolo_node_back_left = launch_ros.actions.Node(
+    
+    all_yolo_node_back_left = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov11_all_node.py",
         parameters=[
-            {"model": ["best"]},
-            {"label_config": ["buoy_label_mappings"]},
-            {"confs": [0.6]},
-            {"ignore_indicator_filters": True},
+            # {"models": ["best", "beacons_numbers_best"]},
+            {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"label_offsets": [0, 24]},
+            {"label_offsets": [0, 24, 27]},
+            # {"label_config": "buoy_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
+            {"label_config": "all_label_mappings"},
+            # {"confs": [0.3, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
+            {"filter_beacon_indicators": True},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+            {"match_indicators_banners": True},
+            {"indicator_banner_px_dist": 0},
         ],
         remappings=[
             ("image", "/back_left_oak/rgb/image_rect"),
@@ -122,15 +138,25 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    buoy_yolo_node_back_right = launch_ros.actions.Node(
+    all_yolo_node_back_right = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov11_all_node.py",
         parameters=[
-            {"model": ["best"]},
-            {"label_config": ["buoy_label_mappings"]},
-            {"confs": [0.6]},
-            {"ignore_indicator_filters": True},
+            # {"models": ["best", "beacons_numbers_best"]},
+            {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"label_offsets": [0, 24]},
+            {"label_offsets": [0, 24, 27]},
+            # {"label_config": "buoy_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
+            {"label_config": "all_label_mappings"},
+            # {"confs": [0.3, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
+            {"filter_beacon_indicators": True},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+            {"match_indicators_banners": True},
+            {"indicator_banner_px_dist": 0},
         ],
         remappings=[
             ("image", "/back_right_oak/rgb/image_rect"),
@@ -489,10 +515,10 @@ def launch_setup(context, *args, **kwargs):
     return [
         set_use_sim_time,
         # ekf_node,
-        # buoy_yolo_node,
-        # buoy_yolo_node_back_left,
-        # buoy_yolo_node_back_right,
-        # bbox_project_pcloud_node,
+        all_yolo_node,
+        all_yolo_node_back_left,
+        all_yolo_node_back_right,
+        bbox_project_pcloud_node,
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
         # multicam_detection_merge_node,
