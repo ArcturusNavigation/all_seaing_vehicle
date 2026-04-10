@@ -652,6 +652,8 @@ class Docking(TaskServerBase):
                     # follow path failed, retry sending
                     self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
                     self.send_waypoint_to_server(self.sent_waypoint)
+            else:
+                self.move_to_waypoint_continuous(waypoint)
             
         self.docking_marker_pub.publish(marker_arr)
 

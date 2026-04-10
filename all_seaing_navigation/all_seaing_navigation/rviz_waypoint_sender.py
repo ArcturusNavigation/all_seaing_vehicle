@@ -19,6 +19,7 @@ class WaypointSender(Node):
         self.declare_parameter("obstacle_tol", 50)
         self.declare_parameter("choose_every", 5)
         self.declare_parameter("use_waypoint_client", False)
+        self.declare_parameter("is_stationary", False)
         self.declare_parameter("planner", "astar")
 
         self.waypoint_client = ActionClient(self, Waypoint, "waypoint")
@@ -49,7 +50,7 @@ class WaypointSender(Node):
         goal_msg.goal_tol = self.get_parameter("goal_tol").value
         goal_msg.obstacle_tol = self.get_parameter("obstacle_tol").value
         goal_msg.choose_every = self.get_parameter("choose_every").value
-        goal_msg.is_stationary = True
+        goal_msg.is_stationary = self.get_parameter("is_stationary").value
         self.follow_path_client.wait_for_server()
         self.send_goal_future = self.follow_path_client.send_goal_async(goal_msg)
 

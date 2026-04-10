@@ -445,6 +445,8 @@ class FollowBuoyPath(TaskServerBase):
                     self.get_logger().info("Waypoint request aborted by nav server and no new waypoint option found. Resending request...")
                     self.send_waypoint_to_server(self.sent_waypoint)
                     # Waypoint has already been sent before, should be fine to avoid adding it to set?
+            else:
+                self.move_to_waypoint_continuous(waypoint)
             if passed_previous:
                 self.first_passed_previous = False
         if not passed_previous:

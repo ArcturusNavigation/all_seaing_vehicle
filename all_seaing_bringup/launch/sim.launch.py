@@ -537,13 +537,14 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"global_frame_id": "map"},
             {"robot_frame_id": "wamv/wamv/base_link"},
-            {"default_forward_speed": 2.0},
+            {"default_forward_speed": 10.0},
             {"Kpid_theta": [3.0, 0.0, 0.0]},
-            {"max_vel": [5.0, 3.0, 1.5]},
+            {"max_vel": [10.0, 3.0, 1.5]},
             {"avoid_max_dist": 15.0},
             {"avoid_vel_coeff": 3.0},
             {"rot_avoid_vel_coeff": 3.0},
             {"avoid_rot_vel_mag": True},
+            {"forward_dist": 5.0},
         ],
         output="screen",
     )
@@ -840,9 +841,10 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_navigation",
         executable="rviz_waypoint_sender.py",
         parameters=[
-            {"xy_threshold": 5.0},
+            {"xy_threshold": 10.0},
             {"theta_threshold": 180.0},
             {"use_waypoint_client": use_waypoint_client},
+            {"is_stationary": False},
         ],
     )
 
