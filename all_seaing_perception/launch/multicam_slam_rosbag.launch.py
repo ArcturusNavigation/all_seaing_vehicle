@@ -72,6 +72,10 @@ def launch_setup(context, *args, **kwargs):
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
+    
+    slam_factor_graph_params = os.path.join(
+        bringup_prefix, "config", "slam", "slam_factor_graph.yaml"
+    )
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -247,6 +251,19 @@ def launch_setup(context, *args, **kwargs):
         parameters=[slam_params]
     )
 
+    slam_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="factor_graph_slam",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            # ("detections", "obstacle_map/local"),
+            # ("odometry/filtered", "odometry/gps_sim"),
+            ("odometry/filtered", "odometry/integrated"),
+        ],
+        parameters=[slam_factor_graph_params],
+    )
+
     tf_filtering = launch_ros.actions.Node(
         package="all_seaing_utility",
         executable="filter_tf.py",
@@ -282,8 +299,8 @@ def launch_setup(context, *args, **kwargs):
             {"datum": [42.358541, -71.087389, 0.0]},
             # {"yaw_offset": -np.pi/2.0},
             # {"odom_yaw_offset": -np.pi/2.0},
-            {"yaw_offset": np.pi/2.0},
-            {"odom_yaw_offset": np.pi/2.0},
+            {"yaw_offset": 0.0},
+            {"odom_yaw_offset": 0.0},
             {"utm_zone": 19}, # 19 for Boston, 17 for Florida
             # {"use_odom_pos": True},
         ]
@@ -480,14 +497,15 @@ def launch_setup(context, *args, **kwargs):
         # bbox_project_pcloud_node_back_right,
         # multicam_detection_merge_node,
         odometry_publisher_node,
-        object_tracking_map_node,
+        # object_tracking_map_node,
+        # slam_node,
         tf_filtering,
         # robot_state_publisher,
         # static_transforms_ld,
         # point_cloud_filter_node,
-        point_cloud_filter_downsampled_node,
-        obstacle_detector_raw_node,
-        obstacle_detector_unlabeled_node,
+        # point_cloud_filter_downsampled_node,
+        # obstacle_detector_raw_node,
+        # obstacle_detector_unlabeled_node,
         # grid_map_generator,
         # rotate_imu_accel,
         # imu_reframe_node,

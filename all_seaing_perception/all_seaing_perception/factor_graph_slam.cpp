@@ -200,6 +200,8 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
         }
     }
 
+    m_global_header.frame_id = m_slam_frame_id;
+
     m_first_state = true;
     m_got_nav = false;
     m_got_odom = false;
@@ -732,6 +734,7 @@ void FactorGraphSLAM::publish_maps(){
 }
 
 void FactorGraphSLAM::visualize_predictions() {
+    m_global_header.stamp = m_last_nav_time;
     // delete previous markers
     visualization_msgs::msg::MarkerArray delete_arr;
     visualization_msgs::msg::Marker delete_mark;
