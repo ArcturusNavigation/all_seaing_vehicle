@@ -456,7 +456,7 @@ def launch_setup(context, *args, **kwargs):
         pcl_to_scan_node,
         rf2o_node,
         ekf_node_rf2o,
-        foxglove_ld,
+        # foxglove_ld,
         # perception_ld,
         # tasks_ld,
     ]

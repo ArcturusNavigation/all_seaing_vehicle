@@ -62,6 +62,13 @@ class NavigationContinuousServer(ActionServerBase):
             .get_parameter_value()
             .double_array_value
         )
+
+        self.avoid_obs = (
+            self.declare_parameter("avoid_obs", True)
+            .get_parameter_value()
+            .bool_value
+        )
+
         self.max_vel = (
             self.declare_parameter("max_vel", [4.0, 2.0, 1.0])
             .get_parameter_value()
@@ -122,6 +129,7 @@ class NavigationContinuousServer(ActionServerBase):
 
         # Continuous waypoint state
         self.current_waypoint = None  # (x, y, forward_speed, avoid_obs)
+        self.forward_speed = self.default_forward_speed
         self.approach_origin = None   # robot position when waypoint was set
         self.approach_dir = None
         self.waypoint_reached = False
@@ -147,7 +155,7 @@ class NavigationContinuousServer(ActionServerBase):
         self.approach_dir = np.array([msg.x, msg.y]) - self.approach_origin
         # self.approach_dir /= np.linalg.norm(self.approach_dir)
         # self.current_waypoint = (msg.x, msg.y, msg.forward_speed, msg.avoid_obs)
-        self.current_waypoint = (msg.x, msg.y, self.current_waypoint[2], self.current_waypoint[3])
+        self.current_waypoint = (msg.x, msg.y, self.forward_speed, self.avoid_obs)
         # self.waypoint_reached = False
         # self.reset_pid()
 
@@ -354,12 +362,12 @@ class NavigationContinuousServer(ActionServerBase):
             return FollowPath.Result()
 
         nav_x, nav_y, _ = self.get_robot_pose()
-        path = self.generate_path(goal_handle, nav_x, nav_y)
+        # path = self.generate_path(goal_handle, nav_x, nav_y)
 
-        if not path.poses:
-            self.get_logger().info("No valid path found. Aborting.")
-            goal_handle.abort()
-            return FollowPath.Result()
+        # if not path.poses:
+        #     self.get_logger().info("No valid path found. Aborting.")
+        #     goal_handle.abort()
+        #     return FollowPath.Result()
 
         self.start_process()
 
@@ -372,7 +380,8 @@ class NavigationContinuousServer(ActionServerBase):
         self.approach_dir = np.array([goal_x, goal_y]) - self.approach_origin
         # self.approach_dir /= np.linalg.norm(self.approach_dir)
         forward_speed = self.default_forward_speed
-        self.current_waypoint = (goal_x, goal_y, forward_speed, True)
+        self.current_waypoint = (goal_x, goal_y, forward_speed, self.avoid_obs)
+        self.forward_speed = forward_speed
         self.waypoint_reached = False
         self.reset_pid()
 
