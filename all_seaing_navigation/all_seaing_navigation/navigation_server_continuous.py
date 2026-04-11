@@ -92,6 +92,11 @@ class NavigationContinuousServer(ActionServerBase):
             .get_parameter_value()
             .double_value
         )
+        self.forward_dist = (
+            self.declare_parameter("forward_dist", 1.0)
+            .get_parameter_value()
+            .double_value
+        )
 
         # Publishers
         self.control_pub = self.create_publisher(ControlOption, "control_options", 10)
@@ -118,7 +123,9 @@ class NavigationContinuousServer(ActionServerBase):
         # Continuous waypoint state
         self.current_waypoint = None  # (x, y, forward_speed, avoid_obs)
         self.approach_origin = None   # robot position when waypoint was set
+        self.approach_dir = None
         self.waypoint_reached = False
+        self.xy_threshold = 0.0
 
         # Control loop timer (only runs when a continuous waypoint is active)
         self.control_timer = self.create_timer(TIMER_PERIOD, self.continuous_control_tick)
@@ -132,11 +139,17 @@ class NavigationContinuousServer(ActionServerBase):
         self.map = msg
 
     def waypoint_callback(self, msg: ContinuousWaypoint):
+        if self.current_waypoint is None:
+            return
+        # self.get_logger().info(f'updating continuous waypoint')
         nav_x, nav_y, _ = self.get_robot_pose()
         self.approach_origin = np.array([nav_x, nav_y])
-        self.current_waypoint = (msg.x, msg.y, msg.forward_speed, msg.avoid_obs)
-        self.waypoint_reached = False
-        self.reset_pid()
+        self.approach_dir = np.array([msg.x, msg.y]) - self.approach_origin
+        # self.approach_dir /= np.linalg.norm(self.approach_dir)
+        # self.current_waypoint = (msg.x, msg.y, msg.forward_speed, msg.avoid_obs)
+        self.current_waypoint = (msg.x, msg.y, self.current_waypoint[2], self.current_waypoint[3])
+        # self.waypoint_reached = False
+        # self.reset_pid()
 
     # --------------- PID helpers ---------------#
 
@@ -192,12 +205,10 @@ class NavigationContinuousServer(ActionServerBase):
         """Check if robot has crossed the perpendicular line through the goal."""
         if self.approach_origin is None:
             return False
-        approach_dir = np.array([goal_x - self.approach_origin[0], goal_y - self.approach_origin[1]])
-        if np.linalg.norm(approach_dir) < 1e-6:
+        if np.linalg.norm(self.approach_dir) < 1e-6:
             # Waypoint is at the approach origin — use distance check
             return np.linalg.norm(np.array([nav_x - goal_x, nav_y - goal_y])) < 0.5
-        dot = (nav_x - goal_x) * approach_dir[0] + (nav_y - goal_y) * approach_dir[1]
-        return dot >= 0
+        return np.array([nav_x - goal_x, nav_y - goal_y]) @ self.approach_dir >= 0
 
     # --------------- Visualization ---------------#
 
@@ -227,6 +238,9 @@ class NavigationContinuousServer(ActionServerBase):
 
         goal_x, goal_y, forward_speed, avoid_obs = self.current_waypoint
         nav_x, nav_y, nav_theta = self.get_robot_pose()
+        goal_vec = np.array([goal_x, goal_y])
+        goal_diff = goal_vec-self.robot_pos
+        dist = np.linalg.norm(goal_diff)
 
         # Check perpendicular crossing
         crossed = self.check_waypoint_crossed(nav_x, nav_y, goal_x, goal_y)
@@ -234,14 +248,19 @@ class NavigationContinuousServer(ActionServerBase):
             self.waypoint_reached = True
 
         # Publish status
-        dist = math.sqrt((nav_x - goal_x)**2 + (nav_y - goal_y)**2)
         status_msg = WaypointStatus()
         status_msg.waypoint_reached = self.waypoint_reached
         status_msg.distance_to_waypoint = dist
         self.status_pub.publish(status_msg)
 
+        if dist < self.xy_threshold and np.linalg.norm(self.approach_dir) >= 1e-6:
+            # make it go forward until it crosses the waypoint line
+            forward_goal_vec = self.forward_dist*self.approach_dir/np.linalg.norm(self.approach_dir)
+            goal_vec += forward_goal_vec
+            goal_diff += forward_goal_vec
+
         # Compute desired heading toward goal
-        desired_heading = math.atan2(goal_y - nav_y, goal_x - nav_x)
+        desired_heading = math.atan2(goal_diff[1], goal_diff[0])
 
         # Heading PID
         self.theta_pid.set_setpoint(desired_heading)
@@ -249,10 +268,11 @@ class NavigationContinuousServer(ActionServerBase):
         theta_output = self.theta_pid.get_effort()
 
         # Constant forward velocity in robot frame
-        x_vel = forward_speed
+        # x_vel = forward_speed
+        x_vel = max(0.0, self.robot_dir @ goal_diff/np.linalg.norm(goal_diff))*forward_speed # so that we go faster when we are more aligned with the goal
         y_vel = 0.0
 
-        self.visualize_waypoint(goal_x, goal_y)
+        self.visualize_waypoint(goal_vec[0], goal_vec[1])
 
         marker_array = MarkerArray()
         marker_array.markers.append(
@@ -345,20 +365,23 @@ class NavigationContinuousServer(ActionServerBase):
 
         goal_x = goal_handle.request.x
         goal_y = goal_handle.request.y
-        xy_threshold = goal_handle.request.xy_threshold
+        self.xy_threshold = goal_handle.request.xy_threshold
 
         # Steer directly toward the final goal using the continuous control loop
         self.approach_origin = np.array([nav_x, nav_y])
+        self.approach_dir = np.array([goal_x, goal_y]) - self.approach_origin
+        # self.approach_dir /= np.linalg.norm(self.approach_dir)
         forward_speed = self.default_forward_speed
         self.current_waypoint = (goal_x, goal_y, forward_speed, True)
         self.waypoint_reached = False
         self.reset_pid()
 
         while True:
-            nav_x, nav_y, _ = self.get_robot_pose()
-            dist = math.sqrt((nav_x - goal_x)**2 + (nav_y - goal_y)**2)
+            # nav_x, nav_y, _ = self.get_robot_pose()
+            # dist = math.sqrt((nav_x - goal_x)**2 + (nav_y - goal_y)**2)
 
-            if dist < xy_threshold and not goal_handle.request.is_stationary:
+            # change it so that if stationary & reached it switches to normal PID or calls the waypoint server
+            if self.waypoint_reached and not goal_handle.request.is_stationary:
                 break
 
             if self.should_abort():

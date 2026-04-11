@@ -324,6 +324,8 @@ class TaskServerBase(ActionServerBase):
                         goal_msg.y = new_goal[1]
                         self.get_logger().info('ADAPTING GOAL POINT')
                         self._send_goal(goal_msg)
+                    else:
+                        self.move_to_waypoint_continuous(new_goal)
                 if self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality
                     self.get_logger().info('RESENDING GOAL')
                     self._send_goal(goal_msg)
@@ -430,8 +432,8 @@ class TaskServerBase(ActionServerBase):
         msg = ContinuousWaypoint()
         msg.x = point[0]
         msg.y = point[1]
-        msg.forward_speed = forward_speed if forward_speed is not None else self.default_forward_speed
-        msg.avoid_obs = avoid_obs
+        # msg.forward_speed = forward_speed if forward_speed is not None else self.default_forward_speed
+        # msg.avoid_obs = avoid_obs
         self.continuous_waypoint_pub.publish(msg)
 
     def wait_for_waypoint_crossed(self, exit_func=None):
@@ -449,9 +451,9 @@ class TaskServerBase(ActionServerBase):
     def send_waypoint_to_server(self, waypoint, is_stationary=False):
         self.sent_waypoint = waypoint
 
-        if self.use_continuous_nav:
-            self.move_to_waypoint_continuous(waypoint)
-        elif not self.bypass_planner:
+        # if self.use_continuous_nav:
+        #     self.move_to_waypoint_continuous(waypoint)
+        if not self.bypass_planner:
             self.move_to_point(waypoint, is_stationary=is_stationary)
         else:
             self.move_to_waypoint(waypoint, is_stationary=is_stationary)
@@ -484,7 +486,7 @@ class TaskServerBase(ActionServerBase):
             if (math.sqrt(dist_squared) > adaptive_distance):
                 setattr(self, point_name, new_point)
                 return True, new_point
-            return False, None
+            return False, new_point
         
     def search_goal_callback(self, goal_request):
         self.get_logger().info(f'Searching Server for [{self.server_name}] called')

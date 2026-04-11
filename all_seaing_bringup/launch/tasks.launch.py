@@ -421,6 +421,7 @@ def launch_setup(context, *args, **kwargs):
             {"avoid_vel_coeff": 2.0},
             {"rot_avoid_vel_coeff": 7.0},
             {"avoid_rot_vel_mag": False},
+            {"forward_dist": 1.0},
         ],
         output="screen",
     )
