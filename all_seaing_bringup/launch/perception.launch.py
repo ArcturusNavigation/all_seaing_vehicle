@@ -96,6 +96,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             # {"models": ["best", "beacons_numbers_best"]},
             {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"models": ["best"]},
             # {"label_offsets": [0, 24]},
             {"label_offsets": [0, 24, 27]},
             # {"label_config": "buoy_label_mappings"},
@@ -123,6 +124,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             # {"models": ["best", "beacons_numbers_best"]},
             {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"models": ["best"]},
             # {"label_offsets": [0, 24]},
             {"label_offsets": [0, 24, 27]},
             # {"label_config": "buoy_label_mappings"},
@@ -151,6 +153,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             # {"models": ["best", "beacons_numbers_best"]},
             {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"models": ["best"]},
             # {"label_offsets": [0, 24]},
             {"label_offsets": [0, 24, 27]},
             # {"label_config": "buoy_label_mappings"},

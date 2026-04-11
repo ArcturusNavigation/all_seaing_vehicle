@@ -72,6 +72,10 @@ def launch_setup(context, *args, **kwargs):
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
     )
+    
+    slam_factor_graph_params = os.path.join(
+        bringup_prefix, "config", "slam", "slam_factor_graph.yaml"
+    )
 
     ekf_node = launch_ros.actions.Node(
         package="robot_localization",
@@ -79,19 +83,25 @@ def launch_setup(context, *args, **kwargs):
         parameters=[robot_localization_params]
     )
 
-    buoy_yolo_node = launch_ros.actions.Node(
+    all_yolo_node = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov11_all_node.py",
         parameters=[
-            {"model": ["best"]},
-            # {"model": ["roboboat_shape_2025"]},
-            # {"model": ["beacons_best"]},
-            {"label_config": "buoy_label_mappings"},
-            # {"label_config": "shape_label_mappings"},
+            # {"models": ["best", "beacons_numbers_best"]},
+            {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"label_offsets": [0, 24]},
+            {"label_offsets": [0, 24, 27]},
+            # {"label_config": "buoy_label_mappings"},
             # {"label_config": "beacon_label_mappings"},
-            {"confs": [0.6]},
-            {"ignore_indicator_filters": True},
+            {"label_config": "all_label_mappings"},
+            # {"confs": [0.3, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
+            {"filter_beacon_indicators": True},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+            {"match_indicators_banners": True},
+            {"indicator_banner_px_dist": 0},
         ],
         remappings=[
             ("image", "/zed/zed_node/rgb/image_rect_color"),
@@ -99,16 +109,26 @@ def launch_setup(context, *args, **kwargs):
         ],
         output="screen",
     )
-
-    buoy_yolo_node_back_left = launch_ros.actions.Node(
+    
+    all_yolo_node_back_left = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov11_all_node.py",
         parameters=[
-            {"model": ["best"]},
-            {"label_config": ["buoy_label_mappings"]},
-            {"confs": [0.6]},
-            {"ignore_indicator_filters": True},
+            # {"models": ["best", "beacons_numbers_best"]},
+            {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"label_offsets": [0, 24]},
+            {"label_offsets": [0, 24, 27]},
+            # {"label_config": "buoy_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
+            {"label_config": "all_label_mappings"},
+            # {"confs": [0.3, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
+            {"filter_beacon_indicators": True},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+            {"match_indicators_banners": True},
+            {"indicator_banner_px_dist": 0},
         ],
         remappings=[
             ("image", "/back_left_oak/rgb/image_rect"),
@@ -118,15 +138,25 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    buoy_yolo_node_back_right = launch_ros.actions.Node(
+    all_yolo_node_back_right = launch_ros.actions.Node(
         package="all_seaing_perception",
         executable="yolov11_all_node.py",
         parameters=[
-            {"model": ["best"]},
-            {"label_config": ["buoy_label_mappings"]},
-            {"confs": [0.6]},
-            {"ignore_indicator_filters": True},
+            # {"models": ["best", "beacons_numbers_best"]},
+            {"models": ["best", "numbers_best", "beacons_best"]},
+            # {"label_offsets": [0, 24]},
+            {"label_offsets": [0, 24, 27]},
+            # {"label_config": "buoy_label_mappings"},
+            # {"label_config": "beacon_label_mappings"},
+            {"label_config": "all_label_mappings"},
+            # {"confs": [0.3, 0.1]},
+            {"confs": [0.5, 0.1, 0.1]},
             {"use_color_names": False},
+            {"filter_beacon_indicators": True},
+            {"beacon_filter_ratio": 0.1},
+            {"indicator_to_beacon_bbox": True},
+            {"match_indicators_banners": True},
+            {"indicator_banner_px_dist": 0},
         ],
         remappings=[
             ("image", "/back_right_oak/rgb/image_rect"),
@@ -247,6 +277,19 @@ def launch_setup(context, *args, **kwargs):
         parameters=[slam_params]
     )
 
+    slam_node = launch_ros.actions.Node(
+        package="all_seaing_perception",
+        executable="factor_graph_slam",
+        output="screen",
+        # arguments=['--ros-args', '--log-level', 'debug'],
+        remappings=[
+            # ("detections", "obstacle_map/local"),
+            # ("odometry/filtered", "odometry/gps_sim"),
+            ("odometry/filtered", "odometry/integrated"),
+        ],
+        parameters=[slam_factor_graph_params],
+    )
+
     tf_filtering = launch_ros.actions.Node(
         package="all_seaing_utility",
         executable="filter_tf.py",
@@ -282,8 +325,8 @@ def launch_setup(context, *args, **kwargs):
             {"datum": [42.358541, -71.087389, 0.0]},
             # {"yaw_offset": -np.pi/2.0},
             # {"odom_yaw_offset": -np.pi/2.0},
-            {"yaw_offset": np.pi/2.0},
-            {"odom_yaw_offset": np.pi/2.0},
+            {"yaw_offset": 0.0},
+            {"odom_yaw_offset": 0.0},
             {"utm_zone": 19}, # 19 for Boston, 17 for Florida
             # {"use_odom_pos": True},
         ]
@@ -472,22 +515,23 @@ def launch_setup(context, *args, **kwargs):
     return [
         set_use_sim_time,
         # ekf_node,
-        # buoy_yolo_node,
-        # buoy_yolo_node_back_left,
-        # buoy_yolo_node_back_right,
-        # bbox_project_pcloud_node,
+        all_yolo_node,
+        all_yolo_node_back_left,
+        all_yolo_node_back_right,
+        bbox_project_pcloud_node,
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
         # multicam_detection_merge_node,
         odometry_publisher_node,
-        object_tracking_map_node,
+        # object_tracking_map_node,
+        # slam_node,
         tf_filtering,
         # robot_state_publisher,
         # static_transforms_ld,
         # point_cloud_filter_node,
-        point_cloud_filter_downsampled_node,
-        obstacle_detector_raw_node,
-        obstacle_detector_unlabeled_node,
+        # point_cloud_filter_downsampled_node,
+        # obstacle_detector_raw_node,
+        # obstacle_detector_unlabeled_node,
         # grid_map_generator,
         # rotate_imu_accel,
         # imu_reframe_node,
