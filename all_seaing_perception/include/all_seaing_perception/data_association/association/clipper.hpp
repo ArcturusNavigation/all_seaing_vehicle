@@ -44,7 +44,7 @@ AssociationResult clipper_associate(
     auto roman_cost = [&](const Candidate& x, const Candidate& y) -> FloatT {
         if (x.tracked_id == y.tracked_id || x.detected_id == y.detected_id){
             FloatT dist = p[x.detected_id][x.tracked_id];
-            return (x.tracked_id == y.tracked_id && x.detected_id == y.detected_id && dist < ctx.threshold) * (1.0 + DIST_CONTRIBUTE / (1.0 + dist));
+            return (x.tracked_id == y.tracked_id && x.detected_id == y.detected_id && dist < ctx.clipper_cull_threshold) * (1.0 + DIST_CONTRIBUTE / (1.0 + dist));
         }
 
         Eigen::Vector2f x_track = tracked[x.tracked_id]->mean_pred.template head<2>();

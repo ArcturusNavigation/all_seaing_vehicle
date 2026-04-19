@@ -26,6 +26,7 @@ object_tracking_map:
     gps_update: True
     direct_tf: True
     data_association: "clipper" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares), clipper
+    clipper_cull_threshold: 4.0
     trace_time: 10.0
     include_unlabeled: True
     unlabeled_association_threshold: 0.01

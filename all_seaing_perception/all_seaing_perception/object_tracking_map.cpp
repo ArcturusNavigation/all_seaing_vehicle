@@ -87,7 +87,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     RCLCPP_INFO(this->get_logger(), m_include_odom_only_theta ? "GPS: OFF" : "GPS: ON");
 
     this->declare_parameter<std::string>("data_association", "greedy_exclusive");
+    this->declare_parameter<double>("clipper_cull_threshold", 4.0);
     m_data_association_algo = this->get_parameter("data_association").as_string();
+    m_clipper_cull_threshold = this->get_parameter("clipper_cull_threshold").as_double();
 
     this->declare_parameter<double>("trace_time", 5.0);
     m_trace_time = this->get_parameter("trace_time").as_double();
@@ -1161,6 +1163,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     ctx.meas_noise_cov = Q;
     double assoc_threshold = msg->is_labeled?m_new_obj_slam_thres:m_unlabeled_assoc_threshold;
     ctx.threshold = assoc_threshold;
+    ctx.clipper_cull_threshold = m_clipper_cull_threshold;
     ctx.state_start_offset = 3;
     if (m_track_robot) {
         ctx.full_state = &m_state;

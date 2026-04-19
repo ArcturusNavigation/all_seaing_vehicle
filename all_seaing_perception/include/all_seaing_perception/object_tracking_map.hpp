@@ -119,6 +119,7 @@ private:
     bool m_normalize_drop_thresh;
     bool m_include_odom_theta, m_include_odom_only_theta;
     std::string m_data_association_algo;
+    float m_clipper_cull_threshold;
     double m_trace_time;
     bool m_include_unlabeled, m_drop_ignore_unlabeled;
     double m_unlabeled_assoc_threshold;

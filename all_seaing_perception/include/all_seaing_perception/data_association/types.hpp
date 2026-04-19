@@ -28,6 +28,9 @@ struct AssociationContext {
 
     // For banner label grouping. nullptr if not used.
     const std::map<int, int>* label_number_map = nullptr;
+
+    // More generous threshold for CLIPPER diagonal culling (chi-squared scale).
+    float clipper_cull_threshold = 4.0;
 };
 
 struct CostResult {
