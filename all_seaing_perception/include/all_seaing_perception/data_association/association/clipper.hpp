@@ -47,14 +47,25 @@ AssociationResult clipper_associate(
             return (x.tracked_id == y.tracked_id && x.detected_id == y.detected_id && dist < ctx.clipper_cull_threshold) * (1.0 + DIST_CONTRIBUTE / (1.0 + dist));
         }
 
-        Eigen::Vector2f x_track = tracked[x.tracked_id]->mean_pred.template head<2>();
-        Eigen::Vector2f y_track = tracked[y.tracked_id]->mean_pred.template head<2>();
+        // Use full_state positions when available (EKF SLAM mode), since
+        // tracked mean_pred may be stale when track_robot is enabled.
+        auto get_tracked_pos = [&](int tid) -> Eigen::Vector2f {
+            if (ctx.full_state != nullptr) {
+                int dim = tracked[tid]->mean_pred.size();
+                int offset = ctx.state_start_offset + dim * tid;
+                return Eigen::Vector2f((*ctx.full_state)(offset), (*ctx.full_state)(offset + 1));
+            }
+            return tracked[tid]->mean_pred.template head<2>();
+        };
+        Eigen::Vector2f x_track = get_tracked_pos(x.tracked_id);
+        Eigen::Vector2f y_track = get_tracked_pos(y.tracked_id);
 
-        // Convert detected (range, bearing) to local (x, y) for distance comparison
+        // Convert detected (range, bearing) to (x, y) for distance comparison
         auto rb_to_xy = [&](const auto& det) -> Eigen::Vector2f {
             float r = det->mean_pred[0];
-            float b = det->mean_pred[1];
-            return Eigen::Vector2f(r * std::cos(b), r * std::sin(b));
+            float b = ctx.robot_state[2] + det->mean_pred[1];
+            return Eigen::Vector2f(ctx.robot_state[0] + r * std::cos(b),
+                                   ctx.robot_state[1] + r * std::sin(b));
         };
         Eigen::Vector2f x_detect = rb_to_xy(detected[x.detected_id]);
         Eigen::Vector2f y_detect = rb_to_xy(detected[y.detected_id]);
