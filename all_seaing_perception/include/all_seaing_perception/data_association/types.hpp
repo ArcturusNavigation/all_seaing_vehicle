@@ -31,6 +31,10 @@ struct AssociationContext {
 
     // More generous threshold for CLIPPER diagonal culling (chi-squared scale).
     float clipper_cull_threshold = 4.0;
+
+    // Hard Euclidean distance cutoff for CLIPPER candidate generation.
+    // Pairs farther apart than this are never considered. 0 = disabled.
+    float clipper_max_euclidean_dist = 0;
 };
 
 struct CostResult {

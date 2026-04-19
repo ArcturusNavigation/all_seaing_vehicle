@@ -35,6 +35,25 @@ AssociationResult clipper_associate(
         int detected_id;
     };
 
+    // Use full_state positions when available (EKF SLAM mode), since
+    // tracked mean_pred may be stale when track_robot is enabled.
+    auto get_tracked_pos = [&](int tid) -> Eigen::Vector2f {
+        if (ctx.full_state != nullptr) {
+            int dim = tracked[tid]->mean_pred.size();
+            int offset = ctx.state_start_offset + dim * tid;
+            return Eigen::Vector2f((*ctx.full_state)(offset), (*ctx.full_state)(offset + 1));
+        }
+        return tracked[tid]->mean_pred.template head<2>();
+    };
+
+    // Convert detected (range, bearing) to global (x, y) for distance comparison
+    auto rb_to_xy = [&](const auto& det) -> Eigen::Vector2f {
+        float r = det->mean_pred[0];
+        float b = ctx.robot_state[2] + det->mean_pred[1];
+        return Eigen::Vector2f(ctx.robot_state[0] + r * std::cos(b),
+                               ctx.robot_state[1] + r * std::sin(b));
+    };
+
     // TODO: I stole this from ROMAN, test to see if other cost functions work ok
     // dist cost on diagonal just in case there aren't many options
     const FloatT ROMAN_COST_STDDEV = 1.0;
@@ -47,26 +66,8 @@ AssociationResult clipper_associate(
             return (x.tracked_id == y.tracked_id && x.detected_id == y.detected_id && dist < ctx.clipper_cull_threshold) * (1.0 + DIST_CONTRIBUTE / (1.0 + dist));
         }
 
-        // Use full_state positions when available (EKF SLAM mode), since
-        // tracked mean_pred may be stale when track_robot is enabled.
-        auto get_tracked_pos = [&](int tid) -> Eigen::Vector2f {
-            if (ctx.full_state != nullptr) {
-                int dim = tracked[tid]->mean_pred.size();
-                int offset = ctx.state_start_offset + dim * tid;
-                return Eigen::Vector2f((*ctx.full_state)(offset), (*ctx.full_state)(offset + 1));
-            }
-            return tracked[tid]->mean_pred.template head<2>();
-        };
         Eigen::Vector2f x_track = get_tracked_pos(x.tracked_id);
         Eigen::Vector2f y_track = get_tracked_pos(y.tracked_id);
-
-        // Convert detected (range, bearing) to (x, y) for distance comparison
-        auto rb_to_xy = [&](const auto& det) -> Eigen::Vector2f {
-            float r = det->mean_pred[0];
-            float b = ctx.robot_state[2] + det->mean_pred[1];
-            return Eigen::Vector2f(ctx.robot_state[0] + r * std::cos(b),
-                                   ctx.robot_state[1] + r * std::sin(b));
-        };
         Eigen::Vector2f x_detect = rb_to_xy(detected[x.detected_id]);
         Eigen::Vector2f y_detect = rb_to_xy(detected[y.detected_id]);
 
@@ -80,13 +81,18 @@ AssociationResult clipper_associate(
         return std::exp(-delta_abs * delta_abs / (2.0 * ROMAN_COST_STDDEV * ROMAN_COST_STDDEV));
     };
 
-    // Build candidate associations from label-compatible pairs
+    // Build candidate associations from label-compatible and distance-feasible pairs
     std::vector<Candidate> candidates;
     for (int i = 0; i < static_cast<int>(tracked.size()); ++i) {
         for (int j = 0; j < static_cast<int>(detected.size()); ++j) {
-            if (label_compatible(detected[j]->label, tracked[i]->label, ctx.label_number_map)) {
-                candidates.push_back(Candidate{i, j});
+            if (!label_compatible(detected[j]->label, tracked[i]->label, ctx.label_number_map))
+                continue;
+            if (ctx.clipper_max_euclidean_dist > 0) {
+                FloatT dist = (get_tracked_pos(i) - rb_to_xy(detected[j])).template cast<FloatT>().norm();
+                if (dist > ctx.clipper_max_euclidean_dist)
+                    continue;
             }
+            candidates.push_back(Candidate{i, j});
         }
     }
 
@@ -105,8 +111,9 @@ AssociationResult clipper_associate(
         }
     }
 
-    const FloatT d_grow = 1.02;
+    const FloatT d_grow = 1.05;
     const FloatT d_min = 0.01;
+    const FloatT d_max = 10.0;
     const FloatT alpha_min = 1e-5;
     const FloatT alpha_decay = 0.9;
     const FloatT u_converge_thresh = 0.001;
@@ -116,13 +123,7 @@ AssociationResult clipper_associate(
 
     Eigen::VectorXd u = Eigen::VectorXd::Constant(n, 1.0 / std::sqrt(static_cast<FloatT>(n)));
 
-    // questionable d initialization, don't question it
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(M);
-    const auto& eigenvalues = eigensolver.eigenvalues();
-    FloatT lambda_min = eigenvalues(0);
-    FloatT lambda_max = eigenvalues(n - 1);
-    FloatT d = std::max(d_min, -lambda_min);
-    FloatT d_max = std::max(d, lambda_max);
+    FloatT d = d_min;
 
     Eigen::MatrixXd M_d = M;
     for (int i = 0; i < n; ++i)
