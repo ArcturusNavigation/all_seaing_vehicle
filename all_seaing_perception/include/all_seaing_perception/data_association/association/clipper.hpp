@@ -88,7 +88,11 @@ AssociationResult clipper_associate(
             if (!label_compatible(detected[j]->label, tracked[i]->label, ctx.label_number_map))
                 continue;
             if (ctx.clipper_max_euclidean_dist > 0) {
-                FloatT dist = (get_tracked_pos(i) - rb_to_xy(detected[j])).template cast<FloatT>().norm();
+                Eigen::Vector2f tp = get_tracked_pos(i);
+                Eigen::Vector2f dp = rb_to_xy(detected[j]);
+                FloatT dist = (tp - dp).template cast<FloatT>().norm();
+                printf("CAND track %d (%.2f,%.2f) det %d (%.2f,%.2f) dist=%.2f\n",
+                       i, tp[0], tp[1], j, dp[0], dp[1], dist);
                 if (dist > ctx.clipper_max_euclidean_dist)
                     continue;
             }
