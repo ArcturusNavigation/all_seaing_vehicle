@@ -166,6 +166,7 @@ private:
     float m_gps_xy_noise, m_gps_theta_noise;
     float m_imu_xy_noise, m_imu_theta_noise;
     float m_update_gps_xy_uncertainty, m_update_odom_theta_uncertainty;
+    float m_fov_obstacle_drop_thresh, m_fov_angle, m_range_min_drop_thresh;
     int m_num_obj, m_num_banners, m_num_poses;
     Eigen::Vector3d m_robot_pos_mean;//obstacle map
     Eigen::Matrix3d m_robot_pos_cov;//covariance matrix

@@ -30,6 +30,8 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     this->declare_parameter<bool>("gps_update", true);
     this->declare_parameter<double>("normalize_drop_dist", 1.0);
     this->declare_parameter<double>("odom_refresh_rate", 40);
+    // this->declare_parameter<double>("fov_obstacle_drop_thresh", 30.0);
+    this->declare_parameter<double>("fov_angle", 90.0);
 
     // Initialize member variables from parameters
     m_global_frame_id = this->get_parameter("global_frame_id").as_string();
@@ -56,6 +58,8 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     m_init_xy_noise = this->get_parameter("init_xy_noise").as_double();
     m_init_theta_noise = this->get_parameter("init_theta_noise").as_double();
     m_gps_update = this->get_parameter("gps_update").as_bool();
+    // m_fov_obstacle_drop_thresh = this->get_parameter("fov_obstacle_drop_thresh").as_double();
+    m_fov_angle = this->get_parameter("fov_angle").as_double();
     
     m_normalize_drop_dist = this->get_parameter("normalize_drop_dist").as_double();
     m_odom_refresh_rate = this->get_parameter("odom_refresh_rate").as_double();
@@ -77,6 +81,9 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
 
     this->declare_parameter<double>("range_drop_thresh", 10.0);
     m_range_drop_thresh = this->get_parameter("range_drop_thresh").as_double();
+
+    this->declare_parameter<double>("range_min_drop_thresh", 0.0);
+    m_range_min_drop_thresh = this->get_parameter("range_min_drop_thresh").as_double();
 
     this->declare_parameter<bool>("include_odom_theta", true);
     m_include_odom_theta = this->get_parameter("include_odom_theta").as_bool();
@@ -1160,17 +1167,20 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
             continue;
         }
         // Dead
-        if (m_tracked_obstacles[tracked_id]->is_dead) {
+        // TODO add a separate dead counter for fov & non-fov to have different time thresholds
+        if (m_tracked_obstacles[tracked_id]->is_dead &&
+            (pcl::euclideanDistance(p0, m_tracked_obstacles[tracked_id]->obstacle.get_local_point()) < m_range_drop_thresh) &&
+            (std::abs(std::atan2(m_tracked_obstacles[tracked_id]->obstacle.get_local_point().y, m_tracked_obstacles[tracked_id]->obstacle.get_local_point().x)) <= m_fov_angle*M_PI/360) &&
+            (pcl::euclideanDistance(p0, m_tracked_obstacles[tracked_id]->obstacle.get_local_point()) >= m_range_min_drop_thresh)) {
             // Was also dead before, add time dead
             m_tracked_obstacles[tracked_id]->time_dead =
                 rclcpp::Time(m_local_header.stamp) -
                 m_tracked_obstacles[tracked_id]->last_dead +
                 m_tracked_obstacles[tracked_id]->time_dead;
-            if ((m_tracked_obstacles[tracked_id]->time_dead.seconds() >
+            if (m_tracked_obstacles[tracked_id]->time_dead.seconds() >
                 (m_normalize_drop_thresh ? (m_obstacle_drop_thresh * (pcl::euclideanDistance(p0,
                                             m_tracked_obstacles[tracked_id]->obstacle.get_local_point()) / avg_dist) *
-                                            m_normalize_drop_dist) : m_obstacle_drop_thresh)) && (pcl::euclideanDistance(p0,
-                                            m_tracked_obstacles[tracked_id]->obstacle.get_local_point()) < m_range_drop_thresh)) {
+                                            m_normalize_drop_dist) : m_obstacle_drop_thresh)) {
                 continue;
             }
         }
@@ -1459,19 +1469,26 @@ void FactorGraphSLAM::banners_cb(const all_seaing_interfaces::msg::LabeledObject
             continue;
         }
         // Dead
-        if (m_tracked_banners[tracked_id]->is_dead) {
+        pcl::PointXYZ p0 = pcl::PointXYZ(m_robot_pos_mean(0), m_robot_pos_mean(1), 0);
+        float dist = pcl::euclideanDistance(
+            p0,
+            pcl::PointXYZ(m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.x, 
+                            m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.y, 
+                            m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.z));
+        // TODO below code is wrong, need to compute local coordinates of banner to use both for FoV checking & can also use it for the above distance checking
+        // if ((std::abs(std::atan2(m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.y, m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.x)) <= m_fov_angle*M_PI/360) &&
+        //     (m_tracked_banners[tracked_id]->time_dead.seconds() > m_fov_obstacle_drop_thresh) &&
+        //     (dist < m_range_drop_thresh)){
+        //     continue;
+        // }
+        // TODO add a separate dead counter for fov & non-fov to have different time thresholds
+        if (m_tracked_banners[tracked_id]->is_dead && (dist <= m_range_drop_thresh) && (dist >= m_range_min_drop_thresh)) {
             // Was also dead before, add time dead
             m_tracked_banners[tracked_id]->time_dead =
                 rclcpp::Time(m_local_header.stamp) -
                 m_tracked_banners[tracked_id]->last_dead +
                 m_tracked_banners[tracked_id]->time_dead;
-            pcl::PointXYZ p0 = pcl::PointXYZ(m_robot_pos_mean(0), m_robot_pos_mean(1), 0);
-            float dist = pcl::euclideanDistance(
-                p0,
-                pcl::PointXYZ(m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.x, 
-                                m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.y, 
-                                m_tracked_banners[tracked_id]->plane_msg.normal_ctr.position.z));
-            if ((m_tracked_banners[tracked_id]->time_dead.seconds() > m_obstacle_drop_thresh) && (dist < m_range_drop_thresh)) {
+            if (m_tracked_banners[tracked_id]->time_dead.seconds() > m_obstacle_drop_thresh) {
                 continue;
             }
         }
