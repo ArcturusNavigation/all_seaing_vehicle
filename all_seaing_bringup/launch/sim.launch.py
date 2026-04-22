@@ -540,6 +540,7 @@ def launch_setup(context, *args, **kwargs):
             {"default_forward_speed": 10.0},
             {"Kpid_theta": [3.0, 0.0, 0.0]},
             {"max_vel": [10.0, 3.0, 1.5]},
+            {"avoid_obs": True},
             {"avoid_max_dist": 15.0},
             {"avoid_vel_coeff": 3.0},
             {"rot_avoid_vel_coeff": 3.0},

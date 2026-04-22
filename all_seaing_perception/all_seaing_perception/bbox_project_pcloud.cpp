@@ -58,9 +58,46 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     // Subscriptions
     m_image_intrinsics_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
         "camera_info_topic", 10, std::bind(&BBoxProjectPCloud::intrinsics_cb, this, std::placeholders::_1));
-    m_image_sub.subscribe(this, "camera_topic", rmw_qos_profile_sensor_data);
-    m_cloud_sub.subscribe(this, "lidar_topic", rmw_qos_profile_sensor_data);
-    m_bbox_sub.subscribe(this, "bounding_boxes", rmw_qos_profile_sensor_data);
+
+    // for all the below, may need best_effort for IRL if reliable doesn't work
+    const rmw_qos_profile_t camera_profile = {
+        RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+        5,
+        RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+        RMW_QOS_POLICY_DURABILITY_VOLATILE,
+        RMW_QOS_DEADLINE_DEFAULT,
+        RMW_QOS_LIFESPAN_DEFAULT,
+        RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+        RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
+        false
+    };
+
+    const rmw_qos_profile_t lidar_profile = {
+        RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+        5,
+        RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+        RMW_QOS_POLICY_DURABILITY_VOLATILE,
+        RMW_QOS_DEADLINE_DEFAULT,
+        RMW_QOS_LIFESPAN_DEFAULT,
+        RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+        RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
+        false
+    };
+
+    const rmw_qos_profile_t bounding_boxes_profile = {
+        RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+        5,
+        RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+        RMW_QOS_POLICY_DURABILITY_VOLATILE,
+        RMW_QOS_DEADLINE_DEFAULT,
+        RMW_QOS_LIFESPAN_DEFAULT,
+        RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+        RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
+        false
+    };
+    m_image_sub.subscribe(this, "camera_topic", camera_profile);
+    m_cloud_sub.subscribe(this, "lidar_topic", lidar_profile);
+    m_bbox_sub.subscribe(this, "bounding_boxes", bounding_boxes_profile);
     
     // Send pc msg and img msg to bb_pcl_project
     m_pc_cam_bbox_sync =

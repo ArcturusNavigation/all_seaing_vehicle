@@ -3,9 +3,11 @@ factor_graph_slam:
     global_frame_id: "odom"
     slam_frame_id: "map"
     local_frame_id: "base_link"
-    duplicate_thresh: 1.0
-    obstacle_drop_thresh: 30.0
-    range_drop_thresh: 10.0
+    duplicate_thresh: 0.0
+    obstacle_drop_thresh: 1.0
+    fov_angle: 100.0 # 100 for rosbag, 270 for IRL
+    range_drop_thresh: 1000.0 # was 10, better to drop & redetect
+    range_min_drop_thresh: 0.0
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False
     range_uncertainty: 15.0
@@ -13,17 +15,17 @@ factor_graph_slam:
     banner_range_uncertainty: 15.0
     banner_bearing_uncertainty: 5.0
     banner_orientation_uncertainty: 15.0
-    motion_imu_xy_noise: 1.5
+    motion_imu_xy_noise: 2.5
     motion_imu_theta_noise: 1.0 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 30.0 # beware, was 10 before but changed it to 30 bc that's mavros publish rate, change it back if issues
-    update_gps_xy_uncertainty: 200.0 # for only labeled
+    update_gps_xy_uncertainty: 100.0 # for only labeled
     include_odom_theta: True
     include_odom_only_theta: False
     rotate_odom: False
     update_odom_theta_uncertainty: 10.0
-    new_object_slam_threshold: 0.1
+    new_object_slam_threshold: 0.05
     new_banner_slam_threshold: 0.2 # all banners have different labels on them, and the ones that have the same (boats to shoot) are very far away, but there is the chance for YOLO misdetections
-    object_huber_threshold: 0.2
+    object_huber_threshold: 0.1 # can maybe reduce a bit (0.05?) to reduce jumps but may have more duplicates
     banner_huber_threshold: 0.2
     object_assoc_distance_threshold: 500.0 # can put like 2.5 if we want to actually use it
     banner_assoc_distance_threshold: 500.0
@@ -35,7 +37,7 @@ factor_graph_slam:
     direct_tf: False
     data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0
-    include_unlabeled: False
+    include_unlabeled: True
     unlabeled_association_threshold: 0.01
     diff_position_odom: True
     odom_queue_size: 1 # can even increase to 30 or 50 since those are processed quickly and it's important to keep a lot of them so that we at least have the latest odometry (and it hasn't been dropped from the queue) before applying the sensor data
