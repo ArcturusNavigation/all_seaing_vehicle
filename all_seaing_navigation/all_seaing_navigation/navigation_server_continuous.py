@@ -200,12 +200,17 @@ class NavigationContinuousServer(ActionServerBase):
         control_msg.twist.angular.z = 0.0
         self.control_pub.publish(control_msg)
 
-    def global_to_robot(self, dx, dy, heading):
-        """Transform a global-frame vector to robot frame."""
-        return (
-            dx * math.cos(heading) + dy * math.sin(heading),
-            -dx * math.sin(heading) + dy * math.cos(heading),
-        )
+    # def global_to_robot(self, dx, dy, heading):
+    #     """Transform a global-frame vector to robot frame."""
+    #     return (
+    #         dx * math.cos(heading) + dy * math.sin(heading),
+    #         -dx * math.sin(heading) + dy * math.cos(heading),
+    #     )
+
+    def global_to_robot(self, target, robot):
+        rel_pos = target[:2] - robot[:2]
+        conv_pos = np.array([rel_pos[0] * math.cos(robot[2]) + rel_pos[1] * math.sin(robot[2]), -rel_pos[0] * math.sin(robot[2]) + rel_pos[1] * math.cos(robot[2])])
+        return np.array([conv_pos[0], conv_pos[1], target[2] - robot[2]])
 
     # --------------- Waypoint crossing check ---------------#
 
@@ -295,7 +300,8 @@ class NavigationContinuousServer(ActionServerBase):
             avoid_x_vel *= self.avoid_vel_coeff
             avoid_y_vel *= self.avoid_vel_coeff
             # Rotational avoidance
-            rot_avoid_x_vel, rot_avoid_y_vel = pf.rotational_force(vel_dir=(x_vel, y_vel))
+            local_goal_x, local_goal_y, _ = self.global_to_robot(np.array([goal_x, goal_y, 0]), np.array([nav_x, nav_y, nav_theta]))
+            rot_avoid_x_vel, rot_avoid_y_vel = pf.rotational_force(vel_dir=(local_goal_x, local_goal_y))
             rot_avoid_x_vel *= self.rot_avoid_vel_coeff
             rot_avoid_y_vel *= self.rot_avoid_vel_coeff
             if self.avoid_rot_vel_mag:
