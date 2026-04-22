@@ -21,9 +21,9 @@ factor_graph_slam:
     include_odom_only_theta: False
     rotate_odom: False
     update_odom_theta_uncertainty: 10.0
-    new_object_slam_threshold: 0.1
+    new_object_slam_threshold: 0.05
     new_banner_slam_threshold: 0.2 # all banners have different labels on them, and the ones that have the same (boats to shoot) are very far away, but there is the chance for YOLO misdetections
-    object_huber_threshold: 0.2 # can maybe reduce a bit (0.05?) to reduce jumps but may have more duplicates
+    object_huber_threshold: 0.1 # can maybe reduce a bit (0.05?) to reduce jumps but may have more duplicates
     banner_huber_threshold: 0.2
     object_assoc_distance_threshold: 500.0 # can put like 2.5 if we want to actually use it
     banner_assoc_distance_threshold: 500.0
@@ -35,7 +35,7 @@ factor_graph_slam:
     direct_tf: False
     data_association: "greedy_exclusive" # greedy_exclusive (default), greedy_exclusive_indiv_var, greedy_exclusive_measurement_var, greedy_individual, linear_sum_assignment (suffix _sqrt for optimizing the sum of Mahalanobis distances and not their squares)
     trace_time: 10.0
-    include_unlabeled: False
+    include_unlabeled: True
     unlabeled_association_threshold: 0.01
     diff_position_odom: True
     odom_queue_size: 1 # can even increase to 30 or 50 since those are processed quickly and it's important to keep a lot of them so that we at least have the latest odometry (and it hasn't been dropped from the queue) before applying the sensor data
