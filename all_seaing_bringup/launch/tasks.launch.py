@@ -101,6 +101,7 @@ def launch_setup(context, *args, **kwargs):
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
+            {"adaptive_distance": 1000.0}, # was 1.0, should never adapt
             {"gate_dist_back": 0.0},
             {"gate_probe_dist": 40.0},
             {"gate_dist_thres": 70.0},
@@ -135,7 +136,7 @@ def launch_setup(context, *args, **kwargs):
             {"turn_offset": 3.0},
             {"beacon_probe_dist": 0.0},
             {"midpoint_pair_forward_dist": 0.5},
-            {"adaptive_distance": 1.0},
+            {"adapt_dist": 1000.0}, # was 1.0, should never adapt
             {"max_turn_vel": [1.5, 0.0, 0.2]},
             {"turn_pid": [0.4,0.0,0.0]},
             {"green_buoy_loop_count": 2},
@@ -166,7 +167,7 @@ def launch_setup(context, *args, **kwargs):
             {"duplicate_dist": 3.0},
             {"init_gate_dist": 0.5},
             {"gate_dist_back": 2.0},
-            {"adaptive_distance": 1.0},
+            {"adaptive_distance": 1000.0}, # was 1.0, should never adapt
             {"max_turn_vel": [2.5, 0.0, 0.2]},
             {"turn_pid": [0.4,0.0,0.0]},
         ],
@@ -193,6 +194,7 @@ def launch_setup(context, *args, **kwargs):
             {"update_slot_dist_thres": 3.0},
             {"docked_xy_thres": 1.0},
             {"duplicate_dist": 0.5},
+            {"adapt_dist": 1000.0}, # was 0.7, should never adapt
             {"choose_every": 10},
             {"Kpid_x": [2.0, 0.0, 0.5]},
             {"Kpid_y": [2.0, 0.0, 0.5]},
@@ -231,6 +233,7 @@ def launch_setup(context, *args, **kwargs):
             {"shooting_xy_thres": 100.0},
             {"shooting_theta_thres": 360.0},
             {"duplicate_dist": 1.0},
+            {"adapt_dist": 1000.0}, # was 1.0, should never adapt
             {"choose_every": 10},
             {"Kpid_x": [2.0, 0.0, 0.5]},
             {"Kpid_y": [2.0, 0.0, 0.5]},
@@ -253,6 +256,7 @@ def launch_setup(context, *args, **kwargs):
             # {"color_label_mappings_file": buoy_label_mappings},
             {"color_label_mappings_file": all_label_mappings},
             {"search_task_radius": 50.0},
+            {"adaptive_distance": 1000.0}, # was 1.0, should never adapt
             {"gate_dist_back": 0.5},
             {"gate_probe_dist": 5.0},
             {"gate_dist_thres": 50.0},
@@ -415,8 +419,9 @@ def launch_setup(context, *args, **kwargs):
             {"global_frame_id": "map"},
             {"robot_frame_id": "base_link"},
             {"default_forward_speed": 1.5},
-            {"Kpid_theta": [0.6, 0.0, 0.1]},
+            {"Kpid_theta": [1.0, 0.0, 1.0]},
             {"max_vel": [3.5, 1.0, 0.3]},
+            {"avoid_obs": False},
             {"avoid_max_dist": 4.0},
             {"avoid_vel_coeff": 2.0},
             {"rot_avoid_vel_coeff": 7.0},
@@ -472,7 +477,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
-        a_star_server,
+        # a_star_server,
         controller_server,
         # navigation_server,
         # navigation_server_tangent,
