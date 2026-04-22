@@ -5,7 +5,7 @@ factor_graph_slam:
     local_frame_id: "base_link"
     duplicate_thresh: 1.0
     obstacle_drop_thresh: 30.0
-    range_drop_thresh: 10.0
+    range_drop_thresh: 1000.0 # was 10, better to drop & redetect
     drop_ignore_unlabeled: False
     normalize_drop_thresh: False
     range_uncertainty: 15.0
@@ -13,17 +13,17 @@ factor_graph_slam:
     banner_range_uncertainty: 15.0
     banner_bearing_uncertainty: 5.0
     banner_orientation_uncertainty: 15.0
-    motion_imu_xy_noise: 1.5
+    motion_imu_xy_noise: 2.5
     motion_imu_theta_noise: 1.0 # can make it even smaller, even when it's 0 it's much better, trust the compass orientation
     odom_refresh_rate: 30.0 # beware, was 10 before but changed it to 30 bc that's mavros publish rate, change it back if issues
-    update_gps_xy_uncertainty: 200.0 # for only labeled
+    update_gps_xy_uncertainty: 100.0 # for only labeled
     include_odom_theta: True
     include_odom_only_theta: False
     rotate_odom: False
     update_odom_theta_uncertainty: 10.0
     new_object_slam_threshold: 0.1
     new_banner_slam_threshold: 0.2 # all banners have different labels on them, and the ones that have the same (boats to shoot) are very far away, but there is the chance for YOLO misdetections
-    object_huber_threshold: 0.2
+    object_huber_threshold: 0.2 # can maybe reduce a bit (0.05?) to reduce jumps but may have more duplicates
     banner_huber_threshold: 0.2
     object_assoc_distance_threshold: 500.0 # can put like 2.5 if we want to actually use it
     banner_assoc_distance_threshold: 500.0
