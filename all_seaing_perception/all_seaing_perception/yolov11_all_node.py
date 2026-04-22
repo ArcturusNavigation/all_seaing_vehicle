@@ -229,7 +229,7 @@ class YOLOv11Node(Node):
         self._frame_id = 0  # monotonic counter to match responses to requests
 
         image_qos_profile = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            reliability=QoSReliabilityPolicy.RELIABLE, # should be BEST_EFFORT for IRL?
             history=QoSHistoryPolicy.KEEP_LAST,
             durability=QoSDurabilityPolicy.VOLATILE,
             depth=1,
@@ -282,6 +282,7 @@ class YOLOv11Node(Node):
     # ------------------------------------------------------------------
 
     def image_cb(self, msg: Image) -> None:
+        # self.get_logger().info(f'IMAGE')
         # start_time = time.time()
 
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg, "bgr8")
