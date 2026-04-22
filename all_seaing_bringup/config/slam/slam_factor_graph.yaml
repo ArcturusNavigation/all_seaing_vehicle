@@ -5,7 +5,7 @@ factor_graph_slam:
     local_frame_id: "base_link"
     duplicate_thresh: 0.0
     obstacle_drop_thresh: 1.0
-    fov_angle: 100.0 # 100 for rosbag, 270 for IRL
+    fov_angle: 270.0 # 100 for rosbag, 270 for IRL
     range_drop_thresh: 1000.0 # was 10, better to drop & redetect
     range_min_drop_thresh: 0.0
     drop_ignore_unlabeled: False
