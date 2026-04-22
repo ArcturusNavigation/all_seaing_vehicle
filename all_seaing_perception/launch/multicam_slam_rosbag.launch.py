@@ -252,15 +252,17 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings = [
-
+            ("detections/merged", "obstacle_map/local"),
         ],
         parameters = [
             {"enable_front": True},
             {"enable_back_left": True},
             {"enable_back_right": True},
-            {"individual": False},
+            {"individual": True},
             {"approximate": False},
             {"delay": 0.1},
+            {"duplicate_thres": 0.3},
+            {"angle_thres": 15.0},
         ]
     )
 
@@ -283,7 +285,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         # arguments=['--ros-args', '--log-level', 'debug'],
         remappings=[
-            # ("detections", "obstacle_map/local"),
+            ("detections", "obstacle_map/local"),
             # ("odometry/filtered", "odometry/gps_sim"),
             ("odometry/filtered", "odometry/integrated"),
         ],
@@ -516,15 +518,15 @@ def launch_setup(context, *args, **kwargs):
         set_use_sim_time,
         # ekf_node,
         all_yolo_node,
-        all_yolo_node_back_left,
-        all_yolo_node_back_right,
+        # all_yolo_node_back_left,
+        # all_yolo_node_back_right,
         bbox_project_pcloud_node,
         # bbox_project_pcloud_node_back_left,
         # bbox_project_pcloud_node_back_right,
-        # multicam_detection_merge_node,
+        multicam_detection_merge_node,
         odometry_publisher_node,
         # object_tracking_map_node,
-        # slam_node,
+        slam_node,
         tf_filtering,
         # robot_state_publisher,
         # static_transforms_ld,
