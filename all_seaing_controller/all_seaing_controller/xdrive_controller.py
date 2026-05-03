@@ -81,22 +81,45 @@ class XDriveController(Node):
     def calculate_control_output(self, target_vel):
         target_vel_sq = np.sign(target_vel) * np.square(target_vel)
         constraint_bounds = self.drag_constants @ target_vel_sq
-        result = scipy.optimize.minimize(
-            lambda u: np.linalg.norm(u),
-            np.ones(4),
+
+        aug_matrix = np.hstack([self.thrust_forces, -constraint_bounds[:,None]])
+
+        # self.get_logger().info(f'MATRIX: {aug_matrix}')
+
+        constr_result = scipy.optimize.minimize(
+            lambda u: -u[4]+0.01*np.linalg.norm(u),
+            np.ones(5),
             constraints=scipy.optimize.LinearConstraint(
-                self.thrust_forces, lb=constraint_bounds, ub=constraint_bounds
+                aug_matrix, lb=np.zeros((3,)), ub=np.zeros((3,))
+            ),
+            bounds=scipy.optimize.Bounds(
+                [-1.0, -0.1, -1.0, -0.1, 0.0],
+                [1.0, 0.1, 1.0, 0.1, 1.0]
             )
         )
+
+        if constr_result.success:
+            result = constr_result
+            self.get_logger().info(f'PERCENT OF DESIRED CONTROL: {result.x.reshape(-1)[4]}')
+        else:
+            self.get_logger().info('OPTIMIZATION FAILED')
+            result = scipy.optimize.minimize(
+                lambda u: np.linalg.norm(u),
+                np.ones(4),
+                constraints=scipy.optimize.LinearConstraint(
+                    self.thrust_forces, lb=constraint_bounds, ub=constraint_bounds
+                )
+            )
 
         if not result.success:
             self.get_logger().error("Optimization failed to converge!")
             return None
         
-        control_output = result.x.reshape(4)
-        if np.any(np.abs(control_output) > 1):
-            control_output = control_output / np.max(np.abs(control_output))
-        return control_output
+        control_output = result.x.reshape(-1)
+        if np.any(np.abs(control_output[:4]) > 1):
+            control_output[:4] = control_output[:4] / np.max(np.abs(control_output[:4]))
+        self.get_logger().info(f'THRUSTER VALUES: {control_output[:4]}')
+        return control_output[:4]
 
     def cmd_vel_cb(self, msg: Twist):
         target_vel = np.array([

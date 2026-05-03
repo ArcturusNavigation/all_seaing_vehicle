@@ -106,9 +106,9 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {
                 "front_right_xy": [1.1, -1.0],
-                "back_left_xy": [-2.4, 1.0],
+                "back_left_xy": [-2.4, 0.5],
                 "front_left_xy": [1.1, 1.0],
-                "back_right_xy": [-2.4, -1.0],
+                "back_right_xy": [-2.4, -0.5],
                 "thruster_angle": 45.0,
                 "drag_constants": [5.0, 5.0, 40.0],
                 "output_range": [-1500.0, 1500.0],
@@ -576,8 +576,8 @@ def launch_setup(context, *args, **kwargs):
         package="all_seaing_driver",
         executable="onshore_node.py",
         parameters=[
-            {"joy_x_scale": 3.0},
-            {"joy_y_scale": -2.0},
+            {"joy_x_scale": 5.0},
+            {"joy_y_scale": -4.0},
             {"joy_ang_scale": -1.5},
         ],
         output="screen",
@@ -885,7 +885,7 @@ def launch_setup(context, *args, **kwargs):
             # "world": "speed_course_world.sdf",
             # "world": "scan_dock_deliver_task.sdf",
             # "world": "roboboat_full_course.sdf",
-            "urdf": f"{description_prefix}/urdf/xdrive_wamv/wamv_target.urdf",
+            "urdf": f"/home/pliam/my_wamv/wamv_target.urdf",
             "extra_gz_args": extra_gz_args,
         }.items(),
     )
