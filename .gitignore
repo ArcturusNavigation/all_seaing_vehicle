@@ -57,3 +57,6 @@ package.nix
 
 # Comms related
 *.csv
+
+# Local credentials (never commit)
+CREDENTIALS.local.md

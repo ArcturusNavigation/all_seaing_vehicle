@@ -168,6 +168,11 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
         RCLCPP_ERROR(this->get_logger(), "Failed to open YAML file: %s", contour_matching_color_ranges_file.c_str());
     }
     contour_ranges_yaml.close();
+
+    // Observability: every bounding box either becomes a detection or is counted (status) and
+    // logged (run log) with the reason it was rejected, see reject_box() in bb_pcl_project
+    m_run_log = std::make_unique<all_seaing_common::RunLogger>(this);
+    m_status = std::make_unique<all_seaing_common::StatusReporter>(this, m_camera_name);
 }
 
 void BBoxProjectPCloud::intrinsics_cb(const sensor_msgs::msg::CameraInfo &info_msg) {
@@ -218,17 +223,49 @@ void BBoxProjectPCloud::bb_pcl_project(
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr &in_cloud_msg,
     const all_seaing_interfaces::msg::LabeledBoundingBox2DArray::ConstSharedPtr &in_bbox_msg) {
 
+    // Observability (see constructor): processing time, input latency, and per-box outcome
+    auto proc_timer = m_status->timer("proc_ms");
+    m_status->count("updates");
+    m_status->count("boxes_in", in_bbox_msg->boxes.size());
+    m_status->gauge("input_age_ms", (this->get_clock()->now() - rclcpp::Time(in_cloud_msg->header.stamp)).seconds() * 1e3);
+    int n_detections = 0;
+    auto label_name = [this](int label) -> std::string {
+        if (label_color_map.count(label)) return label_color_map[label];
+        return beacon_labels.count(label) ? "beacon" : "unknown";
+    };
+    auto reject_box = [&](const all_seaing_interfaces::msg::LabeledBoundingBox2D &box, const std::string &reason,
+                          all_seaing_common::LogFields extra = {}) {
+        m_status->count("rejected/" + reason);
+        all_seaing_common::LogFields fields = {
+            {"camera", m_camera_name}, {"label", static_cast<int64_t>(box.label)}, {"color", label_name(box.label)},
+            {"reason", reason},
+            {"bbox", std::vector<double>{static_cast<double>(box.min_x), static_cast<double>(box.min_y),
+                                         static_cast<double>(box.max_x), static_cast<double>(box.max_y)}}};
+        fields.insert(fields.end(), extra.begin(), extra.end());
+        m_run_log->info("box_rejected", std::move(fields));
+    };
+
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
     if (!m_pc_cam_tf_ok){
         m_pc_cam_tf = get_tf(in_img_msg->header.frame_id, in_cloud_msg->header.frame_id, "pc_cam");
-        if (!m_pc_cam_tf_ok)
+        if (!m_pc_cam_tf_ok){
+            m_status->count("frames_dropped/tf_missing");
+            m_run_log->warn("frame_dropped", {{"camera", m_camera_name}, {"reason", "tf_missing"},
+                {"target", in_img_msg->header.frame_id}, {"source", in_cloud_msg->header.frame_id},
+                {"n_boxes", in_bbox_msg->boxes.size()}});
             return;
+        }
     }
     // Camera -> base_link
     if (!m_cam_base_link_tf_ok){
         m_cam_base_link_tf = get_tf(m_base_link_frame, in_img_msg->header.frame_id, "cam_base_link");
-        if (!m_cam_base_link_tf_ok)
+        if (!m_cam_base_link_tf_ok){
+            m_status->count("frames_dropped/tf_missing");
+            m_run_log->warn("frame_dropped", {{"camera", m_camera_name}, {"reason", "tf_missing"},
+                {"target", m_base_link_frame}, {"source", in_img_msg->header.frame_id},
+                {"n_boxes", in_bbox_msg->boxes.size()}});
             return;
+        }
     }
 
     // // measuring time
@@ -260,6 +297,9 @@ void BBoxProjectPCloud::bb_pcl_project(
         cv_ptr = cv_bridge::toCvCopy(in_img_msg, sensor_msgs::image_encodings::BGR8);
     } catch (cv_bridge::Exception &e) {
         RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+        m_status->count("frames_dropped/cv_bridge");
+        m_run_log->error("frame_dropped", {{"camera", m_camera_name}, {"reason", "cv_bridge"}, {"error", e.what()},
+            {"n_boxes", in_bbox_msg->boxes.size()}});
         return;
     }
 
@@ -287,6 +327,8 @@ void BBoxProjectPCloud::bb_pcl_project(
                 if (overlap(sorted_bboxes[i], sorted_bboxes[j])/area(sorted_bboxes[i]) > m_overlap_filter_thres){
                     // RCLCPP_INFO(this->get_logger(), "FILTERED");
                     should_filter = true;
+                    reject_box(sorted_bboxes[i], "overlap", {{"overlap_ratio", overlap(sorted_bboxes[i], sorted_bboxes[j])/area(sorted_bboxes[i])},
+                        {"by_label", static_cast<int64_t>(sorted_bboxes[j].label)}});
                     break;
                 }
             }
@@ -309,7 +351,10 @@ void BBoxProjectPCloud::bb_pcl_project(
         // Add padding to bbox
         all_seaing_perception::addBBoxPadding(bbox, m_bbox_margin, cv_hsv.rows, cv_hsv.cols);
         all_seaing_perception::PCLInBBoxHSV(in_cloud_tf_ptr, obj_cloud_ptr, bbox, cv_hsv, m_cam_model, m_is_sim);
-        if (obj_cloud_ptr->points.empty()) continue;
+        if (obj_cloud_ptr->points.empty()){
+            reject_box(bbox, "no_points");
+            continue;
+        }
         pcl::PointCloud<pcl::PointXYZHSV>::Ptr obj_cloud_ptr_tf(new pcl::PointCloud<pcl::PointXYZHSV>);
         all_seaing_perception::transformPCLCloud(*obj_cloud_ptr, *obj_cloud_ptr_tf, m_cam_base_link_tf);
         pcl::toROSMsg(*obj_cloud_ptr_tf, labeled_pcl.cloud);
@@ -344,7 +389,10 @@ void BBoxProjectPCloud::bb_pcl_project(
             // RCLCPP_INFO(this->get_logger(), "GOT %d", bbox.label);
 
             // image & bbox relation & adjustment (make sure in-bounds)
-            if(bbox.min_x > bbox.max_x || bbox.min_y > bbox.max_y) continue;
+            if(bbox.min_x > bbox.max_x || bbox.min_y > bbox.max_y){
+                reject_box(bbox, "invalid_bbox");
+                continue;
+            }
 
             cv::Mat hsv_img(cv_hsv, cv::Range(bbox.min_y, bbox.max_y), cv::Range(bbox.min_x, bbox.max_x));
             cv::Size img_sz;
@@ -388,7 +436,12 @@ void BBoxProjectPCloud::bb_pcl_project(
                 }
             }
 
-            if(contours.empty() || clusters_indices.empty()) continue;
+            if(contours.empty() || clusters_indices.empty()){
+                // no image segment of the label's color (e.g. glare) and/or no LiDAR cluster
+                reject_box(bbox, contours.empty() ? (clusters_indices.empty() ? "no_contours_no_clusters" : "no_contours") : "no_clusters",
+                    {{"n_points", pcloud_ptr->points.size()}, {"n_contours", contours.size()}, {"n_clusters", clusters_indices.size()}});
+                continue;
+            }
 
             // pre-filter clusters & segments
             std::vector<std::vector<cv::Point>> contours_filtered;
@@ -413,7 +466,13 @@ void BBoxProjectPCloud::bb_pcl_project(
                 }
             }
 
-            if(contours_filtered.empty() || clusters_indices_filtered.empty()) continue;
+            if(contours_filtered.empty() || clusters_indices_filtered.empty()){
+                // segments/clusters exist but all cover too little of the box (area thresholds)
+                reject_box(bbox, contours_filtered.empty() ? "contours_too_small" : "clusters_too_small",
+                    {{"n_points", pcloud_ptr->points.size()}, {"n_contours", contours.size()}, {"n_clusters", clusters_indices.size()},
+                     {"contour_area_thres", m_contour_bbox_area_thres}, {"cluster_area_thres", m_cluster_bbox_area_thres}});
+                continue;
+            }
             
             // Convert both the pcloud and the contours to a vector of pair<Point2d, Vec3b> and compute sum and sum of squares (can be used to compute all the needed metrics)
             // std::vector<std::vector<std::pair<cv::Point2d, std::vector<long long>>>> contours_pts;
@@ -566,7 +625,8 @@ void BBoxProjectPCloud::bb_pcl_project(
             // RCLCPP_INFO(this->get_logger(), "PUBLISHING %d", bbox.label);
 
             refined_objects_msg.obstacles.push_back(obstacle_msg);
-            
+            n_detections++;
+
             *all_obj_refined_pcls_ptr += *refined_cloud_ptr;
         }else if (beacon_labels.count(bbox.label)){
             // extract clusters
@@ -593,8 +653,12 @@ void BBoxProjectPCloud::bb_pcl_project(
                 }
             }
 
-            if(clusters_indices_filtered.empty()) continue;
-            
+            if(clusters_indices_filtered.empty()){
+                reject_box(bbox, clusters_indices.empty() ? "no_clusters" : "clusters_too_small",
+                    {{"n_points", pcloud_ptr->points.size()}, {"n_clusters", clusters_indices.size()}});
+                continue;
+            }
+
             std::vector<std::vector<std::pair<cv::Point2d, std::vector<long long>>>> clusters_pts;
             std::vector<double> cluster_dists;
             std::vector<double> cluster_area_ratios;
@@ -662,12 +726,21 @@ void BBoxProjectPCloud::bb_pcl_project(
             obstacle_msg.label = bbox.label;
 
             refined_objects_msg.obstacles.push_back(obstacle_msg);
-            
+            n_detections++;
+
             *all_obj_refined_pcls_ptr += *refined_cloud_ptr;
+        }else{
+            // not a buoy color or beacon (e.g. banner shapes): not a detection here, but its
+            // points were already published on labeled_object_point_clouds (for RANSAC)
+            m_status->count("skipped/not_buoy_or_beacon");
         }
     }
 
     m_detection_pub->publish(refined_objects_msg);
+    m_status->count("detections_out", n_detections);
+    m_run_log->debug("frame", {{"camera", m_camera_name}, {"n_boxes", in_bbox_msg->boxes.size()},
+        {"n_detections", n_detections}, {"n_cloud_points", in_cloud_ptr->points.size()},
+        {"labels", [&]{ std::vector<double> l; for (auto &o : refined_objects_msg.obstacles) l.push_back(o.label); return l; }()}});
     
     auto obj_refined_pcls_msg = sensor_msgs::msg::PointCloud2();
     pcl::toROSMsg(*all_obj_refined_pcls_ptr, obj_refined_pcls_msg);

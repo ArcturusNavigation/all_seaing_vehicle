@@ -58,6 +58,9 @@
 #include "all_seaing_perception/perception_utilities.hpp"
 #include "all_seaing_perception/obstacle.hpp"
 
+#include "all_seaing_common/run_logger.hpp"
+#include "all_seaing_common/status_reporter.hpp"
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -143,6 +146,10 @@ private:
     bool m_is_sim, m_label_list;
     double m_bbox_margin;
     std::string m_camera_name;
+
+    // Observability: per-run event log (#501) and live status on /diagnostics (#480)
+    std::unique_ptr<all_seaing_common::RunLogger> m_run_log;
+    std::unique_ptr<all_seaing_common::StatusReporter> m_status;
 
     double m_contour_bbox_area_thres;
     double m_cluster_bbox_area_thres;

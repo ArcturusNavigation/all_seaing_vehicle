@@ -6,6 +6,7 @@ ROS 2 (Humble, Ubuntu 22.04) autonomy stack for **MIT Arcturus**'s autonomous su
 
 - Team wiki (setup, tutorials, per-package docs): https://github.com/ArcturusNavigation/all_seaing_vehicle/wiki. Some pages are stale (e.g. they still describe `yolov8_node.py` and EKF SLAM as current), so treat the code as the source of truth.
 - Design reports and test logs: https://arcturus.mit.edu (TDRs under `/documents/`, testing blog under `/blog/testing`).
+- Team autonomy notes (Notion "Autonomy Wiki": planning, Jetson/GPS setup, perception/SLAM design notes, thruster configuration study): https://neon-coal-0ba.notion.site/Autonomy-Wiki-1c6400e9c6ad80ffae90dc9d9b2f4f0f. A summary is under "Operational notes and design context" below.
 
 ## Workspace, build, run
 
@@ -92,6 +93,45 @@ Frames follow REP-105 loosely. `odometry_publisher.py` turns GPS (UTM, using the
 - Sim and real behaviour differ through `is_sim` parameters and through which launch file passes which config. Keep both paths working.
 - Style: `.clang-format` is LLVM with 4-space indent and a 100-column limit. Python follows the surrounding code (Black/ruff-ish, 4 spaces). Match the existing comment density and naming (`snake_case`; the C++ uses an `m_` member prefix).
 - Do not commit machine-specific paths (e.g. a local URDF in `sim.launch.py`), debug logs (`log.txt`, `dmesg.log`), or rosbags.
+
+## Operational notes and design context (from the Notion Autonomy Wiki)
+
+### Jetson and hardware access
+- SSH: `ssh arcturus@jetson` (static IP `192.168.8.2` on the `arcturus` router network; the router admin page at `192.168.8.1` lists connected devices). Credentials (router, admin, Jetson, Docker) are in the gitignored local file `CREDENTIALS.local.md` in the repo root, and in Notion/team docs. Never commit them or copy them into tracked files.
+- Serial console without the network: connect over micro-USB, find the port with `dmesg | grep tty`, then `sudo screen /dev/ttyACM0 115200`.
+- For a remote desktop, use NoMachine. If it shows no desktop or a bad resolution: `sudo systemctl stop gdm && sudo /etc/NX/nxserver --restart`.
+- To see which `ttyACM*` is the Pixhawk and which is the central hub: `systemctl | grep ttyACM`. Static device names come from udev rules keyed on vendor/device ID.
+- Live visualization: plan to use `foxglove_bridge` instead of RViz on the Jetson (issue #480).
+
+### GPS / RTK
+- In practice we usually get DGNSS Fix/Float (corrections received, not enough satellites for RTK Fix). That's fine because we care about local precision, not global accuracy. Galileo HAS is enabled.
+- To change the base station's fixed position or switch to survey-in, use u-center: View → Messages → `UBX-CFG-TMODE3`, and save the config there. Configuring through Mission Planner is temporary and has broken the base↔rover radio link before. A fixed position too far from the true one never reaches TIME mode.
+- NTRIP/internet corrections (MaCORS) through the Jetson are an open idea, not implemented.
+
+### Replaying rosbags (standard recipe)
+Remap away the topics that the nodes under test will republish, play with `--clock`, and launch the matching `*_rosbag` launch file:
+```bash
+ros2 bag play <bag> --clock [--read-ahead-queue-size 100000] \
+  --remap /tf:=/tf_fake /tf_static:=/tf_static_fake /obstacle_map/global:=/obstacle_map/global_fake [<other republished topics>:=..._fake]
+ros2 launch all_seaing_perception multicam_slam_rosbag.launch.py     # (or multicam_slam_rosbag_indoors / slam_roboboat_rosbag)
+ros2 launch all_seaing_bringup tasks_rosbag.launch.py                # if testing task/nav logic too
+```
+Notion's Perception page lists the exact remaps for specific test bags (Sept/Oct 2025 outdoor, Jan 2026 indoor, Apr 2026 FGO).
+
+### Localization / SLAM design notes
+- Odometry is **pre-integrated in `odometry_publisher.py`** (published as `odometry/integrated`), so SLAM applies the relative motion since its last update. This keeps SLAM consistent even when it processes odometry late. The motion noise is approximated, not exact.
+- Pixhawk EKF3 (IMU + compass + GPS) is preferred over `robot_localization` for fused velocities. The compass is the yaw source. The Pixhawk's mounting orientation relative to `base_link` has been wrong before (rotated 90° and flipped between boats): check the `imu`/odom frames.
+- Indoors: RF2O LiDAR odometry + EKF (current); AMCL+Cartographer and DLIO were used before.
+- The open factor-graph SLAM work (#476) includes: attaching detections and GPS to the pose with the closest timestamp instead of the latest pose, a Huber/robust cost, fixed-lag smoothing (marginalizing old poses and removed landmarks), and batching the Mahalanobis gating.
+- The plan for local–global hybrid control (#479): use the local map for immediate reactions when it has enough information. Use the global map to fill gaps (e.g. gate geometry when only one buoy is visible) and to reject fake gates. Global waypoints can be projected into the robot frame for local control.
+
+### Competition reporting
+The task manager sends the heartbeat and harbor alert reports. Individual task nodes send their own events (gate passes, objects detected with id/color/position, deliveries, docking slot) through `ActionServerBase.report_data`. The onshore side converts these to the RoboBoat protocol. Label → color/number mappings come from `all_seaing_bringup/config/perception/all_label_mappings.yaml`.
+
+### Simulation
+- GPS/IMU noise is configured in the VRX fork: `vrx_urdf/wamv_gazebo/urdf/components/wamv_gps.xacro` (and the IMU equivalent).
+- To test a different thruster layout, generate a URDF with `ros2 launch vrx_gazebo generate_wamv.launch.py component_yaml:=... thruster_yaml:=... wamv_target:=.../wamv_target.urdf wamv_locked:=False`. Then point `sim.launch.py`'s `urdf` argument at it and update the `xdrive_controller.py` thruster positions in `sim.launch.py` to match. Don't commit the local URDF path.
+- Thruster configuration study (RoboBoat 2027): the current layout is X-drive (holonomic, but more drag and less forward thrust). Candidates are Azimuth + X-drive (switchable azimuth/X-drive modes) or differential + sway/tunnel thrusters. Pure differential or pure azimuth layouts lose sway control.
 
 ## Known pitfalls (from field testing)
 - Thruster channel assignment and sign conventions have been flipped by old hotfixes more than once. Verify FR/BL/FL/BR mapping, PID signs, and joystick/x-drive axes in the tank before going on the water.
