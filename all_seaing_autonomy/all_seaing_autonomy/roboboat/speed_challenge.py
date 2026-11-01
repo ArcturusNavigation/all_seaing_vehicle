@@ -174,10 +174,10 @@ class SpeedChallenge(TaskServerBase):
 
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
-        if self.paused:
-            return
+        if self.state != SpeedChallengeState.CIRCLING:
+            self.identify_indicator
 
-        # TODO (step 3): look for the color indicator while driving toward the yellow buoy.
+        # Look for the color indicator while driving toward the yellow buoy.
         #   - Call self.identify_indicator() here.
         #   - Only do it before circling starts (check self.state), so the direction
         #     can't change halfway through the circle.
@@ -186,7 +186,6 @@ class SpeedChallenge(TaskServerBase):
         '''
         Sets self.left_first from the color indicator buoy and reports its color once.
         '''
-        # TODO (step 3):
         #   1. Loop over self.obstacles. Skip any farther than self.beacon_dist_thres
         #      from self.robot_pos (np.linalg.norm and ob_coords help here).
         #   2. If the label is in self.red_indicator_labels:   circle counter-clockwise.
@@ -200,7 +199,22 @@ class SpeedChallenge(TaskServerBase):
         #            object_id=obstacle.id,
         #            task_context=TaskType.TASK_SPEED_CHALLENGE))
         #      Use self.indicator_color to remember that you already reported.
-        pass
+        for obstacle in self.obstacles:
+            if np.linalg.norm(self.robot_pos - ob_coords(obstacle)) > self.beacon_dist_thres:
+                if obstacle.label in self.red_indicator_labels:
+                    self.left_first = False
+                    color = Color.COLOR_RED
+                elif obstacle.label in self.green_indicator_labels:
+                    self.left_first = True
+                    color = Color.COLOR_GREEN
+                if not self.indicator_color and not color is None:
+                    self.report_data(ObjectDetected(
+                        object_type=ObjectType.OBJECT_LIGHT_BEACON,
+                        color=color,
+                        position=self.pos_to_latlng(self.latlng_origin, ob_coords(obstacle)),
+                        object_id=obstacle.id,
+                        task_context=TaskType.TASK_SPEED_CHALLENGE)
+                    )
 
     # ------------------------------------------------------------------
     # Task steps: one method per state
@@ -241,21 +255,30 @@ class SpeedChallenge(TaskServerBase):
         if self.goal_handle.is_cancel_requested:
             return Task.Result(success=False)
 
-        # TODO (step 1): drive to a point just past the gate.
+        #   Drive to a point just past the gate.
         #   - Follow the worked example above, using +self.init_gate_dist.
         #   - Check for cancellation afterwards, like above.
+        self.gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, self.init_gate_dist)
+        self.get_logger().info("Going to the far side of the gate")
+        self.move_to_point(
+            self.gate_wpt,
+            busy_wait=True,  # block until we arrive
+            goal_update_func=self.gate_wpt_updater(-self.init_gate_dist),
+        )
+        if self.goal_handle.is_cancel_requested:
+            return Task.Result(success=False)
 
-        # TODO (step 1): report that we entered the gate.
+        #   Report that we entered the gate.
         #   self.report_data(GatePass(type=GateType.GATE_SPEED_START, position=...))
         #   Use self.pos_to_latlng(self.latlng_origin, self.robot_pos) for the position.
-
+        self.report_data(GatePass(type=GateType.GATE_SPEED_START), position=self.pos_to_latng(self.latlng_origin, self.robot_pos))
         return Task.Result(success=True)
 
     def find_yellow_buoy(self):
         '''
         Drive forward through the gate until the yellow buoy shows up in the map.
         '''
-        # TODO (step 2): use the base class helper probe_buoy().
+        #   Use the base class helper probe_buoy().
         #   probe_buoy(direction, distance, detected_func)
         #     - direction: self.buoy_direction (saved in pass_entry_gate)
         #     - distance:  self.probe_distance
@@ -264,14 +287,15 @@ class SpeedChallenge(TaskServerBase):
         #   Wrap it in a lambda that takes buoy_front and passes self.obstacles, self.yellow_labels,
         #   and self.duplicate_dist.
         #   Return whatever probe_buoy() returns.
-        self.get_logger().warn("find_yellow_buoy() is not implemented yet")
-        return Task.Result(success=False)
+        my_lambda = lambda buoy_front : self.buoy_detected(self.obstacles, self.yellow_labels, self.duplicate_dist, buoy_front)
+        return self.probe_buoy(self.buoy_direction, self.probe_distance, my_lambda)
+        
 
     def circle_yellow_buoy(self):
         '''
         Circle the yellow buoy once, in the direction the indicator asked for.
         '''
-        # TODO (step 4): use the base class helper smooth_circle_buoy().
+        # Use the base class helper smooth_circle_buoy().
         #   smooth_circle_buoy(buoy_labels, adaptive_distance, duplicate_dist, target_pt,
         #                      buoy_loop_count, left_first)
         #     - buoy_labels: the yellow labels
@@ -279,8 +303,13 @@ class SpeedChallenge(TaskServerBase):
         #     - buoy_loop_count: 1
         #     - left_first:  set by identify_indicator()
         #   Log which direction you chose. It makes debugging on the water much easier.
-        self.get_logger().warn("circle_yellow_buoy() is not implemented yet")
-        return Task.Result(success=False)
+        self.get_logger().info("Going clockwise" if self.left_first else "Going counter-clockwise")
+        return self.smooth_circle_buoy(self.buoy_labels, 
+                           self.adaptive_distance, 
+                           self.duplicate_dist, 
+                           self.target_pt, 
+                           self.buoy_loop_count, 
+                           self.left_first)
 
     def return_to_start(self):
         '''
@@ -288,19 +317,44 @@ class SpeedChallenge(TaskServerBase):
         '''
         self.get_logger().info("Returning to start")
 
-        # TODO (step 5): flip the gate so "left" and "right" match the boat's new heading.
+        # Flip the gate so "left" and "right" match the boat's new heading.
         #   - Toggle self.red_left.
         #   - Swap self.gate_pair.left and self.gate_pair.right.
+        self.red_left = not self.red_left
+        self.gate_pair.left, self.gate_pair.right = self.gate_pair.right, self.gate_pair.left
 
-        # TODO (step 5): look for the gate again on the way back.
+        # Look for the gate again on the way back.
         #   - Get a point self.gate_dist_back before the gate with midpoint_pair_dir().
         #   - move_to_point() to it with exit_func=self.setup_buoys. This stops early
         #     once setup_buoys() finds the gate and refreshes self.gate_pair.
+        mid, perp = midpoint_pair_dir(self.gate_pair, -self.gate_dist_back)
+        self.move_to_point(mid, exit_func=self.setup_buoys)
 
-        # TODO (step 5): pass through the gate, the same way as in pass_entry_gate(),
+        # Pass through the gate, the same way as in pass_entry_gate(),
         #   using -self.gate_dist_back and then +self.gate_dist_back.
 
-        # TODO (step 5): report that we exited the gate (GateType.GATE_SPEED_END).
+        self.gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, -self.gate_dist_back)
+        self.get_logger().info("Going to the near side of the gate")
+        self.move_to_point(
+            self.gate_wpt,
+            busy_wait=True,  # block until we arrive
+            goal_update_func=self.gate_wpt_updater(-self.init_gate_dist),
+        )
+        if self.goal_handle.is_cancel_requested:
+            return Task.Result(success=False)
+        
+        self.gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, self.gate_dist_back)
+        self.get_logger().info("Going to the far side of the gate")
+        self.move_to_point(
+            self.gate_wpt,
+            busy_wait=True,  # block until we arrive
+            goal_update_func=self.gate_wpt_updater(-self.init_gate_dist),
+        )
+        if self.goal_handle.is_cancel_requested:
+            return Task.Result(success=False)
+        
+        # Report that we exited the gate (GateType.GATE_SPEED_END).
+        self.report_data(GatePass(type=GateType.GATE_SPEED_END), position=self.pos_to_latng(self.latlng_origin, self.robot_pos))
 
         self.get_logger().warn("return_to_start() is not implemented yet")
         return Task.Result(success=False)
