@@ -134,8 +134,12 @@ class SpeedChallenge(TaskServerBase):
         # setup_buoys() (from the base class) finds the closest red/green pair
         # and stores it in self.gate_pair (with .left and .right obstacles).
         if self.obstacles is None:
+            self.get_logger().warn("Rejecting speed challenge: no obstacle map received yet")
             return False
-        return self.setup_buoys()
+        if not self.setup_buoys():
+            self.get_logger().warn("Rejecting speed challenge: setup_buoys() found no entry gate")
+            return False
+        return True
 
     def init_setup(self):
         # Reset per-run state, since the same node can run the task more than once.
@@ -224,7 +228,7 @@ class SpeedChallenge(TaskServerBase):
 
                     self.report_data(ObjectDetected(
                     object_type=ObjectType.OBJECT_LIGHT_BEACON,
-                    color=color
+                    color=color,
                     position=self.pos_to_latlng(self.latlng_origin, ob_coords(obstacle)),
                     object_id=obstacle.id,
                     task_context=TaskType.TASK_SPEED_CHALLENGE))
@@ -315,11 +319,11 @@ class SpeedChallenge(TaskServerBase):
         #self.get_logger().warn("find_yellow_buoy() is not implemented yet")
         #return Task.Result(success=False)
 
-        YellowB_detected = lambda buoy front: self.buoy_detected(
+        YellowB_detected = lambda buoy_front: self.buoy_detected(
             self.obstacles,
             self.yellow_labels,
             self.duplicate_dist,
-            self.buoy_front
+            buoy_front
         )
 
         return self.probe_buoy(self.buoy_direction, self.probe_distance, YellowB_detected)
@@ -338,7 +342,7 @@ class SpeedChallenge(TaskServerBase):
         #     - left_first:  set by identify_indicator()
         #   Log which direction you chose. It makes debugging on the water much easier.
 
-        self.get_logger().info("Left_first is: ", left_first)
+        self.get_logger().info(f"Left_first is: {self.left_first}")
 
         return self.smooth_circle_buoy(
         self.yellow_labels, 
@@ -374,10 +378,10 @@ class SpeedChallenge(TaskServerBase):
         #     once setup_buoys() finds the gate and refreshes self.gate_pair.
 
 
-        probe_wpt, probe_direction = midpoint_pair_dir(self.gate_pair, -self.init_gate_dist)
+        probe_wpt, probe_direction = midpoint_pair_dir(self.gate_pair, -self.gate_dist_back)
         self.move_to_point(
             probe_wpt,
-            busy_wait = True
+            busy_wait = True,
             exit_func = self.setup_buoys
         )
 
@@ -387,25 +391,25 @@ class SpeedChallenge(TaskServerBase):
 
         
 
-        self.gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, -self.init_gate_dist)
+        self.gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, -self.gate_dist_back)
         self.get_logger().info("Going to the near side of the gate")
         self.move_to_point(
             self.gate_wpt,
             busy_wait=True,  # block until we arrive
-            goal_update_func=self.gate_wpt_updater(-self.init_gate_dist),
+            goal_update_func=self.gate_wpt_updater(-self.gate_dist_back),
         )
         if self.goal_handle.is_cancel_requested:
             return Task.Result(success=False)
 
 
         #need d>0 so
-        self.gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, self.init_gate_dist)
+        self.gate_wpt, self.buoy_direction = midpoint_pair_dir(self.gate_pair, self.gate_dist_back)
         self.get_logger().info("Going to far side of gate")
 
         self.move_to_point(
             self.gate_wpt,
             busy_wait = True,
-            goal_update_func = self.gate_wpt_updater(self.init_gate_dist)
+            goal_update_func = self.gate_wpt_updater(self.gate_dist_back)
         )
 
         if self.goal_handle.is_cancel_requested:

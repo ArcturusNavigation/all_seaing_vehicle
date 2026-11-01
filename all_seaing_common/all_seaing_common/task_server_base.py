@@ -630,7 +630,24 @@ class TaskServerBase(ActionServerBase):
             f"initial red buoys: {[ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[ob_coords(buoy) for buoy in green_buoys]}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
-            self.get_logger().debug("No starting buoy pairs!")
+            # Count why each buoy was filtered out, so the failing criterion shows up in the logs
+            def filter_reasons(obs):
+                behind = far = wrong_dir = 0
+                for ob in obs:
+                    if filter_front and ob.local_point.point.x <= 0:
+                        behind += 1
+                    elif np.linalg.norm(self.robot_pos - ob_coords(ob)) >= self.gate_dist_thres:
+                        far += 1
+                    elif pointing_direction is not None and (ob_coords(ob) - self.robot_pos) @ pointing_direction <= 0:
+                        wrong_dir += 1
+                return f"{behind} behind robot, {far} beyond gate_dist_thres={self.gate_dist_thres}, {wrong_dir} against pointing_direction"
+            for color, init, kept in [("red", red_init, red_buoys), ("green", green_init, green_buoys)]:
+                if len(kept) > 0:
+                    continue
+                if len(init) == 0:
+                    self.get_logger().warn(f"setup_buoys failed: no {color} buoys in obstacle map", throttle_duration_sec=1.0)
+                else:
+                    self.get_logger().warn(f"setup_buoys failed: all {len(init)} {color} buoys filtered out ({filter_reasons(init)})", throttle_duration_sec=1.0)
             return False
 
         # From the red buoys that are in front of the robot, take the one that is closest to it.
@@ -662,15 +679,27 @@ class TaskServerBase(ActionServerBase):
         # else:
         green_to = None
         red_to = None
+        too_close = []
+        too_far = []
         for red_b in red_buoys:
             for green_b in green_buoys:
                 pair_dist = np.linalg.norm(ob_coords(red_b) - ob_coords(green_b))
-                if pair_dist < self.inter_buoy_pair_dist or pair_dist > self.max_inter_gate_dist:
+                if pair_dist < self.inter_buoy_pair_dist:
+                    too_close.append(round(float(pair_dist), 2))
+                    continue
+                elif pair_dist > self.max_inter_gate_dist:
+                    too_far.append(round(float(pair_dist), 2))
                     continue
                 elif ((green_to is None) or (np.linalg.norm((ob_coords(red_b, local=True) + ob_coords(green_b, local=True)) / 2) < np.linalg.norm((ob_coords(red_to, local=True) + ob_coords(green_to, local=True)) / 2))):
                     green_to = green_b
                     red_to = red_b
         if green_to is None:
+            self.get_logger().warn(
+                f"setup_buoys failed: no valid red/green pair among {len(red_buoys)} red and {len(green_buoys)} green buoys; "
+                f"{len(too_close)} pairs closer than inter_buoy_pair_dist={self.inter_buoy_pair_dist} {too_close}, "
+                f"{len(too_far)} pairs farther than max_inter_gate_dist={self.max_inter_gate_dist} {too_far}",
+                throttle_duration_sec=1.0,
+            )
             return False
         if self.red_left:
             self.gate_pair = InternalBuoyPair(red_to, green_to)

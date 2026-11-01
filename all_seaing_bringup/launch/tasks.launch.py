@@ -167,6 +167,7 @@ def launch_setup(context, *args, **kwargs):
             {"duplicate_dist": 3.0},
             {"init_gate_dist": 0.5},
             {"gate_dist_back": 2.0},
+            {"inter_buoy_pair_dist": 0.5},
             {"adaptive_distance": 1000.0}, # was 1.0, should never adapt
             {"max_turn_vel": [2.5, 0.0, 0.2]},
             {"turn_pid": [0.4,0.0,0.0]},
@@ -449,8 +450,8 @@ def launch_setup(context, *args, **kwargs):
             {"shape_label_mappings_file": shape_label_mappings},
             # {"shape_label_mappings_file": all_label_mappings},
             {"Kpid": [0.2, 0.01, 0.0]},
-            {"object_delivery_time": 10.0},
-            {"water_delivery_time": 10.0},
+            {"object_delivery_time": 5.0},
+            {"water_delivery_time": 5.0},
         ]
     )
     
@@ -480,9 +481,9 @@ def launch_setup(context, *args, **kwargs):
         # a_star_server,
         controller_server,
         # navigation_server,
-        # navigation_server_tangent,
+        navigation_server_tangent,
         # navigation_server_nomap,
-        navigation_server_continuous,
+        # navigation_server_continuous,
         rviz_waypoint_sender,
         run_tasks,
         task_init_server, 
