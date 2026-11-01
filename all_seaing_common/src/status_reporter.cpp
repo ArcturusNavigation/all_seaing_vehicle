@@ -16,9 +16,13 @@ std::string fmt(double v) {
 }  // namespace
 
 StatusReporter::StatusReporter(rclcpp::Node *node, const std::string &component) {
-    m_enabled = node->declare_parameter<bool>("status_enabled", true);
-    m_period = node->declare_parameter<double>("status_period", 1.0);
-    m_heartbeat = node->declare_parameter<std::string>("status_heartbeat", "updates");
+    // Several reporters can share a node (e.g. one per camera or topic): declare once
+    if (!node->has_parameter("status_enabled")) node->declare_parameter<bool>("status_enabled", true);
+    if (!node->has_parameter("status_period")) node->declare_parameter<double>("status_period", 1.0);
+    if (!node->has_parameter("status_heartbeat")) node->declare_parameter<std::string>("status_heartbeat", "updates");
+    m_enabled = node->get_parameter("status_enabled").as_bool();
+    m_period = node->get_parameter("status_period").as_double();
+    m_heartbeat = node->get_parameter("status_heartbeat").as_string();
     if (!m_enabled) return;
 
     m_hardware_id = node->get_fully_qualified_name();
@@ -26,7 +30,7 @@ StatusReporter::StatusReporter(rclcpp::Node *node, const std::string &component)
     if (!component.empty()) m_name += "/" + component;
     m_clock = node->get_clock();
     m_pub = node->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
-    m_last_publish = std::chrono::steady_clock::now();
+    m_last_publish = m_start = std::chrono::steady_clock::now();
     m_thread = std::thread(&StatusReporter::run, this);
 }
 
@@ -80,6 +84,8 @@ diagnostic_msgs::msg::DiagnosticArray StatusReporter::build() {
     status.name = m_name;
     status.hardware_id = m_hardware_id;
     status.values.push_back(KeyValue().set__key("period_s").set__value(fmt(dt)));
+    status.values.push_back(KeyValue().set__key("uptime_s").set__value(
+        fmt(std::chrono::duration<double>(now - m_start).count())));
     for (const auto &[name, total] : m_counters) {
         uint64_t prev = m_counters_prev.count(name) ? m_counters_prev[name] : 0;
         status.values.push_back(KeyValue().set__key(name).set__value(std::to_string(total)));

@@ -1,0 +1,86 @@
+# How the Health page presents /diagnostics statuses: human-readable names, units and
+# explanations. Statuses/fields without an entry are still shown, with a generated label.
+# Status values follow the StatusReporter conventions (see all_seaing_common/status_reporter.py):
+# counters "<name>" (total) + "<name>/rate" (per second, last period), gauges, timings
+# "<name>/mean|max|count" (last period).
+
+# Topics measured by topic_monitor (status "topic_monitor/<topic>")
+topics:
+  /velodyne_points: {title: LiDAR point cloud, group: Sensors, description: "Raw Velodyne HDL-32E scans"}
+  /zed/zed_node/rgb/image_rect_color: {title: Front camera (ZED), group: Sensors, description: "Rectified color image of the front ZED 2i camera"}
+  /back_left_oak/rgb/image_rect: {title: Back-left camera (OAK), group: Sensors, description: "Rectified image of the back-left OAK camera"}
+  /back_right_oak/rgb/image_rect: {title: Back-right camera (OAK), group: Sensors, description: "Rectified image of the back-right OAK camera"}
+  /mavros/imu/data: {title: IMU (Pixhawk), group: Sensors, description: "Pixhawk IMU with orientation; must be ~30 Hz (MAVROS rate)"}
+  /mavros/local_position/odom: {title: Pixhawk odometry, group: Sensors, description: "Pixhawk EKF3 velocities and local position"}
+  /mavros/global_position/raw/fix: {title: GPS fix, group: Sensors, description: "Raw RTK GPS position from the Pixhawk"}
+  /point_cloud/filtered: {title: Filtered point cloud, group: Perception, description: "LiDAR cloud after range/box filtering, used for LiDAR-camera fusion"}
+  /bounding_boxes: {title: YOLO boxes (front), group: Perception, description: "YOLO detections on the front camera"}
+  /bounding_boxes/back_left: {title: YOLO boxes (back-left), group: Perception, description: "YOLO detections on the back-left camera"}
+  /bounding_boxes/back_right: {title: YOLO boxes (back-right), group: Perception, description: "YOLO detections on the back-right camera"}
+  /obstacle_map/local: {title: Local map, group: Perception, mode_from: {status: multicam_detection_merge, key: mode},
+    description: "Detections of the 3 cameras in the robot frame. In 'individual' mode each message holds one camera's detections (rate ~ sum of the cameras); in 'merged' mode one message per synchronized set of all cameras"}
+  /obstacle_map/global: {title: Global map, group: Perception, description: "Tracked obstacles in the global frame (SLAM / object tracking)"}
+  /odometry/integrated: {title: Integrated odometry, group: Localization & control, description: "Pre-integrated odometry used by SLAM (odometry_publisher)"}
+  /cmd_vel: {title: Velocity command, group: Localization & control, description: "Output of the control mux to the x-drive controller (only when something is driving)"}
+
+# Components (status name prefix -> presentation)
+components:
+  bbox_project_pcloud:
+    kind: funnel
+    title: LiDAR-camera fusion
+    description: "Projects LiDAR points into each YOLO box, clusters them and matches them to the box's color to locate buoys/beacons. Every box either becomes a detection or is rejected for a reason."
+    instances:
+      front: Front camera (ZED)
+      back_left: Back-left camera (OAK)
+      back_right: Back-right camera (OAK)
+    heartbeat: {key: updates, label: Fused frames, description: "image + LiDAR + boxes sets processed (synchronized)"}
+    input: {key: boxes_in, label: YOLO boxes in}
+    output: {key: detections_out, label: Detections out, color: ok}
+    # Where boxes go besides detections (counter key -> presentation)
+    outcomes:
+      rejected/no_points: {label: No LiDAR points in box, color: "#d64545",
+        description: "No LiDAR point projects into the box: object too far/small for the LiDAR, LiDAR-camera calibration or timing off, or the filtered cloud doesn't cover it"}
+      rejected/contours_too_small: {label: Color region too small, color: "#e07b39",
+        description: "Image regions of the label's color cover less than contour_bbox_area_thres of the (padded) box: glare/lighting, HSV ranges, or small distant objects with large padding"}
+      rejected/no_contours: {label: No color region, color: "#c2410c",
+        description: "No pixels of the label's color in the box (HSV ranges vs lighting, e.g. red under glare)"}
+      rejected/no_clusters: {label: No LiDAR cluster, color: "#b7791f",
+        description: "LiDAR points exist but form no cluster of obstacle_size_min points"}
+      rejected/no_contours_no_clusters: {label: No color region and no cluster, color: "#9a3412", description: "Both of the above"}
+      rejected/clusters_too_small: {label: Cluster too small, color: "#a16207",
+        description: "Clusters cover less than cluster_bbox_area_thres of the box"}
+      rejected/overlap: {label: Overlapping box, color: "#7b3fd6",
+        description: "Box mostly covered by a larger box (overlap_filter_thres): duplicate/occluded detection"}
+      rejected/invalid_bbox: {label: Invalid box, color: "#64748b", description: "Box with negative size"}
+      rejected/not_detected_bag: {label: "Not detected (reason not recorded)", color: "#b45309",
+        description: "From a rosbag without fusion logs: the box had LiDAR points but fusion published no detection for it; why (color region, clusters, overlap...) wasn't recorded"}
+      skipped/not_buoy_or_beacon: {label: Not a buoy/beacon, color: "#94a3b8",
+        description: "Banner shapes etc.: not fused here, their points go to RANSAC (labeled_object_point_clouds)"}
+    frame_drops:
+      frames_dropped/tf_missing: {label: Frames dropped (TF missing), description: "No transform between LiDAR, camera and base_link frames yet"}
+      frames_dropped/cv_bridge: {label: Frames dropped (image conversion), description: "Image couldn't be converted (encoding)"}
+    fields:
+      proc_ms: {label: Processing time, unit: ms, description: "Time per fused frame in bbox_project_pcloud"}
+      input_age_ms: {label: Input latency, unit: ms, description: "Clock now minus the LiDAR scan stamp when processed (pipeline delay; huge values mean clock mismatch)"}
+
+  multicam_detection_merge:
+    kind: merge
+    title: Local map (multi-camera merge)
+    description: "Combines the three cameras' fused detections into the local map (/obstacle_map/local) and removes duplicates seen by two cameras. 'individual' mode republishes each camera's detections as they arrive; 'merged' mode waits for a synchronized set from all cameras (camera messages without a match are dropped)."
+    cameras:
+      front: Front camera (ZED)
+      back_left: Back-left camera (OAK)
+      back_right: Back-right camera (OAK)
+
+  topic_monitor:
+    kind: topics
+
+# Generic field labels (any component)
+fields:
+  period_s: {label: Report period, unit: s, hidden: true}
+  uptime_s: {label: Running for, unit: s, hidden: true}
+  updates: {label: Updates}
+  messages: {label: Messages}
+  stamp_age_ms: {label: Stamp age, unit: ms}
+  expected_min_rate: {label: Expected rate, unit: Hz}
+  type: {label: Message type}

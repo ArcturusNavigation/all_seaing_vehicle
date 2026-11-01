@@ -8,9 +8,15 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     //essential ones
     this->declare_parameter<double>("bbox_object_margin", 0.0);
     m_bbox_margin = this->get_parameter("bbox_object_margin").as_double();
+    // padding proportional to the box (e.g. 0.1 = 10% of its width on each side, 10% of its height on top/bottom)
+    m_bbox_margin_ratio = this->declare_parameter<double>("bbox_object_margin_ratio", 0.0);
 
     this->declare_parameter<double>("contour_bbox_area_thres", 0.5);
     m_contour_bbox_area_thres = this->get_parameter("contour_bbox_area_thres").as_double();
+    // log each buoy box's color contours and projected LiDAR points (box_rejected/box_detected events)
+    m_log_geometry = this->declare_parameter<bool>("log_geometry", true);
+    m_log_geometry_max_points = this->declare_parameter<int>("log_geometry_max_points", 200);
+    m_fused_image_jpeg_quality = this->declare_parameter<int>("fused_image_jpeg_quality", 80);
 
     this->declare_parameter<double>("cluster_bbox_area_thres", 0.35);
     m_cluster_bbox_area_thres = this->get_parameter("cluster_bbox_area_thres").as_double();
@@ -110,6 +116,10 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
     m_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(m_camera_name!=""?std::string("object_point_clouds_viz/")+m_camera_name:"object_point_clouds_viz", 5);
     m_detection_pub = this->create_publisher<all_seaing_interfaces::msg::ObstacleMap>(m_camera_name!=""?std::string("detections/")+m_camera_name:"detections", 5);
     m_refined_object_pcl_viz_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>(m_camera_name!=""?std::string("refined_object_point_clouds_viz/")+m_camera_name:"refined_object_point_clouds_viz", 5);
+    // fused_image[/<camera>]/compressed: the exact image fused, same header (stamp ties it to this frame's
+    // /run_log events and outputs); published for frames with YOLO boxes, encoded only while subscribed
+    m_fused_image_pub = this->create_publisher<sensor_msgs::msg::CompressedImage>(
+        (m_camera_name!=""?std::string("fused_image/")+m_camera_name:std::string("fused_image")) + "/compressed", 10);
 
     // get color label mappings from yaml
     std::ifstream label_yaml(color_label_mappings_file);
@@ -171,7 +181,9 @@ BBoxProjectPCloud::BBoxProjectPCloud() : Node("bbox_project_pcloud"){
 
     // Observability: every bounding box either becomes a detection or is counted (status) and
     // logged (run log) with the reason it was rejected, see reject_box() in bb_pcl_project
-    m_run_log = std::make_unique<all_seaing_common::RunLogger>(this);
+    // one log file per camera instance (all instances share the node name)
+    m_run_log = std::make_unique<all_seaing_common::RunLogger>(
+        this, m_camera_name.empty() ? "" : std::string(this->get_name()) + "." + m_camera_name);
     m_status = std::make_unique<all_seaing_common::StatusReporter>(this, m_camera_name);
 }
 
@@ -202,6 +214,9 @@ cv::Vec3b int_to_bgr(double i, double k){
     return bgrimg.at<cv::Vec3b>(0,0);
 }
 
+// ROS stamp -> seconds, for log fields
+static double stamp_seconds(const builtin_interfaces::msg::Time &t) { return t.sec + t.nanosec * 1e-9; }
+
 double overlap(all_seaing_interfaces::msg::LabeledBoundingBox2D bbox1,all_seaing_interfaces::msg::LabeledBoundingBox2D bbox2){
     double min_x = std::max(bbox1.min_x, bbox2.min_x);
     double min_y = std::max(bbox1.min_y, bbox2.min_y);
@@ -229,6 +244,9 @@ void BBoxProjectPCloud::bb_pcl_project(
     m_status->count("boxes_in", in_bbox_msg->boxes.size());
     m_status->gauge("input_age_ms", (this->get_clock()->now() - rclcpp::Time(in_cloud_msg->header.stamp)).seconds() * 1e3);
     int n_detections = 0;
+    // stamps tie every event of this frame to its camera image / LiDAR scan (snapshot tools, sync checks)
+    const double image_stamp = stamp_seconds(in_img_msg->header.stamp);
+    const double cloud_stamp = stamp_seconds(in_cloud_msg->header.stamp);
     auto label_name = [this](int label) -> std::string {
         if (label_color_map.count(label)) return label_color_map[label];
         return beacon_labels.count(label) ? "beacon" : "unknown";
@@ -237,12 +255,66 @@ void BBoxProjectPCloud::bb_pcl_project(
                           all_seaing_common::LogFields extra = {}) {
         m_status->count("rejected/" + reason);
         all_seaing_common::LogFields fields = {
-            {"camera", m_camera_name}, {"label", static_cast<int64_t>(box.label)}, {"color", label_name(box.label)},
+            {"camera", m_camera_name}, {"image_stamp", image_stamp}, {"label", static_cast<int64_t>(box.label)},
+            {"color", label_name(box.label)},
             {"reason", reason},
             {"bbox", std::vector<double>{static_cast<double>(box.min_x), static_cast<double>(box.min_y),
                                          static_cast<double>(box.max_x), static_cast<double>(box.max_y)}}};
         fields.insert(fields.end(), extra.begin(), extra.end());
         m_run_log->info("box_rejected", std::move(fields));
+    };
+    // Geometry of a buoy box for the control panel's frame viewer (if log_geometry):
+    //   contours:            color-segmentation polygons [x0, y0, x1, y1, ...] (image px, simplified to 1 px)
+    //   contour_area_ratios: contour area / box area of each (kept if > contour_bbox_area_thres)
+    //   cluster_area_ratios: projected bounding-box area / box area of each LiDAR cluster
+    //                        (kept if > cluster_bbox_area_thres)
+    //   points:              the box's LiDAR points [u, v, cluster index or -1] (image px), evenly
+    //                        subsampled to at most log_geometry_max_points
+    auto geometry_fields = [&](const all_seaing_interfaces::msg::LabeledBoundingBox2D &box,
+                               const pcl::PointCloud<pcl::PointXYZHSV>::Ptr &cloud,
+                               const std::vector<std::vector<cv::Point>> &ctrs,
+                               const std::vector<pcl::PointIndices> &clusters) -> all_seaing_common::LogFields {
+        if (!m_log_geometry) return {};
+        const double box_area = std::max(1.0, static_cast<double>(area(box)));
+        auto r3 = [](double v) { return std::round(v * 1000.0) / 1000.0; };
+        std::vector<std::vector<double>> polys;
+        std::vector<double> contour_ratios, cluster_ratios;
+        for (const auto &c : ctrs) {
+            std::vector<cv::Point> approx;
+            cv::approxPolyDP(c, approx, 1.0, true);
+            std::vector<double> poly;
+            for (const auto &pt : approx) {
+                poly.push_back(pt.x);
+                poly.push_back(pt.y);
+            }
+            polys.push_back(std::move(poly));
+            contour_ratios.push_back(r3(cv::contourArea(c) / box_area));
+        }
+        std::vector<int> cluster_of(cloud->points.size(), -1);
+        std::vector<cv::Point2d> px(cloud->points.size());
+        for (size_t i = 0; i < cloud->points.size(); i++)
+            px[i] = all_seaing_perception::projectPCLPtToPixel(m_cam_model, cloud->points[i], m_is_sim);
+        for (size_t k = 0; k < clusters.size(); k++) {
+            double min_x = 1e9, min_y = 1e9, max_x = -1e9, max_y = -1e9;
+            for (pcl::index_t ind : clusters[k].indices) {
+                cluster_of[ind] = static_cast<int>(k);
+                min_x = std::min(min_x, px[ind].x); max_x = std::max(max_x, px[ind].x);
+                min_y = std::min(min_y, px[ind].y); max_y = std::max(max_y, px[ind].y);
+            }
+            cluster_ratios.push_back(clusters[k].indices.empty() ? 0.0 : r3((max_x - min_x) * (max_y - min_y) / box_area));
+        }
+        const size_t n = px.size(), cap = std::max(1, m_log_geometry_max_points);
+        const size_t step = n > cap ? (n + cap - 1) / cap : 1;
+        std::vector<std::vector<double>> pts;
+        for (size_t i = 0; i < n; i += step)
+            pts.push_back({std::round(px[i].x * 10.0) / 10.0, std::round(px[i].y * 10.0) / 10.0,
+                           static_cast<double>(cluster_of[i])});
+        return {{"contours", polys}, {"contour_area_ratios", contour_ratios},
+                {"cluster_area_ratios", cluster_ratios}, {"points", pts}};
+    };
+    auto with_fields = [](all_seaing_common::LogFields a, const all_seaing_common::LogFields &b) {
+        a.insert(a.end(), b.begin(), b.end());
+        return a;
     };
 
     // LIDAR -> Camera transform (useful for projecting the camera bboxes onto the point cloud, have the origin on the camera frame)
@@ -349,7 +421,10 @@ void BBoxProjectPCloud::bb_pcl_project(
         labeled_pcl.camera_name = m_camera_name;
         obj_cloud_ptr->header = in_cloud_tf_ptr->header;
         // Add padding to bbox
-        all_seaing_perception::addBBoxPadding(bbox, m_bbox_margin, cv_hsv.rows, cv_hsv.cols);
+        all_seaing_perception::addBBoxPadding(bbox,
+            static_cast<int>(std::max(m_bbox_margin, m_bbox_margin_ratio * (bbox.max_x - bbox.min_x))),
+            static_cast<int>(std::max(m_bbox_margin, m_bbox_margin_ratio * (bbox.max_y - bbox.min_y))),
+            cv_hsv.rows, cv_hsv.cols);
         all_seaing_perception::PCLInBBoxHSV(in_cloud_tf_ptr, obj_cloud_ptr, bbox, cv_hsv, m_cam_model, m_is_sim);
         if (obj_cloud_ptr->points.empty()){
             reject_box(bbox, "no_points");
@@ -439,7 +514,8 @@ void BBoxProjectPCloud::bb_pcl_project(
             if(contours.empty() || clusters_indices.empty()){
                 // no image segment of the label's color (e.g. glare) and/or no LiDAR cluster
                 reject_box(bbox, contours.empty() ? (clusters_indices.empty() ? "no_contours_no_clusters" : "no_contours") : "no_clusters",
-                    {{"n_points", pcloud_ptr->points.size()}, {"n_contours", contours.size()}, {"n_clusters", clusters_indices.size()}});
+                    with_fields({{"n_points", pcloud_ptr->points.size()}, {"n_contours", contours.size()}, {"n_clusters", clusters_indices.size()}},
+                                geometry_fields(bbox, pcloud_ptr, contours, clusters_indices)));
                 continue;
             }
 
@@ -469,8 +545,9 @@ void BBoxProjectPCloud::bb_pcl_project(
             if(contours_filtered.empty() || clusters_indices_filtered.empty()){
                 // segments/clusters exist but all cover too little of the box (area thresholds)
                 reject_box(bbox, contours_filtered.empty() ? "contours_too_small" : "clusters_too_small",
-                    {{"n_points", pcloud_ptr->points.size()}, {"n_contours", contours.size()}, {"n_clusters", clusters_indices.size()},
-                     {"contour_area_thres", m_contour_bbox_area_thres}, {"cluster_area_thres", m_cluster_bbox_area_thres}});
+                    with_fields({{"n_points", pcloud_ptr->points.size()}, {"n_contours", contours.size()}, {"n_clusters", clusters_indices.size()},
+                                 {"contour_area_thres", m_contour_bbox_area_thres}, {"cluster_area_thres", m_cluster_bbox_area_thres}},
+                                geometry_fields(bbox, pcloud_ptr, contours, clusters_indices)));
                 continue;
             }
             
@@ -599,7 +676,7 @@ void BBoxProjectPCloud::bb_pcl_project(
                     // RCLCPP_INFO(this->get_logger(), "pair cost: %ld", pair_cost);
                     if (min_pair_cost == -1 || pair_cost < min_pair_cost){
                         min_pair_cost = pair_cost;
-                        // opt_contour_id = contour;
+                        opt_contour_id = contour;  // logged with box_detected (the cost doesn't use it further)
                         opt_cluster_id = cluster;
                     }
                 }
@@ -626,6 +703,20 @@ void BBoxProjectPCloud::bb_pcl_project(
 
             refined_objects_msg.obstacles.push_back(obstacle_msg);
             n_detections++;
+            // selected contour/cluster as indices into the logged (unfiltered) contours/clusters
+            int64_t sel_contour = -1, sel_cluster = -1;
+            for (size_t k = 0; k < contours.size(); k++)
+                if (opt_contour_id >= 0 && contours[k] == contours_filtered[opt_contour_id]) { sel_contour = k; break; }
+            for (size_t k = 0; k < clusters_indices.size(); k++)
+                if (clusters_indices[k].indices == clusters_indices_filtered[opt_cluster_id].indices) { sel_cluster = k; break; }
+            m_run_log->debug("box_detected", with_fields({{"camera", m_camera_name}, {"image_stamp", image_stamp},
+                {"label", static_cast<int64_t>(bbox.label)}, {"color", label_name(bbox.label)},
+                {"bbox", std::vector<double>{static_cast<double>(bbox.min_x), static_cast<double>(bbox.min_y),
+                                             static_cast<double>(bbox.max_x), static_cast<double>(bbox.max_y)}},
+                {"n_points", refined_cloud_ptr->points.size()},
+                {"position", std::vector<double>{obstacle_msg.local_point.point.x, obstacle_msg.local_point.point.y}},
+                {"selected_contour", sel_contour}, {"selected_cluster", sel_cluster}},
+                geometry_fields(bbox, pcloud_ptr, contours, clusters_indices)));
 
             *all_obj_refined_pcls_ptr += *refined_cloud_ptr;
         }else if (beacon_labels.count(bbox.label)){
@@ -727,18 +818,37 @@ void BBoxProjectPCloud::bb_pcl_project(
 
             refined_objects_msg.obstacles.push_back(obstacle_msg);
             n_detections++;
+            m_run_log->debug("box_detected", {{"camera", m_camera_name}, {"image_stamp", image_stamp},
+                {"label", static_cast<int64_t>(bbox.label)}, {"color", label_name(bbox.label)},
+                {"bbox", std::vector<double>{static_cast<double>(bbox.min_x), static_cast<double>(bbox.min_y),
+                                             static_cast<double>(bbox.max_x), static_cast<double>(bbox.max_y)}},
+                {"n_points", refined_cloud_ptr->points.size()},
+                {"position", std::vector<double>{obstacle_msg.local_point.point.x, obstacle_msg.local_point.point.y}}});
 
             *all_obj_refined_pcls_ptr += *refined_cloud_ptr;
         }else{
             // not a buoy color or beacon (e.g. banner shapes): not a detection here, but its
             // points were already published on labeled_object_point_clouds (for RANSAC)
             m_status->count("skipped/not_buoy_or_beacon");
+            m_run_log->debug("box_skipped", {{"camera", m_camera_name}, {"image_stamp", image_stamp}, {"label", static_cast<int64_t>(bbox.label)},
+                {"color", label_name(bbox.label)}, {"reason", "not_buoy_or_beacon"},
+                {"bbox", std::vector<double>{static_cast<double>(bbox.min_x), static_cast<double>(bbox.min_y),
+                                             static_cast<double>(bbox.max_x), static_cast<double>(bbox.max_y)}}});
         }
     }
 
     m_detection_pub->publish(refined_objects_msg);
     m_status->count("detections_out", n_detections);
-    m_run_log->debug("frame", {{"camera", m_camera_name}, {"n_boxes", in_bbox_msg->boxes.size()},
+    if (!in_bbox_msg->boxes.empty() && m_fused_image_pub->get_subscription_count() > 0) {
+        sensor_msgs::msg::CompressedImage jpg;
+        jpg.header = in_img_msg->header;
+        jpg.format = "jpeg";
+        cv::imencode(".jpg", cv_ptr->image, jpg.data, {cv::IMWRITE_JPEG_QUALITY, m_fused_image_jpeg_quality});
+        m_fused_image_pub->publish(jpg);
+        m_status->count("fused_images_out");
+    }
+    m_run_log->debug("frame", {{"camera", m_camera_name}, {"image_stamp", image_stamp}, {"cloud_stamp", cloud_stamp},
+        {"n_boxes", in_bbox_msg->boxes.size()},
         {"n_detections", n_detections}, {"n_cloud_points", in_cloud_ptr->points.size()},
         {"labels", [&]{ std::vector<double> l; for (auto &o : refined_objects_msg.obstacles) l.push_back(o.label); return l; }()}});
     

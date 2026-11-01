@@ -13,7 +13,7 @@
 //   counters: "<name>" = total since start, "<name>/rate" = per second over the last period
 //   gauges:   "<name>" = latest value
 //   timings:  "<name>/mean", "<name>/max", "<name>/count" over the last period
-//   "period_s", plus a level (OK / WARN / ERROR / STALE) and a message
+//   "period_s", "uptime_s" (since the reporter started: total / uptime_s = average rate), plus a level (OK / WARN / ERROR / STALE) and a message
 // The level is STALE when the heartbeat counter (default "updates") didn't change during a
 // period (the pipeline isn't running), WARN/ERROR when set with set_level(), else OK.
 //
@@ -101,7 +101,7 @@ private:
     std::map<std::string, Timing> m_timings;
     uint8_t m_level{diagnostic_msgs::msg::DiagnosticStatus::OK};
     std::string m_message{"OK"};
-    std::chrono::steady_clock::time_point m_last_publish;
+    std::chrono::steady_clock::time_point m_last_publish, m_start;
 
     std::mutex m_stop_mutex;
     std::condition_variable m_stop_cv;

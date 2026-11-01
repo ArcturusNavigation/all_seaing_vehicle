@@ -16,6 +16,9 @@ install(PROGRAMS
     ${PROJECT_NAME}/filter_tf.py
     ${PROJECT_NAME}/rosbag_pcl_to_numpy.py
     ${PROJECT_NAME}/rosbag_decompress_images.py
+    ${PROJECT_NAME}/rosbag_shift_time.py
+    ${PROJECT_NAME}/rosbag_light_copy.py
+    ${PROJECT_NAME}/topic_monitor.py
     ${PROJECT_NAME}/run_log_analysis.py
     scripts/kill_ros_nodes.sh
     DESTINATION lib/${PROJECT_NAME}

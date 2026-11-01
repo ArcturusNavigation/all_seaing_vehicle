@@ -74,7 +74,7 @@ Frames follow REP-105 loosely. `odometry_publisher.py` turns GPS (UTM, using the
 | Package | Contents |
 |---|---|
 | `all_seaing_interfaces` | msgs (`ObstacleMap`/`Obstacle`, `ControlOption`, `LabeledBoundingBox2D*`, `LabeledObject{PointCloud,Plane}*`, `ContinuousWaypoint`, `WaypointStatus`, `Heartbeat`, …), srvs (`PlanPath`, `RestartSLAM`, `CommandServo/Adj/Fan`, `GetEstopStatus`, …), actions (`Waypoint`, `FollowPath`, `Task`, `Search`) |
-| `all_seaing_common` | `ActionServerBase` (TF pose, one-process-at-a-time semaphore with `start_process`/`end_process`/`should_abort`, marker cleanup, protobuf `report_data` for the competition reporting server); `TaskServerBase` (task lifecycle: `should_accept_task` / `init_setup` / `control_loop` / `mark_successful`, waypoint/follow_path clients, buoy-gate helpers, shared task params); `report.proto`/`report_pb2.py`; `qos.py` |
+| `all_seaing_common` | observability: `RunLogger` (per-run async JSON-lines logs, #501) and `StatusReporter` (live `/diagnostics`, #480), Python + C++ (`all_seaing_observability` library); `ActionServerBase` (TF pose, one-process-at-a-time semaphore with `start_process`/`end_process`/`should_abort`, marker cleanup, protobuf `report_data` for the competition reporting server); `TaskServerBase` (task lifecycle: `should_accept_task` / `init_setup` / `control_loop` / `mark_successful`, waypoint/follow_path clients, buoy-gate helpers, shared task params); `report.proto`/`report_pb2.py`; `qos.py` |
 | `all_seaing_autonomy` | task servers (`roboboat/`), `buoy_utils.py` (buoy pairing, splitting red/green, gate poses), `geometry_utils.py` |
 | `all_seaing_controller` | `controller_server.py`, `control_mux.py`, `xdrive_controller.py`, `pid_controller.py` (`PIDController`, `CircularPID`), `potential_field.py` |
 | `all_seaing_navigation` | see Navigation above; `planner_executor.py`/`planner_base.py`, `rviz_waypoint_sender.py` |
@@ -83,7 +83,16 @@ Frames follow REP-105 loosely. `odometry_publisher.py` turns GPS (UTM, using the
 | `all_seaing_bringup` | top-level launch files (`sim`, `vehicle`, `perception`, `tasks`, `shoreside`, `*_rosbag`, `amcl`, `cartographer`); `config/{perception,localization,slam,course}`; maps and satellite tiles for RViz |
 | `all_seaing_description` | URDFs (`xdrive_wamv` is the current one for sim, `simple_wamv`), static transforms |
 | `all_seaing_rviz_plugins` | RViz display for `ObstacleMap` |
-| `all_seaing_utility` | rosbag → image/numpy, TF filtering, tile tools |
+| `all_seaing_utility` | rosbag tools (`rosbag_decompress_images.py`, `rosbag_shift_time.py`, → image/numpy), `run_log_analysis.py` + `run_log_analyzers/` (per-run log analysis, #501), `topic_monitor.py` (topic rates & stamp ages → `/diagnostics`), `scripts/kill_ros_nodes.sh` (clean staged shutdown + log recovery), TF filtering, tile tools |
+| `all_seaing_control_panel` | web app **on the laptop** (`ros2 run all_seaing_control_panel control_panel.py`, http://localhost:8080, #327): run anything from `config/registry.yaml` on the Jetson (SSH) or locally, live `/diagnostics`, pre-run checks (adapt to live / rosbag replay / sim), run-log analysis & plots, parameters (set live, save, write into launch files). Also serves the offline map tiles for Foxglove |
+| `all_seaing_foxglove` | not a ROS package (`COLCON_IGNORE`): Foxglove extension (TypeScript) converting our custom messages for Foxglove's panels (replaces `all_seaing_rviz_plugins`), plus Foxglove layouts generated from the RViz configs (`layouts/rviz_to_foxglove.py`) |
+
+## Observability, replay & tools
+- Instrument new or changed nodes: `StatusReporter` for live counters/rates/timings, `RunLogger` for per-event decisions with reasons and data. Every path where data is dropped or rejected should record why. See the wiki pages Observability, Control Panel and Foxglove.
+- Debug perception and performance on the **Jetson** with `ros2 launch all_seaing_perception perception_raw_rosbag.launch.py bag:=<bag>`. It plays raw sensors only and recomputes everything live; camera topics must be uncompressed (`rosbag_decompress_images.py`), and re-recorded bags need `rosbag_shift_time.py`. Bags live in `/media/arcturus/drive/rosbags/` on the Jetson; run logs in `~/arcturus_logs` (symlink to the NVMe).
+- Task-logic logging and observability are tested in **sim**.
+- Stop everything with `kill_ros_nodes.sh`, not by killing processes by hand.
+- Visualize with Foxglove (`ws://jetson:8765`), not RViz on the laptop, which slows the boat down.
 
 ## Conventions
 - **Every package is `ament_cmake`, including the Python ones.** A new Python node needs `#!/usr/bin/env python3`, `chmod +x`, and an entry in that package's `CMakeLists.txt` `install(PROGRAMS …)`. Executables keep the `.py` suffix (`ros2 run pkg node.py`). Dependencies go in `package.xml` (the CMake files use `ament_cmake_auto`). Rebuild after adding files or changing C++.

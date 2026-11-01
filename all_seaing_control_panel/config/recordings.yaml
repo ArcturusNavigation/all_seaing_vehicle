@@ -1,0 +1,67 @@
+# Laptop-side recordings (Recordings tab, all_seaing_control_panel/recorder.py): what is recorded
+# through foxglove_bridge into MCAP, and where.
+buffer_dir: ~/arcturus_recordings/buffer   # rolling segments
+saved_dir: ~/arcturus_recordings/saved     # saved ranges (kept until deleted)
+segment_s: 60                              # one MCAP file per minute
+buffer_s: 1800                             # keep the last 30 min
+
+# Written as received
+topics:
+  - /run_log
+  - /diagnostics
+  - /tf
+  - /bounding_boxes
+  - /bounding_boxes/back_left
+  - /bounding_boxes/back_right
+  - /fused_image/front/compressed       # JPEG of every image fusion processed with YOLO boxes (bbox_project_pcloud)
+  - /fused_image/back_left/compressed
+  - /fused_image/back_right/compressed
+  - /fused_image/compressed             # sim: one fusion node without camera_name
+  - /labeled_object_point_clouds        # sim
+  - /refined_object_point_clouds_viz    # sim
+  - /obstacle_map/local
+  - /obstacle_map/global
+  - /odometry/integrated
+  - /odometry/gps
+  - /mavros/global_position/raw/fix
+  - /cmd_vel
+# Also re-written at the start of every file (self-contained recordings)
+latched_topics:
+  - /tf_static
+  - /zed/zed_node/rgb/camera_info
+  - /back_left_oak/rgb/camera_info
+  - /back_right_oak/rgb/camera_info
+  - /wamv/sensors/cameras/front_left_camera_sensor/camera_info   # sim
+# Full filtered LiDAR scan, written only for the scans fused with images that had YOLO boxes
+# (from /run_log frame events): the same frames as the image keyframes
+keyframe_cloud_topic: /point_cloud/filtered
+# recorded fused images per camera at most this rate [Hz] (the live view isn't limited); scans follow them
+keyframe_max_rate: 5.0
+# Recordings without fusion logs (e.g. imported rosbags): scan shown with a keyframe = the nearest
+# one on the first of these topics that has one (both halves of a split LiDAR revolution)
+cloud_topics: [/point_cloud/filtered, /velodyne_points]
+
+# Cameras in the frame viewer
+# per camera (log_camera: its name in fusion's run log, default the key): keyframes (JPEG topics, first = fusion's fused images; others = older recordings and
+# imported rosbags), boxes (YOLO), camera_info, and fusion's own outputs
+# (detections, object_clouds = each box's points, selected_clouds = chosen clusters), used for recordings
+# without fusion logs (/run_log), e.g. imported rosbags
+cameras:
+  front: {title: Front camera (ZED), keyframes: [/fused_image/front/compressed, /zed/zed_node/rgb/image_rect_color/keyframes/compressed],
+          boxes: /bounding_boxes,
+         detections: /detections/front, object_clouds: /labeled_object_point_clouds/front,
+         selected_clouds: /refined_object_point_clouds_viz/front, camera_info: /zed/zed_node/rgb/camera_info}
+  back_left: {title: Back-left camera (OAK), keyframes: [/fused_image/back_left/compressed, /back_left_oak/rgb/image_rect/keyframes/compressed],
+              boxes: /bounding_boxes/back_left,
+             detections: /detections/back_left, object_clouds: /labeled_object_point_clouds/back_left,
+             selected_clouds: /refined_object_point_clouds_viz/back_left, camera_info: /back_left_oak/rgb/camera_info}
+  back_right: {title: Back-right camera (OAK), keyframes: [/fused_image/back_right/compressed, /back_right_oak/rgb/image_rect/keyframes/compressed],
+               boxes: /bounding_boxes/back_right,
+              detections: /detections/back_right, object_clouds: /labeled_object_point_clouds/back_right,
+              selected_clouds: /refined_object_point_clouds_viz/back_right, camera_info: /back_right_oak/rgb/camera_info}
+  # VRX sim (sim.launch.py): one bbox_project_pcloud without camera_name (unsuffixed topics, run-log camera "")
+  # camera_convention gazebo: the camera frame is x forward (not optical z forward), as fusion's is_sim
+  sim_front: {title: Front camera (sim), keyframes: [/fused_image/compressed], log_camera: "", camera_convention: gazebo,
+              boxes: /bounding_boxes, detections: /obstacle_map/local,
+              object_clouds: /labeled_object_point_clouds, selected_clouds: /refined_object_point_clouds_viz,
+              camera_info: /wamv/sensors/cameras/front_left_camera_sensor/camera_info}

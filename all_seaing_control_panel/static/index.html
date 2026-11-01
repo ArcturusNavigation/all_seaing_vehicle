@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arcturus Control Panel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">Arcturus Control Panel</div>
+    <nav id="tabs">
+      <button data-tab="run" class="active">Run</button>
+      <button data-tab="health">Health</button>
+      <button data-tab="checks">Checks</button>
+      <button data-tab="runs">Runs &amp; analysis</button>
+      <button data-tab="recordings">Recordings</button>
+      <button data-tab="params">Parameters</button>
+    </nav>
+    <div class="target">
+      <span id="target-dot" class="dot"></span>
+      <select id="target-select" title="Where commands run"></select>
+      <select id="mode-select" title="Run mode: adapts checks (Auto detects a rosbag player / simulation from the ROS graph)">
+        <option value="auto">Auto</option><option value="live">Live boat</option>
+        <option value="replay">Rosbag replay</option><option value="sim">Simulation</option></select>
+      <span id="mode-detected" class="badge"></span>
+      <span id="links"></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- RUN ------------------------------------------------------------------>
+    <section id="tab-run" class="tab active">
+      <div class="split">
+        <div class="col-left">
+          <input id="action-filter" type="search" placeholder="Filter actions...">
+          <div id="actions"></div>
+        </div>
+        <div class="col-right">
+          <div id="action-form" class="card hidden"></div>
+          <div class="card" id="rosbag-card">
+            <div class="card-title">Rosbag recording <span class="muted" id="rosbag-free"></span>
+              <button id="rosbag-new" class="small">+ new preset</button></div>
+            <div id="rosbag-editor" class="hidden"></div>
+            <div id="rosbag-recordings"></div>
+            <details><summary class="muted">Presets (from all_seaing_bringup/rosbag_record/ scripts + your own)</summary>
+              <div id="rosbag-presets"></div></details>
+          </div>
+          <div class="card">
+            <div class="card-title">Processes <button id="refresh-procs" class="small">refresh</button></div>
+            <table id="procs"><thead><tr><th>Started</th><th>Process</th><th>Target</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+          <div id="log-card" class="card hidden">
+            <div class="card-title"><span id="log-title"></span>
+              <label class="small"><input type="checkbox" id="log-follow" checked> follow</label></div>
+            <pre id="log"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HEALTH --------------------------------------------------------------->
+    <section id="tab-health" class="tab">
+      <div class="toolbar">
+        <input id="diag-filter" type="search" placeholder="Filter components...">
+        <label><input type="checkbox" id="diag-problems"> problems only</label>
+        <span class="muted">Live /diagnostics (1 Hz). Sensor/topic rates need the topic monitor (Run &gt; Monitoring).</span>
+      </div>
+      <div id="mode-banner" class="card hidden"></div>
+      <div id="diag-summary"></div>
+      <div id="diagnostics"></div>
+      <div class="muted section-note" style="margin-top:16px">Per-event detail (live or past runs: per buoy color, box
+        coordinates, decisions, timelines) is in <a href="#runs" onclick="document.querySelector('#tabs button[data-tab=runs]').click()">Runs &amp; analysis</a>.</div>
+    </section>
+
+    <!-- CHECKS --------------------------------------------------------------->
+    <section id="tab-checks" class="tab">
+      <div class="toolbar"><button id="run-all-checks">Run all checks</button>
+        <label><input type="checkbox" id="checks-auto"> run automatically every</label>
+        <input id="checks-interval" type="number" min="5" value="15" style="width:70px"> s
+        <span id="checks-last" class="muted"></span>
+        <span class="muted">Checks run against the selected target, in parallel.</span></div>
+      <div id="checks"></div>
+    </section>
+
+    <!-- RUNS & ANALYSIS ------------------------------------------------------>
+    <section id="tab-runs" class="tab">
+      <div class="split">
+        <div class="col-left">
+          <div class="card-title">Runs <button id="refresh-runs" class="small">refresh</button></div>
+          <div id="runs"></div>
+        </div>
+        <div class="col-right">
+          <div id="run-detail" class="hidden">
+            <div class="domain-bar" title="Which part of the stack to analyze">
+              <button data-domain="lidar">LiDAR / Camera</button><button data-domain="slam">SLAM</button><button data-domain="tasks">Tasks</button></div>
+            <div class="card">
+              <div class="card-title"><span id="run-name"></span> <span id="live-status"></span></div>
+              <div class="toolbar">
+                <label>Analyzer <select id="analyzer-select"></select></label>
+                <label class="live-only">Window <select id="live-window"><option>10</option><option selected>30</option>
+                  <option>60</option><option>120</option><option>300</option></select> s</label>
+                <label class="live-only"><input type="checkbox" id="live-auto" checked> auto-refresh</label>
+                <button id="run-analyzer">Refresh</button>
+                <span class="muted" id="report-info"></span>
+              </div>
+              <div id="report"></div>
+              <div id="report-plots"></div>
+              <details id="report-text-box"><summary class="muted">Text output</summary><pre id="report-text"></pre></details>
+            </div>
+            <div class="card map-only">
+              <div class="card-title">Map <span class="muted" id="run-map-info"></span></div>
+              <div id="run-map"></div>
+            </div>
+            <div class="card live-only">
+              <div class="card-title">Live log</div>
+              <div class="toolbar">
+                <select id="feed-level"><option value="">all levels</option><option>INFO</option><option selected>WARN</option><option>ERROR</option></select>
+                <input id="feed-node" placeholder="node"><input id="feed-event" placeholder="event"><input id="feed-grep" placeholder="text">
+                <label><input type="checkbox" id="feed-pause"> pause</label>
+              </div>
+              <div id="live-feed" class="feed"></div>
+            </div>
+            <div class="card past-only">
+              <div class="card-title">Command-line analysis</div>
+              <div class="toolbar">
+                <button id="run-stats">Per-node stats</button>
+                <input id="analysis-extra" placeholder="run_log_analysis.py args, e.g. --timeline --level WARN" style="min-width:340px">
+                <button id="run-extra">Run</button>
+              </div>
+              <pre id="analysis-output"></pre>
+            </div>
+            <div class="card past-only">
+              <div class="card-title">Custom plots</div>
+              <div class="toolbar">
+                <button id="plot-rates">Event rates</button>
+                <span class="sep"></span>
+                <select id="plot-node"></select><select id="plot-event"></select>
+                <select id="plot-field" multiple size="1" title="numeric fields (ctrl+click for several)"></select>
+                <button id="plot-field-btn">Field vs time</button>
+                <select id="plot-state"></select><button id="plot-timeline-btn">State timeline</button>
+                <span class="sep"></span>
+                <select id="plot-x"></select><select id="plot-y"></select><button id="plot-xy-btn">X/Y</button>
+              </div>
+              <div id="plots"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PARAMETERS ----------------------------------------------------------->
+    <!-- RECORDINGS --------------------------------------------------------->
+    <section id="tab-recordings" class="tab">
+      <div class="split">
+        <div class="col-left">
+          <div class="card">
+            <div class="card-title">Recorder <span id="rec-badge" class="badge"></span></div>
+            <div class="muted">Records through the target's foxglove_bridge into a rolling MCAP buffer on this laptop
+              (light topics, JPEG keyframes, full LiDAR only for fused keyframes).</div>
+            <div class="toolbar" style="margin-top:8px"><button id="rec-start">Start</button><button id="rec-stop">Stop</button></div>
+            <div id="rec-status" class="muted"></div>
+          </div>
+          <div class="card-title">Sources <button id="rec-refresh" class="small">refresh</button></div>
+          <div id="rec-sources"></div>
+          <div class="card" style="margin-top:12px">
+            <div class="card-title">Rosbags on the target <button id="bags-refresh" class="small">refresh</button></div>
+            <div class="muted">View a recorded bag here (no <code>ros2 bag play</code>): a light copy is made on the target
+              (JPEG images, capped image/LiDAR rates), downloaded and saved as a recording.</div>
+            <div class="toolbar" style="margin:8px 0">
+              <label>images <input id="bag-image-rate" type="number" value="5" min="0.5" step="0.5" style="width:56px"> /s</label>
+              <label>LiDAR <input id="bag-cloud-rate" type="number" value="5" min="0.5" step="0.5" style="width:56px"> /s</label></div>
+            <div id="bag-imports"></div>
+            <div id="bags"></div>
+          </div>
+        </div>
+        <div class="col-right">
+          <div id="rec-detail" class="hidden">
+            <div class="domain-bar" title="Which part of the stack to analyze">
+              <button data-domain="lidar">LiDAR / Camera</button><button data-domain="slam">SLAM</button><button data-domain="tasks">Tasks</button></div>
+            <div class="card" id="rec-timeline-card">
+              <div class="card-title"><span id="rec-name"></span></div>
+              <div class="muted">Fusion outcomes and keyframes over time. Drag to select a range; click to jump there.</div>
+              <div id="rec-timeline" class="rec-timeline"></div>
+              <div class="toolbar" id="rec-save-bar">
+                <span id="rec-range" class="muted">no range selected</span>
+                <input id="rec-save-name" placeholder="name">
+                <button id="rec-save">Save range</button>
+                <button id="rec-delete" class="danger">Delete recording</button>
+              </div>
+            </div>
+            <div class="card map-only">
+              <div class="card-title">Map <span class="muted" id="rec-map-info"></span></div>
+              <div id="rec-map"></div>
+            </div>
+            <div class="card lidar-only">
+              <div class="card-title">Frame viewer</div>
+              <div class="toolbar">
+                <label>Camera <select id="rec-camera"></select></label>
+                <label id="rec-filter-label">Show <select id="rec-filter"><option value="fused" selected>fused frames</option>
+                  <option value="all">all keyframes</option><option value="rejected">frames with rejections</option>
+                  <option value="no_points">frames with "no LiDAR points"</option><option value="worst">most rejections first</option></select></label>
+                <span id="rec-playback" class="toolbar" style="margin:0;flex:1">
+                <button id="rec-prev">◀</button><button id="rec-play">▶ play</button><button id="rec-next">▶</button>
+                <input type="range" id="rec-slider" min="0" max="0" value="0" style="flex:1;min-width:160px"></span>
+                <span id="rec-frame-info" class="muted"></span>
+              </div>
+              <div id="rec-no-fusion" class="muted hidden" style="margin-bottom:6px">This recording has no fusion log
+                (/run_log: recorded before the run logger, or without perception running), so every keyframe is shown and
+                boxes have no outcome ("No fusion event"): which became detections, and why the others were rejected, wasn't recorded.</div>
+              <div class="rec-frame">
+                <div class="rec-image-wrap"><canvas id="rec-image"></canvas></div>
+                <div class="rec-side">
+                  <canvas id="rec-bev" width="320" height="320"></canvas>
+                  <div class="muted small-title" id="rec-bev-caption">Top view (base_link; forward = up)</div>
+                  <div id="rec-boxes"></div>
+                </div>
+              </div>
+              <div id="rec-zooms" class="rec-zooms"></div>
+              <div class="toolbar"><label><input type="checkbox" id="rec-show-points" checked> LiDAR points</label>
+                <label><input type="checkbox" id="rec-show-boxes" checked> boxes</label>
+                <label title="Logged by bbox_project_pcloud (log_geometry): color contours (solid = big enough, dashed = too small, white = selected) and each box's LiDAR points by cluster, with each cluster's convex hull (gray = no cluster, white rim = selected)"><input type="checkbox" id="rec-show-geometry" checked> contours &amp; box points</label></div>
+              <details><summary class="muted">Log entries of this frame</summary><pre id="rec-events"></pre></details>
+            </div>
+            <div class="card" id="rec-analysis-card">
+              <div class="card-title">Analysis <label>Analyzer <select id="rec-analyzer"></select></label>
+                <button id="rec-analyze" class="small">Run</button> <span class="muted" id="rec-report-info"></span></div>
+              <div id="rec-report"></div>
+              <div id="rec-plots"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-params" class="tab">
+      <div class="toolbar">
+        <button id="refresh-params">Refresh</button>
+        <button id="preview-apply">Apply saved values to launch files...</button>
+        <span class="muted">"Set" changes the running node (if running) and saves the value to
+          all_seaing_bringup/config/control_panel_overrides.yaml on the target. Parameters marked
+          "restart" only take effect after relaunching the node. Nothing is committed to git.</span>
+      </div>
+      <div id="apply-preview" class="card hidden"></div>
+      <div id="params"></div>
+    </section>
+  </main>
+
+  <script src="/static/plot.js"></script>
+  <script src="/static/health.js"></script>
+  <script src="/static/analysis.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/recordings.js"></script>
+  <script src="/static/rosbags.js"></script>
+  <script src="/static/mapview.js"></script>
+  <script src="/static/domains.js"></script>
+</body>
+</html>

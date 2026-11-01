@@ -251,6 +251,7 @@ class RunTasks(ActionServerBase):
         self.vel = np.linalg.norm([msg.twist.twist.linear.x, msg.twist.twist.linear.y])
 
     def receive_heartbeat(self, msg):
+        prev_state = getattr(self, "heartbeat_state", None)
         self.heartbeat_msg = msg
         if msg.e_stopped:
             self.heartbeat_state = RobotState.STATE_KILLED
@@ -259,6 +260,9 @@ class RunTasks(ActionServerBase):
                 self.heartbeat_state = RobotState.STATE_MANUAL
             else:
                 self.heartbeat_state = RobotState.STATE_AUTO
+        if self.heartbeat_state != prev_state:  # e-stop / teleop / autonomous changes
+            self.log_event("INFO", "robot_state", state=RobotState.Name(self.heartbeat_state),
+                           e_stopped=bool(msg.e_stopped), in_teleop=bool(msg.in_teleop))
 
     def map_cb(self, msg):
         self.obstacles = msg.obstacles
@@ -395,6 +399,8 @@ class RunTasks(ActionServerBase):
             local_x, local_y = self.task_location_mappings[location_name]["x"], self.task_location_mappings[location_name]["y"]
             if self.gate_pair is None:
                 self.get_logger().info(f"Didn't identify the starting gate yet, but called to search task")
+                self.log_event("WARN", "task_skipped_no_gate", task=getattr(current_task, "_action_name", str(current_task)),
+                               location=location_name)
                 return
             task_x = self.gate_mid[0] + self.gate_dir[1]*local_x + self.gate_dir[0]*local_y
             task_y = self.gate_mid[1] + self.gate_dir[1]*local_y - self.gate_dir[0]*local_x
@@ -404,6 +410,14 @@ class RunTasks(ActionServerBase):
                 task_theta = math.atan2(self.gate_dir[1], self.gate_dir[0]) + self.task_location_mappings[location_name]["theta"] - math.pi/2.0
             task_goal_msg = Search.Goal(x = task_x, y = task_y, include_theta = search_theta, theta = task_theta, wait_time = self.task_location_mappings[location_name]["wait_time"])
         self.get_logger().info(f"Sending goal: {task_goal_msg}")
+        attempt = {"task": getattr(current_task, "_action_name", str(current_task)), "action_type": action_type.name,
+                   "task_type": int(task_type)}
+        if action_type != ActionType.TASK:
+            attempt.update(location=location_name, search_target=[round(task_x, 3), round(task_y, 3), round(task_theta, 3)],
+                           gate_mid=[round(float(c), 3) for c in self.gate_mid[:2]],
+                           gate_dir=[round(float(c), 3) for c in self.gate_dir[:2]])
+        self.status.count("task_attempts")
+        self.log_event("INFO", "task_attempt", **attempt)
         self.restart_slam_options = restart_slam_options
         send_goal_future = self.current_task.send_goal_async(
             task_goal_msg,
@@ -413,6 +427,7 @@ class RunTasks(ActionServerBase):
 
     def cancel_current_task(self):
         self.get_logger().info('TRYING TO CANCEL CURRENT TASK')
+        self.log_event("INFO", "task_cancel", task=getattr(self.current_task, "_action_name", None), reason="harbor alert")
         if self.result_future is None or self.goal_handle is None: # TODO how to handle waypoint sent (& goal handle received) after us trying to cancel it? maybe ROS delay + retry for 3 times or smth
             self.get_logger().info('FUTURE IS NONE')
             self.cancelled_task_harbor = True
@@ -463,16 +478,22 @@ class RunTasks(ActionServerBase):
         self.goal_handle = future.result()
         if not self.goal_handle.accepted:
             self.get_logger().info("Goal rejected, looking for new task")
+            self.log_event("INFO", "task_goal_response", task=getattr(self.current_task, "_action_name", None), accepted=False)
             if not (self.incr_on_fail is None): # consider failure to start task (goal rejected when setup conditions not met) as failure to do the task?
                 self.incr_on_fail.val += 1
             self.find_task()
             return
         self.get_logger().info("Goal accepted")
+        self.log_event("INFO", "task_goal_response", task=getattr(self.current_task, "_action_name", None), accepted=True)
         self.result_future = self.goal_handle.get_result_async()
         self.result_future.add_done_callback(self.get_result_callback)
 
     def get_result_callback(self, future):
         result = future.result().result
+        task_name = getattr(self.current_task, "_action_name", None)
+        outcome = "success" if result.success else ("failure" if self.cancelled_task_harbor else "cancelled_for_harbor_alert")
+        self.status.count(f"task_results/{outcome}")
+        self.log_event("INFO", "task_result", task=task_name, outcome=outcome)
         if result.success:
             self.get_logger().info("Task success, marked as completed, looking for new task")
             self.incr_on_success.val += 1
@@ -485,6 +506,8 @@ class RunTasks(ActionServerBase):
                 self.incr_on_fail.val += 1
         if (self.restart_slam_options is not None) and self.restart_slam_client.wait_for_service(2.0): # self.restart_slam_client.service_is_ready()
             self.get_logger().info(f"Calling restart SLAM service w/ options: {self.restart_slam_options}")
+            self.log_event("INFO", "slam_restart", position=bool(self.restart_slam_options.restart_position),
+                           buoys=bool(self.restart_slam_options.restart_buoys), banners=bool(self.restart_slam_options.restart_banners))
             restart_future = self.restart_slam_client.call_async(RestartSLAM.Request(restart_position=self.restart_slam_options.restart_position,
                                                                     restart_buoys=self.restart_slam_options.restart_buoys,
                                                                     restart_banners=self.restart_slam_options.restart_banners))

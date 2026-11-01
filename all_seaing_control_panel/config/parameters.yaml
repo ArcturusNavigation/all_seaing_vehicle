@@ -1,0 +1,88 @@
+# Parameters shown on the Parameters page. See all_seaing_control_panel/params.py.
+#   id:           unique id
+#   group:        section on the page
+#   node:         node name for `ros2 param get/set`
+#   param:        parameter name
+#   type:         bool | int | double | string | double_array | int_array
+#   launch_file:  launch file (relative to the repo) that sets it
+#   executable:   executable of the Node(...) in that launch file
+#   match:        (optional) text that must appear in the Node(...) when several share the executable
+#   applies:      live (read on every use) | restart (read at startup: relaunch the node to apply)
+#   description
+# The GPS datum comes from the `location` launch argument (all_seaing_bringup/config/localization/locations.yaml).
+
+parameters:
+  # ---------------------------------------------------------------- thrusters (x-drive)
+  - {id: xd_fr, group: Thrusters (x-drive), node: /xdrive_controller, param: front_right_xy, type: double_array,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: xdrive_controller.py, applies: restart,
+     description: "front right thruster [x, y] [m] from the center of mass (x forward, y left)"}
+  - {id: xd_fl, group: Thrusters (x-drive), node: /xdrive_controller, param: front_left_xy, type: double_array,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: xdrive_controller.py, applies: restart,
+     description: "front left thruster [x, y] [m]"}
+  - {id: xd_bl, group: Thrusters (x-drive), node: /xdrive_controller, param: back_left_xy, type: double_array,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: xdrive_controller.py, applies: restart,
+     description: "back left thruster [x, y] [m]"}
+  - {id: xd_br, group: Thrusters (x-drive), node: /xdrive_controller, param: back_right_xy, type: double_array,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: xdrive_controller.py, applies: restart,
+     description: "back right thruster [x, y] [m]"}
+  - {id: xd_angle, group: Thrusters (x-drive), node: /xdrive_controller, param: thruster_angle, type: double,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: xdrive_controller.py, applies: restart,
+     description: "thruster angle [deg] (45 = diagonal)"}
+  - {id: xd_drag, group: Thrusters (x-drive), node: /xdrive_controller, param: drag_constants, type: double_array,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: xdrive_controller.py, applies: restart,
+     description: "empirical drag constants [x, y, theta]"}
+  - {id: xd_range, group: Thrusters (x-drive), node: /xdrive_controller, param: output_range, type: double_array,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: xdrive_controller.py, applies: restart,
+     description: "PWM output range [min, max]"}
+  - {id: xd_smooth, group: Thrusters (x-drive), node: /xdrive_controller, param: smoothing_factor, type: double,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: xdrive_controller.py, applies: restart,
+     description: "output low-pass smoothing (0 = none)"}
+  - {id: tc_fr, group: Thruster port assignment, node: /thrust_commander, param: front_right_port, type: int,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: thrust_commander.py, applies: restart,
+     description: "Pixhawk output port of the front right thruster"}
+  - {id: tc_fl, group: Thruster port assignment, node: /thrust_commander, param: front_left_port, type: int,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: thrust_commander.py, applies: restart,
+     description: "Pixhawk output port of the front left thruster"}
+  - {id: tc_bl, group: Thruster port assignment, node: /thrust_commander, param: back_left_port, type: int,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: thrust_commander.py, applies: restart,
+     description: "Pixhawk output port of the back left thruster"}
+  - {id: tc_br, group: Thruster port assignment, node: /thrust_commander, param: back_right_port, type: int,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: thrust_commander.py, applies: restart,
+     description: "Pixhawk output port of the back right thruster"}
+
+  # ---------------------------------------------------------------- waypoint controller (PID)
+  - {id: cs_kx, group: Waypoint controller (PID), node: /controller_server, param: Kpid_x, type: double_array,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "[Kp, Ki, Kd] for x (forward)"}
+  - {id: cs_ky, group: Waypoint controller (PID), node: /controller_server, param: Kpid_y, type: double_array,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "[Kp, Ki, Kd] for y (left)"}
+  - {id: cs_kt, group: Waypoint controller (PID), node: /controller_server, param: Kpid_theta, type: double_array,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "[Kp, Ki, Kd] for heading"}
+  - {id: cs_maxvel, group: Waypoint controller (PID), node: /controller_server, param: max_vel, type: double_array,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "max velocity [x m/s, y m/s, theta rad/s]"}
+  - {id: cs_avoid_dist, group: Obstacle avoidance, node: /controller_server, param: avoid_max_dist, type: double,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "potential field range [m]"}
+  - {id: cs_avoid_coeff, group: Obstacle avoidance, node: /controller_server, param: avoid_vel_coeff, type: double,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "repulsive velocity weight"}
+  - {id: cs_rot_avoid, group: Obstacle avoidance, node: /controller_server, param: rot_avoid_vel_coeff, type: double,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "rotational avoidance velocity weight"}
+
+  # ---------------------------------------------------------------- frames & localization
+  - {id: cs_global_frame, group: Frames, node: /controller_server, param: global_frame_id, type: string,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "global frame used by the waypoint controller"}
+  - {id: cs_robot_frame, group: Frames, node: /controller_server, param: robot_frame_id, type: string,
+     launch_file: all_seaing_bringup/launch/tasks.launch.py, executable: controller_server.py, applies: restart,
+     description: "robot frame used by the waypoint controller"}
+  - {id: op_yaw, group: Odometry orientation, node: /odometry_publisher, param: yaw_offset, type: double,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: odometry_publisher.py, applies: restart,
+     description: "Pixhawk compass yaw offset vs the robot's front [rad]"}
+  - {id: op_odom_yaw, group: Odometry orientation, node: /odometry_publisher, param: odom_yaw_offset, type: double,
+     launch_file: all_seaing_bringup/launch/vehicle.launch.py, executable: odometry_publisher.py, applies: restart,
+     description: "rotation applied to odometry velocities [rad]"}

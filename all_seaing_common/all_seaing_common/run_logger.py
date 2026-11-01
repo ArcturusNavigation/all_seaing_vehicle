@@ -18,6 +18,9 @@ Design guarantees:
   (`$ARCTURUS_LOG_BUFFER_DIR`, default `/dev/shm/arcturus_logs`). Every `persist_period`
   seconds, and on shutdown, the buffered bytes are appended to the persistent file
   (`$ARCTURUS_LOG_DIR`, default `~/arcturus_logs`) and the buffer is cleared.
+- Live stream: entries are also published (batched, from the background thread) as JSON
+  lines on the `/run_log` topic (std_msgs/String), so they can be analyzed live remotely,
+  e.g. by the control panel through foxglove_bridge. Disable with `run_log_publish: false`.
 - Recovery: if a node dies without shutting down (SIGKILL, crash), its buffer file
   stays in /dev/shm. Any later logger start, or
   `python3 -m all_seaing_common.run_logger --recover` (run by kill_ros_nodes.sh), appends
@@ -55,6 +58,8 @@ import os
 import sys
 import threading
 import time
+
+from std_msgs.msg import String
 
 ENV_LOG_DIR = "ARCTURUS_LOG_DIR"
 ENV_BUFFER_DIR = "ARCTURUS_LOG_BUFFER_DIR"
@@ -187,6 +192,10 @@ class RunLogger:
           run_log_queue_size (int, 10000)    max queued entries before dropping the oldest
           run_log_persist_period (double, 2.0)  [s] how often the buffer is persisted
           run_log_max_buffer_mb (double, 64.0)  max unpersisted RAM buffer before dropping
+          run_log_publish (bool, True)       also publish entries on run_log_topic (live analysis)
+          run_log_publish_min_level (str, "DEBUG")  minimum level of published entries
+          run_log_publish_period (double, 0.0)  [s] 0: publish each entry as soon as it is logged; > 0: batching period
+          run_log_topic (str, "/run_log")
         """
         self._node = node
         self.enabled = node.declare_parameter("run_log_enabled", True).value
@@ -195,6 +204,12 @@ class RunLogger:
         self._persist_period = node.declare_parameter("run_log_persist_period", 2.0).value
         self._max_buffer_bytes = int(node.declare_parameter("run_log_max_buffer_mb", 64.0).value * 1e6)
         self._min_level = self.LEVELS.index(min_level) if min_level in self.LEVELS else 0
+        self._publish = node.declare_parameter("run_log_publish", True).value
+        pub_level = node.declare_parameter("run_log_publish_min_level", "DEBUG").value.upper()
+        self._pub_min_level = self.LEVELS.index(pub_level) if pub_level in self.LEVELS else 0
+        self._publish_period = node.declare_parameter("run_log_publish_period", 0.0).value
+        topic = node.declare_parameter("run_log_topic", "/run_log").value
+        self._pub = node.create_publisher(String, topic, 100) if self._publish else None
 
         self.node_name = name or node.get_fully_qualified_name().strip("/").replace("/", ".")
         self.run_id = None
@@ -249,6 +264,8 @@ class RunLogger:
         if len(self._queue) == self._queue.maxlen:
             self._dropped_queue += 1
         self._queue.append((t, time.time(), self.LEVELS[lvl], event, fields))
+        if self._pub is not None and self._publish_period <= 0:
+            self._wake.set()  # real time: publish now
 
     def debug(self, event, **fields):
         self.log("DEBUG", event, **fields)
@@ -285,8 +302,12 @@ class RunLogger:
 
     def _run(self):
         last_persist = time.monotonic()
+        # wake at the publishing period (writes to the RAM buffer are cheap), persist less often
+        # publish period 0: woken by each log() call, the period only bounds the persist latency
+        wake_period = (min(self._persist_period, self._publish_period) if self._pub and self._publish_period > 0
+                       else self._persist_period)
         while True:
-            self._wake.wait(timeout=self._persist_period)
+            self._wake.wait(timeout=wake_period)
             self._wake.clear()
             stopping = self._stop.is_set()
             self._write_queued()
@@ -315,17 +336,24 @@ class RunLogger:
         """Serialize all queued entries and append them to the RAM buffer file."""
         if not self._queue:
             return
-        lines = []
+        lines, published = [], []
         while self._queue:
             t, wall, level, event, fields = self._queue.popleft()
             entry = {"t": t, "wall": wall, "node": self.node_name, "level": level, "event": event}
             entry.update(fields)
             try:
-                lines.append(json.dumps(entry, default=_to_jsonable))
+                line = json.dumps(entry, default=_to_jsonable)
             except (TypeError, ValueError) as e:
-                lines.append(json.dumps({"t": t, "wall": wall, "node": self.node_name, "level": "ERROR",
-                                         "event": "run_logger_serialization_error", "for_event": event,
-                                         "error": str(e)}))
+                line = json.dumps({"t": t, "wall": wall, "node": self.node_name, "level": "ERROR",
+                                   "event": "run_logger_serialization_error", "for_event": event, "error": str(e)})
+            lines.append(line)
+            if self.LEVELS.index(level) >= self._pub_min_level:
+                published.append(line)
+        if self._pub is not None and published:
+            try:
+                self._pub.publish(String(data="\n".join(published)))
+            except Exception:  # context shut down, etc.: the file log is unaffected
+                pass
         data = ("\n".join(lines) + "\n").encode()
         try:
             if os.path.exists(self._buffer_path) and \

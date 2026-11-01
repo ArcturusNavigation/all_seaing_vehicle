@@ -9,6 +9,9 @@ from message_filters import Subscriber, TimeSynchronizer, ApproximateTimeSynchro
 from typing import List
 import numpy as np
 
+from all_seaing_common.run_logger import RunLogger
+from all_seaing_common.status_reporter import StatusReporter
+
 class MulticamDetectionMerge(Node):
     def __init__(self):
         super().__init__("multicam_detection_merge")
@@ -31,6 +34,20 @@ class MulticamDetectionMerge(Node):
         self.duplicate_thres = self.get_parameter("duplicate_thres").get_parameter_value().double_value
         self.angle_thres = self.get_parameter("angle_thres").get_parameter_value().double_value
     
+        # Observability (#480, #501): the local map's meaning depends on the mode: "individual" republishes
+        # each camera's detections as they arrive (one camera per message, rate ~ sum of the cameras),
+        # "merged" publishes one message per synchronized set of all enabled cameras
+        self.cameras = [c for c, on in (("front", self.enable_front), ("back_left", self.enable_back_left),
+                                        ("back_right", self.enable_back_right)) if on]
+        self.mode = "individual" if self.individual else (
+            f"merged (approximate sync, {self.delay:g} s)" if self.approximate else "merged (exact sync)")
+        self.status = StatusReporter(self)
+        self.status.gauge("mode", self.mode)
+        self.status.gauge("cameras", ", ".join(self.cameras))
+        self.run_log = RunLogger(self)
+        self.run_log.info("config", mode=self.mode, cameras=self.cameras, duplicate_thres=self.duplicate_thres,
+                          angle_thres=self.angle_thres)
+
         if not self.individual:
             self.detection_subs = []
             self.pcl_subs = []
@@ -49,6 +66,9 @@ class MulticamDetectionMerge(Node):
                 self.pcl_back_right_sub = Subscriber(self, LabeledObjectPointCloudArray, "labeled_object_point_clouds/back_right")
                 self.detection_subs.append(self.detection_back_right_sub)
                 self.pcl_subs.append(self.pcl_back_right_sub)
+            # count each camera's arrivals (the synchronizer only reports matched sets)
+            for cam, sub in zip(self.cameras, self.detection_subs):
+                sub.registerCallback(lambda msg, cam=cam: self.count_input(cam, msg))
             if not self.approximate:
                 self.sync = TimeSynchronizer(self.detection_subs, 10)
                 self.pcl_sync = TimeSynchronizer(self.pcl_subs, 10)
@@ -59,13 +79,13 @@ class MulticamDetectionMerge(Node):
             self.pcl_sync.registerCallback(self.pcl_sync_callback)
         else:
             if self.enable_front:
-                self.detection_sub = self.create_subscription(ObstacleMap, "detections/front", self.detection_sync_callback, 10)
+                self.detection_sub = self.create_subscription(ObstacleMap, "detections/front", lambda m: self.individual_callback("front", m), 10)
                 self.pcl_sub = self.create_subscription(LabeledObjectPointCloudArray, "labeled_object_point_clouds/front", self.pcl_sync_callback, 10)
             if self.enable_back_left:
-                self.detection_sub_back_left = self.create_subscription(ObstacleMap, "detections/back_left", self.detection_sync_callback, 10)
+                self.detection_sub_back_left = self.create_subscription(ObstacleMap, "detections/back_left", lambda m: self.individual_callback("back_left", m), 10)
                 self.pcl_sub_back_left = self.create_subscription(LabeledObjectPointCloudArray, "labeled_object_point_clouds/back_left", self.pcl_sync_callback, 10)
             if self.enable_back_right:
-                self.detection_sub_back_right = self.create_subscription(ObstacleMap, "detections/back_right", self.detection_sync_callback, 10)
+                self.detection_sub_back_right = self.create_subscription(ObstacleMap, "detections/back_right", lambda m: self.individual_callback("back_right", m), 10)
                 self.pcl_sub_back_right= self.create_subscription(LabeledObjectPointCloudArray, "labeled_object_point_clouds/back_right", self.pcl_sync_callback, 10)
         self.merged_detection_pub = self.create_publisher(ObstacleMap, "detections/merged", 10)
         self.merged_pcl_pub = self.create_publisher(LabeledObjectPointCloudArray, "labeled_object_point_clouds/merged", 10)
@@ -153,7 +173,15 @@ class MulticamDetectionMerge(Node):
             else:
                 pcls.pop(start_ptr)
     
-    def detection_sync_callback(self, *args):
+    def count_input(self, cam, msg):
+        self.status.count(f"in/{cam}")
+        self.status.count(f"obstacles_in/{cam}", len(msg.obstacles))
+
+    def individual_callback(self, cam, msg):
+        self.count_input(cam, msg)
+        self.detection_sync_callback(msg, sources=[cam])
+
+    def detection_sync_callback(self, *args, sources=None):
         # we assume all the detections are on the same frame (base_link or something equivalent)
         merged_detections = ObstacleMap()
         detections: ObstacleMap
@@ -165,9 +193,18 @@ class MulticamDetectionMerge(Node):
             
             merged_detections.obstacles.extend(detections.obstacles)
         # self.get_logger().info(f'OBJECTS BEFORE DUPLICATE CLEARANCE: {len(merged_detections.obstacles)}')
+        n_in = len(merged_detections.obstacles)
         self.unique_obstacles(merged_detections.obstacles)
         # self.get_logger().info(f'OBJECTS AFTER DUPLICATE CLEARANCE: {len(merged_detections.obstacles)}')
         self.merged_detection_pub.publish(merged_detections)
+        n_out = len(merged_detections.obstacles)
+        self.status.count("updates")
+        self.status.count("out")
+        self.status.count("obstacles_out", n_out)
+        self.status.count("duplicates_removed", n_in - n_out)
+        self.run_log.debug("local_map", mode="individual" if self.individual else "merged",
+                           sources=sources or self.cameras, n_in=n_in, n_out=n_out,
+                           labels=[o.label for o in merged_detections.obstacles])
 
     def pcl_sync_callback(self, *args):
         merged_pcls = LabeledObjectPointCloudArray()

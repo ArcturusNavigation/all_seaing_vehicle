@@ -96,6 +96,16 @@ double wall_now() {
     return std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
+// [x, y, ...]
+void append_json_numbers(std::string &out, const std::vector<double> &v) {
+    out += '[';
+    for (size_t i = 0; i < v.size(); i++) {
+        if (i) out += ", ";
+        append_json_number(out, v[i]);
+    }
+    out += ']';
+}
+
 }  // namespace
 
 void LogValue::append_json(std::string &out) const {
@@ -110,11 +120,13 @@ void LogValue::append_json(std::string &out) const {
                 append_json_number(out, v);
             } else if constexpr (std::is_same_v<T, std::string>) {
                 append_json_string(out, v);
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                append_json_numbers(out, v);
             } else {
                 out += '[';
                 for (size_t i = 0; i < v.size(); i++) {
                     if (i) out += ", ";
-                    append_json_number(out, v[i]);
+                    append_json_numbers(out, v[i]);
                 }
                 out += ']';
             }
@@ -129,10 +141,16 @@ RunLogger::RunLogger(rclcpp::Node *node, const std::string &name) : m_node(node)
     m_persist_period = node->declare_parameter<double>("run_log_persist_period", 2.0);
     m_max_buffer_bytes =
         static_cast<uint64_t>(node->declare_parameter<double>("run_log_max_buffer_mb", 64.0) * 1e6);
+    bool publish = node->declare_parameter<bool>("run_log_publish", true);
+    std::string pub_level = node->declare_parameter<std::string>("run_log_publish_min_level", "DEBUG");
+    m_publish_period = node->declare_parameter<double>("run_log_publish_period", 0.0);
+    std::string topic = node->declare_parameter<std::string>("run_log_topic", "/run_log");
     for (int i = 0; i < 4; i++) {
         if (min_level == LEVEL_NAMES[i]) m_min_level = i;
+        if (pub_level == LEVEL_NAMES[i]) m_pub_min_level = i;
     }
     if (!m_enabled) return;
+    if (publish) m_pub = node->create_publisher<std_msgs::msg::String>(topic, 100);
 
     m_node_name = name;
     if (m_node_name.empty()) {
@@ -189,6 +207,7 @@ void RunLogger::log(Level level, const std::string &event, LogFields fields) {
     } catch (...) {
         // bad_alloc etc.: never propagate into the node
     }
+    if (m_pub && m_publish_period <= 0.0) m_cv.notify_one();  // real time: publish now
 }
 
 void RunLogger::flush() {
@@ -202,13 +221,21 @@ void RunLogger::flush() {
 void RunLogger::run() {
     using clock = std::chrono::steady_clock;
     auto period = std::chrono::duration_cast<clock::duration>(std::chrono::duration<double>(m_persist_period));
+    // wake at the publishing period (writes to the RAM buffer are cheap), persist less often
+    // (publish period 0: woken by each log() call, the period only bounds the persist latency)
+    auto wake_period = m_pub && m_publish_period > 0.0
+                           ? std::chrono::duration_cast<clock::duration>(
+                                 std::chrono::duration<double>(std::min(m_persist_period, m_publish_period)))
+                           : period;
+    const bool immediate = m_pub && m_publish_period <= 0.0;
     auto last_persist = clock::now();
     while (true) {
         std::deque<Entry> batch;
         bool stopping, flush_now;
         {
             std::unique_lock<std::mutex> lock(m_mutex);
-            m_cv.wait_for(lock, period, [this] { return m_stop || m_flush_requested; });
+            m_cv.wait_for(lock, wake_period,
+                          [this, immediate] { return m_stop || m_flush_requested || (immediate && !m_queue.empty()); });
             stopping = m_stop;
             flush_now = m_flush_requested;
             m_flush_requested = false;
@@ -239,10 +266,9 @@ void RunLogger::report_drops(std::deque<Entry> &batch) {
     m_dropped_io = 0;
 }
 
-void RunLogger::write_queued(std::deque<Entry> &batch) {
-    if (batch.empty()) return;
+std::string RunLogger::serialize(const Entry &e) const {
     std::string data;
-    for (const auto &e : batch) {
+    {
         data += "{\"t\": ";
         append_json_number(data, e.t);
         data += ", \"wall\": ";
@@ -259,7 +285,31 @@ void RunLogger::write_queued(std::deque<Entry> &batch) {
             data += ": ";
             value.append_json(data);
         }
-        data += "}\n";
+        data += "}";
+    }
+    return data;
+}
+
+void RunLogger::write_queued(std::deque<Entry> &batch) {
+    if (batch.empty()) return;
+    std::string data, published;
+    for (const auto &e : batch) {
+        std::string line = serialize(e);
+        if (m_pub && static_cast<int>(e.level) >= m_pub_min_level) {
+            if (!published.empty()) published += '\n';
+            published += line;
+        }
+        data += line;
+        data += '\n';
+    }
+    if (m_pub && !published.empty()) {
+        try {
+            std_msgs::msg::String msg;
+            msg.data = std::move(published);
+            m_pub->publish(msg);
+        } catch (...) {
+            // context shut down, etc.: the file log is unaffected
+        }
     }
     std::error_code ec;
     uint64_t current = fs::exists(m_buffer_path, ec) ? fs::file_size(m_buffer_path, ec) : 0;

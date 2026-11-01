@@ -150,12 +150,21 @@ class NavigationContinuousServer(ActionServerBase):
         if self.current_waypoint is None:
             return
         # self.get_logger().info(f'updating continuous waypoint')
+        # Only the target moves: the approach direction (the line through the goal that must be crossed, like
+        # a gate) stays the one set when the goal started. Re-anchoring it from the current pose on every
+        # update kept the boat "before" the line near the goal, so it orbited the goal without finishing.
         nav_x, nav_y, _ = self.get_robot_pose()
-        self.approach_origin = np.array([nav_x, nav_y])
-        self.approach_dir = np.array([msg.x, msg.y]) - self.approach_origin
+        if self.approach_origin is None or np.linalg.norm(self.approach_dir) < 1e-6:
+            self.approach_origin = np.array([nav_x, nav_y])
+            self.approach_dir = np.array([msg.x, msg.y]) - self.approach_origin
         # self.approach_dir /= np.linalg.norm(self.approach_dir)
         # self.current_waypoint = (msg.x, msg.y, msg.forward_speed, msg.avoid_obs)
+        prev = self.current_waypoint
         self.current_waypoint = (msg.x, msg.y, self.forward_speed, self.avoid_obs)
+        if prev is None or math.hypot(msg.x - prev[0], msg.y - prev[1]) > 0.2:  # log changes only
+            self.log_event("INFO", "continuous_waypoint_update", target=[round(msg.x, 3), round(msg.y, 3)],
+                           pose=[round(nav_x, 3), round(nav_y, 3)],
+                           approach_dir=[round(float(c), 3) for c in self.approach_dir])
         # self.waypoint_reached = False
         # self.reset_pid()
 
@@ -258,6 +267,10 @@ class NavigationContinuousServer(ActionServerBase):
         # Check perpendicular crossing
         crossed = self.check_waypoint_crossed(nav_x, nav_y, goal_x, goal_y)
         if crossed:
+            if not self.waypoint_reached:
+                self.status.count("waypoints_crossed")
+                self.log_event("INFO", "waypoint_crossed", target=[round(goal_x, 3), round(goal_y, 3)],
+                               distance=round(float(dist), 3))
             self.waypoint_reached = True
 
         # Publish status
@@ -322,6 +335,13 @@ class NavigationContinuousServer(ActionServerBase):
 
         # Scale and publish
         x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
+        # run log (every tick): steering toward the carrot point (goal, pushed forward near it), avoidance, command
+        if True:
+            r = lambda v: [round(float(c), 3) for c in v]
+            self.log_event("DEBUG", "nav_control", with_pose=False, pose=r((nav_x, nav_y, nav_theta)),
+                           goal=r((goal_x, goal_y)), carrot=r(goal_vec), distance=round(float(dist), 3),
+                           desired_heading=round(float(desired_heading), 3), avoid_vel=r((avoid_x_vel, avoid_y_vel)),
+                           cmd=r((x_vel, y_vel, theta_output)), crossed=bool(self.waypoint_reached))
         control_msg = ControlOption()
         control_msg.priority = 1
         control_msg.twist.linear.x = x_vel
@@ -364,6 +384,7 @@ class NavigationContinuousServer(ActionServerBase):
 
         if self.map is None:
             self.get_logger().info("No map available. Aborting.")
+            self.log_event("WARN", "nav_aborted_no_map", target=[round(goal_handle.request.x, 3), round(goal_handle.request.y, 3)])
             goal_handle.abort()
             return FollowPath.Result()
 
@@ -388,6 +409,10 @@ class NavigationContinuousServer(ActionServerBase):
         forward_speed = self.default_forward_speed
         self.current_waypoint = (goal_x, goal_y, forward_speed, self.avoid_obs)
         self.forward_speed = forward_speed
+        self.status.count("follow_path_goals")
+        self.log_event("INFO", "follow_path_goal", target=[round(goal_x, 3), round(goal_y, 3)],
+                       xy_threshold=self.xy_threshold, forward_speed=forward_speed, avoid_obs=bool(self.avoid_obs),
+                       stationary=bool(goal_handle.request.is_stationary))
         self.waypoint_reached = False
         self.reset_pid()
 

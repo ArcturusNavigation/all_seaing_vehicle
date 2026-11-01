@@ -6,6 +6,7 @@ from launch.actions import (
     OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_xml.launch_description_sources import XMLLaunchDescriptionSource
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 import launch_ros
@@ -890,7 +891,16 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
+    # Foxglove bridge for the control panel's live views / recorder and Foxglove (ws://localhost:8765),
+    # on loopback only: the sim's data stays on this machine
+    foxglove_ld = IncludeLaunchDescription(
+        XMLLaunchDescriptionSource(os.path.join(get_package_share_directory("foxglove_bridge"), "launch",
+                                                "foxglove_bridge_launch.xml")),
+        launch_arguments={"port": "8765", "address": "127.0.0.1", "use_sim_time": "true"}.items(),
+    )
+
     return [
+        foxglove_ld,
         ekf_node,
         navsat_node,
         controller_node,

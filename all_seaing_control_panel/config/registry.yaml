@@ -1,0 +1,340 @@
+# Everything the control panel's Run page can start. To add a tool: add an entry here.
+#
+# Action fields (command templates can use {path_repo}, {path_workspace}, {path_logs}, {path_bags}:
+# the selected target's paths from targets.yaml):
+#   id, title, category (one of `categories`), description
+#   target: jetson | laptop          default target (can be changed in the UI)
+#   kind:   launch  -> ros2 launch <package> <file> name:=value ...
+#           run     -> ros2 run <package> <executable> <args rendered with `flag`>
+#           command -> `command` template, {name} = shell-quoted arg value
+#   mode:   background (default: runs detached, output streamed, stop button) | blocking (short, output shown once)
+#   sudo:   true -> asks for the sudo password (sent through stdin only, never stored)
+#   args:   [{name, type: string|number|bool|choice|bag|run, default, choices, help, flag}]
+#           type bag/run: choices filled from the target's bags / run-logs folders
+
+categories:
+  - {id: boat, title: Boat}
+  - {id: replay, title: Rosbags & replay}
+  - {id: sim, title: Simulation}
+  - {id: monitoring, title: Monitoring & visualization}
+  - {id: analysis, title: Run logs & analysis}
+  - {id: tools, title: Tools & maintenance}
+
+location_choices: &locations [pavillion, seagrant, boathouse, conference, nbpark, sydney, z_center, tank]
+
+actions:
+  # ---------------------------------------------------------------- boat
+  - id: vehicle
+    title: Vehicle (drivers, control, odometry)
+    category: boat
+    target: jetson
+    kind: launch
+    package: all_seaing_bringup
+    file: vehicle.launch.py
+    description: Sensor drivers, MAVROS, central hub, control mux, x-drive controller, odometry. Start first.
+    args:
+      - {name: location, type: choice, choices: *locations, default: pavillion}
+      - {name: comms, type: choice, choices: [custom, wifi, lora], default: custom}
+      - {name: use_slam, type: bool, default: true}
+      - {name: use_gps, type: bool, default: true}
+      - {name: use_lio, type: bool, default: false}
+      - {name: use_amcl, type: bool, default: false}
+  - id: perception
+    title: Perception (YOLO, fusion, SLAM, maps)
+    category: boat
+    target: jetson
+    kind: launch
+    package: all_seaing_bringup
+    file: perception.launch.py
+    args:
+      - {name: location, type: choice, choices: *locations, default: pavillion}
+      - {name: use_slam, type: bool, default: false}
+      - {name: use_gps, type: bool, default: true}
+      - {name: track_banners, type: bool, default: true}
+      - {name: banners_slam, type: bool, default: true}
+      - {name: use_lio, type: bool, default: false}
+      - {name: use_amcl, type: bool, default: false}
+      - {name: use_sim_time, type: bool, default: false}
+  - id: tasks
+    title: Tasks (controller/nav servers, task servers, run_tasks)
+    category: boat
+    target: jetson
+    kind: launch
+    package: all_seaing_bringup
+    file: tasks.launch.py
+    args:
+      - {name: location, type: choice, choices: *locations, default: pavillion}
+      - {name: use_waypoint_client, type: bool, default: false}
+  - id: mavros_rate_30
+    title: Set MAVROS rate to 30 Hz
+    category: boat
+    target: jetson
+    kind: command
+    mode: blocking
+    command: "ros2 run mavros mav sys rate --all {rate}"
+    description: Must be run after every MAVROS start (the Pixhawk resets it); slow odometry breaks SLAM.
+    args:
+      - {name: rate, type: number, default: 30}
+  - id: restart_slam
+    title: Restart SLAM
+    category: boat
+    target: jetson
+    kind: command
+    mode: blocking
+    command: "ros2 service call restart_slam all_seaing_interfaces/RestartSLAM \"{{restart_buoys: {buoys}, restart_banners: {banners}, restart_position: {position}}}\""
+    args:
+      - {name: buoys, type: bool, default: true}
+      - {name: banners, type: bool, default: true}
+      - {name: position, type: bool, default: true}
+  - id: shoreside
+    title: Shoreside (teleop & heartbeat)
+    category: boat
+    target: laptop
+    kind: launch
+    package: all_seaing_bringup
+    file: shoreside.launch.py
+    description: Run on the laptop, after vehicle.launch.py.
+    args:
+      - {name: comms, type: choice, choices: [wifi, custom, lora], default: wifi}
+      - {name: launch_rviz, type: bool, default: false}
+  - id: kill_all
+    title: Stop all ROS nodes (kill_ros_nodes.sh)
+    category: boat
+    target: jetson
+    kind: run
+    package: all_seaing_utility
+    executable: kill_ros_nodes.sh
+    mode: blocking
+    timeout: 90
+    description: Clean staged shutdown of every ROS process on the target, recovers run logs and ends the run.
+    args:
+      - {name: grace, type: number, default: 5, flag: "-t"}
+      - {name: sim, type: bool, default: false, flag: "--sim"}
+      - {name: daemon, type: bool, default: false, flag: "--daemon"}
+
+  # ---------------------------------------------------------------- rosbags & replay
+  - id: replay_raw
+    title: Replay bag through perception (raw sensor data)
+    category: replay
+    target: jetson
+    kind: launch
+    package: all_seaing_perception
+    file: perception_raw_rosbag.launch.py
+    description: Plays only raw sensors + /tf_static and recomputes everything live (real-time performance). Camera topics must be uncompressed.
+    args:
+      - {name: bag, type: bag}
+      - {name: location, type: choice, choices: *locations, default: pavillion}
+      - {name: rate, type: number, default: 1.0}
+      - {name: start_offset, type: number, default: 0.0}
+      - {name: play_delay, type: number, default: 20.0}
+      - {name: loop, type: bool, default: false}
+      - {name: use_slam, type: bool, default: false}
+  - id: multicam_slam_rosbag
+    title: SLAM debugging on bag (processed topics)
+    category: replay
+    target: jetson
+    kind: launch
+    package: all_seaing_perception
+    file: multicam_slam_rosbag.launch.py
+    description: Play the bag separately with the remaps from the Notion notes.
+  - id: tasks_rosbag
+    title: Task logic on bag
+    category: replay
+    target: jetson
+    kind: launch
+    package: all_seaing_bringup
+    file: tasks_rosbag.launch.py
+  - id: record_raw
+    title: Record raw sensors (rosbag)
+    category: replay
+    target: jetson
+    kind: command
+    command: "ros2 bag record -o {path_bags}/{name} /velodyne_points /zed/zed_node/rgb/image_rect_color /zed/zed_node/rgb/camera_info /back_left_oak/rgb/image_rect/compressed /back_left_oak/rgb/camera_info /back_right_oak/rgb/image_rect/compressed /back_right_oak/rgb/camera_info /mavros/imu/data /mavros/imu/data_raw /mavros/imu/mag /mavros/local_position/odom /mavros/local_position/pose /mavros/global_position/raw/fix /mavros/global_position/global /tf /tf_static /diagnostics"
+    description: Raw sensors (enough to replay the pipeline) + /tf + /diagnostics, to the NVMe.
+    args:
+      - {name: name, type: string, default: "raw_YYYY_MM_DD_test", help: bag folder name}
+  - id: decompress
+    title: Decompress camera topics of a bag
+    category: replay
+    target: jetson
+    kind: run
+    package: all_seaing_utility
+    executable: rosbag_decompress_images.py
+    args:
+      - {name: input, type: bag, flag: "-i"}
+      - {name: output, type: string, flag: "-o", help: "output bag path, e.g. <input>_decompressed"}
+  - id: shift_time
+    title: Fix bag clock (re-recorded bags)
+    category: replay
+    target: jetson
+    kind: run
+    package: all_seaing_utility
+    executable: rosbag_shift_time.py
+    args:
+      - {name: input, type: bag, flag: "-i"}
+      - {name: output, type: string, flag: "-o", help: "output bag path, e.g. <input>_timefix"}
+  - id: bag_info
+    title: Bag info
+    category: replay
+    target: jetson
+    kind: command
+    mode: blocking
+    command: "ros2 bag info {bag}"
+    args:
+      - {name: bag, type: bag}
+
+  # ---------------------------------------------------------------- simulation
+  - id: sim
+    title: VRX simulation (full stack)
+    category: sim
+    target: laptop
+    kind: launch
+    # keep the sim's ROS traffic on this machine: on the shared Wi-Fi (Arcturus router bridged to MIT
+    # Secure) its DDS discovery/data otherwise reaches the network and the Jetson (same domain/topics)
+    env: {ROS_LOCALHOST_ONLY: "1", GZ_IP: 127.0.0.1}  # GZ_IP: Gazebo transport on loopback too
+    package: all_seaing_bringup
+    file: sim.launch.py
+    args:
+      - {name: no_gui, type: bool, default: false}
+      - {name: launch_rviz, type: bool, default: true}
+      - {name: use_waypoint_client, type: bool, default: false}
+
+  # ---------------------------------------------------------------- monitoring
+  - id: topic_monitor
+    title: Topic monitor (rates & stamp ages -> /diagnostics)
+    category: monitoring
+    target: jetson
+    kind: run
+    package: all_seaing_utility
+    executable: topic_monitor.py
+    description: Measures sensor/pipeline topic rates on the Jetson (needed by the Health page and several checks).
+    args:
+      - {name: use_sim_time, type: bool, default: false, flag: "--ros-args -p use_sim_time:=true"}
+  - id: foxglove_bridge
+    title: Foxglove bridge
+    category: monitoring
+    target: jetson
+    kind: command
+    command: "ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:={port}"
+    description: Connect from Foxglove to ws://jetson:<port>. Doesn't slow the Jetson like RViz over Wi-Fi.
+    args:
+      - {name: port, type: number, default: 8765}
+  - id: foxglove_extension
+    title: Install Foxglove extension (Arcturus messages)
+    category: monitoring
+    target: laptop
+    kind: command
+    mode: blocking
+    timeout: 300
+    command: "cd {path_repo}/all_seaing_foxglove && npm install --no-audit --no-fund && npm run local-install"
+    description: Lets Foxglove display ObstacleMap, YOLO boxes, banner planes, clicked points. Restart Foxglove afterwards.
+  - id: rviz_to_foxglove
+    title: Convert RViz config to Foxglove layout
+    category: monitoring
+    target: laptop
+    kind: command
+    mode: blocking
+    command: "python3 {path_repo}/all_seaing_foxglove/layouts/rviz_to_foxglove.py {rviz} -o {path_repo}/all_seaing_foxglove/layouts"
+    args:
+      - {name: rviz, type: string, default: "/home/<user>/.rviz2/default.rviz", help: absolute path of the .rviz file}
+  - id: rviz_dashboard
+    title: RViz dashboard
+    category: monitoring
+    target: laptop
+    kind: command
+    command: "rviz2 -d $(ros2 pkg prefix all_seaing_bringup)/share/all_seaing_bringup/rviz/dashboard.rviz"
+  - id: tegrastats
+    title: Jetson load (tegrastats, 5 s)
+    category: monitoring
+    target: jetson
+    kind: command
+    mode: blocking
+    command: "timeout 5 tegrastats --interval 1000"
+  - id: topic_hz
+    title: Topic rate (ros2 topic hz, 8 s)
+    category: monitoring
+    target: jetson
+    kind: command
+    mode: blocking
+    command: "timeout 8 ros2 topic hz {topic} 2>&1 | tail -5"
+    args:
+      - {name: topic, type: string, default: /velodyne_points}
+
+  # ---------------------------------------------------------------- analysis
+  - id: analysis_stats
+    title: Run log stats
+    category: analysis
+    target: jetson
+    kind: run
+    package: all_seaing_utility
+    executable: run_log_analysis.py
+    mode: blocking
+    args:
+      - {name: run, type: run}
+  - id: analysis_fusion
+    title: Fusion funnel (YOLO boxes -> detections)
+    category: analysis
+    target: jetson
+    kind: run
+    package: all_seaing_utility
+    executable: run_log_analysis.py
+    mode: blocking
+    args:
+      - {name: run, type: run}
+      - {name: analyzer, type: string, default: fusion, flag: "-a"}
+  - id: analysis_timeline
+    title: Run log timeline (filtered)
+    category: analysis
+    target: jetson
+    kind: run
+    package: all_seaing_utility
+    executable: run_log_analysis.py
+    mode: blocking
+    args:
+      - {name: run, type: run}
+      - {name: timeline, type: bool, default: true, flag: "--timeline"}
+      - {name: level, type: choice, choices: ["", DEBUG, INFO, WARN, ERROR], default: WARN, flag: "--level"}
+      - {name: node, type: string, default: "", flag: "--node"}
+      - {name: event, type: string, default: "", flag: "--event"}
+      - {name: since, type: string, default: "", flag: "--since"}
+      - {name: until, type: string, default: "", flag: "--until"}
+
+  # ---------------------------------------------------------------- tools
+  - id: allow_ports
+    title: Allow serial ports (chmod 666)
+    category: tools
+    target: jetson
+    kind: command
+    sudo: true
+    command: "chmod 666 /dev/ttyACM* /dev/ttyUSB* /dev/serial/by-id/* 2>/dev/null; ls -l /dev/ttyACM* /dev/ttyUSB* 2>/dev/null"
+  - id: git_pull
+    title: Git status / pull on target
+    category: tools
+    target: jetson
+    kind: command
+    mode: blocking
+    command: "cd {path_repo} && git fetch -q && git status -sb | head -20 && if [ {pull} = true ]; then git pull --ff-only; fi"
+    args:
+      - {name: pull, type: bool, default: false}
+  - id: build
+    title: Build workspace (colcon)
+    category: tools
+    target: jetson
+    kind: command
+    command: "cd {path_workspace} && colcon build --symlink-install {packages}"
+    args:
+      - {name: packages, type: string, default: "--packages-select all_seaing_perception", help: "extra colcon args"}
+  - id: disk
+    title: Disk usage
+    category: tools
+    target: jetson
+    kind: command
+    mode: blocking
+    command: "df -h / /media/arcturus/drive 2>/dev/null; du -sh /media/arcturus/drive/rosbags ~/arcturus_logs/ 2>/dev/null"
+  - id: recover_logs
+    title: Recover run logs & end run
+    category: tools
+    target: jetson
+    kind: command
+    mode: blocking
+    command: "python3 -m all_seaing_common.run_logger --recover --end-run"

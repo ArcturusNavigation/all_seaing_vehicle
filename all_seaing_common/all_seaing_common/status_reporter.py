@@ -11,7 +11,7 @@ Diagnostics panel or with `ros2 topic echo /diagnostics`. For each period:
     counters: "<name>" = total since start, "<name>/rate" = per second over the last period
     gauges:   "<name>" = latest value
     timings:  "<name>/mean", "<name>/max", "<name>/count" over the last period
-    "period_s", plus a level (OK / WARN / ERROR / STALE) and a message
+    "period_s", "uptime_s" (since the reporter started: total / uptime_s = average rate), plus a level (OK / WARN / ERROR / STALE) and a message
 The level is STALE when the heartbeat counter (default "updates") didn't change during a
 period, WARN/ERROR when set with set_level(), else OK.
 
@@ -45,9 +45,15 @@ def _fmt(v):
 class StatusReporter:
 
     def __init__(self, node, component=""):
-        self.enabled = node.declare_parameter("status_enabled", True).value
-        self._period = node.declare_parameter("status_period", 1.0).value
-        self._heartbeat = node.declare_parameter("status_heartbeat", "updates").value
+        # Several reporters can share a node (e.g. one per monitored topic): declare once
+        def param(name, default):
+            if not node.has_parameter(name):
+                node.declare_parameter(name, default)
+            return node.get_parameter(name).value
+
+        self.enabled = param("status_enabled", True)
+        self._period = param("status_period", 1.0)
+        self._heartbeat = param("status_heartbeat", "updates")
         self._lock = threading.Lock()
         self._counters, self._counters_prev = {}, {}
         self._gauges = {}
@@ -60,7 +66,7 @@ class StatusReporter:
         self._name = self._hardware_id.lstrip("/") + (f"/{component}" if component else "")
         self._clock = node.get_clock()
         self._pub = node.create_publisher(DiagnosticArray, "/diagnostics", 10)
-        self._last_publish = time.monotonic()
+        self._last_publish = self._start = time.monotonic()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="status_reporter", daemon=True)
         self._thread.start()
@@ -106,7 +112,7 @@ class StatusReporter:
         with self._lock:
             now = time.monotonic()
             dt, self._last_publish = now - self._last_publish, now
-            values = [KeyValue(key="period_s", value=_fmt(dt))]
+            values = [KeyValue(key="period_s", value=_fmt(dt)), KeyValue(key="uptime_s", value=_fmt(now - self._start))]
             for name, total in sorted(self._counters.items()):
                 prev = self._counters_prev.get(name, 0)
                 values.append(KeyValue(key=name, value=str(total)))

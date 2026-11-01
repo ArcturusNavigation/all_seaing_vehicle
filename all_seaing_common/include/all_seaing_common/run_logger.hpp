@@ -12,6 +12,8 @@
 //     to <log_dir>/<run_id>/<node>.jsonl (default log_dir ~/arcturus_logs) and clears it.
 //   - Buffers of killed nodes stay in /dev/shm and are recovered by the next Python
 //     logger start or `python3 -m all_seaing_common.run_logger --recover`.
+//   - Entries are also published (batched, from the background thread) as JSON lines on the
+//     `/run_log` topic (std_msgs/String) for live analysis (e.g. control panel via foxglove_bridge).
 //   - Environment: ARCTURUS_LOG_DIR, ARCTURUS_LOG_BUFFER_DIR, ARCTURUS_RUN_ID.
 //
 // Usage:
@@ -22,7 +24,10 @@
 //
 // ROS parameters (declared on the node): run_log_enabled (bool, true),
 // run_log_min_level (string, "DEBUG"), run_log_queue_size (int, 10000),
-// run_log_persist_period (double, 2.0 s), run_log_max_buffer_mb (double, 64.0).
+// run_log_persist_period (double, 2.0 s), run_log_max_buffer_mb (double, 64.0),
+// run_log_publish (bool, true), run_log_publish_min_level (string, "DEBUG"),
+// run_log_publish_period (double, 0 s: publish each entry as soon as it is logged; > 0: batch over that
+// period), run_log_topic (string, "/run_log").
 
 #include <atomic>
 #include <condition_variable>
@@ -36,13 +41,16 @@
 #include <vector>
 
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
 
 namespace all_seaing_common {
 
-// A JSON-serializable field value: bool, integer, floating point, string, or a list of numbers
+// A JSON-serializable field value: bool, integer, floating point, string, a list of numbers, or a
+// list of lists of numbers (e.g. polygons, point lists)
 class LogValue {
 public:
-    using Variant = std::variant<bool, int64_t, double, std::string, std::vector<double>>;
+    using Variant =
+        std::variant<bool, int64_t, double, std::string, std::vector<double>, std::vector<std::vector<double>>>;
 
     LogValue(bool v) : m_value(v) {}
     LogValue(int v) : m_value(static_cast<int64_t>(v)) {}
@@ -57,6 +65,7 @@ public:
     LogValue(std::string v) : m_value(std::move(v)) {}
     LogValue(std::vector<double> v) : m_value(std::move(v)) {}
     LogValue(std::initializer_list<double> v) : m_value(std::vector<double>(v)) {}
+    LogValue(std::vector<std::vector<double>> v) : m_value(std::move(v)) {}
 
     // Append the JSON encoding of this value to out
     void append_json(std::string &out) const;
@@ -101,6 +110,7 @@ private:
 
     void run();
     void write_queued(std::deque<Entry> &batch);
+    std::string serialize(const Entry &e) const;
     void persist();
     void report_drops(std::deque<Entry> &batch);
 
@@ -110,6 +120,9 @@ private:
     size_t m_queue_size{10000};
     double m_persist_period{2.0};
     uint64_t m_max_buffer_bytes{64000000};
+    int m_pub_min_level{0};
+    double m_publish_period{0.0};  // 0: publish immediately (no batching)
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr m_pub;
     std::string m_node_name, m_run_id, m_buffer_path, m_persist_path;
 
     std::mutex m_mutex;

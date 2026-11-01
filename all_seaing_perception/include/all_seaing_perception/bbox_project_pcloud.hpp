@@ -27,6 +27,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include "sensor_msgs/msg/compressed_image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "builtin_interfaces/msg/time.hpp"
 
@@ -71,6 +72,9 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_object_pcl_viz_pub;
     rclcpp::Publisher<all_seaing_interfaces::msg::ObstacleMap>::SharedPtr m_detection_pub;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_refined_object_pcl_viz_pub;
+    // JPEG of every fused image with >= 1 YOLO box (only encoded while subscribed): control panel recordings/live view
+    rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr m_fused_image_pub;
+    int m_fused_image_jpeg_quality;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr m_image_intrinsics_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> m_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::PointCloud2> m_cloud_sub;
@@ -144,7 +148,8 @@ private:
     std::map<std::string, std::vector<int>> contour_matching_color_range_map;
 
     bool m_is_sim, m_label_list;
-    double m_bbox_margin;
+    double m_bbox_margin;        // fixed padding of YOLO boxes [px]
+    double m_bbox_margin_ratio;  // padding as a fraction of the box's width/height (the larger padding applies)
     std::string m_camera_name;
 
     // Observability: per-run event log (#501) and live status on /diagnostics (#480)
@@ -152,6 +157,9 @@ private:
     std::unique_ptr<all_seaing_common::StatusReporter> m_status;
 
     double m_contour_bbox_area_thres;
+    // run log: per-box geometry (contours, projected points with cluster ids) for the snapshot viewer
+    bool m_log_geometry;
+    int m_log_geometry_max_points;
     double m_cluster_bbox_area_thres;
     double m_overlap_filter_thres;
 

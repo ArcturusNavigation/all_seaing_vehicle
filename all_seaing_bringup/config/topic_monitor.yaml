@@ -1,0 +1,22 @@
+# Topics measured by all_seaing_utility/topic_monitor.py (rate & header stamp age, on /diagnostics).
+# min_rate [Hz]: WARN below this. header: whether the type starts with std_msgs/Header (default: guessed).
+max_stamp_age_ms: 1000.0
+topics:
+  # Sensors
+  - {name: /velodyne_points, min_rate: 8.0}
+  - {name: /zed/zed_node/rgb/image_rect_color, min_rate: 10.0}
+  - {name: /back_left_oak/rgb/image_rect, min_rate: 10.0}
+  - {name: /back_right_oak/rgb/image_rect, min_rate: 10.0}
+  - {name: /mavros/imu/data, min_rate: 25.0}
+  - {name: /mavros/local_position/odom, min_rate: 25.0}
+  - {name: /mavros/global_position/raw/fix, min_rate: 4.0}
+  # Perception pipeline
+  - {name: /point_cloud/filtered, min_rate: 8.0}
+  - {name: /bounding_boxes, min_rate: 5.0}
+  - {name: /bounding_boxes/back_left, min_rate: 5.0}
+  - {name: /bounding_boxes/back_right, min_rate: 5.0}
+  - {name: /obstacle_map/local, min_rate: 3.0}
+  - {name: /obstacle_map/global, min_rate: 3.0}
+  # Localization & control
+  - {name: /odometry/integrated, min_rate: 20.0}
+  - {name: /cmd_vel, min_rate: 0.0}

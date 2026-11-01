@@ -179,7 +179,9 @@ class TaskServerBase(ActionServerBase):
 
     def goal_callback(self, goal_request):
         self.get_logger().info(f'Task Server [{self.server_name}] received task')
-        if self.should_accept_task(goal_request):
+        accepted = self.should_accept_task(goal_request)
+        self.log_event("INFO", "task_goal", task=self.server_name, accepted=bool(accepted))
+        if accepted:
             return GoalResponse.ACCEPT
         else:
             return GoalResponse.REJECT
@@ -219,6 +221,7 @@ class TaskServerBase(ActionServerBase):
             goal_handle.abort()
             return Task.Result(success=False)
 
+        self.log_event("INFO", "task_phase", task=self.server_name, phase="setup_done" if self._succeed else "setup_failed")
         if (not self._succeed):
             self.end_process(f"Task Server [{self.server_name}] task failed in setup")
             self.paused = True
@@ -246,6 +249,7 @@ class TaskServerBase(ActionServerBase):
                 return Task.Result()
 
             self.control_loop()
+            self.log_task_state()
             time.sleep(self.timer_period)
 
         if goal_handle.is_cancel_requested:
@@ -262,11 +266,39 @@ class TaskServerBase(ActionServerBase):
             self.paused = True
             return Task.Result(success=False)
 
+        self.status.count("tasks_succeeded" if self._succeed else "tasks_failed")
+        self.log_event("INFO", "task_finished", task=self.server_name, success=bool(self._succeed))
         self.end_process(f"Task Server [{self.server_name}] task completed with result {self._succeed}")
         goal_handle.succeed()
         self.paused = True
         return Task.Result(success=self._succeed)
     
+    def log_task_state(self, period_s=0.0):
+        """Run-log (every call, or at most every period_s if > 0) what the task currently knows and targets, for replaying its
+        logic on a map: pose, sent waypoint, gate pair (left/right buoys + waypoint), map obstacles."""
+        # task state machines keep their state in self.state (an Enum by convention): log every change
+        state = getattr(self, "state", None)
+        state_name = getattr(state, "name", None if state is None else str(state))
+        if state_name != getattr(self, "_logged_state", None):
+            self.log_event("INFO", "task_state_change", task=self.server_name, state=state_name,
+                           previous=getattr(self, "_logged_state", None))
+            self._logged_state = state_name
+        now = time.monotonic()
+        if now - getattr(self, "_last_state_log", 0.0) < period_s:
+            return
+        self._last_state_log = now
+        r = lambda v: [round(float(c), 3) for c in v]
+        fields = {"task": self.server_name, "state": state_name}
+        if getattr(self, "sent_waypoint", None) is not None:
+            fields["waypoint"] = r(self.sent_waypoint[:3])
+        if getattr(self, "gate_pair", None) is not None:
+            fields["gate"] = {"left": r(ob_coords(self.gate_pair.left)), "right": r(ob_coords(self.gate_pair.right))}
+        if getattr(self, "gate_wpt", None) is not None:
+            fields["gate_waypoint"] = r(self.gate_wpt[:2])
+        obs = getattr(self, "obstacles", None) or []
+        fields["obstacles"] = [r(ob_coords(ob)) + [int(ob.label)] for ob in obs[:150]]  # [x, y, label]
+        self.log_event("DEBUG", "task_state", **fields)
+
     def _send_goal(self, goal_msg):
         self.follow_path_client.wait_for_server()
         self.active_future_request += 1
@@ -295,6 +327,9 @@ class TaskServerBase(ActionServerBase):
         - goal_update_func() -> should_update, (new_goal.x, new_goal.y)
         '''
         self.get_logger().info(f"Moving to point {point}")
+        self.log_event("INFO", "nav_goal", kind="follow_path", task=self.server_name,
+                       target=[round(float(c), 3) for c in point[:3]], stationary=bool(is_stationary))
+        self.status.count("nav_goals")
         self.moved_to_point = False
         self.waypoint_rejected = False
         self.waypoint_aborted = False
@@ -323,17 +358,22 @@ class TaskServerBase(ActionServerBase):
                         goal_msg.x = new_goal[0]
                         goal_msg.y = new_goal[1]
                         self.get_logger().info('ADAPTING GOAL POINT')
+                        self.log_event("INFO", "nav_goal_updated", kind="follow_path", task=self.server_name,
+                                       target=[round(float(new_goal[0]), 3), round(float(new_goal[1]), 3)])
                         self._send_goal(goal_msg)
                     else:
                         self.move_to_waypoint_continuous(new_goal)
                 if self.waypoint_rejected or self.waypoint_aborted:  # Retry functionality
                     self.get_logger().info('RESENDING GOAL')
+                    self.log_event("WARN", "nav_goal_resent", task=self.server_name,
+                                   reason="rejected" if self.waypoint_rejected else "aborted")
                     self._send_goal(goal_msg)
                     self.waypoint_rejected = False
                     self.waypoint_aborted = False
                 if self.goal_handle.is_cancel_requested:
                     self.cancel_navigation()
                     return False
+                self.log_task_state()
                 time.sleep(self.timer_period)
         return False
 
@@ -349,6 +389,7 @@ class TaskServerBase(ActionServerBase):
         
         if not self.wpt_goal_handle.accepted:
             self.get_logger().info('Waypoint rejected')
+            self.log_event("WARN", "nav_goal_rejected", task=self.server_name)
             self.waypoint_rejected = True
             return
 
@@ -359,6 +400,7 @@ class TaskServerBase(ActionServerBase):
 
     def cancel_navigation(self):
         self.get_logger().info('TRYING TO CANCEL NAVIGATION')
+        self.log_event("INFO", "nav_cancel", task=self.server_name)
         if self._get_result_future is None or self.wpt_goal_handle is None: # TODO how to handle waypoint sent (& goal handle received) after us trying to cancel it? maybe ROS delay + retry for 3 times or smth
             self.get_logger().info('FUTURE IS NONE')
             return
@@ -383,13 +425,18 @@ class TaskServerBase(ActionServerBase):
         status = future.result().status
         if status == GoalStatus.STATUS_ABORTED:
             self.get_logger().info(f'WAYPOINT ABORTED')
+            self.log_event("WARN", "nav_goal_result", task=self.server_name, result="aborted")
             self.waypoint_aborted = True
         elif result.is_finished:
             self.get_logger().info(f'MOVED TO WAYPOINT')
+            self.log_event("INFO", "nav_goal_result", task=self.server_name, result="reached")
             self.moved_to_point = True
 
     def move_to_waypoint(self, point, is_stationary=False, busy_wait=False, exit_func=None, goal_update_func=None, cancel_on_exit=False):
         self.get_logger().info(f"Moving to waypoint {point}")
+        self.log_event("INFO", "nav_goal", kind="waypoint", task=self.server_name,
+                       target=[round(float(c), 3) for c in point[:3]], stationary=bool(is_stationary))
+        self.status.count("nav_goals")
         self.moved_to_point = False
         goal_msg = Waypoint.Goal()
         goal_msg.xy_threshold = self.get_parameter("xy_threshold").value
@@ -416,10 +463,13 @@ class TaskServerBase(ActionServerBase):
                         goal_msg.y = new_goal[1]
 
                         self.get_logger().info('ADAPTING WAYPOINT')
+                        self.log_event("INFO", "nav_goal_updated", kind="waypoint", task=self.server_name,
+                                       target=[round(float(new_goal[0]), 3), round(float(new_goal[1]), 3)])
                         self._send_wpt_goal(goal_msg)
                 if self.goal_handle.is_cancel_requested:
                     self.cancel_navigation()
                     return False
+                self.log_task_state()
                 time.sleep(self.timer_period)
         return False
 
@@ -432,6 +482,11 @@ class TaskServerBase(ActionServerBase):
         msg = ContinuousWaypoint()
         msg.x = point[0]
         msg.y = point[1]
+        last = getattr(self, "_last_continuous_wpt", None)
+        if last is None or math.hypot(point[0] - last[0], point[1] - last[1]) > 0.2:  # log changes only
+            self._last_continuous_wpt = (point[0], point[1])
+            self.log_event("INFO", "nav_goal", kind="continuous", task=self.server_name,
+                           target=[round(float(point[0]), 3), round(float(point[1]), 3)])
         # msg.forward_speed = forward_speed if forward_speed is not None else self.default_forward_speed
         # msg.avoid_obs = avoid_obs
         self.continuous_waypoint_pub.publish(msg)
@@ -445,6 +500,7 @@ class TaskServerBase(ActionServerBase):
                 return True
             if self.goal_handle.is_cancel_requested:
                 return False
+            self.log_task_state()
             time.sleep(self.timer_period)
         return False
 
@@ -630,7 +686,10 @@ class TaskServerBase(ActionServerBase):
             f"initial red buoys: {[ob_coords(buoy) for buoy in red_buoys]}, green buoys: {[ob_coords(buoy) for buoy in green_buoys]}"
         )
         if len(red_buoys) == 0 or len(green_buoys) == 0:
-            # Count why each buoy was filtered out, so the failing criterion shows up in the logs
+            self.log_event("INFO", "gate_not_found", task=self.server_name, reason="no red or no green buoy in range",
+                           red=[[round(float(c), 3) for c in ob_coords(b)] for b in red_init],
+                           green=[[round(float(c), 3) for c in ob_coords(b)] for b in green_init],
+                           red_kept=len(red_buoys), green_kept=len(green_buoys), gate_dist_thres=self.gate_dist_thres)
             def filter_reasons(obs):
                 behind = far = wrong_dir = 0
                 for ob in obs:
@@ -694,6 +753,11 @@ class TaskServerBase(ActionServerBase):
                     green_to = green_b
                     red_to = red_b
         if green_to is None:
+            self.log_event("INFO", "gate_not_found", task=self.server_name, reason="no valid red/green pair",
+                           red=[[round(float(c), 3) for c in ob_coords(b)] for b in red_buoys],
+                           green=[[round(float(c), 3) for c in ob_coords(b)] for b in green_buoys],
+                           pairs_too_close=too_close, pairs_too_far=too_far,
+                           inter_buoy_pair_dist=self.inter_buoy_pair_dist, max_inter_gate_dist=self.max_inter_gate_dist)
             self.get_logger().warn(
                 f"setup_buoys failed: no valid red/green pair among {len(red_buoys)} red and {len(green_buoys)} green buoys; "
                 f"{len(too_close)} pairs closer than inter_buoy_pair_dist={self.inter_buoy_pair_dist} {too_close}, "
@@ -705,6 +769,11 @@ class TaskServerBase(ActionServerBase):
             self.gate_pair = InternalBuoyPair(red_to, green_to)
         else:
             self.gate_pair = InternalBuoyPair(green_to, red_to)
+        self.status.count("gates_found")
+        self.log_event("INFO", "gate_found", task=self.server_name,
+                       left=[round(float(c), 3) for c in ob_coords(self.gate_pair.left)],
+                       right=[round(float(c), 3) for c in ob_coords(self.gate_pair.right)],
+                       red_left=bool(self.red_left), n_red=len(red_buoys), n_green=len(green_buoys))
         
         if visualize:
             self.get_logger().info(f'FOUND GATE')
@@ -912,6 +981,9 @@ class TaskServerBase(ActionServerBase):
             # Check if there is not a buoy of the intended color in close distance and there is one from the other color, then remove the waypoint, it is false
             if ((not res_left_left) and (res_left_right)) or ((not res_right_right) and (res_right_left)):
                 self.get_logger().info('WE ARE GOING TO A FAKE PAIR, FIND PATH AGAIN')
+                self.log_event("WARN", "gate_fake", task=self.server_name,
+                               left=[round(float(c), 3) for c in ob_coords(self.gate_pair.left)],
+                               right=[round(float(c), 3) for c in ob_coords(self.gate_pair.right)])
                 if not self.setup_buoys():
                     return self.gate_wpt
         self.waypoint_marker_pub.publish(MarkerArray(markers=[Marker(id=0,action=Marker.DELETEALL)]))

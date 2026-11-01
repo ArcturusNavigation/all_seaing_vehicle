@@ -154,6 +154,9 @@ ObjectTrackingMap::ObjectTrackingMap() : Node("object_tracking_map") {
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 
+    m_run_log = std::make_unique<all_seaing_common::RunLogger>(this);
+    m_status = std::make_unique<all_seaing_common::StatusReporter>(this);
+
     // update odometry based on transforms on timer click
     odom_timer = this->create_wall_timer(
     std::chrono::duration<float>(((float)1.0)/m_odom_refresh_rate), std::bind(&ObjectTrackingMap::odom_callback, this));
@@ -1105,6 +1108,25 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     // m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     if(m_track_robot && m_first_state) return;
+    auto proc_timer = m_status->timer("update_ms");
+    m_status->count("updates");
+    m_status->count("detections_in", msg->obstacles.size());
+    const double stamp_s = rclcpp::Time(msg->local_header.stamp).seconds();
+    // robot pose in the map frame: the EKF state when SLAM tracks the robot, else the navigation pose
+    auto robot_pose = [&]() {
+        return m_track_robot ? std::vector<double>{m_state(0), m_state(1), m_state(2)}
+                             : std::vector<double>{m_nav_x, m_nav_y, m_nav_heading};
+    };
+    // landmark position (map frame) and 2x2 covariance [xx, xy, yy]
+    auto landmark_xy_cov = [&](int i) {
+        if (m_track_robot) {
+            return std::vector<double>{m_state(3 + 2 * i), m_state(3 + 2 * i + 1), m_cov(3 + 2 * i, 3 + 2 * i),
+                                       m_cov(3 + 2 * i, 3 + 2 * i + 1), m_cov(3 + 2 * i + 1, 3 + 2 * i + 1)};
+        }
+        auto &o = m_tracked_obstacles[i];
+        return std::vector<double>{o->mean_pred(0), o->mean_pred(1), o->cov(0, 0), o->cov(0, 1), o->cov(1, 1)};
+    };
+    auto r3 = [](double v) { return std::round(v * 1000.0) / 1000.0; };
     
     // RCLCPP_INFO(this->get_logger(), "DIFFERENCE BETWEEN DETECTION & LAST ODOM TIME: %lf - %lf = %lf", rclcpp::Time(msg->local_header.stamp).nanoseconds()/((float)1e9), m_last_odom_time.nanoseconds()/((float)1e9), std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()));
 
@@ -1343,6 +1365,38 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
         m_tracked_obstacles[tracked_id] = detected_obstacles[i];
     }
 
+    // run log: what happened to every detection (coordinates in the map frame, from the robot pose)
+    {
+        std::vector<double> pose = robot_pose();
+        std::vector<std::vector<double>> dets;  // [label, x, y, result, landmark id, d2, nearest id, nearest d2]
+        int n_matched = 0, n_new = 0, n_skipped = 0;
+        for (size_t i = 0; i < detected_obstacles.size(); i++) {
+            float range, bearing;
+            int signature;
+            std::tie(range, bearing, signature) = all_seaing_perception::local_to_range_bearing_signature(
+                detected_obstacles[i]->obstacle.get_local_point(), detected_obstacles[i]->label);
+            double gx = pose[0] + range * std::cos(bearing + pose[2]), gy = pose[1] + range * std::sin(bearing + pose[2]);
+            // result: 0 = matched a landmark, 1 = new landmark, 2 = unmatched without label (not added)
+            int result = match[i] >= 0 ? 0 : (detected_obstacles[i]->label == -1 ? 2 : 1);
+            (result == 0 ? n_matched : result == 1 ? n_new : n_skipped)++;
+            int best = -1;
+            for (size_t j = 0; j < p[i].size(); j++) if (best < 0 || p[i][j] < p[i][best]) best = j;
+            dets.push_back({(double)detected_obstacles[i]->label, r3(gx), r3(gy), (double)result,
+                            result == 2 ? -1.0 : (double)detected_obstacles[i]->obstacle.get_id(),
+                            match[i] >= 0 && match[i] < (int)p[i].size() ? r3(p[i][match[i]]) : -1.0,
+                            best >= 0 ? (double)best : -1.0, best >= 0 ? r3(p[i][best]) : -1.0});
+        }
+        m_status->count("associations/matched", n_matched);
+        m_status->count("associations/new", n_new);
+        m_status->count("associations/unlabeled_not_added", n_skipped);
+        m_run_log->debug("slam_update", {{"stamp", stamp_s}, {"labeled", msg->is_labeled},
+            {"algorithm", m_data_association_algo}, {"threshold", assoc_threshold},
+            {"pose", std::vector<double>{r3(pose[0]), r3(pose[1]), r3(pose[2])}},
+            {"n_detections", detected_obstacles.size()}, {"n_matched", n_matched}, {"n_new", n_new},
+            {"n_unlabeled_not_added", n_skipped}, {"detections", dets},
+            {"fields", "detections: [label, x, y, result (0 matched, 1 new, 2 unlabeled not added), landmark id, mahalanobis d2, nearest landmark index, its d2]"}});
+    }
+
     // t2 = high_resolution_clock::now();
 
     // ms_double = t2 - t1;
@@ -1409,6 +1463,7 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
 
     // Clear out duplicates
     // TODO: optimize to N^2 (now is N^3) by making a priority queue of pairs of indices based on minimum distance and popping if index already removed and removing if distance < threshold
+    const std::unordered_set<int> kept_before_dedup = to_keep_set;  // for the removal reasons
     int ind_to_remove = 0;
     while(ind_to_remove != -1){
         ind_to_remove = -1;
@@ -1471,6 +1526,15 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     }
 
     // update vectors & matrices
+    for (int i : to_remove) {
+        std::vector<double> lm = landmark_xy_cov(i);
+        std::string reason = kept_before_dedup.count(i) ? "duplicate" : "not_seen";
+        m_status->count("landmarks_removed/" + reason);
+        m_run_log->info("slam_landmark_removed", {{"stamp", stamp_s}, {"id", m_tracked_obstacles[i]->obstacle.get_id()},
+            {"label", m_tracked_obstacles[i]->label}, {"position", std::vector<double>{r3(lm[0]), r3(lm[1])}},
+            {"reason", reason}, {"time_dead_s", m_tracked_obstacles[i]->time_dead.seconds()},
+            {"drop_thresh_s", m_obstacle_drop_thresh}, {"duplicate_thresh_m", m_duplicate_thresh}});
+    }
     if (!to_remove.empty()) {
         std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>> new_obj;
 
@@ -1514,6 +1578,33 @@ void ObjectTrackingMap::object_track_map_publish(const all_seaing_interfaces::ms
     }
 
     this->publish_maps();
+
+    // run log: the map after this update (for drawing it over time)
+    {
+        std::vector<std::vector<double>> lms;  // [id, label, x, y, cov_xx, cov_xy, cov_yy, dead]
+        for (int i = 0; i < (int)m_tracked_obstacles.size(); i++) {
+            std::vector<double> lm = landmark_xy_cov(i);
+            lms.push_back({(double)m_tracked_obstacles[i]->obstacle.get_id(), (double)m_tracked_obstacles[i]->label,
+                           r3(lm[0]), r3(lm[1]), r3(lm[2]), r3(lm[3]), r3(lm[4]),
+                           m_tracked_obstacles[i]->is_dead ? 1.0 : 0.0});
+        }
+        std::vector<double> pose = robot_pose();
+        std::vector<std::vector<double>> banners;  // [id, label, x, y, theta (normal), width]
+        if (m_track_banners) {
+            for (auto &b : m_tracked_banners) {
+                banners.push_back({(double)b->plane_msg.id, (double)b->label, r3(b->mean_pred(0)), r3(b->mean_pred(1)),
+                                   r3(b->mean_pred(2)), r3(b->plane_msg.size.y)});
+            }
+        }
+        all_seaing_common::LogFields f = {{"stamp", stamp_s}, {"frame", m_global_header.frame_id},
+            {"pose", std::vector<double>{r3(pose[0]), r3(pose[1]), r3(pose[2])}}, {"landmarks", lms}, {"banners", banners},
+            {"fields", "landmarks: [id, label, x, y, cov_xx, cov_xy, cov_yy, dead (not seen in the last update)]"}};
+        if (m_track_robot) {
+            f.push_back({"pose_cov", std::vector<double>{r3(m_cov(0, 0)), r3(m_cov(0, 1)), r3(m_cov(1, 1)), r3(m_cov(2, 2))}});
+        }
+        m_run_log->debug("slam_map", std::move(f));
+        m_status->gauge("landmarks", (double)m_tracked_obstacles.size());
+    }
 
     if(m_got_nav){
         this->visualize_predictions();
