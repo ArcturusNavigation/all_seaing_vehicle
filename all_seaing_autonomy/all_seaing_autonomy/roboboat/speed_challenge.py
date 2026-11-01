@@ -134,8 +134,12 @@ class SpeedChallenge(TaskServerBase):
         # setup_buoys() (from the base class) finds the closest red/green pair
         # and stores it in self.gate_pair (with .left and .right obstacles).
         if self.obstacles is None:
+            self.get_logger().warn("Rejecting speed challenge: no obstacle map received yet")
             return False
-        return self.setup_buoys()
+        if not self.setup_buoys():
+            self.get_logger().warn("Rejecting speed challenge: setup_buoys() found no entry gate")
+            return False
+        return True
 
     def init_setup(self):
         # Reset per-run state, since the same node can run the task more than once.
