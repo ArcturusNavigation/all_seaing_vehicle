@@ -61,6 +61,8 @@ namespace all_seaing_perception{
 
     // Add padding to bounding box
     void addBBoxPadding(all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, int margin, int height, int width);
+    // pad by margin_x pixels left/right and margin_y pixels top/bottom, clamped to the image
+    void addBBoxPadding(all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, int margin_x, int margin_y, int height, int width);
 
     // Convert OpenCV HSV to PCL (OpenCV max HSV (int): (180, 255, 255), PCL (float): (360, 1, 1))
     template<typename numType>

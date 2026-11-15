@@ -157,6 +157,9 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 
+    m_run_log = std::make_unique<all_seaing_common::RunLogger>(this);
+    m_status = std::make_unique<all_seaing_common::StatusReporter>(this);
+
     // update odometry based on transforms on timer click
     odom_timer = this->create_wall_timer(
     std::chrono::duration<float>(((float)1.0)/m_odom_refresh_rate), std::bind(&FactorGraphSLAM::odom_callback, this));
@@ -922,6 +925,11 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
     // m_base_link_map_tf = all_seaing_perception::get_tf(m_tf_buffer, m_local_frame_id, m_global_frame_id);
 
     if(m_first_state) return;
+    auto proc_timer = m_status->timer("update_ms");
+    m_status->count("updates");
+    m_status->count("detections_in", msg->obstacles.size());
+    const double stamp_s = rclcpp::Time(msg->local_header.stamp).seconds();
+    auto r3 = [](double v) { return std::round(v * 1000.0) / 1000.0; };
     
     // RCLCPP_INFO(this->get_logger(), "DIFFERENCE BETWEEN DETECTION & LAST ODOM TIME: %lf - %lf = %lf", rclcpp::Time(msg->local_header.stamp).nanoseconds()/((float)1e9), m_last_odom_time.nanoseconds()/((float)1e9), std::abs((rclcpp::Time(msg->local_header.stamp)-m_last_odom_time).seconds()));
 
@@ -1072,6 +1080,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
     // t1 = high_resolution_clock::now();
 
     // add new factors to the factor graph w/ known correspondences
+    const std::vector<int> match_before_gate = match;  // for the run log (distance gate below)
     gtsam::NonlinearFactorGraph graph;
     gtsam::Values initialEstimate; // only for new objects
     for (size_t i = 0; i < detected_obstacles.size(); i++) {
@@ -1126,6 +1135,43 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
     }
 
     m_isam2->update(graph, initialEstimate); // this runs the iSAM2 optimization step
+
+    // run log: what happened to every detection (coordinates in the SLAM frame, from the robot pose)
+    {
+        std::vector<std::vector<double>> dets;  // [label, x, y, result, landmark id, d2, nearest index, nearest d2]
+        int n[4] = {0, 0, 0, 0};
+        for (size_t i = 0; i < detected_obstacles.size(); i++) {
+            float range, bearing;
+            int signature;
+            std::tie(range, bearing, signature) = all_seaing_perception::local_to_range_bearing_signature(
+                detected_obstacles[i]->obstacle.get_local_point(), detected_obstacles[i]->label);
+            double gx = m_robot_pos_mean(0) + range * std::cos(bearing + m_robot_pos_mean(2));
+            double gy = m_robot_pos_mean(1) + range * std::sin(bearing + m_robot_pos_mean(2));
+            // result: 0 matched, 1 new landmark, 2 unmatched without label (not added),
+            // 3 matched by Mahalanobis distance but farther than object_assoc_dist_thres -> new landmark
+            int result = match[i] >= 0 ? 0 : (detected_obstacles[i]->label == -1 ? 2 : (match_before_gate[i] >= 0 ? 3 : 1));
+            n[result]++;
+            int best = -1;
+            for (size_t j = 0; j < p[i].size(); j++) if (best < 0 || p[i][j] < p[i][best]) best = j;
+            int m = match_before_gate[i];
+            dets.push_back({(double)detected_obstacles[i]->label, r3(gx), r3(gy), (double)result,
+                            result == 2 ? -1.0 : (double)detected_obstacles[i]->obstacle.get_id(),
+                            m >= 0 && m < (int)p[i].size() ? r3(p[i][m]) : -1.0,
+                            best >= 0 ? (double)best : -1.0, best >= 0 ? r3(p[i][best]) : -1.0});
+        }
+        m_status->count("associations/matched", n[0]);
+        m_status->count("associations/new", n[1]);
+        m_status->count("associations/unlabeled_not_added", n[2]);
+        m_status->count("associations/distance_gated_new", n[3]);
+        m_run_log->debug("slam_update", {{"stamp", stamp_s}, {"labeled", msg->is_labeled},
+            {"algorithm", m_data_association_algo}, {"threshold", assoc_threshold},
+            {"distance_gate_m", (double)m_object_assoc_dist_thres},
+            {"pose", std::vector<double>{r3(m_robot_pos_mean(0)), r3(m_robot_pos_mean(1)), r3(m_robot_pos_mean(2))}},
+            {"odom_pose", std::vector<double>{r3(m_nav_x), r3(m_nav_y), r3(m_nav_heading)}},
+            {"n_detections", detected_obstacles.size()}, {"n_matched", n[0]}, {"n_new", n[1]},
+            {"n_unlabeled_not_added", n[2]}, {"n_distance_gated_new", n[3]}, {"detections", dets},
+            {"fields", "detections: [label, x, y, result (0 matched, 1 new, 2 unlabeled not added, 3 distance-gated -> new), landmark id, mahalanobis d2, nearest landmark index, its d2]"}});
+    }
 
     // update the means & covariances of everything
     this->update_estimates();
@@ -1199,6 +1245,7 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
 
     // Clear out duplicates
     // TODO: optimize to N^2 (now is N^3) by making a priority queue of pairs of indices based on minimum distance and popping if index already removed and removing if distance < threshold
+    const std::unordered_set<int> kept_before_dedup = to_keep_set;  // for the removal reasons
     int ind_to_remove = 0;
     while(ind_to_remove != -1){
         ind_to_remove = -1;
@@ -1246,6 +1293,15 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
     }
 
     // update vectors & matrices
+    for (int i : to_remove) {
+        std::string reason = kept_before_dedup.count(i) ? "duplicate" : "not_seen";
+        m_status->count("landmarks_removed/" + reason);
+        m_run_log->info("slam_landmark_removed", {{"stamp", stamp_s}, {"id", m_tracked_obstacles[i]->obstacle.get_id()},
+            {"label", m_tracked_obstacles[i]->label},
+            {"position", std::vector<double>{r3(m_tracked_obstacles[i]->mean_pred(0)), r3(m_tracked_obstacles[i]->mean_pred(1))}},
+            {"reason", reason}, {"time_dead_s", m_tracked_obstacles[i]->time_dead.seconds()},
+            {"drop_thresh_s", m_obstacle_drop_thresh}, {"duplicate_thresh_m", m_duplicate_thresh}});
+    }
     if (!to_remove.empty()) {
         std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>> new_obj;
 
@@ -1269,6 +1325,29 @@ void FactorGraphSLAM::object_track_map_publish(const all_seaing_interfaces::msg:
     m_trace.push_back(std::make_tuple(m_robot_pos_mean(0), m_robot_pos_mean(1), rclcpp::Time(m_local_header.stamp).seconds()));
 
     this->publish_maps();
+
+    // run log: the map after this update (for drawing it over time)
+    {
+        std::vector<std::vector<double>> lms;  // [id, label, x, y, cov_xx, cov_xy, cov_yy, dead]
+        for (auto &o : m_tracked_obstacles) {
+            lms.push_back({(double)o->obstacle.get_id(), (double)o->label, r3(o->mean_pred(0)), r3(o->mean_pred(1)),
+                           r3(o->cov(0, 0)), r3(o->cov(0, 1)), r3(o->cov(1, 1)), o->is_dead ? 1.0 : 0.0});
+        }
+        std::vector<std::vector<double>> banners;  // [id, label, x, y, theta (normal), width]
+        if (m_track_banners) {
+            for (auto &b : m_tracked_banners) {
+                banners.push_back({(double)b->plane_msg.id, (double)b->label, r3(b->mean_pred(0)), r3(b->mean_pred(1)),
+                                   r3(b->mean_pred(2)), r3(b->plane_msg.size.y)});
+            }
+        }
+        m_run_log->debug("slam_map", {{"stamp", stamp_s}, {"frame", m_global_header.frame_id}, {"banners", banners},
+            {"pose", std::vector<double>{r3(m_robot_pos_mean(0)), r3(m_robot_pos_mean(1)), r3(m_robot_pos_mean(2))}},
+            {"pose_cov", std::vector<double>{r3(m_robot_pos_cov(0, 0)), r3(m_robot_pos_cov(0, 1)), r3(m_robot_pos_cov(1, 1)), r3(m_robot_pos_cov(2, 2))}},
+            {"odom_pose", std::vector<double>{r3(m_nav_x), r3(m_nav_y), r3(m_nav_heading)}},
+            {"landmarks", lms},
+            {"fields", "landmarks: [id, label, x, y, cov_xx, cov_xy, cov_yy, dead (not seen in the last update)]"}});
+        m_status->gauge("landmarks", (double)m_tracked_obstacles.size());
+    }
 
     if(m_got_nav){
         this->visualize_predictions();

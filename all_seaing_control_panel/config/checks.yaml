@@ -1,0 +1,45 @@
+# Pre-run checks configuration (Checks page). See all_seaing_control_panel/checks.py.
+
+disk_paths: [/, /media/arcturus/drive]
+
+# Serial devices that must exist and be read/write accessible
+serial_devices:
+  - {name: central hub (EE board), path: "/dev/serial/by-id/usb-STMicroelectronics_GENERIC_F072CBUX_CDC_in_FS_Mode_205034625347-if00"}
+  - {name: Pixhawk (ttyACM0), path: /dev/ttyACM0}
+
+# MAVROS stream rate (must be ~30 Hz, see `ros2 run mavros mav sys rate --all 30`)
+mavros_rate_topic: /mavros/imu/data
+mavros_min_rate: 25.0
+
+# Topics that must be OK in topic_monitor (rates configured in all_seaing_bringup/config/topic_monitor.yaml).
+# sensor_topics come from drivers live, or from the rosbag player in replay (never both);
+# pipeline_topics are always computed live by our nodes.
+sensor_topics:
+  - /velodyne_points
+  - /zed/zed_node/rgb/image_rect_color
+  - /back_left_oak/rgb/image_rect
+  - /back_right_oak/rgb/image_rect
+  - /mavros/imu/data
+  - /mavros/global_position/raw/fix
+pipeline_topics:
+  - /odometry/integrated
+  - /point_cloud/filtered
+  - /obstacle_map/local
+
+# Header stamps of these topics must be within max_stamp_age_ms of the clock (time sync)
+stamped_topics:
+  - /velodyne_points
+  - /zed/zed_node/rgb/image_rect_color
+  - /back_left_oak/rgb/image_rect
+  - /back_right_oak/rgb/image_rect
+  - /mavros/imu/data
+max_stamp_age_ms: 1000.0
+
+# TF transforms (target, source) that must be available
+tf_pairs:
+  - [map, base_link]
+  - [odom, base_link]
+  - [base_link, velodyne]
+  - [velodyne, zed_left_camera_optical_frame]
+  - [velodyne, back_left_oak_rgb_camera_optical_frame]
+  - [velodyne, back_right_oak_rgb_camera_optical_frame]

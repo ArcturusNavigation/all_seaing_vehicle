@@ -8,6 +8,17 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
+if(NOT CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 17)
+endif()
+
+# C++ observability library (Python counterparts: all_seaing_common/run_logger.py and
+# status_reporter.py): per-run logger (#501) and live status on /diagnostics (#480)
+ament_auto_add_library(all_seaing_observability SHARED
+    src/run_logger.cpp
+    src/status_reporter.cpp
+)
+
 ament_python_install_package(${PROJECT_NAME})
 
 ament_auto_package()

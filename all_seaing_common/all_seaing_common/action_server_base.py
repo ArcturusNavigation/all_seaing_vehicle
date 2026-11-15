@@ -18,6 +18,9 @@ from all_seaing_common.report import report_factory
 
 import math
 from all_seaing_common.report_pb2 import LatLng
+from all_seaing_common.run_logger import RunLogger
+from all_seaing_common.status_reporter import StatusReporter
+from google.protobuf.json_format import MessageToDict
 
 
 class ActionServerBase(ABC, Node):
@@ -63,6 +66,18 @@ class ActionServerBase(ABC, Node):
         self.proc_semaphore = Semaphore(1)
         self.proc_cancel_evt = Event()
 
+        # observability: per-run decisions (run log, with the robot pose) and live counters (/diagnostics)
+        self.run_log = RunLogger(self)
+        self.status = StatusReporter(self)
+
+    def log_event(self, level, event, with_pose=True, **fields):
+        """Run-log an event of this server; adds the robot pose [x, y, heading] in global_frame_id."""
+        if with_pose:
+            x, y, heading = self.get_robot_pose(quiet=True)
+            fields["pose"] = [round(float(x), 3), round(float(y), 3), round(float(heading), 3)]
+        fields.setdefault("frame", self.global_frame_id)
+        self.run_log.log(level, event, **fields)
+
     def default_cancel_callback(self, cancel_request):
         """Canceling has no extra functionalities by default"""
         return CancelResponse.ACCEPT
@@ -76,6 +91,8 @@ class ActionServerBase(ABC, Node):
         self.proc_cancel_evt.set()
         self.proc_semaphore.acquire()
         self.proc_cancel_evt.clear()
+        self.status.count("processes_started")
+        self.log_event("INFO", "process_start", message=msg or "")
         if msg:
             self.get_logger().info(msg)
 
@@ -86,6 +103,7 @@ class ActionServerBase(ABC, Node):
         aborted, or successfully completed.
         """
         self.delete_all_marker()
+        self.log_event("INFO", "process_end", message=msg or "")
         if msg:
             self.get_logger().info(msg)
         self.proc_semaphore.release()
@@ -124,9 +142,9 @@ class ActionServerBase(ABC, Node):
         heading = self.get_robot_pose()[2]
         return np.array([cos(heading), sin(heading)])
 
-    def get_robot_pose(self):
+    def get_robot_pose(self, quiet=False):
         """
-        Return robot pose as a tuple of (x, y, heading).
+        Return robot pose as a tuple of (x, y, heading). quiet: don't print a failed lookup.
         """
         try:
             t = self.tf_buffer.lookup_transform(
@@ -134,6 +152,8 @@ class ActionServerBase(ABC, Node):
                 self.robot_frame_id,
                 rclpy.time.Time())
         except TransformException as ex:
+            if quiet:
+                return 0, 0, 0
             self.get_logger().info(
                 f'Could not transform {self.global_frame_id} to {self.robot_frame_id}: {ex}')
             return 0, 0, 0
@@ -154,6 +174,10 @@ class ActionServerBase(ABC, Node):
         msg = ByteMultiArray()
         msg.data = [bytes([b]) for b in report_factory(data).SerializeToString()]
         self.reporter_pub.publish(msg)
+        # competition report, decoded (lat/lng as reported; the pose is the robot's in the map frame)
+        self.status.count(f"reports/{type(data).__name__}")
+        self.log_event("INFO", "report", type=type(data).__name__,
+                       data=MessageToDict(data, preserving_proto_field_name=True))
 
     def pos_to_latlng(self, latlng_origin, pose):
         EARTH_RADIUS = 6_370_000

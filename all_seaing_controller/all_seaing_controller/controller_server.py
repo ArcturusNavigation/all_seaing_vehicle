@@ -194,6 +194,7 @@ class ControllerServer(ActionServerBase):
         x_vel = self.x_pid.get_effort()
         y_vel = self.y_pid.get_effort()
         theta_output = self.theta_pid.get_effort()
+        pid_vel = (x_vel, y_vel)
 
         marker_array = MarkerArray()
         marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 1.0, 0.0), id=0))
@@ -223,6 +224,13 @@ class ControllerServer(ActionServerBase):
         marker_array.markers.append(self.vel_to_marker((x_vel, y_vel), scale=self.vel_marker_scale, rgb=(0.0, 0.0, 1.0), id=2))
 
         x_vel, y_vel = self.scale_thrust(x_vel, y_vel)
+        # run log (every tick): error in the robot frame, PID output, obstacle avoidance push, command sent
+        if True:
+            r = lambda v: [round(float(c), 3) for c in v]
+            self.log_event("DEBUG", "control", with_pose=False, pose=r((nav_x, nav_y, heading)),
+                           target=r((self.goal_x, self.goal_y, self.goal_theta)), error_robot=r(target_robot_frame),
+                           pid_vel=r(pid_vel), avoid_vel=r((avoid_x_vel, avoid_y_vel)),
+                           cmd=r((x_vel, y_vel, theta_output)), avoid_obs=bool(self.avoid_obs))
         control_msg = ControlOption()
         control_msg.priority = 1  # Second highest priority, TeleOp takes precedence
         control_msg.twist.linear.x = x_vel
@@ -255,6 +263,11 @@ class ControllerServer(ActionServerBase):
         self.goal_theta = goal_theta
         target_robot_frame = self.global_to_robot((self.goal_x, self.goal_y, self.goal_theta), (nav_x, nav_y, heading))
         self.set_pid_setpoints(*target_robot_frame)
+        self.status.count("waypoint_goals")
+        self.log_event("INFO", "waypoint_goal", target=[round(goal_x, 3), round(goal_y, 3), round(goal_theta, 3)],
+                       xy_threshold=xy_threshold, theta_threshold=theta_threshold,
+                       ignore_theta=bool(goal_handle.request.ignore_theta), stationary=bool(is_stationary),
+                       avoid_obs=bool(self.avoid_obs))
         # self.set_pid_setpoints(goal_x, goal_y, goal_theta)
         while (
             not self.x_pid.is_done(xy_threshold)

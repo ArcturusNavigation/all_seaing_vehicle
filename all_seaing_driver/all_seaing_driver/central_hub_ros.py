@@ -77,7 +77,7 @@ class CentralHubROS(Node):
         return response
 
     def cmd_adj_cb(self, request, response):
-        self.get_logger().debug(f'cmd_adj: {request}')
+        self.get_logger().info(f'cmd_adj: {request}')
         if request.enable:
             if request.port == 1:
                 self.mech_pow_a.set_voltage(request.voltage)
@@ -131,7 +131,7 @@ class CentralHubROS(Node):
         self.switch_pub.publish(Bool(data=bool(switch_status)))
 
     def cmd_servo_cb(self, request, response):
-        # self.get_logger().info(f'cmd_servo: {request}')
+        self.get_logger().info(f'cmd_servo: {request}')
         if request.enable:
             self.mech_pow_a.output(True)
             if request.port == 1:

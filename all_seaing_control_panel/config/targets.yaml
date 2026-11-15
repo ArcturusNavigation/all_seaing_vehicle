@@ -1,0 +1,47 @@
+# Where the control panel runs commands. Personal/machine-specific overrides (e.g. where
+# your workspace is) go in ~/.arcturus_control_panel/targets.yaml, same format, merged per target.
+default_target: jetson
+
+targets:
+  jetson:
+    label: Boat (Jetson)
+    kind: ssh               # key-based SSH (ssh-copy-id arcturus@jetson once)
+    host: jetson
+    user: arcturus
+    foxglove_url: ws://jetson:8765   # foxglove_bridge on the boat (live /run_log for the Health page)
+    setup:                  # run before every command
+      - source /opt/ros/humble/setup.bash
+      - source ~/dev_ws/install/setup.bash
+    paths:
+      repo: /home/arcturus/dev_ws/src/all_seaing_vehicle
+      workspace: /home/arcturus/dev_ws
+      logs: /home/arcturus/arcturus_logs                     # RunLogger logs (symlink to the NVMe)
+      bags: /media/arcturus/drive/rosbags
+      panel: /media/arcturus/drive/control_panel/process_logs  # output of processes started from the panel
+
+  laptop:
+    label: This laptop (sim)
+    kind: local
+    foxglove_url: ws://localhost:8765
+    setup:
+      - source /opt/ros/humble/setup.bash
+      - source ~/arcturus/dev_ws/install/setup.bash
+      - source ~/arcturus/vrx_ws/install/setup.bash
+    paths:
+      repo: ~/arcturus/dev_ws/src/all_seaing_vehicle
+      workspace: ~/arcturus/dev_ws
+      logs: ~/arcturus_logs
+      bags: ~/rosbags
+      panel: ~/.arcturus_control_panel/process_logs
+
+# Light topics the panel subscribes to from the laptop (best effort)
+ros_topics:
+  diagnostics: /diagnostics
+  odometry: /odometry/gps
+  gps: /mavros/global_position/raw/fix
+
+# Shown in the header
+links:
+  - {title: Foxglove, url: "https://app.foxglove.dev"}
+  - {title: Wiki, url: "https://github.com/ArcturusNavigation/all_seaing_vehicle/wiki"}
+  - {title: Issues, url: "https://github.com/ArcturusNavigation/all_seaing_vehicle/issues"}

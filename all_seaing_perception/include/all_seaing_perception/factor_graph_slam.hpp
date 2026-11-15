@@ -4,6 +4,8 @@
 #include <iostream>
 #include <fstream>
 #include "yaml-cpp/yaml.h"
+#include "all_seaing_common/run_logger.hpp"
+#include "all_seaing_common/status_reporter.hpp"
 
 #include <vector>
 #include <tuple>
@@ -80,6 +82,9 @@
 
 class FactorGraphSLAM : public rclcpp::Node{
 private:
+    // observability (run log: per-update associations, landmark removals, map snapshots; /diagnostics)
+    std::unique_ptr<all_seaing_common::RunLogger> m_run_log;
+    std::unique_ptr<all_seaing_common::StatusReporter> m_status;
     void object_track_map_publish(const all_seaing_interfaces::msg::ObstacleMap::ConstSharedPtr &msg);
     void odom_callback();
     void odom_msg_callback(const nav_msgs::msg::Odometry &msg);

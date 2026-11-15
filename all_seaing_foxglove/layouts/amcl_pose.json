@@ -1,0 +1,214 @@
+{
+  "configById": {
+    "3D!main": {
+      "cameraState": {
+        "distance": 24.597532272338867,
+        "perspective": true,
+        "phi": 51.84103334755923,
+        "thetaOffset": 190.99820783694264,
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.01,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "odom",
+      "scene": {
+        "transforms": {
+          "showLabel": false,
+          "axisScale": 1
+        }
+      },
+      "transforms": {},
+      "topics": {
+        "/point_cloud/filtered": {
+          "visible": false,
+          "pointSize": 3.0,
+          "pointShape": "circle",
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/refined_object_point_clouds_viz/front": {
+          "visible": false,
+          "pointSize": 3.0,
+          "pointShape": "circle",
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/obstacle_map/global": {
+          "visible": false
+        },
+        "/refined_object_point_clouds_viz/back_left": {
+          "visible": false,
+          "pointSize": 3.0,
+          "pointShape": "circle",
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/refined_object_point_clouds_viz/back_right": {
+          "visible": false,
+          "pointSize": 3.0,
+          "pointShape": "square",
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/obstacle_map/map_cov_viz": {
+          "visible": false
+        },
+        "/obstacle_map/raw": {
+          "visible": false
+        },
+        "/obstacle_map/unlabeled": {
+          "visible": false
+        },
+        "/dynamic_map": {
+          "visible": false,
+          "colorMode": "map",
+          "alpha": 0.699999988079071,
+          "frameLocked": false
+        },
+        "/obstacle_map/local": {
+          "visible": false
+        },
+        "/waypoint_markers": {
+          "visible": false
+        },
+        "/action_marker": {
+          "visible": false
+        },
+        "/clicked_point": {
+          "visible": false
+        },
+        "/pcl_scan": {
+          "visible": true,
+          "pointSize": 3.0,
+          "pointShape": "circle",
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/object_planes_viz": {
+          "visible": false
+        },
+        "/controller_markers": {
+          "visible": false
+        },
+        "/map": {
+          "visible": true,
+          "colorMode": "map",
+          "alpha": 0.699999988079071,
+          "frameLocked": false
+        }
+      },
+      "layers": {
+        "grid": {
+          "layerId": "foxglove.Grid",
+          "visible": true,
+          "frameId": "odom",
+          "size": 100,
+          "divisions": 100,
+          "lineWidth": 1,
+          "color": "#a0a0a480",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1,
+          "label": "Grid"
+        }
+      },
+      "publish": {
+        "type": "point",
+        "pointTopic": "/clicked_point",
+        "poseTopic": "/goal_pose",
+        "poseEstimateTopic": "/initialpose"
+      },
+      "imageMode": {}
+    },
+    "Image!img0": {
+      "cameraState": {},
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point"
+      },
+      "imageMode": {
+        "imageTopic": "/zed/zed_node/rgb/image_rect_color",
+        "annotations": {
+          "/bounding_boxes": {
+            "visible": true
+          }
+        }
+      }
+    },
+    "Image!img1": {
+      "cameraState": {},
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point"
+      },
+      "imageMode": {
+        "imageTopic": "/annotated_image/buoy",
+        "annotations": {}
+      }
+    },
+    "DiagnosticSummary!diag": {
+      "minLevel": 0,
+      "pinnedIds": [],
+      "hardwareIdFilter": "",
+      "topicToRender": "/diagnostics",
+      "sortByLevel": true
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "first": "3D!main",
+    "second": {
+      "first": "Image!img0",
+      "second": {
+        "first": "Image!img1",
+        "second": "DiagnosticSummary!diag",
+        "direction": "column"
+      },
+      "direction": "column"
+    },
+    "direction": "row",
+    "splitPercentage": 65
+  }
+}

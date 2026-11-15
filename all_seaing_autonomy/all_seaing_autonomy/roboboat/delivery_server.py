@@ -177,15 +177,16 @@ class DeliveryServer(ActionServerBase):
             self.command_servo_cli.call_async(req)
 
     def timer_callback(self):
-        if not self.is_sim:
-            if self.is_aiming:
-                self.update_pid()
-                servo_output = self.servo_angle
-                req = CommandServo.Request()
-                req.enable = True
-                req.angle = int(servo_output)
-                req.port = 1
-                self.command_servo_cli.call_async(req)
+        # if not self.is_sim:
+        #     if self.is_aiming:
+        #         self.update_pid()
+        #         servo_output = self.servo_angle
+        #         req = CommandServo.Request()
+        #         req.enable = True
+        #         req.angle = int(servo_output)
+        #         req.port = 1
+        #         self.command_servo_cli.call_async(req)
+        pass
 
     def bbox_callback(self, msg):
         self.bboxes = msg.boxes
@@ -320,7 +321,7 @@ class DeliveryServer(ActionServerBase):
         prev_status = False
         curr_status = False
         start = time.time()
-        while not (prev_status == True and curr_status == False):
+        while (not (prev_status == True and curr_status == False)) and time.time() < start + self.object_delivery_time:
             prev_status = curr_status
             curr_status = self.switch_status
             time.sleep(TIMER_PERIOD)

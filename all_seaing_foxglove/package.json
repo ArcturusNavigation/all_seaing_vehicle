@@ -1,0 +1,34 @@
+{
+  "name": "all_seaing_foxglove",
+  "displayName": "Arcturus (all_seaing_vehicle)",
+  "description": "Displays all_seaing_interfaces messages (ObstacleMap, YOLO boxes, banner planes) in Foxglove's 3D and Image panels, replacing all_seaing_rviz_plugins",
+  "publisher": "arcturus",
+  "homepage": "https://github.com/ArcturusNavigation/all_seaing_vehicle",
+  "version": "0.1.0",
+  "license": "MIT",
+  "main": "./dist/extension.js",
+  "keywords": [],
+  "scripts": {
+    "build": "foxglove-extension build",
+    "foxglove:prepublish": "foxglove-extension build --mode production",
+    "lint": "eslint .",
+    "lint:ci": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "local-install": "foxglove-extension install",
+    "package": "foxglove-extension package",
+    "pretest": "foxglove-extension pretest"
+  },
+  "devDependencies": {
+    "@foxglove/eslint-plugin": "2.1.2",
+    "@foxglove/extension": "2.59.0",
+    "@foxglove/schemas": "^2.3.1",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "create-foxglove-extension": "1.3.2",
+    "eslint": "9.39.5",
+    "prettier": "3.9.10",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "5.9.3"
+  }
+}

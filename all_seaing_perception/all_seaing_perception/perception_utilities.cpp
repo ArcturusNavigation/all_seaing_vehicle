@@ -19,10 +19,14 @@ namespace all_seaing_perception{
     }
 
     void addBBoxPadding(all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, int margin, int height, int width){
-        bbox.min_x -= margin;
-        bbox.max_x += margin;
-        bbox.min_y -= margin;
-        bbox.max_y += margin;
+        addBBoxPadding(bbox, margin, margin, height, width);
+    }
+
+    void addBBoxPadding(all_seaing_interfaces::msg::LabeledBoundingBox2D& bbox, int margin_x, int margin_y, int height, int width){
+        bbox.min_x -= margin_x;
+        bbox.max_x += margin_x;
+        bbox.min_y -= margin_y;
+        bbox.max_y += margin_y;
         bbox.min_x = std::max((int)bbox.min_x,0);
         bbox.max_x = std::min((int)bbox.max_x+1, width);
         bbox.min_y = std::max((int)bbox.min_y,0);

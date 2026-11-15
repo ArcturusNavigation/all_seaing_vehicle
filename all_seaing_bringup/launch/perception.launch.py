@@ -21,7 +21,8 @@ def launch_setup(context, *args, **kwargs):
     description_prefix = get_package_share_directory("all_seaing_description")
     bringup_prefix = get_package_share_directory("all_seaing_bringup")
 
-    # set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
+    # Applies to every node below: true when replaying rosbags with --clock (see all_seaing_perception/launch/perception_raw_rosbag.launch.py)
+    set_use_sim_time = launch_ros.actions.SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time'))
 
     slam_params = os.path.join(
         bringup_prefix, "config", "slam", "slam_real.yaml"
@@ -103,7 +104,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
             # {"confs": [0.3, 0.1]},
-            {"confs": [0.5, 0.1, 0.1]},
+            {"confs": [0.3, 0.1, 0.1]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -131,7 +132,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
             # {"confs": [0.3, 0.1]},
-            {"confs": [0.5, 0.1, 0.1]},
+            {"confs": [0.3, 0.1, 0.1]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -160,7 +161,7 @@ def launch_setup(context, *args, **kwargs):
             # {"label_config": "beacon_label_mappings"},
             {"label_config": "all_label_mappings"},
             # {"confs": [0.3, 0.1]},
-            {"confs": [0.5, 0.1, 0.1]},
+            {"confs": [0.3, 0.1, 0.1]},
             {"use_color_names": False},
             {"filter_beacon_indicators": True},
             {"beacon_filter_ratio": 0.1},
@@ -208,7 +209,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"camera_name": "front"},
             {"base_link_frame": "base_link"},
-            {"bbox_object_margin": 20.0},
+            {"bbox_object_margin": 0.0},
+            {"bbox_object_margin_ratio": 0.1},  # pad YOLO boxes by 10% of their size (was a fixed 20 px)
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
@@ -238,7 +240,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"camera_name": "back_left"},
             {"base_link_frame": "base_link"},
-            {"bbox_object_margin": 20.0},
+            {"bbox_object_margin": 0.0},
+            {"bbox_object_margin_ratio": 0.1},  # pad YOLO boxes by 10% of their size (was a fixed 20 px)
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
@@ -267,7 +270,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {"camera_name": "back_right"},
             {"base_link_frame": "base_link"},
-            {"bbox_object_margin": 20.0},
+            {"bbox_object_margin": 0.0},
+            {"bbox_object_margin_ratio": 0.1},  # pad YOLO boxes by 10% of their size (was a fixed 20 px)
             # {"color_label_mappings_file": inc_color_buoy_label_mappings},
             {"color_label_mappings_file": inc_color_all_label_mappings},
             {"obstacle_size_min": 2},
@@ -477,22 +481,23 @@ def launch_setup(context, *args, **kwargs):
     )
 
     return [
+        set_use_sim_time,
         point_cloud_filter_obstacle_node,
         all_yolo_node,
         all_yolo_node_back_left,
         all_yolo_node_back_right,
-        shape_yolo_node,
+        # shape_yolo_node,
         bbox_project_pcloud_node,
         bbox_project_pcloud_node_back_left,
         bbox_project_pcloud_node_back_right,
         multicam_detection_merge_node,
-        ransac_node,
+        # ransac_node,
         point_cloud_filter_downsampled_node,
         obstacle_detector_raw_node,
         obstacle_detector_unlabeled_node,
         grid_map_generator,
-        # object_tracking_map_node,
-        slam_node,
+        object_tracking_map_node,
+        # slam_node,
         # static_transforms_ld,
         map_to_odom,
     ]
@@ -500,9 +505,9 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            # DeclareLaunchArgument('use_sim_time', default_value='true'),
+            DeclareLaunchArgument('use_sim_time', default_value='false', choices=['true', 'false']),
             DeclareLaunchArgument("location", default_value="pavillion"),
-            DeclareLaunchArgument("use_slam", default_value='true'),
+            DeclareLaunchArgument("use_slam", default_value='false'),
             DeclareLaunchArgument("use_gps", default_value='true'),
             DeclareLaunchArgument("track_banners", default_value='true'),
             DeclareLaunchArgument("banners_slam", default_value='true'),
