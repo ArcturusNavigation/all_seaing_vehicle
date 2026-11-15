@@ -18,6 +18,8 @@
     <exec_depend>python3-fastapi</exec_depend>
     <exec_depend>python3-uvicorn</exec_depend>
     <exec_depend>python3-paramiko</exec_depend>
+    <!-- bridge.py uses websockets.sync.client (>= 11); Ubuntu 22.04's apt package is too old, use pip -->
+    <exec_depend version_gte="11.0">python3-websockets</exec_depend>
     <exec_depend>python3-yaml</exec_depend>
 
     <export>

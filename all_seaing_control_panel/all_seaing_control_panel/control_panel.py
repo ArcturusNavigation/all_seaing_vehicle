@@ -11,9 +11,14 @@ boat (or the simulation), all in one place:
 - Parameters: view/set basic parameters, save them, write them into the launch files
 
 Usage:
-    ros2 run all_seaing_control_panel control_panel.py [--port 8080] [--config-dir DIR] [--no-browser]
+    ros2 run all_seaing_control_panel control_panel.py [--port 8080] [--host 127.0.0.1] [--config-dir DIR] [--no-browser]
 then open http://localhost:8080. It only listens on localhost: it can run commands on the
 boat, so it must not be reachable from the network.
+
+In Docker (arcturus_docker, e.g. on a Mac), run it with `--host 0.0.0.0 --no-browser` and
+open http://localhost:8080 on the host. Docker forwards the published port to the container's
+network interface, not to its loopback, so 127.0.0.1 inside the container refuses it.
+docker-compose.yml publishes it as 127.0.0.1:8080:8080, so only the host machine can reach it.
 """
 
 import argparse
@@ -42,6 +47,8 @@ def main():
     share = get_package_share_directory("all_seaing_control_panel")
     parser = argparse.ArgumentParser(description="Arcturus control panel (web UI on localhost)")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="address to listen on; keep 127.0.0.1 except inside Docker (0.0.0.0)")
     parser.add_argument("--config-dir", default=os.path.join(share, "config"))
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
@@ -85,7 +92,7 @@ def main():
     print(f"Arcturus control panel: {url}")
     if not args.no_browser:
         webbrowser.open(url)
-    uvicorn.run(create_app(ctx), host="127.0.0.1", port=args.port, log_level="warning")
+    uvicorn.run(create_app(ctx), host=args.host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":
