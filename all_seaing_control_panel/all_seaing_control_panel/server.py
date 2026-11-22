@@ -209,6 +209,22 @@ def create_app(ctx):
         text, new_offset = ctx.processes.read_log(proc_id, offset)
         return {"text": text, "offset": new_offset}
 
+    # ------------------------------------------------------------------ global map
+
+    @app.post("/api/map/add_object")
+    def map_add_object(payload: dict = Body(...)):
+        """Add an object into the SLAM global map: calls the `add_object` service of the SLAM node
+        (factor_graph_slam / object_tracking_map) on the target. payload: {target?, label, x, y}."""
+        tname = payload.get("target") or ctx.cfg.get("default_target")
+        try:
+            label, x, y = int(payload["label"]), float(payload["x"]), float(payload["y"])
+        except (KeyError, TypeError, ValueError) as e:
+            raise HTTPException(400, f"label (int), x and y (floats) are required: {e}")
+        req = f"{{label: {label}, x: {x}, y: {y}}}"
+        cmd = f"timeout 10 ros2 service call add_object all_seaing_interfaces/srv/AddObject {shlex.quote(req)}"
+        rc, out, err = target(tname).run(cmd, timeout=20)
+        return {"command": cmd, "returncode": rc, "output": (out + err).strip()}
+
     # ------------------------------------------------------------------ health & checks
 
     @app.get("/api/diagnostics")

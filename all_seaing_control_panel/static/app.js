@@ -155,6 +155,30 @@ async function selectAction(id) {
   };
 }
 
+// ---------------------------------------------------------------- global map (add object)
+(async function initAddObject() {
+  try {  // label number -> name (all_label_mappings.yaml); falls back to a bare number input
+    const labels = await api("/api/labels");
+    $("#addobj-label").innerHTML = Object.entries(labels).map(([num, name]) =>
+      `<option value="${num}">${esc(name)} (${num})</option>`).join("");
+  } catch {
+    $("#addobj-label").outerHTML = '<input id="addobj-label" type="number" step="1" style="width:60px" placeholder="label">';
+  }
+})();
+$("#addobj-send").onclick = async () => {
+  const btn = $("#addobj-send"), out = $("#addobj-output");
+  const label = $("#addobj-label").value, x = $("#addobj-x").value, y = $("#addobj-y").value;
+  if (label === "" || x === "" || y === "") { alert("label, x and y are required"); return; }
+  btn.disabled = true;
+  out.classList.remove("hidden");
+  out.textContent = "calling add_object...";
+  try {
+    const r = await api("/api/map/add_object", {method: "POST", body: {target: state.target, label, x, y}});
+    out.textContent = `$ ${r.command}\n${r.output}\n[exit code ${r.returncode}]`;
+  } catch (e) { out.textContent = e.message; }
+  btn.disabled = false;
+};
+
 async function refreshProcs() {
   let procs;
   try { procs = await api("/api/processes"); } catch { return; }

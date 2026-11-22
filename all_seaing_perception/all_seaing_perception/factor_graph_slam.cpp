@@ -191,6 +191,8 @@ FactorGraphSLAM::FactorGraphSLAM() : Node("factor_graph_slam") {
 
     m_restart_service = this->create_service<all_seaing_interfaces::srv::RestartSLAM>("restart_slam", std::bind(&FactorGraphSLAM::restart_slam, this, std::placeholders::_1, std::placeholders::_2));
 
+    m_add_object_service = this->create_service<all_seaing_interfaces::srv::AddObject>("add_object", std::bind(&FactorGraphSLAM::add_object, this, std::placeholders::_1, std::placeholders::_2));
+
     if (m_track_banners){
         m_banners_sub = 
             this->create_subscription<all_seaing_interfaces::msg::LabeledObjectPlaneArray>(
@@ -300,6 +302,30 @@ void FactorGraphSLAM::restart_slam(const std::shared_ptr<all_seaing_interfaces::
         m_tracked_banners = std::vector<std::shared_ptr<all_seaing_perception::Banner>>();
         m_num_banners = 0;
     }
+}
+
+void FactorGraphSLAM::add_object(const std::shared_ptr<all_seaing_interfaces::srv::AddObject::Request> request,
+          std::shared_ptr<all_seaing_interfaces::srv::AddObject::Response> response){
+    RCLCPP_INFO(this->get_logger(), "ADDING OBJECT TO GLOBAL MAP: label=%d, x=%lf, y=%lf",
+                request->label, request->x, request->y);
+    if (m_first_state){
+        response->success = false;
+        response->message = "SLAM not initialized yet (no pose state)";
+        return;
+    }
+    add_object_to_map(request->label, request->x, request->y);
+    // TODO: set success/message from the actual result once add_object_to_map is implemented
+    response->success = false;
+    response->message = "add_object received, but adding objects to the factor graph is not implemented yet";
+}
+
+void FactorGraphSLAM::add_object_to_map(int label, double x, double y){
+    // TODO: add the object as a new landmark in the factor graph and the tracked map:
+    //  - create a new landmark key gtsam::Symbol('l', m_num_obj) and insert its initial estimate
+    //    gtsam::Point2(x, y), with a prior factor expressing how certain the manual position is
+    //  - create the corresponding ObjectCloud (label, global point (x, y)) and push it to
+    //    m_tracked_obstacles / increment m_num_obj, so data association can match future detections to it
+    //  - update & publish the maps (update_estimates / update_maps / publish_maps)
 }
 
 template <typename T_matrix> std::string matrix_to_string(T_matrix matrix) {
