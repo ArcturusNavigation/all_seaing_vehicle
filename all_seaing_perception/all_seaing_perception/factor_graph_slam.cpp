@@ -326,6 +326,23 @@ void FactorGraphSLAM::add_object_to_map(int label, double x, double y){
     //  - create the corresponding ObjectCloud (label, global point (x, y)) and push it to
     //    m_tracked_obstacles / increment m_num_obj, so data association can match future detections to it
     //  - update & publish the maps (update_estimates / update_maps / publish_maps)
+    gtsam::Key new_object_key;
+    new_object_key = gtsam::Symbol('l', m_obstacle_id);
+    m_tracked_obstacles.back()->node_key = new_object_key;
+    Eigen::Vector2d projected_global = Eigen::Vector2d(m_robot_pos_mean(0), m_robot_pos_mean(1)) +
+            range * Eigen::Vector2d(std::cos(bearing + m_robot_pos_mean(2)),
+                                    std::sin(bearing + m_robot_pos_mean(2)));
+
+    float range, bearing;
+    int signature;
+    // wip, working off of example in line 1157
+    std::tie(range, bearing, signature) = all_seaing_perception::local_to_range_bearing_signature(
+        detected_obstacles[i]->obstacle.get_local_point(), detected_obstacles[i]->label);
+    Eigen::Vector2d projected_global = Eigen::Vector2d(m_robot_pos_mean(0), m_robot_pos_mean(1)) +
+        range * Eigen::Vector2d(std::cos(bearing + m_robot_pos_mean(2)),
+                                std::sin(bearing + m_robot_pos_mean(2)));
+
+    initialEstimate.insert(new_object_key, projected_global);
 }
 
 template <typename T_matrix> std::string matrix_to_string(T_matrix matrix) {
