@@ -62,6 +62,7 @@
 #include "all_seaing_perception/obstacle.hpp"
 #include "all_seaing_perception/object_tracking_shared.hpp"
 #include "all_seaing_interfaces/srv/restart_slam.hpp"
+#include "all_seaing_interfaces/srv/add_object.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
@@ -95,6 +96,14 @@ private:
 
     void restart_slam(const std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Request> request,
           std::shared_ptr<all_seaing_interfaces::srv::RestartSLAM::Response> response);
+
+    // `add_object` service callback: manually add an object into the global map (e.g. from the
+    // control panel), at (x, y) in the SLAM global frame (m_slam_frame_id) with the given label
+    void add_object(const std::shared_ptr<all_seaing_interfaces::srv::AddObject::Request> request,
+          std::shared_ptr<all_seaing_interfaces::srv::AddObject::Response> response);
+
+    // Insert the manually added object into the EKF state as a new landmark (TODO: not implemented)
+    void add_object_to_map(int label, double x, double y);
 
     // Member variables
     std::vector<std::shared_ptr<all_seaing_perception::ObjectCloud<pcl::PointXYZHSV>>> m_tracked_obstacles;
@@ -171,6 +180,9 @@ private:
 
     // SLAM restart service
     rclcpp::Service<all_seaing_interfaces::srv::RestartSLAM>::SharedPtr m_restart_service;
+
+    // Manual object addition service
+    rclcpp::Service<all_seaing_interfaces::srv::AddObject>::SharedPtr m_add_object_service;
 
 public:
     ObjectTrackingMap();

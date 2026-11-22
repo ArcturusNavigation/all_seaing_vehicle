@@ -35,6 +35,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
     "srv/AcknowledgeLowBattery.srv"
     "srv/PlanPath.srv"
     "srv/RestartSLAM.srv"
+    "srv/AddObject.srv"
     DEPENDENCIES
     geometry_msgs
     sensor_msgs

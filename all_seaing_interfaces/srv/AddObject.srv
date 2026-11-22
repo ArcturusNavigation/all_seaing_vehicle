@@ -1,0 +1,8 @@
+# Manually add an object (landmark) into the SLAM global map, e.g. from the control panel.
+# Served as `add_object` by the running SLAM node (factor_graph_slam or object_tracking_map).
+int8 label   # detection label (all_seaing_bringup config/perception/all_label_mappings.yaml)
+float64 x    # global x [m], in the SLAM global frame (slam_map)
+float64 y    # global y [m], in the SLAM global frame (slam_map)
+---
+bool success
+string message

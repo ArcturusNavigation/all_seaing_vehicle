@@ -47,6 +47,18 @@
               <div id="rosbag-presets"></div></details>
           </div>
           <div class="card">
+            <div class="card-title">Global map</div>
+            <div class="muted">Add an object (landmark) into the SLAM global map, at a position in the SLAM
+              global frame (slam_map), via the SLAM node's <code>add_object</code> service on the target.</div>
+            <div class="toolbar" style="margin-top:8px">
+              <label>label <select id="addobj-label"></select></label>
+              <label>x <input id="addobj-x" type="number" step="any" style="width:80px"> m</label>
+              <label>y <input id="addobj-y" type="number" step="any" style="width:80px"> m</label>
+              <button id="addobj-send">Add object</button>
+            </div>
+            <pre id="addobj-output" class="hidden"></pre>
+          </div>
+          <div class="card">
             <div class="card-title">Processes <button id="refresh-procs" class="small">refresh</button></div>
             <table id="procs"><thead><tr><th>Started</th><th>Process</th><th>Target</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>
           </div>
